@@ -202,7 +202,7 @@ jobs:
           - SHA256: ${{ steps.generate-checksums.outputs.SHA256 }}
           
           ### Системные требования
-          - Windows 7 или выше
+          - Windows 10 или выше
           - Не требует установки
           
           ### Как использовать
