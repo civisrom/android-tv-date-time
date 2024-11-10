@@ -3,18 +3,18 @@ name: Build AndroidTVTimeFixer
 on:
   push:
     branches:
-      - main  # Запускать сборку при пуше в ветку main
+      - main
   pull_request:
     branches:
-      - main  # Запускать сборку при pull request в ветку main
-  workflow_dispatch:  # Добавляем это для ручного запуска
-  
+      - main
+  workflow_dispatch:
+
 jobs:
   build:
-    runs-on: windows-latest  # Используем Windows для сборки
+    runs-on: windows-latest
 
     steps:
-    # Шаг 1: Проверить репозиторий
+    # Шаг 1: Клонировать репозиторий
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -22,7 +22,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'  # Укажите версию Python, которую вы используете
+        python-version: '3.13'
 
     # Шаг 3: Установить зависимости
     - name: Install dependencies
@@ -35,30 +35,42 @@ jobs:
       run: |
         pyinstaller --onefile --console --name=AndroidTVTimeFixer android_time_fixer.py
 
-    # Шаг 5: Загрузить артефакт (исполняемый файл) как артефакт сборки
-    - name: Upload executable as artifact
+    # Шаг 5: Сохранение артефакта как артефакт Workflow
+    - name: Upload executable as workflow artifact
       uses: actions/upload-artifact@v4
       with:
         name: AndroidTVTimeFixer
-        path: dist/AndroidTVTimeFixer.exe  # Путь к файлу в папке dist
+        path: dist/AndroidTVTimeFixer.exe  # Путь к скомпилированному файлу в папке dist
 
-    # Шаг 6: Опубликовать артефакт как релиз (только при пуше в main)
+    # Шаг 6: Создание версии для релиза
+    - name: Create version tag
+      id: create_tag
+      run: |
+        TAG="v$(date +'%Y.%m.%d.%H%M%S')"  # Динамически генерируем тег на основе времени
+        echo "Generated tag: $TAG"
+        echo "::set-output name=tag_name::$TAG"
+      
+    # Шаг 7: Создать релиз
     - name: Create GitHub Release
-      if: github.ref == 'refs/heads/main'
+      id: create_release
       uses: actions/create-release@v1
       with:
-        tag_name: 'v1.0.0'  # Укажите нужный номер версии
-        release_name: 'AndroidTVTimeFixer Release v1.0.0'
+        tag_name: ${{ steps.create_tag.outputs.tag_name }}  # Используем сгенерированный тег
+        release_name: 'AndroidTVTimeFixer Release'
         draft: false
         prerelease: false
         body: |
           Первый релиз AndroidTVTimeFixer, включающий исправление времени на Android TV.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Upload release asset
-      if: github.ref == 'refs/heads/main'
+    # Шаг 8: Загрузка артефакта в релиз
+    - name: Upload to GitHub Release
       uses: actions/upload-release-asset@v1
       with:
-        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: dist/AndroidTVTimeFixer.exe
         asset_name: AndroidTVTimeFixer.exe
         label: "AndroidTVTimeFixer Executable"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
