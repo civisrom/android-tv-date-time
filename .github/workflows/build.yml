@@ -1,0 +1,42 @@
+name: Build AndroidTVTimeFixer
+
+on:
+  push:
+    branches:
+      - main  # Запускать сборку при пуше в ветку main
+  pull_request:
+    branches:
+      - main  # Запускать сборку при pull request в ветку main
+
+jobs:
+  build:
+    runs-on: windows-latest  # Используем Windows для сборки
+
+    steps:
+    # Шаг 1: Проверить репозиторий
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # Шаг 2: Установить Python
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'  # Укажите версию Python, которую вы используете
+
+    # Шаг 3: Установить зависимости
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller adb-shell
+
+    # Шаг 4: Сборка исполняемого файла с помощью PyInstaller
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --onefile --console --name=AndroidTVTimeFixer android_time_fixer.py
+
+    # Шаг 5: Загрузить артефакты (исполняемый файл) в GitHub
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: AndroidTVTimeFixer
+        path: dist/AndroidTVTimeFixer.exe  # Путь к файлу в папке dist
