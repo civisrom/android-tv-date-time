@@ -24,11 +24,12 @@ jobs:
       with:
         python-version: '3.13'
 
-    # Шаг 3: Установить зависимости
-    - name: Install dependencies
+    # Шаг 3: Обновить pip, pyinstaller и adb-shell
+    - name: Upgrade pip, pyinstaller, and adb-shell
       run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller adb-shell
+        python -m pip install --upgrade pip  # Обновление pip
+        pip install --upgrade pyinstaller   # Обновление pyinstaller
+        pip install --upgrade adb-shell     # Обновление adb-shell
 
     # Шаг 4: Сборка исполняемого файла с помощью PyInstaller
     - name: Build executable with PyInstaller
@@ -49,11 +50,11 @@ jobs:
         $TAG = "v$(Get-Date -Format 'yyyy.MM.dd.HHmmss')"  # Динамически генерируем тег на основе времени в PowerShell
         echo "Generated tag: $TAG"
         echo "TAG_NAME=$TAG" >> $GITHUB_ENV  # Записываем тег в переменную окружения
-      
-    # Шаг 7: Создать релиз
+
+    # Шаг 7: Создать релиз с новой версией
     - name: Create GitHub Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: actions/create-release@v2  # Обновленная версия для создания релиза
       with:
         tag_name: ${{ env.TAG_NAME }}  # Используем сгенерированный тег
         release_name: 'AndroidTVTimeFixer Release'
@@ -66,7 +67,7 @@ jobs:
 
     # Шаг 8: Загрузка артефакта в релиз
     - name: Upload to GitHub Release
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@v2  # Обновленная версия для загрузки активов в релиз
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: dist/AndroidTVTimeFixer.exe
