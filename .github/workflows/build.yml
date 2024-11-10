@@ -43,20 +43,26 @@ jobs:
         name: AndroidTVTimeFixer
         path: dist/AndroidTVTimeFixer.exe  # Путь к скомпилированному файлу в папке dist
 
-    # Шаг 6: Создание версии для релиза
-    - name: Create version tag
-      id: create_tag
+    # Шаг 6: Чтение тега из файла version.txt
+    - name: Read version tag from version.txt
+      id: read_version
       run: |
-        $TAG = "v$(Get-Date -Format 'yyyy.MM.dd.HHmmss')"  # Динамически генерируем тег на основе времени в PowerShell
-        echo "Generated tag: $TAG"
-        echo "TAG_NAME=$TAG" >> $GITHUB_ENV  # Записываем тег в переменную окружения
+        # Проверяем наличие файла version.txt
+        if [ -f "version.txt" ]; then
+          VERSION=$(cat version.txt)  # Читаем содержимое version.txt
+          echo "Version found: $VERSION"
+          echo "VERSION_TAG=$VERSION" >> $GITHUB_ENV  # Записываем в переменные окружения
+        else
+          echo "Error: version.txt not found!" >&2
+          exit 1
+        fi
 
     # Шаг 7: Создать релиз с новой версией
     - name: Create GitHub Release
       id: create_release
       uses: actions/create-release@v2  # Используем актуальную версию v2
       with:
-        tag_name: ${{ env.TAG_NAME }}  # Используем сгенерированный тег
+        tag_name: ${{ env.VERSION_TAG }}  # Используем тег из файла version.txt
         release_name: 'AndroidTVTimeFixer Release'
         draft: false
         prerelease: false
