@@ -38,7 +38,7 @@ jobs:
 
     # Шаг 5: Сохранение артефакта как артефакт Workflow
     - name: Upload executable as workflow artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # Используем последнюю версию v4
       with:
         name: AndroidTVTimeFixer
         path: dist/AndroidTVTimeFixer.exe  # Путь к скомпилированному файлу в папке dist
@@ -54,7 +54,7 @@ jobs:
     # Шаг 7: Создать релиз с новой версией
     - name: Create GitHub Release
       id: create_release
-      uses: actions/create-release@v1  # Используем версию v1
+      uses: actions/create-release@v2  # Используем актуальную версию v2
       with:
         tag_name: ${{ env.TAG_NAME }}  # Используем сгенерированный тег
         release_name: 'AndroidTVTimeFixer Release'
@@ -67,7 +67,7 @@ jobs:
 
     # Шаг 8: Загрузка артефакта в релиз
     - name: Upload to GitHub Release
-      uses: actions/upload-release-asset@v1  # Используем версию v1
+      uses: actions/upload-release-asset@v2  # Используем актуальную версию v2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: dist/AndroidTVTimeFixer.exe
