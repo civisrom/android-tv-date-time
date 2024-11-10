@@ -46,7 +46,7 @@ jobs:
     - name: Create version tag
       id: create_tag
       run: |
-        TAG="v$(date +'%Y.%m.%d.%H%M%S')"  # Динамически генерируем тег на основе времени
+        $TAG = "v$(Get-Date -Format 'yyyy.MM.dd.HHmmss')"  # Динамически генерируем тег на основе времени в PowerShell
         echo "Generated tag: $TAG"
         echo "::set-output name=tag_name::$TAG"
       
