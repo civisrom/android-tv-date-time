@@ -35,9 +35,30 @@ jobs:
       run: |
         pyinstaller --onefile --console --name=AndroidTVTimeFixer android_time_fixer.py
 
-    # Шаг 5: Загрузить артефакты (исполняемый файл) в GitHub
+    # Шаг 5: Загрузить артефакт (исполняемый файл) как артефакт сборки
     - name: Upload executable as artifact
       uses: actions/upload-artifact@v3
       with:
         name: AndroidTVTimeFixer
         path: dist/AndroidTVTimeFixer.exe  # Путь к файлу в папке dist
+
+    # Шаг 6: Опубликовать артефакт как релиз (только при пуше в main)
+    - name: Create GitHub Release
+      if: github.ref == 'refs/heads/main'
+      uses: actions/create-release@v1
+      with:
+        tag_name: 'v1.0.0'  # Укажите нужный номер версии
+        release_name: 'AndroidTVTimeFixer Release v1.0.0'
+        draft: false
+        prerelease: false
+        body: |
+          Первый релиз AndroidTVTimeFixer, включающий исправление времени на Android TV.
+
+    - name: Upload release asset
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: dist/AndroidTVTimeFixer.exe
+        asset_name: AndroidTVTimeFixer.exe
+        label: "AndroidTVTimeFixer Executable"
