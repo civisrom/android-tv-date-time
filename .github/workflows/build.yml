@@ -16,11 +16,11 @@ jobs:
     steps:
     # Шаг 1: Проверить репозиторий
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Шаг 2: Установить Python
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.13'  # Укажите версию Python, которую вы используете
 
@@ -37,7 +37,7 @@ jobs:
 
     # Шаг 5: Загрузить артефакт (исполняемый файл) как артефакт сборки
     - name: Upload executable as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: AndroidTVTimeFixer
         path: dist/AndroidTVTimeFixer.exe  # Путь к файлу в папке dist
