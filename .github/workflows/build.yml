@@ -7,7 +7,8 @@ on:
   pull_request:
     branches:
       - main  # Запускать сборку при pull request в ветку main
-
+  workflow_dispatch:  # Добавляем это для ручного запуска
+  
 jobs:
   build:
     runs-on: windows-latest  # Используем Windows для сборки
