@@ -9,6 +9,12 @@ on:
       - main
   workflow_dispatch:
 
+# Добавляем необходимые разрешения
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -17,6 +23,8 @@ jobs:
     # Шаг 1: Клонировать репозиторий
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     # Шаг 2: Установить Python
     - name: Set up Python
@@ -43,27 +51,45 @@ jobs:
         name: AndroidTVTimeFixer
         path: dist/AndroidTVTimeFixer.exe
 
-    # Шаг 6: Чтение тега из файла version.txt
-    - name: Read version tag from version.txt
-      id: read_version
+    # Шаг 6: Создаем версию если её нет
+    - name: Create version if not exists
       shell: bash
       run: |
-        if [ -f "version.txt" ]; then
-          echo "VERSION_TAG=$(cat version.txt)" >> $GITHUB_OUTPUT
-        else
-          echo "Error: version.txt not found!" >&2
-          exit 1
+        if [ ! -f "version.txt" ]; then
+          echo "v1.0.0" > version.txt
+          echo "Created version.txt with v1.0.0"
         fi
 
-    # Шаг 7: Создать релиз с новой версией
+    # Шаг 7: Чтение тега из файла version.txt
+    - name: Read version tag
+      id: version
+      shell: bash
+      run: |
+        VERSION=$(cat version.txt)
+        echo "Reading version: $VERSION"
+        echo "VERSION_TAG=$VERSION" >> $GITHUB_OUTPUT
+
+    # Шаг 8: Вывод отладочной информации
+    - name: Debug Info
+      run: |
+        echo "Current branch: ${{ github.ref }}"
+        echo "Version tag: ${{ steps.version.outputs.VERSION_TAG }}"
+        echo "Checking if file exists:"
+        ls -la dist/AndroidTVTimeFixer.exe
+
+    # Шаг 9: Создать релиз с новой версией
     - name: Create Release
       uses: softprops/action-gh-release@v1
-      if: github.ref == 'refs/heads/main'
-      with:
-        files: dist/AndroidTVTimeFixer.exe
-        tag_name: ${{ steps.read_version.outputs.VERSION_TAG }}
-        name: 'AndroidTVTimeFixer Release'
-        body: |
-          Первый релиз AndroidTVTimeFixer, включающий исправление времени на Android TV.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: dist/AndroidTVTimeFixer.exe
+        tag_name: ${{ steps.version.outputs.VERSION_TAG }}
+        name: 'AndroidTVTimeFixer ${{ steps.version.outputs.VERSION_TAG }}'
+        body: |
+          Release version ${{ steps.version.outputs.VERSION_TAG }}
+          
+          Включает:
+          - Исполняемый файл AndroidTVTimeFixer.exe
+        draft: false
+        prerelease: false
