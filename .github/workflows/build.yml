@@ -48,14 +48,14 @@ jobs:
       run: |
         $TAG = "v$(Get-Date -Format 'yyyy.MM.dd.HHmmss')"  # Динамически генерируем тег на основе времени в PowerShell
         echo "Generated tag: $TAG"
-        echo "::set-output name=tag_name::$TAG"
+        echo "TAG_NAME=$TAG" >> $GITHUB_ENV  # Записываем тег в переменную окружения
       
     # Шаг 7: Создать релиз
     - name: Create GitHub Release
       id: create_release
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ steps.create_tag.outputs.tag_name }}  # Используем сгенерированный тег
+        tag_name: ${{ env.TAG_NAME }}  # Используем сгенерированный тег
         release_name: 'AndroidTVTimeFixer Release'
         draft: false
         prerelease: false
@@ -71,6 +71,6 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: dist/AndroidTVTimeFixer.exe
         asset_name: AndroidTVTimeFixer.exe
-        label: "AndroidTVTimeFixer Executable"
+        asset_content_type: application/octet-stream  # Указываем тип контента для .exe файла
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
