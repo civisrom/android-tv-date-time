@@ -24,6 +24,7 @@ on:
 env:
   PYTHON_VERSION: '3.13'
   APP_NAME: AndroidTVTimeFixer
+  DEPENDENCIES: 'pyinstaller adb-shell pytest pytest-cov'
 
 permissions:
   contents: write
@@ -49,22 +50,21 @@ jobs:
         cache: 'pip'
         check-latest: true
 
-    - name: Install and upgrade dependencies
-      run: |
-        python -m pip install --upgrade pip wheel setuptools
-        pip install --upgrade pyinstaller adb-shell
-        pip install pytest pytest-cov # Добавляем инструменты для тестирования
-      continue-on-error: false
-
     - name: Cache PyInstaller files
       uses: actions/cache@v4
       with:
         path: |
           ~\AppData\Local\pip\Cache
           ~\.pyinstaller
-        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('**/requirements.txt', 'android_time_fixer.py') }}
+        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('android_time_fixer.py') }}
         restore-keys: |
           ${{ runner.os }}-pyinstaller-
+
+    - name: Install and upgrade dependencies
+      run: |
+        python -m pip install --upgrade pip wheel setuptools
+        pip install --upgrade ${{ env.DEPENDENCIES }}
+      continue-on-error: false
 
     - name: Verify source files and environment
       shell: pwsh
@@ -101,7 +101,6 @@ jobs:
       run: |
         pyinstaller --clean --onefile --console `
           --name=${{ env.APP_NAME }} `
-          --add-data "version.txt;." `
           --noconfirm `
           --log-level=INFO `
           android_time_fixer.py
@@ -168,11 +167,6 @@ jobs:
           ## Системные требования
           - Windows 7/8/10/11
           - Не требует установки Python
-          
-          ## Контрольные суммы
-          ```
-          ${{ hashFiles('dist/*.exe') }}
-          ```
           
           ## Примечания к релизу
           Это автоматически сгенерированный релиз из последних изменений в репозитории.
