@@ -40,6 +40,16 @@ class AndroidTVTimeFixer:
             'au': 'au.pool.ntp.org',
             'ca': 'ca.pool.ntp.org'
         }
+        self.custom_ntp_servers = [
+            'ntp0.ntp-servers.net',
+            'ntp1.ntp-servers.net',
+            'ntp2.ntp-servers.net',
+            'ntp3.ntp-servers.net',
+            'ntp4.ntp-servers.net',
+            'ntp5.ntp-servers.net',
+            'ntp6.ntp-servers.net',
+            'time.windows.com'
+        ]
 
     @staticmethod
     def validate_ip(ip: str) -> bool:
@@ -97,7 +107,8 @@ class AndroidTVTimeFixer:
                         "Пожалуйста, убедитесь в следующем:\n"
                         "1. На вашем ТВ включен отладчик ADB\n"
                         "2. Ваш ТВ и ПК находятся в одной сети\n"
-                        "3. IP-адрес введен правильно"
+                        "3. IP-адрес введен правильно\n"
+                        "4. Вы предоставили доступ устройству при появлении запроса на ТВ"
                     )
                 logger.warning(f"Попытка подключения {attempt + 1} не удалась, повторная попытка...")
                 time.sleep(self.connection_retry_delay)
@@ -127,15 +138,33 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось обновить сервер NTP: {str(e)}")
 
-    def fix_time(self, country_code: str) -> None:
-        if not self.validate_country_code(country_code):
-            raise AndroidTVTimeFixerError("Неверный формат кода страны. Используйте два буквенных символа (например, 'ru' для России, 'us' для США)")
+    def fix_time(self, ntp_server: str) -> None:
+        if not self.device:
+            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
 
-        if country_code.lower() not in self.ntp_servers:
-            raise AndroidTVTimeFixerError(f"Не найден сервер NTP для кода страны '{country_code.upper()}'")
-
-        ntp_server = self.ntp_servers[country_code.lower()]
         self.set_ntp_server(ntp_server)
+
+    def show_country_codes(self) -> None:
+        print("\nДоступные коды стран:")
+        for code, server in self.ntp_servers.items():
+            print(f"{code.upper()} - {server}")
+
+    def show_custom_ntp_servers(self) -> None:
+        print("\nДоступные альтернативные серверы NTP:")
+        for server in self.custom_ntp_servers:
+            print(f"- {server}")
+
+    def set_custom_ntp(self) -> None:
+        while True:
+            ntp_server = input("\nВведите свой NTP-сервер (или 'q' для выхода): ").strip()
+            if ntp_server.lower() == 'q':
+                return
+            try:
+                self.fix_time(ntp_server)
+                print(f"Сервер NTP установлен на {ntp_server}")
+                return
+            except AndroidTVTimeFixerError as e:
+                print(f"Ошибка: {str(e)}")
 
 def main():
     fixer = AndroidTVTimeFixer()
@@ -155,32 +184,66 @@ def main():
         # Генерируем ключи ADB
         fixer.gen_keys()
 
-        # Получаем IP-адрес ТВ
         while True:
-            ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
-            if fixer.validate_ip(ip):
-                break
-            print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+            print("\nГлавное меню:")
+            print("1. Изменить сервер NTP по коду страны")
+            print("2. Изменить сервер NTP на пользовательский")
+            print("3. Показать доступные коды стран")
+            print("4. Показать доступные альтернативные серверы NTP")
+            print("5. Выход")
 
-        # Подключаемся к устройству
-        fixer.connect(ip)
+            choice = input("Введите номер пункта меню: ").strip()
 
-        # Получаем текущий сервер NTP
-        current_ntp = fixer.get_current_ntp()
-        print(f"\nТекущий сервер NTP: {current_ntp}")
+            if choice == '1':
+                # Получаем IP-адрес ТВ
+                while True:
+                    ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                    if fixer.validate_ip(ip):
+                        break
+                    print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
-        # Получаем код страны и исправляем время
-        while True:
-            code = input('\nВведите код вашей страны (например, ru для России, us для США): ').strip()
-            if fixer.validate_country_code(code):
-                break
-            print("Неверный код страны. Используйте два буквенных символа (например, 'ru', 'us')")
+                # Подключаемся к устройству
+                fixer.connect(ip)
 
-        fixer.fix_time(code)
+                # Получаем текущий сервер NTP
+                current_ntp = fixer.get_current_ntp()
+                print(f"\nТекущий сервер NTP: {current_ntp}")
 
-        print("\nНастройки времени успешно обновлены!")
-        print("Убедитесь, что на вашем ТВ время и дата установлены в автоматический режим.")
-        print("\nСоздано Civis Romanuss (civisrom)")
+                # Получаем код страны и исправляем время
+                while True:
+                    code = input('\nВведите код вашей страны (например, ru для России, us для США): ').strip()
+                    if fixer.validate_country_code(code):
+                        break
+                    print("Неверный код страны. Используйте два буквенных символа (например, 'ru', 'us')")
+
+                ntp_server = fixer.ntp_servers[code.lower()]
+                fixer.fix_time(ntp_server)
+                print("\nНастройки времени успешно обновлены!")
+
+            elif choice == '2':
+                # Получаем IP-адрес ТВ
+                while True:
+                    ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                    if fixer.validate_ip(ip):
+                        break
+                    print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+
+                # Подключаемся к устройству
+                fixer.connect(ip)
+                fixer.set_custom_ntp()
+
+            elif choice == '3':
+                fixer.show_country_codes()
+
+            elif choice == '4':
+                fixer.show_custom_ntp_servers()
+
+            elif choice == '5':
+                print("\nВыход из программы...")
+                sys.exit(0)
+
+            else:
+                print("Неверный выбор. Пожалуйста, попробуйте еще раз.")
         
     except AndroidTVTimeFixerError as e:
         print(f"\nОшибка: {str(e)}")
