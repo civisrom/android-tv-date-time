@@ -29,6 +29,7 @@ env:
   APP_NAME: 'AndroidTVTimeFixer'
 
 jobs:
+
   build:
     runs-on: windows-latest
     timeout-minutes: 15
@@ -62,12 +63,12 @@ jobs:
       shell: pwsh
       run: |
         if (-not (Test-Path "requirements.txt")) {
-          @'
+          @"
 pyinstaller>=6.3.0
 adb-shell>=0.4.3
 wheel>=0.42.0
 setuptools>=69.0.3
-'@ | Out-File -FilePath "requirements.txt" -Encoding UTF8
+"@ | Out-File -FilePath "requirements.txt" -Encoding UTF8
           Write-Host "Created requirements.txt"
         }
 
@@ -232,22 +233,23 @@ setuptools>=69.0.3
         body: |
           Release version ${{ steps.version.outputs.VERSION_TAG }}
           
-          ### Что нового
-          - Автоматическая сборка из ветки ${{ github.ref_name }}
-          - Улучшенная стабильность и производительность
+          ### What's New
+          - Automatic build from ${{ github.ref_name }} branch
+          - Improved stability and performance
           
-          ### Контрольные суммы
+          ### Checksums
           - MD5: ${{ steps.generate-checksums.outputs.MD5 }}
           - SHA256: ${{ steps.generate-checksums.outputs.SHA256 }}
           
-          ### Системные требования
-          - Windows 10 или выше
-          - Не требует установки
+          ### System Requirements
+          - Windows 10 or later
+          - No installation required
           
-          ### Как использовать
-          1. Скачайте файл AndroidTVTimeFixer.exe
-          2. Запустите от имени администратора
-          3. Следуйте инструкциям в программе
+          ### How to Use
+          1. Download the AndroidTVTimeFixer.exe file
+          2. Run the executable as administrator
+          3. Follow the instructions in the program
+
         draft: false
         prerelease: false
         generate_release_notes: true
