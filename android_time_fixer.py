@@ -103,6 +103,21 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
+    def copy_to_clipboard(self, text):
+        """Копирует текст в буфер обмена"""
+        if platform.system() == 'Windows':
+            os.system(f'echo {text}| clip')
+        elif platform.system() == 'Darwin':  # macOS
+            os.system(f'echo "{text}" | pbcopy')
+        else:  # Linux и другие Unix-подобные системы
+            try:
+                import pyperclip
+                pyperclip.copy(text)
+            except ImportError:
+                print("Для работы с буфером обмена установите пакет pyperclip: pip install pyperclip")
+                return False
+        return True
+
     @staticmethod
     def validate_ip(ip: str) -> bool:
         pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
@@ -197,16 +212,49 @@ class AndroidTVTimeFixer:
         self.set_ntp_server(ntp_server)
 
     def show_country_codes(self) -> None:
-        print("\nДоступные коды стран:")
-        for code, server in self.ntp_servers.items():
-            print(f"{code.upper()} — {server}")
+        print("\nДоступные коды стран (введите номер для копирования сервера):")
+        for i, (code, server) in enumerate(self.ntp_servers.items(), 1):
+            print(f"{i}. {code.upper()} — {server}")
+        
+        while True:
+            choice = input("\nВведите номер сервера для копирования (или 'b' для возврата): ").strip()
+            if choice.lower() == 'b':
+                break
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(self.ntp_servers):
+                    server = list(self.ntp_servers.values())[idx]
+                    if self.copy_to_clipboard(server):
+                        print(f"\nСервер '{server}' скопирован в буфер обмена!")
+                    break
+                else:
+                    print("Неверный номер. Попробуйте еще раз.")
+            except ValueError:
+                print("Введите корректный номер.")
 
     def show_custom_ntp_servers(self) -> None:
-        print("\nДоступные альтернативные серверы NTP:")
-        for server in self.custom_ntp_servers:
-            print(f"- {server}")
+        print("\nДоступные альтернативные серверы NTP (введите номер для копирования):")
+        for i, server in enumerate(self.custom_ntp_servers, 1):
+            print(f"{i}. {server}")
+        
+        while True:
+            choice = input("\nВведите номер сервера для копирования (или 'b' для возврата): ").strip()
+            if choice.lower() == 'b':
+                break
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(self.custom_ntp_servers):
+                    server = self.custom_ntp_servers[idx]
+                    if self.copy_to_clipboard(server):
+                        print(f"\nСервер '{server}' скопирован в буфер обмена!")
+                    break
+                else:
+                    print("Неверный номер. Попробуйте еще раз.")
+            except ValueError:
+                print("Введите корректный номер.")
 
     def set_custom_ntp(self) -> None:
+        print("\nВы можете вставить скопированный ранее сервер или ввести свой.")
         while True:
             ntp_server = input("\nВведите свой NTP-сервер (или 'q' для выхода): ").strip()
             if ntp_server.lower() == 'q':
@@ -246,12 +294,18 @@ class AndroidTVTimeFixer:
 
         try:
             current_ntp = self.get_current_ntp()
-            device_info = self.get_device_info()  # Получаем информацию об устройстве
+            device_info = self.get_device_info()
             print(f"\nТекущие настройки:")
             print(f"- Сервер NTP: {current_ntp}")
             print(f"- Устройство (информация):")
             for key, value in device_info.items():
                 print(f"  {key.capitalize()}: {value}")
+            
+            # Добавляем возможность копирования текущего NTP сервера
+            copy_choice = input("\nХотите скопировать текущий NTP сервер? (y/n): ").strip().lower()
+            if copy_choice == 'y':
+                if self.copy_to_clipboard(current_ntp):
+                    print(f"\nТекущий сервер NTP '{current_ntp}' скопирован в буфер обмена!")
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
 
