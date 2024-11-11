@@ -166,6 +166,18 @@ class AndroidTVTimeFixer:
             except AndroidTVTimeFixerError as e:
                 print(f"Ошибка: {str(e)}")
 
+    def show_current_settings(self) -> None:
+        if not self.device:
+            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+
+        try:
+            current_ntp = self.get_current_ntp()
+            print(f"\nТекущие настройки:")
+            print(f"- Сервер NTP: {current_ntp}")
+            print(f"- Устройство: {self.device.device_state.serial}")
+        except Exception as e:
+            raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
+
 def main():
     fixer = AndroidTVTimeFixer()
     
@@ -190,7 +202,8 @@ def main():
             print("2. Изменить сервер NTP на пользовательский")
             print("3. Показать доступные коды стран")
             print("4. Показать доступные альтернативные серверы NTP")
-            print("5. Выход")
+            print("5. Показать текущие настройки")
+            print("6. Выход")
 
             choice = input("Введите номер пункта меню: ").strip()
 
@@ -206,8 +219,7 @@ def main():
                 fixer.connect(ip)
 
                 # Получаем текущий сервер NTP
-                current_ntp = fixer.get_current_ntp()
-                print(f"\nТекущий сервер NTP: {current_ntp}")
+                fixer.show_current_settings()
 
                 # Получаем код страны и исправляем время
                 while True:
@@ -239,6 +251,18 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
+                # Получаем IP-адрес ТВ
+                while True:
+                    ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                    if fixer.validate_ip(ip):
+                        break
+                    print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+
+                # Подключаемся к устройству
+                fixer.connect(ip)
+                fixer.show_current_settings()
+
+            elif choice == '6':
                 print("\nВыход из программы...")
                 sys.exit(0)
 
