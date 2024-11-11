@@ -29,16 +29,67 @@ class AndroidTVTimeFixer:
         self.max_connection_retries = 3
         self.connection_retry_delay = 2
         self.ntp_servers = {
-            'ru': 'ru.pool.ntp.org',
-            'us': 'us.pool.ntp.org',
-            'gb': 'uk.pool.ntp.org',
+            'ad': 'ad.pool.ntp.org',
+            'al': 'al.pool.ntp.org',
+            'at': 'at.pool.ntp.org',
+            'ax': 'ax.pool.ntp.org',
+            'ba': 'ba.pool.ntp.org',
+            'be': 'be.pool.ntp.org',
+            'bg': 'bg.pool.ntp.org',
+            'by': 'by.pool.ntp.org',
+            'ch': 'ch.pool.ntp.org',
+            'cy': 'cy.pool.ntp.org',
+            'cz': 'cz.pool.ntp.org',
             'de': 'de.pool.ntp.org',
+            'dk': 'dk.pool.ntp.org',
+            'ee': 'ee.pool.ntp.org',
+            'es': 'es.pool.ntp.org',
+            'fi': 'fi.pool.ntp.org',
+            'fo': 'fo.pool.ntp.org',
             'fr': 'fr.pool.ntp.org',
-            'cn': 'cn.pool.ntp.org',
-            'jp': 'jp.pool.ntp.org',
+            'gg': 'gg.pool.ntp.org',
+            'gi': 'gi.pool.ntp.org',
+            'gr': 'gr.pool.ntp.org',
+            'hr': 'hr.pool.ntp.org',
+            'hu': 'hu.pool.ntp.org',
+            'ie': 'ie.pool.ntp.org',
+            'im': 'im.pool.ntp.org',
+            'is': 'is.pool.ntp.org',
+            'it': 'it.pool.ntp.org',
+            'je': 'je.pool.ntp.org',
+            'li': 'li.pool.ntp.org',
+            'lt': 'lt.pool.ntp.org',
+            'lu': 'lu.pool.ntp.org',
+            'lv': 'lv.pool.ntp.org',
+            'mc': 'mc.pool.ntp.org',
+            'md': 'md.pool.ntp.org',
+            'me': 'me.pool.ntp.org',
+            'mk': 'mk.pool.ntp.org',
+            'mt': 'mt.pool.ntp.org',
+            'nl': 'nl.pool.ntp.org',
+            'no': 'no.pool.ntp.org',
+            'pl': 'pl.pool.ntp.org',
+            'pt': 'pt.pool.ntp.org',
+            'ro': 'ro.pool.ntp.org',
+            'rs': 'rs.pool.ntp.org',
+            'ru': 'ru.pool.ntp.org',
+            'se': 'se.pool.ntp.org',
+            'si': 'si.pool.ntp.org',
+            'sj': 'sj.pool.ntp.org',
+            'sk': 'sk.pool.ntp.org',
+            'sm': 'sm.pool.ntp.org',
+            'tr': 'tr.pool.ntp.org',
+            'ua': 'ua.pool.ntp.org',
+            'uk': 'uk.pool.ntp.org',
+            'va': 'va.pool.ntp.org',
+            'xk': 'xk.pool.ntp.org',
+            'yu': 'yu.pool.ntp.org',
+            'us': 'us.pool.ntp.org',
+            'ca': 'ca.pool.ntp.org',
             'br': 'br.pool.ntp.org',
             'au': 'au.pool.ntp.org',
-            'ca': 'ca.pool.ntp.org'
+            'cn': 'cn.pool.ntp.org',
+            'jp': 'jp.pool.ntp.org'
         }
         self.custom_ntp_servers = [
             'ntp0.ntp-servers.net',
@@ -147,7 +198,7 @@ class AndroidTVTimeFixer:
     def show_country_codes(self) -> None:
         print("\nДоступные коды стран:")
         for code, server in self.ntp_servers.items():
-            print(f"{code.upper()} - {server}")
+            print(f"{code.upper()} — {server}")
 
     def show_custom_ntp_servers(self) -> None:
         print("\nДоступные альтернативные серверы NTP:")
@@ -203,7 +254,8 @@ def main():
             print("3. Показать доступные коды стран")
             print("4. Показать доступные альтернативные серверы NTP")
             print("5. Показать текущие настройки")
-            print("6. Выход")
+            print("6. Справка")
+            print("7. Выход")
             print("\nДля возврата к предыдущему меню введите 'b'")
 
             choice = input("Введите номер пункта меню: ").strip()
@@ -244,6 +296,25 @@ def main():
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
             elif choice == '6':
+                print("\nСправка:")
+                print("Данная программа предназначена для настройки времени и даты на Android TV устройствах.")
+                print("Она позволяет изменять сервер NTP (Network Time Protocol) как по коду страны, так и на пользовательский.")
+                print("Также можно просмотреть текущие настройки устройства.")
+                print("\nПеред началом работы убедитесь, что на вашем ТВ включен отладчик ADB и установлено автоматическое определение времени.")
+                print("Для подключения к устройству вам потребуется IP-адрес ТВ, который можно найти в разделе Сеть и интернет в настройках устройства.")
+                print("\nЕсли у вас возникли трудности, обратитесь к разделу 'Ошибки' ниже.")
+                print("\nОшибки:")
+                print("1. Не удалось подключиться к устройству после нескольких попыток.")
+                print("   - Убедитесь, что на вашем ТВ включен отладчик ADB.")
+                print("   - Проверьте, что ТВ и ПК находятся в одной сети.")
+                print("   - Убедитесь, что IP-адрес введен правильно.")
+                print("   - Проверьте, что вы предоставили доступ устройству при появлении запроса на ТВ.")
+                print("2. Не удалось получить информацию об устройстве.")
+                print("   - Возможно, устройство отключилось или было перезагружено во время работы программы.")
+                print("   - Попробуйте еще раз подключиться к устройству.")
+                print("\nВведите 'b' для возврата в главное меню.")
+
+            elif choice == '7':
                 print("\nВыход из программы...")
                 sys.exit(0)
             
