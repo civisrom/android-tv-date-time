@@ -217,17 +217,42 @@ class AndroidTVTimeFixer:
             except AndroidTVTimeFixerError as e:
                 print(f"Ошибка: {str(e)}")
 
-    def show_current_settings(self) -> None:
-        if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+    def get_device_info(self) -> dict:
+    if not self.device:
+        raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
 
-        try:
-            current_ntp = self.get_current_ntp()
-            print(f"\nТекущие настройки:")
-            print(f"- Сервер NTP: {current_ntp}")
-            print(f"- Устройство: {self.device.serial}")
-        except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
+    try:
+        device_info = {
+            'model': self.device.shell('getprop ro.product.model').strip(),
+            'brand': self.device.shell('getprop ro.product.brand').strip(),
+            'name': self.device.shell('getprop ro.product.name').strip(),
+            'android_version': self.device.shell('getprop ro.build.version.release').strip(),
+            'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
+            'serial': self.device.shell('getprop ro.serialno').strip(),
+            'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
+            'hardware': self.device.shell('getprop ro.hardware').strip(),
+            'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
+            'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
+            'battery_status': self.device.shell('dumpsys battery | grep status').strip()
+        }
+        return device_info
+    except Exception as e:
+        raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
+
+def show_current_settings(self) -> None:
+    if not self.device:
+        raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+
+    try:
+        current_ntp = self.get_current_ntp()
+        device_info = self.get_device_info()  # Получаем информацию об устройстве
+        print(f"\nТекущие настройки:")
+        print(f"- Сервер NTP: {current_ntp}")
+        print(f"- Устройство (информация):")
+        for key, value in device_info.items():
+            print(f"  {key.capitalize()}: {value}")
+    except Exception as e:
+        raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
 
 def main():
     fixer = AndroidTVTimeFixer()
