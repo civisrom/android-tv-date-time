@@ -132,7 +132,7 @@ class AndroidTVTimeFixer:
             logger.info(f'Сервер NTP установлен на {ntp_server}')
 
             # Проверяем изменение
-            new_ntp = self.device.shell('settings get global ntp_server')
+            new_ntp = self.get_current_ntp()
             if ntp_server not in new_ntp:
                 raise AndroidTVTimeFixerError("Не удалось подтвердить изменение сервера NTP")
         except Exception as e:
@@ -174,7 +174,7 @@ class AndroidTVTimeFixer:
             current_ntp = self.get_current_ntp()
             print(f"\nТекущие настройки:")
             print(f"- Сервер NTP: {current_ntp}")
-            print(f"- Устройство: {self.device.device_state.serial}")
+            print(f"- Устройство: {self.device.serial}")
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
 
@@ -204,45 +204,30 @@ def main():
             print("4. Показать доступные альтернативные серверы NTP")
             print("5. Показать текущие настройки")
             print("6. Выход")
+            print("\nДля возврата к предыдущему меню введите 'b'")
 
             choice = input("Введите номер пункта меню: ").strip()
 
             if choice == '1':
-                # Получаем IP-адрес ТВ
-                while True:
-                    ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
-                    if fixer.validate_ip(ip):
-                        break
-                    print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
-
-                # Подключаемся к устройству
-                fixer.connect(ip)
-
-                # Получаем текущий сервер NTP
-                fixer.show_current_settings()
-
-                # Получаем код страны и исправляем время
-                while True:
+                ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                if fixer.validate_ip(ip):
+                    fixer.connect(ip)
+                    fixer.show_current_settings()
                     code = input('\nВведите код вашей страны (например, ru для России, us для США): ').strip()
                     if fixer.validate_country_code(code):
-                        break
-                    print("Неверный код страны. Используйте два буквенных символа (например, 'ru', 'us')")
-
-                ntp_server = fixer.ntp_servers[code.lower()]
-                fixer.fix_time(ntp_server)
-                print("\nНастройки времени успешно обновлены!")
-
-            elif choice == '2':
-                # Получаем IP-адрес ТВ
-                while True:
-                    ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
-                    if fixer.validate_ip(ip):
-                        break
+                        ntp_server = fixer.ntp_servers[code.lower()]
+                        fixer.fix_time(ntp_server)
+                        print("\nНастройки времени успешно обновлены!")
+                else:
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
-                # Подключаемся к устройству
-                fixer.connect(ip)
-                fixer.set_custom_ntp()
+            elif choice == '2':
+                ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                if fixer.validate_ip(ip):
+                    fixer.connect(ip)
+                    fixer.set_custom_ntp()
+                else:
+                    print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
             elif choice == '3':
                 fixer.show_country_codes()
@@ -251,21 +236,19 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
-                # Получаем IP-адрес ТВ
-                while True:
-                    ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
-                    if fixer.validate_ip(ip):
-                        break
+                ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                if fixer.validate_ip(ip):
+                    fixer.connect(ip)
+                    fixer.show_current_settings()
+                else:
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
-
-                # Подключаемся к устройству
-                fixer.connect(ip)
-                fixer.show_current_settings()
 
             elif choice == '6':
                 print("\nВыход из программы...")
                 sys.exit(0)
-
+            
+            elif choice.lower() == 'b':
+                continue
             else:
                 print("Неверный выбор. Пожалуйста, попробуйте еще раз.")
         
