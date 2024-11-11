@@ -180,7 +180,7 @@ def main():
 
         print("\nНастройки времени успешно обновлены!")
         print("Убедитесь, что на вашем ТВ время и дата установлены в автоматический режим.")
-        print("\nСоздано Jagar Yousef (Rojava Programmers Forum)")
+        print("\nСоздано Civis Romanuss (civisrom)")
         
     except AndroidTVTimeFixerError as e:
         print(f"\nОшибка: {str(e)}")
