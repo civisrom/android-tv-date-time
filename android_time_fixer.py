@@ -9,7 +9,7 @@ from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
-# Configure logging
+# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -18,7 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class AndroidTVTimeFixerError(Exception):
-    """Base exception class for AndroidTVTimeFixer"""
+    """Базовый класс исключений для AndroidTVTimeFixer"""
     pass
 
 class AndroidTVTimeFixer:
@@ -26,7 +26,9 @@ class AndroidTVTimeFixer:
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self.device = None
-        
+        self.max_connection_retries = 3
+        self.connection_retry_delay = 2
+
     @staticmethod
     def validate_ip(ip: str) -> bool:
         pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
@@ -45,11 +47,11 @@ class AndroidTVTimeFixer:
                 self.keys_folder.mkdir(parents=True)
                 priv_key = self.keys_folder / 'adbkey'
                 keygen(str(priv_key))
-                logger.info('ADB keys have been generated successfully')
+                logger.info('Ключи ADB сгенерированы успешно')
             else:
-                logger.info('Using existing ADB keys')
+                logger.info('Используются существующие ключи ADB')
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Failed to generate keys: {str(e)}")
+            raise AndroidTVTimeFixerError(f"Не удалось сгенерировать ключи: {str(e)}")
 
     def load_keys(self):
         try:
@@ -59,107 +61,107 @@ class AndroidTVTimeFixer:
                 priv = f.read()
             return pub, priv
         except FileNotFoundError:
-            raise AndroidTVTimeFixerError("ADB keys not found. Please generate them first.")
+            raise AndroidTVTimeFixerError("Ключи ADB не найдены. Пожалуйста, сначала сгенерируйте их.")
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Failed to load keys: {str(e)}")
+            raise AndroidTVTimeFixerError(f"Не удалось загрузить ключи: {str(e)}")
 
-    def connect(self, ip: str, max_retries: int = 3) -> None:
+    def connect(self, ip: str) -> None:
         if not self.validate_ip(ip):
-            raise AndroidTVTimeFixerError("Invalid IP address format")
+            raise AndroidTVTimeFixerError("Неверный формат IP-адреса")
 
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
         
-        for attempt in range(max_retries):
+        for attempt in range(self.max_connection_retries):
             try:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=0.1)
-                logger.info(f'Connected to {ip}:5555 successfully')
+                logger.info(f'Подключение к {ip}:5555 выполнено успешно')
                 return
             except Exception as e:
-                if attempt == max_retries - 1:
+                if attempt == self.max_connection_retries - 1:
                     raise AndroidTVTimeFixerError(
-                        f"Failed to connect after {max_retries} attempts.\n"
-                        "Please ensure:\n"
-                        "1. ADB debugging is enabled on your TV\n"
-                        "2. Your TV and PC are on the same network\n"
-                        "3. The IP address is correct"
+                        f"Не удалось подключиться после {self.max_connection_retries} попыток.\n"
+                        "Пожалуйста, убедитесь в следующем:\n"
+                        "1. На вашем ТВ включен отладчик ADB\n"
+                        "2. Ваш ТВ и ПК находятся в одной сети\n"
+                        "3. IP-адрес введен правильно"
                     )
-                logger.warning(f"Connection attempt {attempt + 1} failed, retrying...")
-                time.sleep(2)
+                logger.warning(f"Попытка подключения {attempt + 1} не удалась, повторная попытка...")
+                time.sleep(self.connection_retry_delay)
 
     def fix_time(self, country_code: str) -> None:
         if not self.device:
-            raise AndroidTVTimeFixerError("Not connected to any device")
+            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
         
         if not self.validate_country_code(country_code):
-            raise AndroidTVTimeFixerError("Invalid country code format. Please use two letters (e.g., 'us', 'uk')")
+            raise AndroidTVTimeFixerError("Неверный формат кода страны. Используйте два буквенных символа (например, 'ru' для России, 'us' для США)")
 
         try:
             current_ntp = self.device.shell('settings get global ntp_server')
-            logger.info(f'Current NTP server: {current_ntp}')
+            logger.info(f'Текущий сервер NTP: {current_ntp}')
 
             ntp_server = f'{country_code.strip().lower()}.pool.ntp.org'
             self.device.shell(f'settings put global ntp_server {ntp_server}')
-            logger.info(f'NTP server set to {ntp_server}')
+            logger.info(f'Сервер NTP установлен на {ntp_server}')
 
-            # Verify the change
+            # Проверяем изменение
             new_ntp = self.device.shell('settings get global ntp_server')
             if ntp_server not in new_ntp:
-                raise AndroidTVTimeFixerError("Failed to verify NTP server change")
+                raise AndroidTVTimeFixerError("Не удалось подтвердить изменение сервера NTP")
 
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Failed to update NTP server: {str(e)}")
+            raise AndroidTVTimeFixerError(f"Не удалось обновить сервер NTP: {str(e)}")
 
 def main():
     fixer = AndroidTVTimeFixer()
     
     try:
-        # Show initial instructions
-        print("\nAndroid TV Time & Date Fixer")
-        print("\nPlease ensure the following are done:")
-        print("1. Enable ADB debugging on your TV:")
-        print("   Settings > Device Preferences > About > Build (click 7 times)")
-        print("   Then: Developer Options > ADB Debugging")
-        print("2. Set Time & Date to automatic:")
-        print("   Settings > Device Preferences > Date & Time > Use Network Provided Time")
-        print("3. Connect TV and PC to the same network")
-        input("\nPress Enter to continue...")
+        # Показываем начальные инструкции
+        print("\nИсправитель времени и даты для Android TV")
+        print("\nПожалуйста, убедитесь, что следующее сделано:")
+        print("1. Включите отладку ADB на вашем ТВ:")
+        print("   Настройки > Параметры устройства > О устройстве > Сборка (нажмите 7 раз)")
+        print("   Затем: Параметры для разработчиков > Отладка по USB")
+        print("2. Установите время и дату в автоматический режим:")
+        print("   Настройки > Параметры устройства > Дата и время > Использовать время, предоставляемое сетью")
+        print("3. Подключите ТВ и ПК к одной сети")
+        input("\nНажмите Enter, чтобы продолжить...")
 
-        # Generate ADB keys
+        # Генерируем ключи ADB
         fixer.gen_keys()
 
-        # Get TV IP address
+        # Получаем IP-адрес ТВ
         while True:
-            ip = input('\nEnter your TV IP (found in Settings > Network & Internet): ').strip()
+            ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
             if fixer.validate_ip(ip):
                 break
-            print("Invalid IP format. Please use format: xxx.xxx.xxx.xxx")
+            print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
-        # Connect to device
+        # Подключаемся к устройству
         fixer.connect(ip)
 
-        # Get country code and fix time
+        # Получаем код страны и исправляем время
         while True:
-            code = input('\nEnter your country code (e.g., us for USA, uk for UK): ').strip()
+            code = input('\nВведите код вашей страны (например, ru для России, us для США): ').strip()
             if fixer.validate_country_code(code):
                 break
-            print("Invalid country code. Please use two letters (e.g., 'us', 'uk')")
+            print("Неверный код страны. Используйте два буквенных символа (например, 'ru', 'us')")
 
         fixer.fix_time(code)
 
-        print("\nTime settings updated successfully!")
-        print("Please ensure Time & Date is set to automatic on your TV.")
-        print("\nCreated by Jagar Yousef (Rojava Programmers Forum)")
+        print("\nНастройки времени успешно обновлены!")
+        print("Убедитесь, что на вашем ТВ время и дата установлены в автоматический режим.")
+        print("\nСоздано Jagar Yousef (Rojava Programmers Forum)")
         
     except AndroidTVTimeFixerError as e:
-        print(f"\nError: {str(e)}")
+        print(f"\nОшибка: {str(e)}")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user")
+        print("\nОперация отменена пользователем")
         sys.exit(0)
     except Exception as e:
-        print(f"\nUnexpected error: {str(e)}")
+        print(f"\nНепредвиденная ошибка: {str(e)}")
         sys.exit(1)
 
 if __name__ == '__main__':
