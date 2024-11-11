@@ -2,34 +2,21 @@ name: Build AndroidTVTimeFixer
 
 on:
   push:
-    branches: [ main, master ]
-    tags:
-      - 'v*'
+    branches: 
+      - main
+      - master
   pull_request:
-    branches: [ main, master ]
+    branches: 
+      - main
+      - master
   workflow_dispatch:
-    inputs:
-      version_bump:
-        description: 'Version bump type'
-        required: false
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
 
 permissions:
   contents: write
   packages: write
   actions: write
 
-env:
-  PYTHON_VERSION: '3.13'
-  APP_NAME: 'AndroidTVTimeFixer'
-
 jobs:
-
   build:
     runs-on: windows-latest
     timeout-minutes: 15
@@ -43,220 +30,79 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip'
+        python-version: '3.13'
 
-    - name: Check Python version
-      shell: pwsh
-      run: |
-        $pythonVersion = (python --version 2>&1).ToString()
-        Write-Host "Using Python: $pythonVersion"
-        if (-not $pythonVersion.StartsWith("Python ${{ env.PYTHON_VERSION }}")) {
-          Write-Error "Unexpected Python version: $pythonVersion"
-          exit 1
-        }
-
-    - name: Setup Windows SDK
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Create requirements if not exists
-      shell: pwsh
-      run: |
-        if (-not (Test-Path "requirements.txt")) {
-          @"
-pyinstaller>=6.3.0
-adb-shell>=0.4.3
-wheel>=0.42.0
-setuptools>=69.0.3
-"@ | Out-File -FilePath "requirements.txt" -Encoding UTF8
-          Write-Host "Created requirements.txt"
-        }
-
-    - name: Install dependencies
+    - name: Upgrade dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-      shell: pwsh
-      
-    - name: Cache PyInstaller files
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~\AppData\Local\pyinstaller
-          dist
-          build
-        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('**/*.py', 'requirements.txt') }}
+        pip install --upgrade pyinstaller adb-shell
 
-    - name: Validate Python script
+    - name: Verify source files
       shell: pwsh
       run: |
         if (-not (Test-Path "android_time_fixer.py")) {
-          Write-Error "Source file android_time_fixer.py not found!"
-          exit 1
-        }
-        try {
-          python -m py_compile android_time_fixer.py
-          Write-Host "Python script validation successful"
-        } catch {
-          Write-Error "Python script validation failed: $_"
+          Write-Error "Source file 'android_time_fixer.py' not found!"
           exit 1
         }
 
-    - name: Version Management
-      id: version
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --onefile --console --name=AndroidTVTimeFixer android_time_fixer.py
+
+    - name: Upload executable as workflow artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AndroidTVTimeFixer
+        path: dist/AndroidTVTimeFixer.exe
+
+    - name: Ensure version file exists
       shell: pwsh
       run: |
-        function Update-Version {
-          param (
-            [string]$CurrentVersion,
-            [string]$BumpType
-          )
-          $parts = $CurrentVersion.TrimStart('v').Split('.')
-          switch ($BumpType) {
-            'major' { $parts[0] = [int]$parts[0] + 1; $parts[1] = 0; $parts[2] = 0 }
-            'minor' { $parts[1] = [int]$parts[1] + 1; $parts[2] = 0 }
-            'patch' { $parts[2] = [int]$parts[2] + 1 }
-          }
-          return "v$($parts -join '.')"
-        }
-        
         if (-not (Test-Path "version.txt")) {
           "v1.0.0" | Out-File -FilePath "version.txt" -Encoding UTF8
           Write-Host "Created version.txt with v1.0.0"
         }
-        
-        $currentVersion = Get-Content -Path "version.txt"
-        $newVersion = $currentVersion
-        
-        if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-          $newVersion = Update-Version -CurrentVersion $currentVersion -BumpType '${{ inputs.version_bump }}'
-          $newVersion | Out-File -FilePath "version.txt" -Encoding UTF8 -Force
-        }
-        
-        "VERSION_TAG=$newVersion" >> $env:GITHUB_OUTPUT
-        Write-Host "Version: $newVersion"
 
-    - name: Build executable with PyInstaller
+    - name: Read and output version tag
+      id: version
       shell: pwsh
       run: |
-        try {
-          pyinstaller --onefile `
-                      --console `
-                      --name=${{ env.APP_NAME }} `
-                      --version-file=version.txt `
-                      --clean `
-                      --noconfirm `
-                      --uac-admin `
-                      android_time_fixer.py
-          if (-not (Test-Path "dist\${{ env.APP_NAME }}.exe")) {
-            throw "Build failed: Executable not created"
-          }
-        } catch {
-          Write-Error "Build failed: $_"
-          exit 1
-        }
+        $VERSION = Get-Content -Path "version.txt"
+        Write-Host "Reading version: $VERSION"
+        echo "VERSION_TAG=$VERSION" >> $env:GITHUB_OUTPUT
 
-    - name: Verify build integrity
+    - name: Debug Info
       shell: pwsh
       run: |
-        $exePath = "dist\${{ env.APP_NAME }}.exe"
-        if (-not (Test-Path $exePath)) {
-          Write-Error "Build artifact not found: $exePath"
-          exit 1
-        }
-        $fileSize = (Get-Item $exePath).Length
-        Write-Host "Build size: $fileSize bytes"
-        if ($fileSize -lt 1MB) {
-          Write-Error "Build file seems too small: $fileSize bytes"
-          exit 1
+        Write-Host "Current branch: ${{ github.ref }}"
+        Write-Host "Version tag: ${{ steps.version.outputs.VERSION_TAG }}"
+        if (Test-Path "dist\AndroidTVTimeFixer.exe") {
+            Get-Item "dist\AndroidTVTimeFixer.exe" | Select-Object FullName, Length, LastWriteTime
+        } else {
+            Write-Error "File dist\AndroidTVTimeFixer.exe not found!"
+            Get-ChildItem "dist" -ErrorAction SilentlyContinue
         }
 
-    - name: Test executable
-      shell: pwsh
-      run: |
-        $exePath = "dist\${{ env.APP_NAME }}.exe"
-        try {
-          $process = Start-Process -FilePath $exePath -ArgumentList "--version" -NoNewWindow -PassThru -Wait
-          if ($process.ExitCode -ne 0) {
-            throw "Executable test failed with exit code: $($process.ExitCode)"
-          }
-        } catch {
-          Write-Error "Executable test failed: $_"
-          exit 1
-        }
-
-    - name: Generate checksums
-      id: generate-checksums
-      shell: pwsh
-      run: |
-        $file = "dist\${{ env.APP_NAME }}.exe"
-        $md5 = (Get-FileHash -Path $file -Algorithm MD5).Hash
-        $sha256 = (Get-FileHash -Path $file -Algorithm SHA256).Hash
-        "MD5=$md5" >> $env:GITHUB_OUTPUT
-        "SHA256=$sha256" >> $env:GITHUB_OUTPUT
-        "MD5: $md5`nSHA256: $sha256" | Out-File -FilePath "dist\checksums.txt"
-
-    - name: Generate build metadata
-      shell: pwsh
-      run: |
-        $metadata = @{
-          version = "${{ steps.version.outputs.VERSION_TAG }}"
-          buildDate = (Get-Date).ToString("o")
-          pythonVersion = "${{ env.PYTHON_VERSION }}"
-          md5 = "${{ steps.generate-checksums.outputs.MD5 }}"
-          sha256 = "${{ steps.generate-checksums.outputs.SHA256 }}"
-        }
-        $metadata | ConvertTo-Json | Out-File "dist\build-info.json"
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.APP_NAME }}
-        path: |
-          dist/${{ env.APP_NAME }}.exe
-          dist/checksums.txt
-          dist/build-info.json
-        retention-days: 90
-
-    - name: Create Release
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: |
-          dist/${{ env.APP_NAME }}.exe
-          dist/checksums.txt
-          dist/build-info.json
+        files: dist/AndroidTVTimeFixer.exe
         tag_name: ${{ steps.version.outputs.VERSION_TAG }}
-        name: '${{ env.APP_NAME }} ${{ steps.version.outputs.VERSION_TAG }}'
+        name: 'AndroidTVTimeFixer ${{ steps.version.outputs.VERSION_TAG }}'
         body: |
           Release version ${{ steps.version.outputs.VERSION_TAG }}
           
-          ### What's New
-          - Automatic build from ${{ github.ref_name }} branch
-          - Improved stability and performance
-          
-          ### Checksums
-          - MD5: ${{ steps.generate-checksums.outputs.MD5 }}
-          - SHA256: ${{ steps.generate-checksums.outputs.SHA256 }}
-          
-          ### System Requirements
-          - Windows 10 or later
-          - No installation required
-          
-          ### How to Use
-          1. Download the AndroidTVTimeFixer.exe file
-          2. Run the executable as administrator
-          3. Follow the instructions in the program
-
+          Включает:
+          - Исполняемый файл AndroidTVTimeFixer.exe
         draft: false
         prerelease: false
-        generate_release_notes: true
 
-    - name: Cleanup
+    - name: Clean up build artifacts
       if: always()
       shell: pwsh
       run: |
-        Remove-Item -Path "dist","build" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "dist", "build" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path "*.spec" -Force -ErrorAction SilentlyContinue
