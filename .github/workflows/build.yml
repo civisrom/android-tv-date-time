@@ -1,0 +1,108 @@
+name: Build AndroidTVTimeFixer
+
+on:
+  push:
+    branches: 
+      - main
+      - master
+  pull_request:
+    branches: 
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Upgrade dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade pyinstaller adb-shell
+
+    - name: Verify source files
+      shell: pwsh
+      run: |
+        if (-not (Test-Path "android_time_fixer.py")) {
+          Write-Error "Source file 'android_time_fixer.py' not found!"
+          exit 1
+        }
+
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --onefile --console --name=AndroidTVTimeFixer android_time_fixer.py
+
+    - name: Upload executable as workflow artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AndroidTVTimeFixer
+        path: dist/AndroidTVTimeFixer.exe
+
+    - name: Ensure version file exists
+      shell: pwsh
+      run: |
+        if (-not (Test-Path "version.txt")) {
+          "v1.0.0" | Out-File -FilePath "version.txt" -Encoding UTF8
+          Write-Host "Created version.txt with v1.0.0"
+        }
+
+    - name: Read and output version tag
+      id: version
+      shell: pwsh
+      run: |
+        $VERSION = Get-Content -Path "version.txt"
+        Write-Host "Reading version: $VERSION"
+        echo "VERSION_TAG=$VERSION" >> $env:GITHUB_OUTPUT
+
+    - name: Debug Info
+      shell: pwsh
+      run: |
+        Write-Host "Current branch: ${{ github.ref }}"
+        Write-Host "Version tag: ${{ steps.version.outputs.VERSION_TAG }}"
+        if (Test-Path "dist\AndroidTVTimeFixer.exe") {
+            Get-Item "dist\AndroidTVTimeFixer.exe" | Select-Object FullName, Length, LastWriteTime
+        } else {
+            Write-Error "File dist\AndroidTVTimeFixer.exe not found!"
+            Get-ChildItem "dist" -ErrorAction SilentlyContinue
+        }
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: dist/AndroidTVTimeFixer.exe
+        tag_name: ${{ steps.version.outputs.VERSION_TAG }}
+        name: 'AndroidTVTimeFixer ${{ steps.version.outputs.VERSION_TAG }}'
+        body: |
+          Release version ${{ steps.version.outputs.VERSION_TAG }}
+          
+          Включает:
+          - Исполняемый файл AndroidTVTimeFixer.exe
+        draft: false
+        prerelease: false
+
+    - name: Clean up build artifacts
+      if: always()
+      shell: pwsh
+      run: |
+        Remove-Item -Path "dist", "build" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "*.spec" -Force -ErrorAction SilentlyContinue
