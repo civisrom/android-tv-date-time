@@ -130,7 +130,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest --cov=. --cov-report=xml
+        python -m pytest tests/ --cov=. --cov-report=xml
       continue-on-error: true
 
     - name: Build executable with PyInstaller
