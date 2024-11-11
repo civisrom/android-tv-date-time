@@ -99,7 +99,8 @@ class AndroidTVTimeFixer:
             'ntp4.ntp-servers.net',
             'ntp5.ntp-servers.net',
             'ntp6.ntp-servers.net',
-            'time.windows.com'
+            'time.windows.com',
+            'time.android.com'
         ]
 
     @staticmethod
