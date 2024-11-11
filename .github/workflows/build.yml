@@ -24,7 +24,6 @@ on:
 env:
   PYTHON_VERSION: '3.13'
   APP_NAME: AndroidTVTimeFixer
-  DEPENDENCIES: 'pyinstaller adb-shell pytest pytest-cov'
 
 permissions:
   contents: write
@@ -43,6 +42,29 @@ jobs:
         fetch-depth: 0
         lfs: true
 
+    - name: Create requirements.txt
+      shell: pwsh
+      run: |
+        @"
+        # Python dependencies for AndroidTVTimeFixer
+        # Created automatically by GitHub Actions
+
+        # Main dependencies
+        pyinstaller==6.5.0
+        adb-shell==0.4.4
+
+        # Testing dependencies
+        pytest==8.0.2
+        pytest-cov==4.1.0
+
+        # Development dependencies
+        wheel==0.42.0
+        setuptools==69.1.1
+        "@ | Out-File -FilePath "requirements.txt" -Encoding UTF8
+        
+        Write-Host "Created requirements.txt with content:"
+        Get-Content "requirements.txt"
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -50,21 +72,28 @@ jobs:
         cache: 'pip'
         check-latest: true
 
-    - name: Cache PyInstaller files
+    - name: Cache dependencies
       uses: actions/cache@v4
       with:
         path: |
           ~\AppData\Local\pip\Cache
           ~\.pyinstaller
-        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('android_time_fixer.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pyinstaller-
+          ${{ runner.os }}-pip-
 
     - name: Install and upgrade dependencies
       run: |
-        python -m pip install --upgrade pip wheel setuptools
-        pip install --upgrade ${{ env.DEPENDENCIES }}
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
       continue-on-error: false
+
+    - name: Export current dependencies
+      shell: pwsh
+      run: |
+        pip freeze > current_requirements.txt
+        Write-Host "Current dependencies:"
+        Get-Content current_requirements.txt
 
     - name: Verify source files and environment
       shell: pwsh
@@ -74,6 +103,11 @@ jobs:
         # Проверка наличия исходного файла
         if (-not (Test-Path "android_time_fixer.py")) {
             throw "Source file 'android_time_fixer.py' not found!"
+        }
+        
+        # Проверка наличия requirements.txt
+        if (-not (Test-Path "requirements.txt")) {
+            throw "Requirements file 'requirements.txt' not found!"
         }
         
         # Проверка версии Python
@@ -127,7 +161,10 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.APP_NAME }}
-        path: dist/${{ env.APP_NAME }}.exe
+        path: |
+          dist/${{ env.APP_NAME }}.exe
+          requirements.txt
+          current_requirements.txt
         retention-days: 5
         if-no-files-found: error
 
@@ -151,7 +188,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: dist/${{ env.APP_NAME }}.exe
+        files: |
+          dist/${{ env.APP_NAME }}.exe
+          requirements.txt
+          current_requirements.txt
         tag_name: ${{ env.VERSION_TAG }}
         name: '${{ env.APP_NAME }} ${{ env.VERSION_TAG }}'
         body: |
@@ -163,10 +203,20 @@ jobs:
           
           ## Файлы
           - ${{ env.APP_NAME }}.exe - основной исполняемый файл
+          - requirements.txt - файл зависимостей
+          - current_requirements.txt - текущие версии всех зависимостей
           
           ## Системные требования
           - Windows 7/8/10/11
           - Не требует установки Python
+          
+          ## Зависимости
+          ```
+          pyinstaller==6.5.0
+          adb-shell==0.4.4
+          pytest==8.0.2
+          pytest-cov==4.1.0
+          ```
           
           ## Примечания к релизу
           Это автоматически сгенерированный релиз из последних изменений в репозитории.
