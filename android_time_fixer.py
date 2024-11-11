@@ -28,6 +28,18 @@ class AndroidTVTimeFixer:
         self.device = None
         self.max_connection_retries = 3
         self.connection_retry_delay = 2
+        self.ntp_servers = {
+            'ru': 'ru.pool.ntp.org',
+            'us': 'us.pool.ntp.org',
+            'gb': 'uk.pool.ntp.org',
+            'de': 'de.pool.ntp.org',
+            'fr': 'fr.pool.ntp.org',
+            'cn': 'cn.pool.ntp.org',
+            'jp': 'jp.pool.ntp.org',
+            'br': 'br.pool.ntp.org',
+            'au': 'au.pool.ntp.org',
+            'ca': 'ca.pool.ntp.org'
+        }
 
     @staticmethod
     def validate_ip(ip: str) -> bool:
@@ -90,18 +102,21 @@ class AndroidTVTimeFixer:
                 logger.warning(f"Попытка подключения {attempt + 1} не удалась, повторная попытка...")
                 time.sleep(self.connection_retry_delay)
 
-    def fix_time(self, country_code: str) -> None:
+    def get_current_ntp(self) -> str:
         if not self.device:
             raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
-        
-        if not self.validate_country_code(country_code):
-            raise AndroidTVTimeFixerError("Неверный формат кода страны. Используйте два буквенных символа (например, 'ru' для России, 'us' для США)")
 
         try:
             current_ntp = self.device.shell('settings get global ntp_server')
-            logger.info(f'Текущий сервер NTP: {current_ntp}')
+            return current_ntp.strip()
+        except Exception as e:
+            raise AndroidTVTimeFixerError(f"Не удалось получить текущий сервер NTP: {str(e)}")
 
-            ntp_server = f'{country_code.strip().lower()}.pool.ntp.org'
+    def set_ntp_server(self, ntp_server: str) -> None:
+        if not self.device:
+            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+
+        try:
             self.device.shell(f'settings put global ntp_server {ntp_server}')
             logger.info(f'Сервер NTP установлен на {ntp_server}')
 
@@ -109,9 +124,18 @@ class AndroidTVTimeFixer:
             new_ntp = self.device.shell('settings get global ntp_server')
             if ntp_server not in new_ntp:
                 raise AndroidTVTimeFixerError("Не удалось подтвердить изменение сервера NTP")
-
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось обновить сервер NTP: {str(e)}")
+
+    def fix_time(self, country_code: str) -> None:
+        if not self.validate_country_code(country_code):
+            raise AndroidTVTimeFixerError("Неверный формат кода страны. Используйте два буквенных символа (например, 'ru' для России, 'us' для США)")
+
+        if country_code.lower() not in self.ntp_servers:
+            raise AndroidTVTimeFixerError(f"Не найден сервер NTP для кода страны '{country_code.upper()}'")
+
+        ntp_server = self.ntp_servers[country_code.lower()]
+        self.set_ntp_server(ntp_server)
 
 def main():
     fixer = AndroidTVTimeFixer()
@@ -140,6 +164,10 @@ def main():
 
         # Подключаемся к устройству
         fixer.connect(ip)
+
+        # Получаем текущий сервер NTP
+        current_ntp = fixer.get_current_ntp()
+        print(f"\nТекущий сервер NTP: {current_ntp}")
 
         # Получаем код страны и исправляем время
         while True:
