@@ -293,7 +293,8 @@ class AndroidTVTimeFixer:
                 'serial': self.device.shell('getprop ro.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
-                'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
+                #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
+                'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip()
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
                 'battery_status': self.device.shell('dumpsys battery | grep status').strip()
             }
@@ -309,7 +310,7 @@ class AndroidTVTimeFixer:
             current_ntp = self.get_current_ntp()
             device_info = self.get_device_info()
             print(f"\nТекущие настройки:")
-            print(f"- Сервер NTP: {current_ntp}")
+            print(f"- Текущий сервер NTP, установленный на устройстве: {current_ntp}")
             print(f"- Устройство (информация):")
             for key, value in device_info.items():
                 print(f"  {key.capitalize()}: {value}")
