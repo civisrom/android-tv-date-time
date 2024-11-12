@@ -292,11 +292,11 @@ class AndroidTVTimeFixer:
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
                 'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
                 #'serial': self.device.shell('getprop ro.serialno').strip(),
-                'serial': self.device.shell('getprop ro.boot.serialno').strip()
+                'serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
                 #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
-                'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip()
+                'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
                 'battery_status': self.device.shell('dumpsys battery | grep status').strip()
             }
@@ -418,8 +418,8 @@ def main():
             print("\nГлавное меню:")
             print("1. Изменить сервер времени NTP по коду страны")
             print("2. Изменить сервер времени NTP на пользовательский")
-            print("3. Показать доступные коды стран")
-            print("4. Показать доступные альтернативные серверы времени NTP")
+            print("3. Показать доступные коды стран и серверов NTP")
+            print("4. Показать доступные альтернативные сервера времени NTP")
             print("5. Показать текущие настройки устройства")
            # print("6. Управление серверами")
             print("6. Расшифровка кодов стран")
