@@ -31,36 +31,9 @@ env:
   CI_DEBUG: true
 
 jobs:
-  generate-requirements:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          
-      - name: Install pipreqs
-        run: pip install pipreqs
-        
-      - name: Generate requirements.txt
-        run: |
-          pipreqs . --force
-          
-      - name: Commit requirements.txt
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add requirements.txt
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-generate requirements.txt"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build:
-    needs: generate-requirements
+  setup-and-build:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
@@ -81,14 +54,38 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 1
+        persist-credentials: false
 
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip'
         check-latest: true
+
+    - name: Create initial requirements
+      shell: bash
+      run: |
+        echo "adb-shell" > requirements.txt
+        echo "pyperclip" >> requirements.txt
+        echo "pyinstaller" >> requirements.txt
+        cat requirements.txt
+
+    - name: Install dependencies (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip list
+
+    - name: Install dependencies (Unix)
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip list
 
     - name: Cache PyInstaller build
       uses: actions/cache@v4
@@ -100,77 +97,50 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pyinstaller-
 
-    - name: Upgrade dependencies
-      run: |
-        python -m pip install --upgrade pip wheel setuptools
-        pip install --upgrade --no-cache-dir -r requirements.txt pyinstaller
-
     - name: Verify CI environment
       shell: bash
       run: |
         echo "CI Environment Information:"
         echo "OS: ${{ runner.os }}"
         echo "Python Version: $(python --version)"
-        echo "Disk Space:"
-        df -h || true
-        echo "Memory Info:"
-        free -h || true
-        echo "Environment Variables:"
-        env | grep -i "github\|python\|ci" || true
-        
-    - name: Security scan dependencies
-      run: |
-        pip install safety
-        safety check
+        echo "Working Directory: $(pwd)"
+        echo "Directory Contents:"
+        ls -la
+        echo "Python Location: $(which python || where python)"
+        echo "Pip Location: $(which pip || where pip)"
 
-    - name: Build executable with PyInstaller
+    - name: Build executable with PyInstaller (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        pyinstaller --clean `
+                   --onefile `
+                   --console `
+                   --name=${{ env.APP_NAME }} `
+                   --log-level=DEBUG `
+                   ${{ env.SOURCE_FILE }}
+        
+        if (-not (Test-Path "dist\${{ env.APP_NAME }}.exe")) {
+            throw "Build failed: Executable not found"
+        }
+
+    - name: Build executable with PyInstaller (Unix)
+      if: matrix.os != 'windows-latest'
       shell: bash
       run: |
-        set -e
-        export APP_PATH="dist/${{ env.APP_NAME }}${{ matrix.extension }}"
-        
-        echo "Starting PyInstaller build..."
+        set -ex
         pyinstaller --clean \
                    --onefile \
                    --console \
                    --name=${{ env.APP_NAME }} \
-                   --log-level=INFO \
-                   --strip \
+                   --log-level=DEBUG \
                    ${{ env.SOURCE_FILE }}
         
-        if [ ! -f "$APP_PATH" ]; then
-          echo "Error: Build failed - executable not found at $APP_PATH"
+        if [ ! -f "dist/${{ env.APP_NAME }}${{ matrix.extension }}" ]; then
+          echo "Build failed: Executable not found"
           exit 1
         fi
-        
-        echo "Build successful!"
-        ls -lh "$APP_PATH"
-
-    - name: Verify executable
-      shell: bash
-      run: |
-        APP_PATH="dist/${{ env.APP_NAME }}${{ matrix.extension }}"
-        
-        echo "Verifying executable at $APP_PATH"
-        if [ ! -f "$APP_PATH" ]; then
-          echo "Error: Executable not found!"
-          exit 1
-        fi
-        
-        # Platform specific checks
-        case "${{ runner.os }}" in
-          "Windows")
-            powershell -Command "Get-AuthenticodeSignature '$APP_PATH'"
-            ;;
-          "Linux")
-            file "$APP_PATH"
-            ldd "$APP_PATH" || true
-            ;;
-          "macOS")
-            file "$APP_PATH"
-            otool -L "$APP_PATH" || true
-            ;;
-        esac
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -180,43 +150,29 @@ jobs:
         retention-days: 90
         if-no-files-found: error
 
-    - name: Process version
-      id: version
-      shell: bash
+    - name: Create version file
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        if [ ! -f "version.txt" ]; then
-          echo "v1.0.0" > version.txt
-          echo "Created version.txt with v1.0.0"
-        fi
-        
-        VERSION=$(cat version.txt | tr -d '\r\n')
-        
-        if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-          echo "Error: Invalid version format in version.txt: $VERSION"
-          exit 1
-        fi
-        
-        echo "VERSION_TAG=$VERSION" >> $GITHUB_OUTPUT
+        "v1.0.0" | Out-File -FilePath "version.txt" -Encoding UTF8 -NoNewline
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
       if: |
         (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
         matrix.os == 'windows-latest'
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: |
-          dist/${{ env.APP_NAME }}${{ matrix.extension }}
-        tag_name: ${{ steps.version.outputs.VERSION_TAG }}
-        name: '${{ env.APP_NAME }} ${{ steps.version.outputs.VERSION_TAG }}'
+        files: dist/${{ env.APP_NAME }}${{ matrix.extension }}
+        tag_name: v1.0.0
+        name: '${{ env.APP_NAME }} v1.0.0'
         body: |
-          Release version ${{ steps.version.outputs.VERSION_TAG }}
+          Release v1.0.0
           
           ### Что нового
           - Кросс-платформенная сборка для Windows, Linux и macOS
-          - Улучшенная обработка ошибок и проверки
-          - Автоматическая генерация requirements.txt
+          - Автоматическая сборка через GitHub Actions
           
           ### Контрольная информация
           - Дата сборки: ${{ github.sha }}
@@ -236,15 +192,5 @@ jobs:
       shell: bash
       run: |
         echo "Cleaning up build artifacts..."
-        rm -rf dist build *.spec
+        rm -rf dist build *.spec || true
         echo "Cleanup complete"
-
-  notify:
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Send build status
-        run: |
-          echo "Build completed with status: ${{ needs.build.result }}"
-          # Here you can add notification logic (e.g., email, Slack, etc.)
