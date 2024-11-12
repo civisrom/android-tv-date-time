@@ -205,8 +205,37 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось загрузить ключи: {str(e)}")
 
+    def find_devices(self) -> list:
+        """Пытаемся найти подключенные устройства через adb"""
+        try:
+            # Выполняем команду для получения списка подключенных устройств
+            result = subprocess.run(['adb', 'devices'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # Разбираем вывод и ищем устройства
+            devices = []
+            for line in result.stdout.splitlines():
+                if line.strip() and line.strip() != "List of devices attached":
+                    device_info = line.split("\t")
+                    if len(device_info) == 2 and device_info[1] == "device":
+                        devices.append(device_info[0])  # Добавляем IP устройства в список
+            return devices
+        except Exception as e:
+            logger.error(f"Ошибка при поиске устройств: {e}")
+            return []
+    
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
+        if ip is None:
+            # Если IP не передан, пробуем найти устройства
+            devices = self.find_devices()
+            if devices:
+                # Если устройства найдены, используем первое
+                ip = devices[0]
+                logger.info(f"Устройство найдено: {ip}")
+            else:
+                logger.warning("Не удалось найти устройства автоматически.")
+                # Предлагаем ввести IP вручную
+                ip = input("Пожалуйста, введите IP-адрес устройства вручную: ").strip()
+        
         if not self.validate_ip(ip):
             raise AndroidTVTimeFixerError("Неверный формат IP-адреса")
 
