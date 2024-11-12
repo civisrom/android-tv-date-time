@@ -94,7 +94,8 @@ class AndroidTVTimeFixer:
             'br': 'br.pool.ntp.org',
             'au': 'au.pool.ntp.org',
             'cn': 'cn.pool.ntp.org',
-            'jp': 'jp.pool.ntp.org'
+            'jp': 'jp.pool.ntp.org',
+            'kz': 'kz.pool.ntp.org'
         }
         self.custom_ntp_servers = [
             'ntp0.ntp-servers.net',
@@ -290,7 +291,8 @@ class AndroidTVTimeFixer:
                 'name': self.device.shell('getprop ro.product.name').strip(),
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
                 'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
-                'serial': self.device.shell('getprop ro.serialno').strip(),
+                #'serial': self.device.shell('getprop ro.serialno').strip(),
+                'serial': self.device.shell('getprop ro.boot.serialno').strip()
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
                 #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
