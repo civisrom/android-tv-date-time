@@ -87,7 +87,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip list
-
+        
+    - name: Install zip (Unix)
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y zip
+        
     - name: Prepare cache directories
       shell: bash
       run: |
