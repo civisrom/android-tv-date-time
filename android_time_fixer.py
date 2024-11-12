@@ -11,6 +11,20 @@ from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
+def show_disclaimer():
+    disclaimer = """
+    ==========================================
+    ВНИМАНИЕ: Эта программа предоставляется на условиях «как есть» (as is).
+    Автор(ы) не несут ответственности за любые возможные убытки или ущерб,
+    возникшие в результате использования данной программы.
+    ==========================================
+    """
+    print(disclaimer)
+
+# Вызов функции при запуске программы
+if __name__ == "__main__":
+    show_disclaimer()
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
