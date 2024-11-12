@@ -432,7 +432,7 @@ def main():
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
-                    code = input('\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри меню доступные коды стран, для отмены Ctrl+C): ').strip()
+                    code = input('\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ').strip()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
