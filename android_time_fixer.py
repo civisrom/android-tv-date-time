@@ -413,14 +413,14 @@ def main():
 
         while True:
             print("\nГлавное меню:")
-            print("1. Изменить сервер NTP по коду страны")
-            print("2. Изменить сервер NTP на пользовательский")
+            print("1. Изменить сервер времени NTP по коду страны")
+            print("2. Изменить сервер времени NTP на пользовательский")
             print("3. Показать доступные коды стран")
-            print("4. Показать доступные альтернативные серверы NTP")
-            print("5. Показать текущие настройки")
-            print("6. Управление серверами")
-            print("7. Справка")
-            print("8. Выход")
+            print("4. Показать доступные альтернативные серверы времени NTP")
+            print("5. Показать текущие настройки устройства")
+           # print("6. Управление серверами")
+           # print("6. Справка")
+            print("6. Выход")
            # print("\nДля возврата к предыдущему меню введите 'b'")
 
             choice = input("Введите номер пункта меню: ").strip()
@@ -430,7 +430,7 @@ def main():
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
-                    code = input('\nВведите код вашей страны (например, ru для России, us для США): ').strip()
+                    code = input('\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри меню доступные коды стран, для отмены Ctrl+C): ').strip()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
@@ -460,7 +460,7 @@ def main():
                 else:
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
-            elif choice == '6':
+            elif choice == '8':
                 fixer.manage_servers()
 
             elif choice == '7':
@@ -482,7 +482,7 @@ def main():
                 print("   - Попробуйте еще раз подключиться к устройству.")
                # print("\nВведите 'b' для возврата в главное меню.")
 
-            elif choice == '8':
+            elif choice == '6':
                 print("\nВыход из программы...")
                 sys.exit(0)
             
