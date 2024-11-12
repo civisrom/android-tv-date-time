@@ -35,7 +35,7 @@ jobs:
     - name: Upgrade dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install --upgrade pyinstaller adb-shell
+        pip install --upgrade pyinstaller adb-shell pyperclip
 
     - name: Verify source files
       shell: pwsh
