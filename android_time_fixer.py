@@ -204,7 +204,7 @@ class AndroidTVTimeFixer:
         while time.time() - start_time < self.connection_timeout:
             try:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
-                self.device.connect(rsa_keys=[signer], auth_timeout_s=7)
+                self.device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 connection_established = True
                 logger.info(f'Подключение к {ip}:5555 выполнено успешно')
                 break
