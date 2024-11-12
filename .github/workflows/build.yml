@@ -88,12 +88,16 @@ jobs:
         pip install -r requirements.txt
         pip list
         
-    - name: Install zip (Unix)
-      if: matrix.os != 'windows-latest'
-      shell: bash
+    - name: Install zip
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
         sudo apt-get install -y zip
+
+    - name: Install zip (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install zip
         
     - name: Prepare cache directories
       shell: bash
@@ -167,16 +171,20 @@ jobs:
         if [ "${{ matrix.os }}" != "windows-latest" ]; then
           chmod +x dist/${{ env.APP_NAME }}
         fi
-
-    - name: Package build
+    - name: Package build (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        cd dist
+        Compress-Archive -Path AndroidTVTimeFixer.exe -DestinationPath AndroidTVTimeFixer-windows.zip
+        cd ..
+        
+    - name: Package build (Unix)
+      if: matrix.os != 'windows-latest'
       shell: bash
       run: |
         cd dist
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          zip -r ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}.exe
-        else
-          zip -r ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}
-        fi
+        zip -r AndroidTVTimeFixer-${{ matrix.platform }}.zip AndroidTVTimeFixer
         cd ..
 
     - name: Upload build artifact
