@@ -1,5 +1,4 @@
 import os
-import time
 import sys
 import re
 import time
@@ -30,7 +29,7 @@ class AndroidTVTimeFixer:
         self.keys_folder = self.current_path / 'keys'
         self.device = None
         self.max_connection_retries = 3
-        self.connection_retry_delay = 2
+        self.connection_retry_delay = 7
         self.connection_timeout = 60  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
@@ -193,15 +192,14 @@ class AndroidTVTimeFixer:
 
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
-
+        
         start_time = time.time()
-        connection_attempts = 0
         connection_established = False
         last_error = None
-
+        
         print("\nОжидание подключения и разрешения на устройстве...")
         print("Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос.")
-
+        
         while time.time() - start_time < self.connection_timeout:
             try:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
@@ -211,23 +209,12 @@ class AndroidTVTimeFixer:
                 break
             except Exception as e:
                 last_error = str(e)
-                if "device offline" in last_error or "device not found" in last_error:
-                    # Если устройство недоступно, увеличиваем счетчик попыток
-                    connection_attempts += 1
-                    if connection_attempts >= self.max_connection_retries:
-                        # Если достигнуто максимальное количество попыток, выходим из цикла
-                        break
-                    # Ждем некоторое время перед следующей попыткой
-                    time.sleep(self.connection_retry_delay)
-                    continue
-                elif "Unable to authenticate with remote" in last_error:
-                    # Если требуется предоставить доступ, ждем 10 секунд и пробуем еще раз
-                    time.sleep(10)
-                    continue
-                else:
-                    # Для других ошибок выходим из цикла
-                    break
+                remaining_time = int(self.connection_timeout - (time.time() - start_time))
+                print(f"\rОжидание подключения... {remaining_time} сек.", end='')
+                time.sleep(1)
 
+        print()  # Новая строка после завершения ожидания
+        
         if not connection_established:
             raise AndroidTVTimeFixerError(
                 f"Не удалось подключиться в течение {self.connection_timeout} секунд.\n"
