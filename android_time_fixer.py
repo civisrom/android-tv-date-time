@@ -120,6 +120,11 @@ class AndroidTVTimeFixer:
             'ntp5.ntp-servers.net',
             'ntp6.ntp-servers.net',
             'time.windows.com',
+            'twc.trafficmanager.net',
+            '0.europe.pool.ntp.org',
+            '1.europe.pool.ntp.org',
+            '2.europe.pool.ntp.org',
+            '3.europe.pool.ntp.org',
             'time.android.com'
         ]
 
