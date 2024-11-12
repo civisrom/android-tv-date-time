@@ -195,6 +195,7 @@ class AndroidTVTimeFixer:
         signer = PythonRSASigner(pub, priv)
 
         start_time = time.time()
+        connection_attempts = 0
         connection_established = False
         last_error = None
 
@@ -210,11 +211,21 @@ class AndroidTVTimeFixer:
                 break
             except Exception as e:
                 last_error = str(e)
-                if "Unable to connect" in last_error:
-                    # Если не удалось подключиться, то ждем 5 секунд и пробуем еще раз
-                    time.sleep(5)
+                if "device offline" in last_error or "device not found" in last_error:
+                    # Если устройство недоступно, увеличиваем счетчик попыток
+                    connection_attempts += 1
+                    if connection_attempts >= self.max_connection_retries:
+                        # Если достигнуто максимальное количество попыток, выходим из цикла
+                        break
+                    # Ждем некоторое время перед следующей попыткой
+                    time.sleep(self.connection_retry_delay)
+                    continue
+                elif "Unable to authenticate with remote" in last_error:
+                    # Если требуется предоставить доступ, ждем 10 секунд и пробуем еще раз
+                    time.sleep(10)
                     continue
                 else:
+                    # Для других ошибок выходим из цикла
                     break
 
         if not connection_established:
