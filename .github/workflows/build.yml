@@ -39,13 +39,13 @@ jobs:
         include:
           - os: windows-latest
             extension: .exe
-            separator: '\\'
+            platform: windows
           - os: ubuntu-latest
             extension: ''
-            separator: '/'
+            platform: linux
           - os: macos-latest
             extension: ''
-            separator: '/'
+            platform: macos
     
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -62,6 +62,7 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         check-latest: true
+        cache: 'pip'
 
     - name: Create initial requirements
       shell: bash
@@ -87,27 +88,41 @@ jobs:
         pip install -r requirements.txt
         pip list
 
+    - name: Prepare cache directories
+      shell: bash
+      run: |
+        mkdir -p build_cache
+        mkdir -p spec_cache
+        
+        if [ -d "build" ]; then
+          cp -r build/* build_cache/ || true
+        fi
+        
+        if [ -f "*.spec" ]; then
+          cp *.spec spec_cache/ || true
+        fi
+
     - name: Cache PyInstaller build
       uses: actions/cache@v4
       with:
         path: |
-          build
-          *.spec
+          build_cache
+          spec_cache
         key: ${{ runner.os }}-pyinstaller-${{ hashFiles('*.py', 'requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pyinstaller-
 
-    - name: Verify CI environment
+    - name: Restore cache to build directory
       shell: bash
       run: |
-        echo "CI Environment Information:"
-        echo "OS: ${{ runner.os }}"
-        echo "Python Version: $(python --version)"
-        echo "Working Directory: $(pwd)"
-        echo "Directory Contents:"
-        ls -la
-        echo "Python Location: $(which python || where python)"
-        echo "Pip Location: $(which pip || where pip)"
+        if [ -d "build_cache" ] && [ "$(ls -A build_cache)" ]; then
+          mkdir -p build
+          cp -r build_cache/* build/ || true
+        fi
+        
+        if [ -d "spec_cache" ] && [ "$(ls -A spec_cache)" ]; then
+          cp spec_cache/*.spec . || true
+        fi
 
     - name: Build executable with PyInstaller (Windows)
       if: matrix.os == 'windows-latest'
@@ -141,48 +156,96 @@ jobs:
           echo "Build failed: Executable not found"
           exit 1
         fi
+        
+        if [ "${{ matrix.os }}" != "windows-latest" ]; then
+          chmod +x dist/${{ env.APP_NAME }}
+        fi
 
-    - name: Upload artifact
+    - name: Package build
+      shell: bash
+      run: |
+        cd dist
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          zip -r ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}.exe
+        else
+          zip -r ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}
+        fi
+        cd ..
+
+    - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}-${{ runner.os }}
-        path: dist/${{ env.APP_NAME }}${{ matrix.extension }}
+        name: ${{ env.APP_NAME }}-${{ matrix.platform }}
+        path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
         retention-days: 90
         if-no-files-found: error
 
     - name: Create version file
       if: matrix.os == 'windows-latest'
-      shell: pwsh
+      shell: bash
       run: |
-        "v1.0.0" | Out-File -FilePath "version.txt" -Encoding UTF8 -NoNewline
+        echo "v1.0.0" > version.txt
 
-    - name: Create GitHub Release
-      if: |
-        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
-        matrix.os == 'windows-latest'
+  create-release:
+    needs: setup-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: dist
+        merge-multiple: true
+
+    - name: Create Release
       uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: dist/${{ env.APP_NAME }}${{ matrix.extension }}
+        files: |
+          dist/*.zip
         tag_name: v1.0.0
-        name: '${{ env.APP_NAME }} v1.0.0'
+        name: 'Release v1.0.0'
         body: |
           Release v1.0.0
           
-          ### Что нового
-          - Кросс-платформенная сборка для Windows, Linux и macOS
-          - Автоматическая сборка через GitHub Actions
-          
-          ### Контрольная информация
-          - Дата сборки: ${{ github.sha }}
-          - Версия Python: ${{ env.PYTHON_VERSION }}
-          - Платформа сборки: ${{ runner.os }}
+          ### Сборки для разных платформ
+          - Windows (AMD64): `${{ env.APP_NAME }}-windows.zip`
+          - Linux (AMD64): `${{ env.APP_NAME }}-linux.zip`
+          - macOS (AMD64): `${{ env.APP_NAME }}-macos.zip`
           
           ### Установка
-          1. Скачайте файл для вашей операционной системы
-          2. Запустите программу от имени администратора (для Windows)
-          3. Для Linux/macOS: `chmod +x ./${{ env.APP_NAME }} && ./${{ env.APP_NAME }}`
+          
+          #### Windows
+          1. Распакуйте архив
+          2. Запустите .exe файл от имени администратора
+          
+          #### Linux
+          1. Распакуйте архив
+          2. Откройте терминал в папке с программой
+          3. Выполните команды:
+             ```bash
+             chmod +x ./${{ env.APP_NAME }}
+             ./${{ env.APP_NAME }}
+             ```
+          
+          #### macOS
+          1. Распакуйте архив
+          2. Откройте терминал в папке с программой
+          3. Выполните команды:
+             ```bash
+             chmod +x ./${{ env.APP_NAME }}
+             ./${{ env.APP_NAME }}
+             ```
+          
+          ### Контрольная информация
+          - Версия Python: ${{ env.PYTHON_VERSION }}
+          - Дата сборки: ${{ github.sha }}
+          
+          ### Примечания к выпуску
+          - Кросс-платформенная сборка для всех основных ОС
+          - Автоматическая сборка через GitHub Actions
         draft: false
         prerelease: false
         generate_release_notes: true
@@ -191,6 +254,6 @@ jobs:
       if: always()
       shell: bash
       run: |
-        echo "Cleaning up build artifacts..."
-        rm -rf dist build *.spec || true
+        echo "Cleaning up artifacts..."
+        rm -rf dist
         echo "Cleanup complete"
