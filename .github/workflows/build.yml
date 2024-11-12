@@ -5,10 +5,18 @@ on:
     branches: 
       - main
       - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches: 
       - main
       - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
@@ -16,72 +24,140 @@ permissions:
   packages: write
   actions: write
 
+env:
+  PYTHON_VERSION: '3.13'
+  APP_NAME: AndroidTVTimeFixer
+  SOURCE_FILE: android_time_fixer.py
+
 jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 15
-
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Set up Python
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        check-latest: true
+
+    - name: Cache PyInstaller build
+      uses: actions/cache@v4
+      with:
+        path: |
+          build
+          *.spec
+        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('*.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pyinstaller-
 
     - name: Upgrade dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade pyinstaller adb-shell pyperclip
+        python -m pip install --upgrade pip wheel setuptools
+        pip install --upgrade --no-cache-dir pyinstaller adb-shell pyperclip
 
-    - name: Verify source files
+    - name: Verify source files and environment
       shell: pwsh
       run: |
-        if (-not (Test-Path "android_time_fixer.py")) {
-          Write-Error "Source file 'android_time_fixer.py' not found!"
+        # Проверка исходного файла
+        if (-not (Test-Path "${{ env.SOURCE_FILE }}")) {
+          Write-Error "Source file '${{ env.SOURCE_FILE }}' not found!"
+          exit 1
+        }
+        
+        # Проверка версии Python
+        $pythonVersion = (python --version 2>&1).ToString()
+        Write-Host "Using Python: $pythonVersion"
+        
+        # Проверка установленных пакетов
+        pip list
+        
+        # Проверка доступного места
+        $disk = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
+        Write-Host "Available disk space: $([math]::Round($disk.FreeSpace / 1GB, 2)) GB"
+
+    - name: Build executable with PyInstaller
+      shell: pwsh
+      run: |
+        try {
+          pyinstaller --clean `
+                     --onefile `
+                     --console `
+                     --name=${{ env.APP_NAME }} `
+                     --log-level=INFO `
+                     --strip `
+                     ${{ env.SOURCE_FILE }}
+          
+          if (-not (Test-Path "dist\${{ env.APP_NAME }}.exe")) {
+            throw "Build failed: Executable not found"
+          }
+          
+          # Получение размера файла
+          $fileSize = (Get-Item "dist\${{ env.APP_NAME }}.exe").Length
+          Write-Host "Executable size: $([math]::Round($fileSize / 1MB, 2)) MB"
+          
+        } catch {
+          Write-Error "Build failed: $_"
           exit 1
         }
 
-    - name: Build executable with PyInstaller
+    - name: Verify executable
+      shell: pwsh
       run: |
-        pyinstaller --onefile --console --name=AndroidTVTimeFixer android_time_fixer.py
+        $exePath = "dist\${{ env.APP_NAME }}.exe"
+        if (-not (Test-Path $exePath)) {
+          Write-Error "Executable not found at: $exePath"
+          exit 1
+        }
+        
+        # Проверка цифровой подписи (если есть)
+        try {
+          $signature = Get-AuthenticodeSignature $exePath
+          Write-Host "Signature status: $($signature.Status)"
+        } catch {
+          Write-Warning "Could not verify signature: $_"
+        }
+        
+        # Проверка метаданных файла
+        $fileInfo = Get-Item $exePath | Select-Object *
+        Write-Host "File created: $($fileInfo.CreationTime)"
+        Write-Host "File size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
 
     - name: Upload executable as workflow artifact
       uses: actions/upload-artifact@v4
       with:
-        name: AndroidTVTimeFixer
-        path: dist/AndroidTVTimeFixer.exe
+        name: ${{ env.APP_NAME }}
+        path: dist/${{ env.APP_NAME }}.exe
+        retention-days: 90
+        if-no-files-found: error
 
-    - name: Ensure version file exists
+    - name: Process version
+      id: version
       shell: pwsh
       run: |
+        # Создание или чтение version.txt
         if (-not (Test-Path "version.txt")) {
           "v1.0.0" | Out-File -FilePath "version.txt" -Encoding UTF8
           Write-Host "Created version.txt with v1.0.0"
         }
-
-    - name: Read and output version tag
-      id: version
-      shell: pwsh
-      run: |
-        $VERSION = Get-Content -Path "version.txt"
-        Write-Host "Reading version: $VERSION"
-        echo "VERSION_TAG=$VERSION" >> $env:GITHUB_OUTPUT
-
-    - name: Debug Info
-      shell: pwsh
-      run: |
-        Write-Host "Current branch: ${{ github.ref }}"
-        Write-Host "Version tag: ${{ steps.version.outputs.VERSION_TAG }}"
-        if (Test-Path "dist\AndroidTVTimeFixer.exe") {
-            Get-Item "dist\AndroidTVTimeFixer.exe" | Select-Object FullName, Length, LastWriteTime
-        } else {
-            Write-Error "File dist\AndroidTVTimeFixer.exe not found!"
-            Get-ChildItem "dist" -ErrorAction SilentlyContinue
+        
+        $VERSION = Get-Content -Path "version.txt" -Raw
+        $VERSION = $VERSION.Trim()
+        
+        # Валидация формата версии
+        if ($VERSION -notmatch '^v\d+\.\d+\.\d+$') {
+          Write-Error "Invalid version format in version.txt: $VERSION"
+          exit 1
         }
+        
+        Write-Host "Version: $VERSION"
+        echo "VERSION_TAG=$VERSION" >> $env:GITHUB_OUTPUT
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -89,20 +165,43 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: dist/AndroidTVTimeFixer.exe
+        files: dist/${{ env.APP_NAME }}.exe
         tag_name: ${{ steps.version.outputs.VERSION_TAG }}
-        name: 'AndroidTVTimeFixer ${{ steps.version.outputs.VERSION_TAG }}'
+        name: '${{ env.APP_NAME }} ${{ steps.version.outputs.VERSION_TAG }}'
         body: |
           Release version ${{ steps.version.outputs.VERSION_TAG }}
           
-          Включает:
-          - Исполняемый файл AndroidTVTimeFixer.exe
+          ### Что нового
+          - Исполняемый файл ${{ env.APP_NAME }}.exe
+          
+          ### Контрольная информация
+          - Дата сборки: ${{ env.GITHUB_SHA }}
+          - Версия Python: ${{ env.PYTHON_VERSION }}
+          
+          ### Установка
+          1. Скачайте файл ${{ env.APP_NAME }}.exe
+          2. Запустите программу от имени администратора
         draft: false
         prerelease: false
+        generate_release_notes: true
 
-    - name: Clean up build artifacts
+    - name: Clean up
       if: always()
       shell: pwsh
       run: |
-        Remove-Item -Path "dist", "build" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "*.spec" -Force -ErrorAction SilentlyContinue
+        $foldersToClean = @("dist", "build")
+        $filesToClean = @("*.spec")
+        
+        foreach ($folder in $foldersToClean) {
+          if (Test-Path $folder) {
+            Remove-Item -Path $folder -Recurse -Force
+            Write-Host "Cleaned up $folder"
+          }
+        }
+        
+        foreach ($pattern in $filesToClean) {
+          Get-Item -Path $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+            Remove-Item -Path $_.FullName -Force
+            Write-Host "Cleaned up $($_.Name)"
+          }
+        }
