@@ -279,7 +279,7 @@ class AndroidTVTimeFixer:
             except AndroidTVTimeFixerError as e:
                 print(f"Ошибка: {str(e)}")
 
-        def get_device_info(self) -> dict:
+    def get_device_info(self) -> dict:
         if not self.device:
             raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
 
