@@ -1,4 +1,5 @@
 import os
+import time
 import sys
 import re
 import time
@@ -192,14 +193,14 @@ class AndroidTVTimeFixer:
 
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
-        
+
         start_time = time.time()
         connection_established = False
         last_error = None
-        
+
         print("\nОжидание подключения и разрешения на устройстве...")
         print("Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос.")
-        
+
         while time.time() - start_time < self.connection_timeout:
             try:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
@@ -209,12 +210,13 @@ class AndroidTVTimeFixer:
                 break
             except Exception as e:
                 last_error = str(e)
-                remaining_time = int(self.connection_timeout - (time.time() - start_time))
-                print(f"\rОжидание подключения... {remaining_time} сек.", end='')
-                time.sleep(1)
+                if "Unable to connect" in last_error:
+                    # Если не удалось подключиться, то ждем 5 секунд и пробуем еще раз
+                    time.sleep(5)
+                    continue
+                else:
+                    break
 
-        print()  # Новая строка после завершения ожидания
-        
         if not connection_established:
             raise AndroidTVTimeFixerError(
                 f"Не удалось подключиться в течение {self.connection_timeout} секунд.\n"
