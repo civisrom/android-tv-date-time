@@ -21,7 +21,7 @@ class CIBuildError(Exception):
 
 class GithubBuilder:
     def __init__(self):
-        self.script_path = Path('android_tv_time_fixer.py')
+        self.script_path = Path('android_time_fixer.py')
         self.build_dir = Path('build')
         self.dist_dir = Path('dist')
         self.artifacts_dir = Path('artifacts')
