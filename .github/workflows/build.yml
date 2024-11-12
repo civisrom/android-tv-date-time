@@ -28,11 +28,54 @@ env:
   PYTHON_VERSION: '3.13'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
+  CI_DEBUG: true
 
 jobs:
+  generate-requirements:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install pipreqs
+        run: pip install pipreqs
+        
+      - name: Generate requirements.txt
+        run: |
+          pipreqs . --force
+          
+      - name: Commit requirements.txt
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add requirements.txt
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-generate requirements.txt"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
-    runs-on: windows-latest
-    timeout-minutes: 15
+    needs: generate-requirements
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            extension: .exe
+            separator: '\\'
+          - os: ubuntu-latest
+            extension: ''
+            separator: '/'
+          - os: macos-latest
+            extension: ''
+            separator: '/'
+    
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     
     steps:
     - name: Checkout repository
@@ -53,155 +96,155 @@ jobs:
         path: |
           build
           *.spec
-        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('*.py') }}
+        key: ${{ runner.os }}-pyinstaller-${{ hashFiles('*.py', 'requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pyinstaller-
 
     - name: Upgrade dependencies
       run: |
         python -m pip install --upgrade pip wheel setuptools
-        pip install --upgrade --no-cache-dir pyinstaller adb-shell pyperclip
+        pip install --upgrade --no-cache-dir -r requirements.txt pyinstaller
 
-    - name: Verify source files and environment
-      shell: pwsh
+    - name: Verify CI environment
+      shell: bash
       run: |
-        # Проверка исходного файла
-        if (-not (Test-Path "${{ env.SOURCE_FILE }}")) {
-          Write-Error "Source file '${{ env.SOURCE_FILE }}' not found!"
-          exit 1
-        }
+        echo "CI Environment Information:"
+        echo "OS: ${{ runner.os }}"
+        echo "Python Version: $(python --version)"
+        echo "Disk Space:"
+        df -h || true
+        echo "Memory Info:"
+        free -h || true
+        echo "Environment Variables:"
+        env | grep -i "github\|python\|ci" || true
         
-        # Проверка версии Python
-        $pythonVersion = (python --version 2>&1).ToString()
-        Write-Host "Using Python: $pythonVersion"
-        
-        # Проверка установленных пакетов
-        pip list
-        
-        # Проверка доступного места
-        $disk = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
-        Write-Host "Available disk space: $([math]::Round($disk.FreeSpace / 1GB, 2)) GB"
+    - name: Security scan dependencies
+      run: |
+        pip install safety
+        safety check
 
     - name: Build executable with PyInstaller
-      shell: pwsh
+      shell: bash
       run: |
-        try {
-          pyinstaller --clean `
-                     --onefile `
-                     --console `
-                     --name=${{ env.APP_NAME }} `
-                     --log-level=INFO `
-                     --strip `
-                     ${{ env.SOURCE_FILE }}
-          
-          if (-not (Test-Path "dist\${{ env.APP_NAME }}.exe")) {
-            throw "Build failed: Executable not found"
-          }
-          
-          # Получение размера файла
-          $fileSize = (Get-Item "dist\${{ env.APP_NAME }}.exe").Length
-          Write-Host "Executable size: $([math]::Round($fileSize / 1MB, 2)) MB"
-          
-        } catch {
-          Write-Error "Build failed: $_"
+        set -e
+        export APP_PATH="dist/${{ env.APP_NAME }}${{ matrix.extension }}"
+        
+        echo "Starting PyInstaller build..."
+        pyinstaller --clean \
+                   --onefile \
+                   --console \
+                   --name=${{ env.APP_NAME }} \
+                   --log-level=INFO \
+                   --strip \
+                   ${{ env.SOURCE_FILE }}
+        
+        if [ ! -f "$APP_PATH" ]; then
+          echo "Error: Build failed - executable not found at $APP_PATH"
           exit 1
-        }
+        fi
+        
+        echo "Build successful!"
+        ls -lh "$APP_PATH"
 
     - name: Verify executable
-      shell: pwsh
+      shell: bash
       run: |
-        $exePath = "dist\${{ env.APP_NAME }}.exe"
-        if (-not (Test-Path $exePath)) {
-          Write-Error "Executable not found at: $exePath"
+        APP_PATH="dist/${{ env.APP_NAME }}${{ matrix.extension }}"
+        
+        echo "Verifying executable at $APP_PATH"
+        if [ ! -f "$APP_PATH" ]; then
+          echo "Error: Executable not found!"
           exit 1
-        }
+        fi
         
-        # Проверка цифровой подписи (если есть)
-        try {
-          $signature = Get-AuthenticodeSignature $exePath
-          Write-Host "Signature status: $($signature.Status)"
-        } catch {
-          Write-Warning "Could not verify signature: $_"
-        }
-        
-        # Проверка метаданных файла
-        $fileInfo = Get-Item $exePath | Select-Object *
-        Write-Host "File created: $($fileInfo.CreationTime)"
-        Write-Host "File size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
+        # Platform specific checks
+        case "${{ runner.os }}" in
+          "Windows")
+            powershell -Command "Get-AuthenticodeSignature '$APP_PATH'"
+            ;;
+          "Linux")
+            file "$APP_PATH"
+            ldd "$APP_PATH" || true
+            ;;
+          "macOS")
+            file "$APP_PATH"
+            otool -L "$APP_PATH" || true
+            ;;
+        esac
 
-    - name: Upload executable as workflow artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}
-        path: dist/${{ env.APP_NAME }}.exe
+        name: ${{ env.APP_NAME }}-${{ runner.os }}
+        path: dist/${{ env.APP_NAME }}${{ matrix.extension }}
         retention-days: 90
         if-no-files-found: error
 
     - name: Process version
       id: version
-      shell: pwsh
+      shell: bash
       run: |
-        # Создание или чтение version.txt
-        if (-not (Test-Path "version.txt")) {
-          "v1.0.0" | Out-File -FilePath "version.txt" -Encoding UTF8
-          Write-Host "Created version.txt with v1.0.0"
-        }
+        if [ ! -f "version.txt" ]; then
+          echo "v1.0.0" > version.txt
+          echo "Created version.txt with v1.0.0"
+        fi
         
-        $VERSION = Get-Content -Path "version.txt" -Raw
-        $VERSION = $VERSION.Trim()
+        VERSION=$(cat version.txt | tr -d '\r\n')
         
-        # Валидация формата версии
-        if ($VERSION -notmatch '^v\d+\.\d+\.\d+$') {
-          Write-Error "Invalid version format in version.txt: $VERSION"
+        if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "Error: Invalid version format in version.txt: $VERSION"
           exit 1
-        }
+        fi
         
-        Write-Host "Version: $VERSION"
-        echo "VERSION_TAG=$VERSION" >> $env:GITHUB_OUTPUT
+        echo "VERSION_TAG=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      if: |
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+        matrix.os == 'windows-latest'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: dist/${{ env.APP_NAME }}.exe
+        files: |
+          dist/${{ env.APP_NAME }}${{ matrix.extension }}
         tag_name: ${{ steps.version.outputs.VERSION_TAG }}
         name: '${{ env.APP_NAME }} ${{ steps.version.outputs.VERSION_TAG }}'
         body: |
           Release version ${{ steps.version.outputs.VERSION_TAG }}
           
           ### Что нового
-          - Исполняемый файл ${{ env.APP_NAME }}.exe
+          - Кросс-платформенная сборка для Windows, Linux и macOS
+          - Улучшенная обработка ошибок и проверки
+          - Автоматическая генерация requirements.txt
           
           ### Контрольная информация
-          - Дата сборки: ${{ env.GITHUB_SHA }}
+          - Дата сборки: ${{ github.sha }}
           - Версия Python: ${{ env.PYTHON_VERSION }}
+          - Платформа сборки: ${{ runner.os }}
           
           ### Установка
-          1. Скачайте файл ${{ env.APP_NAME }}.exe
-          2. Запустите программу от имени администратора
+          1. Скачайте файл для вашей операционной системы
+          2. Запустите программу от имени администратора (для Windows)
+          3. Для Linux/macOS: `chmod +x ./${{ env.APP_NAME }} && ./${{ env.APP_NAME }}`
         draft: false
         prerelease: false
         generate_release_notes: true
 
     - name: Clean up
       if: always()
-      shell: pwsh
+      shell: bash
       run: |
-        $foldersToClean = @("dist", "build")
-        $filesToClean = @("*.spec")
-        
-        foreach ($folder in $foldersToClean) {
-          if (Test-Path $folder) {
-            Remove-Item -Path $folder -Recurse -Force
-            Write-Host "Cleaned up $folder"
-          }
-        }
-        
-        foreach ($pattern in $filesToClean) {
-          Get-Item -Path $pattern -ErrorAction SilentlyContinue | ForEach-Object {
-            Remove-Item -Path $_.FullName -Force
-            Write-Host "Cleaned up $($_.Name)"
-          }
-        }
+        echo "Cleaning up build artifacts..."
+        rm -rf dist build *.spec
+        echo "Cleanup complete"
+
+  notify:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send build status
+        run: |
+          echo "Build completed with status: ${{ needs.build.result }}"
+          # Here you can add notification logic (e.g., email, Slack, etc.)
