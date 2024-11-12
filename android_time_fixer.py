@@ -317,7 +317,23 @@ class AndroidTVTimeFixer:
                 #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
                 'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
-                'battery_status': self.device.shell('dumpsys battery | grep status').strip()
+                'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
+                'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
+                'device': self.device.shell('getprop ro.product.device').strip(),
+                'build_id': self.device.shell('getprop ro.build.id').strip(),
+                'build_fingerprint': self.device.shell('getprop ro.build.fingerprint').strip(),
+                'uptime': self.device.shell('cat /proc/uptime').strip(),
+                'total_ram': self.device.shell("cat /proc/meminfo | grep 'MemTotal'").strip(),
+                'available_ram': self.device.shell("cat /proc/meminfo | grep 'MemAvailable'").strip(),
+                'screen_resolution': self.device.shell('wm size').strip(),
+                'screen_density': self.device.shell('wm density').strip(),
+                'timezone': self.device.shell('getprop persist.sys.timezone').strip(),
+                'locale': self.device.shell('getprop persist.sys.locale').strip(),
+                'cpu_cores': self.device.shell('cat /proc/cpuinfo | grep "^processor" | wc -l').strip(),
+                'bootloader_version': self.device.shell('getprop ro.bootloader').strip(),  # Версия загрузчика
+                'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
+                'kernel_version': self.device.shell('uname -r').strip(),
+                'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
             }
             return device_info
         except Exception as e:
