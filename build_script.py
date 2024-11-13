@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import List, Optional
 from contextlib import contextmanager
 
-# Настройка логирования для CI/CD
+# Настройка расширенного логирования для CI/CD
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
     force=True
 )
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class GithubBuilder:
         self.dist_dir = Path('dist')
         self.artifacts_dir = Path('artifacts')
         self.executable_name = 'AndroidTVTimeFixer'
-        self.requirements = ['pyinstaller', 'adb-shell']
+        self.requirements = ['pyinstaller==6.11.1', 'adb-shell==0.4.4']
         
         # Определяем расширение файла в зависимости от ОС
         self.executable_extension = '.exe' if sys.platform == 'win32' else ''
@@ -58,7 +59,7 @@ class GithubBuilder:
             raise CIBuildError(f"Ошибка настройки CI окружения: {e}")
 
     def install_requirements(self) -> bool:
-        """Устанавливает зависимости в CI окружении"""
+        """Устанавливает зависимости в CI окружении с кэшированием"""
         try:
             # Обновляем pip
             subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'],
@@ -114,7 +115,7 @@ class GithubBuilder:
             return True
             
         except Exception as e:
-            logger.error(f"Ошибка сборки: {e}")
+            logger.error(f"Ошибка сборки: {e}", exc_info=True)
             return False
 
     def run_ci_build(self) -> bool:
@@ -134,7 +135,7 @@ class GithubBuilder:
             return True
             
         except Exception as e:
-            logger.error(f"Ошибка CI сборки: {e}")
+            logger.error(f"Ошибка CI сборки: {e}", exc_info=True)
             return False
 
 def main():
@@ -143,7 +144,7 @@ def main():
         success = builder.run_ci_build()
         sys.exit(0 if success else 1)
     except Exception as e:
-        logger.critical(f"Критическая ошибка: {e}")
+        logger.critical(f"Критическая ошибка: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == '__main__':
