@@ -294,14 +294,14 @@ jobs:
             ### Примечания к выпуску
             - Кросс-платформенная сборка для всех основных ОС
             - Автоматическая сборка через GitHub Actions
-                    draft: false
-                    prerelease: false
-                    generate_release_notes: true
+          draft: false
+          prerelease: false
+          generate_release_notes: true
 
-                  - name: Clean up
-                    if: always()
-                    shell: bash
-                    run: |
-                      echo "Cleaning up artifacts..."
-                      rm -rf dist
-                      echo "Cleanup complete"
+      - name: Clean up
+        if: always()
+        shell: bash
+        run: |
+          echo "Cleaning up artifacts..."
+          rm -rf dist
+          echo "Cleanup complete"
