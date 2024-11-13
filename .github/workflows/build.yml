@@ -207,11 +207,44 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: dist
         merge-multiple: true
+
+    - name: Update version number
+      id: update_version
+      run: |
+        # Считываем текущую версию
+        version=$(cat version.txt)
+        
+        # Извлекаем части версии: major, minor и patch
+        major=$(echo $version | cut -d. -f1)
+        minor=$(echo $version | cut -d. -f2)
+        patch=$(echo $version | cut -d. -f3)
+        
+        # Увеличиваем патч-версию на 1
+        new_patch=$((patch + 1))
+        new_version="$major.$minor.$new_patch"
+        
+        # Сохраняем новую версию в файл
+        echo "$new_version" > version.txt
+
+        # Выводим новую версию, чтобы использовать ее далее
+        echo "::set-output name=version::$new_version"
+
+      # Коммитим обновленный файл version.txt
+    - name: Commit version update
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add version.txt
+        git commit -m "Update version to ${{ steps.update_version.outputs.version }}"
+        git push origin ${{ github.ref }}
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
@@ -220,10 +253,10 @@ jobs:
       with:
         files: |
           dist/*.zip
-        tag_name: v1.0.0
-        name: 'Release v1.0.0'
+        tag_name: v${{ steps.update_version.outputs.version }}
+        name: 'Release v${{ steps.update_version.outputs.version }}'
         body: |
-          Release v1.0.0
+          Release v${{ steps.update_version.outputs.version }}
           
           ### Сборки для разных платформ
           - Windows (AMD64): `${{ env.APP_NAME }}-windows.zip`
