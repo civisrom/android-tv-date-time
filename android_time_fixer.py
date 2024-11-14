@@ -345,9 +345,9 @@ class AndroidTVTimeFixer:
 
         try:
             current_ntp = self.get_current_ntp()
-            #device_info = self.get_device_info()
+            device_info = self.get_device_info()
             print(f"\nТекущие настройки:")
-            print(f"- Текущий сервер NTP, установленный на устройстве: {current_ntp}")
+            print(f"- Текущий сервер времени, установленный на устройстве: {current_ntp}")
             print(f"- Устройство (информация):")
             for key, value in device_info.items():
                 print(f"  {key.capitalize()}: {value}")
@@ -463,7 +463,7 @@ def main():
             choice = input("Введите номер пункта меню: ").strip()
 
             if choice == '1':
-                ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                ip = input('\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
