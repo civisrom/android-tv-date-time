@@ -4,10 +4,10 @@ version = "1.0.0"
 description = "Time fixer for Android TV"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-packages = [{include = "android_time_fixer.py"}]
+packages = [{include = "android_time_fixer"}]  # Убедитесь, что правильно указали путь
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.10"  # Рекомендуется использовать стабильную версию
 adb-shell = {extras = ["usb"], version = "^0.4.3"}
 pyperclip = "^1.8.2"
 colorama = "^0.4.6"
@@ -15,7 +15,7 @@ platformdirs = "^3.5.0"
 packaging = "^23.0"
 typing-extensions = "^4.5.0"
 cryptography = "^41.0.0"
-pyusb = "^1.2.1"
+pyusb = "^1.2.1"  # Возможно, libusb1 не нужен, если используете pyusb
 libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 
@@ -37,8 +37,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 100
-target-version = ['py313']
-include = '\.pyi?$'
+target-version = ['py310', 'py311']  # Обновите целевые версии Python
 
 [tool.isort]
 profile = "black"
