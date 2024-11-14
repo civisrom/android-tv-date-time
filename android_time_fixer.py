@@ -313,7 +313,7 @@ class AndroidTVTimeFixer:
                 'serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
-                'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
+                'ip_address': self.get_device_ip_address(),
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
                 'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
                 'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
@@ -341,19 +341,21 @@ class AndroidTVTimeFixer:
         try:
             output = subprocess.check_output(['adb', 'shell', 'ip', 'addr'])
             interfaces = [line.split()[1][:-1] for line in output.decode().strip().split('\n') if line.startswith('1:')]
-        
-        # Проверяем, есть ли интерфейс WLAN0
+            
+            # Проверяем, есть ли интерфейс WLAN0
             if 'wlan0' in interfaces:
                 return 'wlan0'
-        # Если WLAN0 нет, возвращаем первый доступный интерфейс
+            # Если WLAN0 нет, возвращаем первый доступный интерфейс
             elif interfaces:
                 return interfaces[0]
             else:
                 return None
         except subprocess.CalledProcessError:
             return None
-
-    def get_device_ip_address(self, interface="wlan0"):
+    
+    def get_device_ip_address(self, interface=None):
+        if not interface:
+            interface = self.get_network_interface() or "Unknown"
         try:
             output = subprocess.check_output(['adb', 'shell', 'ip', 'addr', 'show', interface])
             ip_address = output.decode().strip().split('\n')[2].split()[1].split('/')[0]
