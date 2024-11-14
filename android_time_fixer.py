@@ -490,7 +490,7 @@ def main():
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
-                        print("\nНастройки времени успешно обновлены!")
+                        print(Fore.YELLOW + "\nНастройки времени успешно обновлены!")
                 else:
                     print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
