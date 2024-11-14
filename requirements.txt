@@ -1,3 +1,0 @@
-adb_shell==0.4.4
-pyperclip==1.9.0
-pytest==8.3.3
