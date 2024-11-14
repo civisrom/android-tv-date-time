@@ -349,7 +349,8 @@ class AndroidTVTimeFixer:
 
         try:
             current_ntp = self.get_current_ntp()
-            print(Fore.GREEN + f"- Текущий сервер времени, установленный на устройстве: " + Fore.RED + f"{current_ntp}")
+            print(Fore.GREEN + "- Текущий сервер времени, установленный на устройстве: ", end="")
+            print(Fore.RED + f"{current_ntp}")
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось получить информацию о сервере NTP: {str(e)}")
 
@@ -362,8 +363,9 @@ class AndroidTVTimeFixer:
             current_ntp = self.get_current_ntp()
             device_info = self.get_device_info()
             print(Fore.GREEN + f"\nТекущая информация об устройстве:")
-            print(Fore.GREEN + f"- Текущий сервер времени, установленный на устройстве: " + Fore.RED + f"{current_ntp}")
-            print(Fore.YELLOW + f"- Информация об устройстве:")
+            print(Fore.GREEN + "- Текущий сервер времени, установленный на устройстве: ", end="")
+            print(Fore.RED + f"{current_ntp}")
+            print(Fore.YELLOW + "- Информация об устройстве:")
             for key, value in device_info.items():
                 print(f"  {key.capitalize()}: {value}")
         except Exception as e:
@@ -478,11 +480,13 @@ def main():
             choice = input("Введите номер пункта меню: ").strip()
 
             if choice == '1':
-                ip = input(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ' + Fore.WHITE).strip()
+                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ', end="")
+                ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
-                    code = input(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ' + Fore.WHITE).strip()
+                    print(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ', end="")
+                    code = input(Fore.WHITE).strip()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
@@ -491,7 +495,8 @@ def main():
                     print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
             elif choice == '2':
-                ip = input(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ' + Fore.WHITE).strip()
+                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ', end="")
+                ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.set_custom_ntp()
@@ -505,7 +510,8 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
-                ip = input(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
+                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ', end="")
+                ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_device_info()
@@ -516,7 +522,7 @@ def main():
                 fixer.manage_servers()
 
             elif choice == '6':
-                print("\nРасшифровка кодов стран (можно копировать в буфер обмена):")
+                print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
                 print("ad: Андорра")
                 print("al: Албания")
                 print("at: Австрия")
