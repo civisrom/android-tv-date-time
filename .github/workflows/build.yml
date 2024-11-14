@@ -64,14 +64,37 @@ jobs:
           check-latest: true
           cache: 'pip'
 
-      - name: Create initial requirements
-        shell: bash
+      # Изменяем способ создания requirements.txt
+      - name: Generate requirements.txt
+        shell: python
         run: |
-          echo "adb-shell" > requirements.txt
-          echo "pyperclip" >> requirements.txt
-          echo "pyinstaller" >> requirements.txt
-          echo "colorama" >> requirements.txt
-          cat requirements.txt
+          import sys
+          
+          requirements = [
+              'adb-shell',
+              'pyperclip',
+              'pyinstaller',
+              'colorama',
+              'platformdirs',  # Для кросс-платформенных путей
+              'packaging',     # Для управления версиями
+              'typing-extensions', # Для типизации
+          ]
+          
+          # Добавляем специфичные для Windows зависимости
+          if sys.platform == 'win32':
+              requirements.extend([
+                  'pywin32',  # Для Windows-специфичных функций
+                  'wmi',      # Для работы с WMI
+              ])
+          
+          # Записываем зависимости в файл
+          with open('requirements.txt', 'w') as f:
+              for req in requirements:
+                  f.write(f'{req}\n')
+          
+          print("Generated requirements.txt:")
+          with open('requirements.txt', 'r') as f:
+              print(f.read())
 
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
@@ -79,6 +102,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install --upgrade setuptools wheel
           pip list
 
       - name: Install dependencies (Unix)
@@ -87,6 +111,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install --upgrade setuptools wheel
           pip list
 
       - name: Install zip
