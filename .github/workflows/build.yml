@@ -25,7 +25,7 @@ permissions:
   actions: write
 
 env:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
@@ -65,12 +65,18 @@ jobs:
           check-latest: true
           cache: 'pip'
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: latest
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+      - name: Install Poetry (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $poetryPath = "$env:USERPROFILE\.poetry\bin"
+          if (-not (Test-Path $poetryPath)) {
+            Invoke-WebRequest -Uri https://install.python-poetry.org | python -
+          }
+          $env:PATH += ";$poetryPath"
+          echo $env:PATH  # Проверка PATH на Windows
+          where poetry  # На Windows используем where
+          poetry --version  # Проверка версии Poetry
+        shell: pwsh
 
       - name: Add Poetry to PATH (Linux/macOS)
         if: runner.os != 'Windows'
