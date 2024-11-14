@@ -2,7 +2,7 @@ name: Build AndroidTVTimeFixer
 
 on:
   push:
-    branches:
+    branches: 
       - main
       - master
     paths-ignore:
@@ -10,7 +10,7 @@ on:
       - '.gitignore'
       - 'LICENSE'
   pull_request:
-    branches:
+    branches: 
       - main
       - master
     paths-ignore:
@@ -65,20 +65,29 @@ jobs:
           check-latest: true
           cache: 'pip'
 
-      - name: Install Poetry with pip
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Add Poetry to PATH (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry
-      
-      - name: Check Poetry version
-        run: poetry --version
-        
-      - name: List installed packages
+          export PATH="$HOME/.poetry/bin:$PATH"
+          echo $PATH  # Проверка PATH после добавления Poetry
+          which poetry  # Проверка доступности Poetry
+          poetry --version  # Проверка версии Poetry
+
+      - name: Install Poetry (Windows)
+        if: runner.os == 'Windows'
         run: |
-          echo $Env:PATH
-          where poetry  # на Windows для поиска poetry в PATH
-          poetry --version
-          
+          $env:PATH += ";$env:USERPROFILE\.poetry\bin"
+          echo $env:PATH  # Проверка PATH на Windows
+          where poetry  # На Windows используем where
+          poetry --version  # Проверка версии Poetry
+
       - name: Load cached venv
         id: cached-poetry-dependencies
         uses: actions/cache@v4
@@ -88,7 +97,7 @@ jobs:
           restore-keys: |
             venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
 
-      - name: Install dependencies and pyinstaller
+      - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: |
           poetry install --no-interaction --no-root
@@ -129,18 +138,13 @@ jobs:
       - name: Build executable
         shell: bash
         run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            adb_path="C:/path/to/adb.exe"  # Укажите правильный путь для Windows
-          else
-            adb_path="$(which adb)"
-          fi
           poetry run pyinstaller --clean \
-                                 --onefile \
-                                 --console \
-                                 --name=${{ env.APP_NAME }} \
-                                 --add-binary "${adb_path}:." \
-                                 --log-level=DEBUG \
-                                 ${{ env.SOURCE_FILE }}
+                     --onefile \
+                     --console \
+                     --name=${{ env.APP_NAME }} \
+                     --add-binary "$(which adb):." \
+                     --log-level=DEBUG \
+                     ${{ env.SOURCE_FILE }}
 
       - name: Package build
         shell: bash
@@ -160,7 +164,7 @@ jobs:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
           path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
           retention-days: 90
-          if-no-files-found: warn
+          if-no-files-found: error
 
   create-release:
     needs: setup-and-build
@@ -180,8 +184,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: dist/*.zip
-          tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
           generate_release_notes: true
