@@ -307,19 +307,19 @@ class AndroidTVTimeFixer:
             device_info = {
                 'model': self.device.shell('getprop ro.product.model').strip(),
                 'brand': self.device.shell('getprop ro.product.brand').strip(),
-                #'name': self.device.shell('getprop ro.product.name').strip(),
+                'name': self.device.shell('getprop ro.product.name').strip(),
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
-                #'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
-                #'serial': self.device.shell('getprop ro.serialno').strip(),
+                'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
+                'serial': self.device.shell('getprop ro.serialno').strip(),
                 'serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
                 #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
                 #'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
-                #'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
-                #'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
+                'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
+                'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
                 'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
-                #'device': self.device.shell('getprop ro.product.device').strip(),
+                'device': self.device.shell('getprop ro.product.device').strip(),
                 'build_id': self.device.shell('getprop ro.build.id').strip(),
                 'build_fingerprint': self.device.shell('getprop ro.build.fingerprint').strip(),
                 'uptime': self.device.shell('cat /proc/uptime').strip(),
@@ -331,9 +331,9 @@ class AndroidTVTimeFixer:
                 'locale': self.device.shell('getprop persist.sys.locale').strip(),
                 'cpu_cores': self.device.shell('cat /proc/cpuinfo | grep "^processor" | wc -l').strip(),
                 'bootloader_version': self.device.shell('getprop ro.bootloader').strip(),  # Версия загрузчика
-                #'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
+                'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
                 'kernel_version': self.device.shell('uname -r').strip(),
-                #'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
+                'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
             }
             return device_info
         except Exception as e:
@@ -345,7 +345,7 @@ class AndroidTVTimeFixer:
 
         try:
             current_ntp = self.get_current_ntp()
-            device_info = self.get_device_info()
+            #device_info = self.get_device_info()
             print(f"\nТекущие настройки:")
             print(f"- Текущий сервер времени, установленный на устройстве: {current_ntp}")
             print(f"- Устройство (информация):")
@@ -353,7 +353,22 @@ class AndroidTVTimeFixer:
                 print(f"  {key.capitalize()}: {value}")
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
-
+            
+    def show_device_info(self) -> None:
+        if not self.device:
+            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+    
+        try:
+            current_ntp = self.get_current_ntp()
+            device_info = self.get_device_info()
+            print(f"\nТекущие настройки устройства:")
+            print(f"- Текущий сервер времени, установленный на устройстве: {current_ntp}")
+            print(f"- Информация об устройстве:")
+            for key, value in device_info.items():
+                print(f"  {key.capitalize()}: {value}")
+        except Exception as e:
+            raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
+            
     def manage_servers(self):
         """Управление сохраненными серверами"""
         while True:
@@ -476,7 +491,7 @@ def main():
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
             elif choice == '2':
-                ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                ip = input('\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.set_custom_ntp()
@@ -490,10 +505,10 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
-                ip = input('\nВведите IP-адрес вашего ТВ (найдите в Настройки > Сеть и интернет): ').strip()
+                ip = input('\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
-                    fixer.show_current_settings()
+                    fixer.show_device_info()
                 else:
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
