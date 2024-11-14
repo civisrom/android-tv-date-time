@@ -499,6 +499,7 @@ def main():
                 ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
+                    fixer.show_current_settings()
                     fixer.set_custom_ntp()
                 else:
                     print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
