@@ -307,19 +307,19 @@ class AndroidTVTimeFixer:
             device_info = {
                 'model': self.device.shell('getprop ro.product.model').strip(),
                 'brand': self.device.shell('getprop ro.product.brand').strip(),
-                'name': self.device.shell('getprop ro.product.name').strip(),
+                #'name': self.device.shell('getprop ro.product.name').strip(),
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
-                'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
+                #'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
                 #'serial': self.device.shell('getprop ro.serialno').strip(),
                 'serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
                 #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
-                'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
-                'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
-                'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
+                #'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
+                #'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
+                #'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
                 'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
-                'device': self.device.shell('getprop ro.product.device').strip(),
+                #'device': self.device.shell('getprop ro.product.device').strip(),
                 'build_id': self.device.shell('getprop ro.build.id').strip(),
                 'build_fingerprint': self.device.shell('getprop ro.build.fingerprint').strip(),
                 'uptime': self.device.shell('cat /proc/uptime').strip(),
@@ -331,9 +331,9 @@ class AndroidTVTimeFixer:
                 'locale': self.device.shell('getprop persist.sys.locale').strip(),
                 'cpu_cores': self.device.shell('cat /proc/cpuinfo | grep "^processor" | wc -l').strip(),
                 'bootloader_version': self.device.shell('getprop ro.bootloader').strip(),  # Версия загрузчика
-                'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
+                #'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
                 'kernel_version': self.device.shell('uname -r').strip(),
-                'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
+                #'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
             }
             return device_info
         except Exception as e:
@@ -345,7 +345,7 @@ class AndroidTVTimeFixer:
 
         try:
             current_ntp = self.get_current_ntp()
-            device_info = self.get_device_info()
+            #device_info = self.get_device_info()
             print(f"\nТекущие настройки:")
             print(f"- Текущий сервер NTP, установленный на устройстве: {current_ntp}")
             print(f"- Устройство (информация):")
