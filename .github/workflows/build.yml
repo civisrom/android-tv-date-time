@@ -65,34 +65,18 @@ jobs:
           check-latest: true
           cache: 'pip'
 
-      - name: Install Poetry (Windows)
-        if: runner.os == 'Windows'
+      - name: Install Poetry
+        shell: bash
         run: |
-          $poetryPath = "$env:USERPROFILE\.poetry\bin"
-          if (-not (Test-Path $poetryPath)) {
-            Invoke-WebRequest -Uri https://install.python-poetry.org | python -
-          }
-          $env:PATH += ";$poetryPath"
-          echo $env:PATH  # Проверка PATH на Windows
-          where poetry  # На Windows используем where
-          poetry --version  # Проверка версии Poetry
-        shell: pwsh
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.poetry/bin" >> $GITHUB_PATH
 
-      - name: Add Poetry to PATH (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Configure Poetry
+        shell: bash
         run: |
-          export PATH="$HOME/.poetry/bin:$PATH"
-          echo $PATH  # Проверка PATH после добавления Poetry
-          which poetry  # Проверка доступности Poetry
-          poetry --version  # Проверка версии Poetry
-
-      - name: Install Poetry (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          $env:PATH += ";$env:USERPROFILE\.poetry\bin"
-          echo $env:PATH  # Проверка PATH на Windows
-          where poetry  # На Windows используем where
-          poetry --version  # Проверка версии Poetry
+          poetry config virtualenvs.in-project true
+          poetry config virtualenvs.create true
+          poetry --version
 
       - name: Load cached venv
         id: cached-poetry-dependencies
@@ -105,6 +89,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           poetry install --no-interaction --no-root
           poetry run pip install --upgrade pip setuptools wheel
