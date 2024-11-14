@@ -10,6 +10,8 @@ from pathlib import Path
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+from colorama import Fore, Style, init
+init(autoreset=True)
 
 def show_disclaimer():
     disclaimer = """
@@ -338,23 +340,20 @@ class AndroidTVTimeFixer:
             return device_info
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
-
+            
     def show_current_settings(self) -> None:
+        """Показывает только текущий сервер NTP"""
         if not self.device:
             raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
 
         try:
             current_ntp = self.get_current_ntp()
-            #device_info = self.get_device_info()
-            print(f"\nТекущие настройки:")
-            print(f"- Текущий сервер времени, установленный на устройстве: {current_ntp}")
-            print(f"- Устройство (информация):")
-            for key, value in device_info.items():
-                print(f"  {key.capitalize()}: {value}")
+            print(f"\nТекущий сервер времени, установленный на устройстве: {current_ntp}")
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
-            
+            raise AndroidTVTimeFixerError(f"Не удалось получить информацию о сервере NTP: {str(e)}")
+
     def show_device_info(self) -> None:
+        """Показывает полную информацию об устройстве, включая NTP-сервер"""
         if not self.device:
             raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
     
@@ -465,20 +464,20 @@ def main():
         fixer.gen_keys()
 
         while True:
-            print("\nГлавное меню:")
-            print("1. Изменить сервер времени NTP по коду страны")
-            print("2. Изменить сервер времени NTP на пользовательский")
-            print("3. Показать доступные коды стран и серверов NTP,(можно копировать в буфер обмена)")
-            print("4. Показать доступные альтернативные сервера времени NTP,(можно копировать в буфер обмена)")
-            print("5. Показать текущие настройки устройства")
+            print(Fore.GREEN + "\nГлавное меню:")
+            print(Fore.YELLOW + "1. Изменить сервер времени NTP по коду страны")
+            print(Fore.YELLOW + "2. Изменить сервер времени NTP на пользовательский")
+            print(Fore.YELLOW + "3. Показать доступные коды стран и серверов NTP,(можно копировать в буфер обмена)")
+            print(Fore.YELLOW + "4. Показать доступные альтернативные сервера времени NTP,(можно копировать в буфер обмена)")
+            print(Fore.YELLOW + "5. Показать текущие настройки устройства")
            # print("6. Управление серверами")
-            print("6. Расшифровка кодов стран,(можно копировать в буфер обмена)")
-            print("7. Выход")
+            print(Fore.YELLOW + "6. Расшифровка кодов стран,(можно копировать в буфер обмена)")
+            print(Fore.YELLOW + "7. Выход")
 
             choice = input("Введите номер пункта меню: ").strip()
 
             if choice == '1':
-                ip = input('\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
+                ip = input(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
@@ -491,7 +490,7 @@ def main():
                     print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
             elif choice == '2':
-                ip = input('\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
+                ip = input(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.set_custom_ntp()
@@ -505,12 +504,12 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
-                ip = input('\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
+                ip = input(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ').strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_device_info()
                 else:
-                    print("Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+                    print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
             elif choice == '8':
                 fixer.manage_servers()
@@ -587,16 +586,16 @@ def main():
             elif choice.lower() == 'b':
                 continue
             else:
-                print("Неверный выбор. Пожалуйста, попробуйте еще раз.")
+                print(Fore.RED + "Неверный выбор. Пожалуйста, попробуйте еще раз.")
         
     except AndroidTVTimeFixerError as e:
         print(f"\nОшибка: {str(e)}")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nОперация отменена пользователем")
+        print(Fore.RED + "\nОперация отменена пользователем")
         sys.exit(0)
     except Exception as e:
-        print(f"\nНепредвиденная ошибка: {str(e)}")
+        print(Fore.RED + f"\nНепредвиденная ошибка: {str(e)}")
         sys.exit(1)
 
 if __name__ == '__main__':
