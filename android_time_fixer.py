@@ -6,6 +6,7 @@ import logging
 import platform
 import pyperclip
 import json
+import subprocess
 from pathlib import Path
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
