@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "android_time_fixer"}]  # Убедитесь, что правильно указали путь
 
 [tool.poetry.dependencies]
-python = "^3.12"  # Рекомендуется использовать стабильную версию
+python = "^3.13"  # Рекомендуется использовать стабильную версию
 adb-shell = {extras = ["usb"], version = "^0.4.3"}
 pyperclip = "^1.8.2"
 colorama = "^0.4.6"
@@ -20,7 +20,7 @@ libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 
 [tool.poetry.group.dev.dependencies]
-pyinstaller = "^6.0.0"
+pyinstaller = "^6.11.1"
 pytest = "^7.4.0"
 black = "^23.3.0"
 isort = "^5.12.0"
