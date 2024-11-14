@@ -6,7 +6,6 @@ import logging
 import platform
 import pyperclip
 import json
-import subprocess
 from pathlib import Path
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
@@ -311,10 +310,12 @@ class AndroidTVTimeFixer:
                 'name': self.device.shell('getprop ro.product.name').strip(),
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
                 'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
+                #'serial': self.device.shell('getprop ro.serialno').strip(),
                 'serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
-                'ip_address': self.get_device_ip_address(),
+                #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
+                'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
                 'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
                 'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
@@ -329,7 +330,7 @@ class AndroidTVTimeFixer:
                 'timezone': self.device.shell('getprop persist.sys.timezone').strip(),
                 'locale': self.device.shell('getprop persist.sys.locale').strip(),
                 'cpu_cores': self.device.shell('cat /proc/cpuinfo | grep "^processor" | wc -l').strip(),
-                'bootloader_version': self.device.shell('getprop ro.bootloader').strip(),
+                'bootloader_version': self.device.shell('getprop ro.bootloader').strip(),  # Версия загрузчика
                 'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
                 'kernel_version': self.device.shell('uname -r').strip(),
                 'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
@@ -337,32 +338,6 @@ class AndroidTVTimeFixer:
             return device_info
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
-
-    def get_network_interface(self):
-        try:
-            output = subprocess.check_output(['adb', 'shell', 'ip', 'addr'])
-            interfaces = [line.split()[1][:-1] for line in output.decode().strip().split('\n') if line.startswith('1:')]
-            
-            # Проверяем, есть ли интерфейс WLAN0
-            if 'wlan0' in interfaces:
-                return 'wlan0'
-            # Если WLAN0 нет, возвращаем первый доступный интерфейс
-            elif interfaces:
-                return interfaces[0]
-            else:
-                return None
-        except subprocess.CalledProcessError:
-            return None
-    
-    def get_device_ip_address(self, interface=None):
-        if not interface:
-            interface = self.get_network_interface() or "Unknown"
-        try:
-            output = subprocess.check_output(['adb', 'shell', 'ip', 'addr', 'show', interface])
-            ip_address = output.decode().strip().split('\n')[2].split()[1].split('/')[0]
-            return ip_address
-        except (subprocess.CalledProcessError, IndexError):
-            return "Unknown"
 
     def show_current_settings(self) -> None:
         if not self.device:
