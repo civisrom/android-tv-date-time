@@ -25,7 +25,7 @@ permissions:
   actions: write
 
 env:
-  PYTHON_VERSION: '3.13'
+  PYTHON_VERSION: '3.12'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
