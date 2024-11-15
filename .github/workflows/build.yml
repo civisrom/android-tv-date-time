@@ -64,81 +64,13 @@ jobs:
           check-latest: true
           cache: 'pip'
 
-      # Изменяем способ создания requirements.txt
-      - name: Generate requirements.txt
-        shell: python
+      - name: Create initial requirements
+        shell: bash
         run: |
-          import sys
-          
-          requirements = [
-              'adb-shell',
-              'adb-shell[usb]',    # Для USB-подключения
-              'pyperclip',
-              'pyinstaller',
-              'colorama',
-              'platformdirs',      # Для кросс-платформенных путей
-              'packaging',         # Для управления версиями
-              'typing-extensions', # Для типизации
-              'cryptography',      # Для шифрования ADB-соединений
-              'pyusb',            # Для USB-коммуникации
-              'libusb1',          # Для работы с USB-устройствами
-              'rsa',              # Для работы с ключами RSA в ADB
-          ]
-          
-          # Добавляем специфичные для Windows зависимости
-          if sys.platform == 'win32':
-              requirements.extend([
-                  'pywin32',       # Для Windows-специфичных функций
-                  'wmi',           # Для работы с WMI
-                  'windows-curses' # Для корректной работы консоли в Windows
-              ])
-          
-          # Записываем зависимости в файл
-          with open('requirements.txt', 'w') as f:
-              for req in requirements:
-                  f.write(f'{req}\n')
-          
-          print("Generated requirements.txt:")
-          with open('requirements.txt', 'r') as f:
-              print(f.read())
-
-      # Добавляем шаг для установки драйверов ADB в Windows
-      - name: Install ADB drivers (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          # Создаем директорию для ADB
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
-          cd "$env:USERPROFILE\adb"
-          
-          # Скачиваем Platform Tools
-          $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "platform-tools.zip"
-          
-          # Распаковываем
-          Expand-Archive -Path "platform-tools.zip" -DestinationPath "."
-          
-          # Добавляем в PATH
-          $env:Path += ";$env:USERPROFILE\adb\platform-tools"
-          [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::User)
-          
-          # Проверяем установку
-          adb version
-
-      - name: Install ADB (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y android-tools-adb
-          sudo apt-get install -y libusb-1.0-0-dev
-          adb version
-
-      - name: Install ADB (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install android-platform-tools
-          brew install libusb
-          adb version
+          echo "adb-shell" > requirements.txt
+          echo "pyperclip" >> requirements.txt
+          echo "pyinstaller" >> requirements.txt
+          cat requirements.txt
 
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
@@ -146,12 +78,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install --upgrade setuptools wheel
-          
-          # Устанавливаем дополнительные компоненты для USB
-          pip install pyusb
-          pip install libusb1
-          
           pip list
 
       - name: Install dependencies (Unix)
@@ -160,7 +86,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install --upgrade setuptools wheel
           pip list
 
       - name: Install zip
