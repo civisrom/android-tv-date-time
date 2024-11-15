@@ -154,9 +154,17 @@ jobs:
             --hidden-import=usb.core `
             --hidden-import=usb.util `
             --hidden-import=rsa `
+            --hidden-import=aiofiles `
+            --hidden-import=async_timeout `
+            --hidden-import=asyncio `
+            --hidden-import=socket `
+            --hidden-import=subprocess `
+            --hidden-import=threading `
             --collect-all adb_shell `
             --collect-all libusb1 `
+            --collect-all async_timeout `
             --collect-data colorama `
+            --collect-data aiofiles `
             --log-level=DEBUG `
             ${{ env.SOURCE_FILE }}
         shell: pwsh
@@ -168,7 +176,7 @@ jobs:
             --onefile \
             --console \
             --name=${{ env.APP_NAME }} \
-            --add-binary "$ADB_PATH:." \
+            --add-binary "$env:ADB_PATH;." \
             --hidden-import=pyperclip \
             --hidden-import=colorama \
             --hidden-import=platformdirs \
@@ -179,9 +187,17 @@ jobs:
             --hidden-import=usb.core \
             --hidden-import=usb.util \
             --hidden-import=rsa \
+            --hidden-import=aiofiles \
+            --hidden-import=async_timeout \
+            --hidden-import=asyncio \
+            --hidden-import=socket \
+            --hidden-import=subprocess \
+            --hidden-import=threading \
             --collect-all adb_shell \
             --collect-all libusb1 \
+            --collect-all async_timeout \
             --collect-data colorama \
+            --collect-data aiofiles \
             --log-level=DEBUG \
             ${{ env.SOURCE_FILE }}
         shell: bash
