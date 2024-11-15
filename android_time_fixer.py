@@ -205,6 +205,18 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось загрузить ключи: {str(e)}")
 
+    def enable_usb_debugging(self):
+        """Включение отладки по USB на устройстве"""
+        if not self.device:
+            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+    
+        try:
+            self.device.shell('settings put global adb_enabled 1')
+            logger.info("Отладка по USB включена")
+            print(Fore.GREEN + "Отладка по USB успешно включена")
+        except Exception as e:
+            raise AndroidTVTimeFixerError(f"Не удалось включить отладку по USB: {str(e)}")
+    
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
         if not self.validate_ip(ip):
@@ -471,8 +483,9 @@ def main():
             print(Fore.YELLOW + "4. Показать доступные альтернативные сервера времени NTP,(можно копировать в буфер обмена)")
             print(Fore.YELLOW + "5. Показать текущую информацию об устройстве")
            # print("6. Управление серверами")
-            print(Fore.YELLOW + "6. Расшифровка кодов стран,(можно копировать в буфер обмена)")
-            print(Fore.YELLOW + "7. Выход")
+            print(Fore.YELLOW + "6. Включить отладку по USB")
+            print(Fore.YELLOW + "7. Расшифровка кодов стран,(можно копировать в буфер обмена)")
+            print(Fore.YELLOW + "8. Выход")
 
             choice = input("Введите номер пункта меню: ").strip()
 
@@ -516,10 +529,18 @@ def main():
                 else:
                     print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
 
-            elif choice == '8':
+            elif choice == '6':
+                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield): ', end="")
+                ip = input(Fore.WHITE).strip()
+                if fixer.validate_ip(ip):
+                    fixer.connect(ip)
+                    fixer.enable_usb_debugging()
+                else:
+            
+            elif choice == '9':
                 fixer.manage_servers()
 
-            elif choice == '6':
+            elif choice == '7':
                 print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
                 print("ad: Андорра")
                 print("al: Албания")
@@ -584,7 +605,7 @@ def main():
                 print("jp: Япония")
                 print("kz: Казахстан")
 
-            elif choice == '7':
+            elif choice == '8':
                 print("\nВыход из программы...")
                 sys.exit(0)
             
