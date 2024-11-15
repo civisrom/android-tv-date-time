@@ -482,10 +482,10 @@ def main():
             print(Fore.YELLOW + "3. Показать доступные коды стран и серверов NTP,(можно копировать в буфер обмена)")
             print(Fore.YELLOW + "4. Показать доступные альтернативные сервера времени NTP,(можно копировать в буфер обмена)")
             print(Fore.YELLOW + "5. Показать текущую информацию об устройстве")
-           # print("6. Управление серверами")
-            print(Fore.YELLOW + "6. Включить отладку по USB")
-            print(Fore.YELLOW + "7. Расшифровка кодов стран,(можно копировать в буфер обмена)")
-            print(Fore.YELLOW + "8. Выход")
+           #print("6. Управление серверами")
+            #print(Fore.YELLOW + "6. Включить отладку по USB")
+            print(Fore.YELLOW + "6. Расшифровка кодов стран,(можно копировать в буфер обмена)")
+            print(Fore.YELLOW + "7. Выход")
 
             choice = input("Введите номер пункта меню: ").strip()
 
@@ -533,15 +533,17 @@ def main():
                 fixer.manage_servers()
                 
             elif choice == '6':
-                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield): ', end="")
-                ip = input(Fore.WHITE).strip()
-                if fixer.validate_ip(ip):
-                    fixer.connect(ip)
+                print(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ', end="")
+                code = input(Fore.WHITE).strip()
+                if fixer.validate_country_code(code):
+                    ntp_server = fixer.ntp_servers[code.lower()]
+                    fixer.fix_time(ntp_server)
                     fixer.enable_usb_debugging()
+                    print(Fore.YELLOW + "\nНастройки времени успешно обновлены!")
                 else:
                     print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
                     
-            elif choice == '7':
+            elif choice == '6':
                 print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
                 print("ad: Андорра")
                 print("al: Албания")
@@ -606,7 +608,7 @@ def main():
                 print("jp: Япония")
                 print("kz: Казахстан")
 
-            elif choice == '8':
+            elif choice == '7':
                 print("\nВыход из программы...")
                 sys.exit(0)
             
