@@ -176,7 +176,7 @@ jobs:
             --onefile \
             --console \
             --name=${{ env.APP_NAME }} \
-            --add-binary "$ADB_PATH:." \
+            --copy-data "$ADB_PATH" \
             --hidden-import=pyperclip \
             --hidden-import=colorama \
             --hidden-import=platformdirs \
