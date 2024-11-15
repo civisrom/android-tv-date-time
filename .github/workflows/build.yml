@@ -101,7 +101,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pywin32==306
-          poetry install --no-interaction --no-root --with dev
+          poetry install --no-interaction --no-root
           pip install pyinstaller
 
       - name: Install dependencies (Unix)
