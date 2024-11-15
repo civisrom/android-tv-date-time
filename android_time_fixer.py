@@ -173,12 +173,9 @@ class AndroidTVTimeFixer:
             self.save_servers()
 
     @staticmethod
-    def validate_ip(ip: str) -> bool:
-        pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
-        if not re.match(pattern, ip):
-            return False
-        octets = ip.split('.')
-        return all(0 <= int(octet) <= 255 for octet in octets)
+    def validate_ip(self, ip: str) -> bool:
+        pattern = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
+        return bool(pattern.match(ip)) and all(0 <= int(octet) <= 255 for octet in ip.split('.'))
 
     @staticmethod
     def validate_country_code(code: str) -> bool:
