@@ -179,16 +179,21 @@ jobs:
                      --log-level=DEBUG \
                      ${{ env.SOURCE_FILE }}
 
-      - name: Package build
+      - name: Package build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path "${{ env.APP_NAME }}${{ matrix.extension }}" -DestinationPath "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" -Force
+          cd ..
+
+      - name: Package build (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           cd dist
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            zip ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}${{ matrix.extension }}
-          else
-            chmod +x ${{ env.APP_NAME }}
-            zip ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}
-          fi
+          chmod +x ${{ env.APP_NAME }}
+          zip ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}
           cd ..
 
       - name: Upload build artifact
