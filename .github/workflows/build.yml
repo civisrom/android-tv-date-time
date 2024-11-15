@@ -65,18 +65,26 @@ jobs:
           check-latest: true
           cache: 'pip'
 
-      - name: Install Poetry
-        shell: bash
+      - name: Install Poetry (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+          echo "$env:APPDATA\Python\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Install Poetry (Unix)
+        if: runner.os != 'Windows'
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.poetry/bin" >> $GITHUB_PATH
+        shell: bash
 
       - name: Configure Poetry
-        shell: bash
         run: |
           poetry config virtualenvs.in-project true
           poetry config virtualenvs.create true
           poetry --version
+        shell: bash
 
       - name: Load cached venv
         id: cached-poetry-dependencies
@@ -87,13 +95,19 @@ jobs:
           restore-keys: |
             venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
 
+      - name: Update pyproject.toml for Python compatibility
+        run: |
+          poetry version
+          poetry add "pyinstaller>=6.11.0,<7.0.0"
+          poetry add --group dev "pyinstaller>=6.11.0,<7.0.0"
+        shell: bash
+
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          poetry install --no-interaction --no-root
+          poetry install --no-interaction --no-root --with dev
           poetry run pip install --upgrade pip setuptools wheel
-          poetry run pip install pyinstaller
 
       - name: Export requirements
         run: poetry export -f requirements.txt --output requirements.txt --without-hashes
