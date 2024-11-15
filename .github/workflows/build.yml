@@ -179,18 +179,14 @@ jobs:
     - name: Package build
       run: |
         cd dist
-        
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          7z a "AndroidTVTimeFixer-windows.zip" "AndroidTVTimeFixer.exe"
-        elif [[ "$RUNNER_OS" == "Linux" ]]; then
-          chmod +x AndroidTVTimeFixer
-          zip "AndroidTVTimeFixer-linux.zip" "AndroidTVTimeFixer"
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          7z a "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}${{ matrix.extension }}"
         else
-          echo "Unsupported operating system: $RUNNER_OS"
-          exit 1
+          chmod +x ${{ env.APP_NAME }}
+          zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
         fi
-        
         cd ..
+      shell: bash
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
