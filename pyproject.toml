@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "android_time_fixer.py"}]
 
 [tool.poetry.dependencies]
-python = ">=3.13,<3.14"
+python = ">=3.11,<3.12"  # Изменили версию Python
 adb-shell = {extras = ["usb"], version = "^0.4.3"}
 pyperclip = "^1.8.2"
 colorama = "^0.4.6"
@@ -19,20 +19,8 @@ pyusb = "^1.2.1"
 libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 
-[tool.poetry.group.dev.dependencies]
-pyinstaller = "^6.11.1"
-pytest = "^7.4.0"
-black = "^23.3.0"
-isort = "^5.12.0"
-flake8 = "^6.0.0"
-
-[tool.poetry.group.windows]
-optional = true
-
 [tool.poetry.group.windows.dependencies]
-pywin32 = {version = ">=308", platform = "win32"}
-wmi = {version = "^1.5.1", platform = "win32"}
-windows-curses = {version = ">=2.3.2", platform = "win32"}
+pywin32 = {version = "^306", platform = "win32"}
 
 [build-system]
 requires = ["poetry-core"]
@@ -46,7 +34,3 @@ target-version = ['py310', 'py311']
 profile = "black"
 multi_line_output = 3
 line_length = 100
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
