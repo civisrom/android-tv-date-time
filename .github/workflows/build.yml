@@ -140,27 +140,30 @@ jobs:
       - name: Install ADB (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          # Проверяем наличие android-platform-tools
-          if ! brew list --cask android-platform-tools &>/dev/null; then
-            brew install --cask android-platform-tools
-          else
-            echo "android-platform-tools already installed"
-          fi
-        
-          # Проверяем наличие libusb
-          if ! brew list libusb &>/dev/null; then
-            brew install libusb
-          else
-            echo "libusb already installed"
-          fi
-        
-          # Проверяем установку ADB и записываем путь
+          # Обновляем Homebrew
+          brew update
+          
+          # Удаляем старые версии если есть
+          brew uninstall --cask android-platform-tools &>/dev/null || true
+          
+          # Устанавливаем необходимые пакеты
+          brew install --cask android-platform-tools
+          brew install libusb || true
+          
+          # Проверяем и фиксируем путь к ADB
           ADB_PATH=$(which adb)
-          if [ -n "$ADB_PATH" ]; then
+          if [ -x "$ADB_PATH" ]; then
             echo "ADB_PATH=$ADB_PATH" >> $GITHUB_ENV
+            echo "ADB installed successfully at: $ADB_PATH"
             adb version
           else
-            echo "Error: ADB not found after installation"
+            echo "Error: ADB installation failed or not executable"
+            exit 1
+          fi
+          
+          # Проверяем работоспособность ADB
+          if ! adb version &>/dev/null; then
+            echo "Error: ADB installation appears broken"
             exit 1
           fi
         shell: bash
