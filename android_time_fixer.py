@@ -173,9 +173,12 @@ class AndroidTVTimeFixer:
             self.save_servers()
 
     @staticmethod
-    def validate_ip(self, ip: str) -> bool:
-        pattern = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
-        return bool(pattern.match(ip)) and all(0 <= int(octet) <= 255 for octet in ip.split('.'))
+    def validate_ip(ip: str) -> bool:
+        pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(pattern, ip):
+            return False
+        octets = ip.split('.')
+        return all(0 <= int(octet) <= 255 for octet in octets)
 
     @staticmethod
     def validate_country_code(code: str) -> bool:
@@ -532,7 +535,7 @@ def main():
             elif choice == '9':
                 fixer.manage_servers()
                 
-            elif choice == '6':
+            elif choice == '8':
                 print(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ', end="")
                 code = input(Fore.WHITE).strip()
                 if fixer.validate_country_code(code):
