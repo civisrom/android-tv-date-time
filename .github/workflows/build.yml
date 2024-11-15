@@ -58,75 +58,72 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
           cache: 'pip'
 
-      - name: Install Poetry (Windows)
-        if: runner.os == 'Windows'
+      # Изменяем способ создания requirements.txt
+      - name: Generate requirements.txt
+        shell: python
         run: |
-          (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
-          echo "$env:APPDATA\Python\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        shell: pwsh
+          import sys
+          
+          requirements = [
+              'adb-shell',
+              'adb-shell[usb]',    # Для USB-подключения
+              'pyperclip',
+              'pyinstaller',
+              'colorama',
+              'platformdirs',      # Для кросс-платформенных путей
+              'packaging',         # Для управления версиями
+              'typing-extensions', # Для типизации
+              'cryptography',      # Для шифрования ADB-соединений
+              'pyusb',            # Для USB-коммуникации
+              'libusb1',          # Для работы с USB-устройствами
+              'rsa',              # Для работы с ключами RSA в ADB
+          ]
+          
+          # Добавляем специфичные для Windows зависимости
+          if sys.platform == 'win32':
+              requirements.extend([
+                  'pywin32',       # Для Windows-специфичных функций
+                  'wmi',           # Для работы с WMI
+                  'windows-curses' # Для корректной работы консоли в Windows
+              ])
+          
+          # Записываем зависимости в файл
+          with open('requirements.txt', 'w') as f:
+              for req in requirements:
+                  f.write(f'{req}\n')
+          
+          print("Generated requirements.txt:")
+          with open('requirements.txt', 'r') as f:
+              print(f.read())
 
-      - name: Install Poetry (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.poetry/bin" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Configure Poetry
-        if: runner.os != 'Windows'
-        run: |
-          poetry config virtualenvs.in-project true
-          poetry config virtualenvs.create true
-          poetry --version
-        shell: bash
-
-      - name: Configure Poetry (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          poetry config virtualenvs.in-project true
-          poetry config virtualenvs.create true
-          poetry --version
-        shell: pwsh
-
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip
-          pip install pywin32==306
-          poetry install --no-interaction --no-root
-          pip install pyinstaller
-
-      - name: Install dependencies (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          poetry install --no-interaction --no-root --with dev
-          poetry run pip install --upgrade pip setuptools wheel
-
-      - name: Export requirements
-        run: poetry export -f requirements.txt --output requirements.txt --without-hashes
-
-      - name: Install ADB (Windows)
+      # Добавляем шаг для установки драйверов ADB в Windows
+      - name: Install ADB drivers (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $ProgressPreference = 'SilentlyContinue'
+          # Создаем директорию для ADB
           New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
+          cd "$env:USERPROFILE\adb"
+          
+          # Скачиваем Platform Tools
           $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
-          $adbPath = "$env:USERPROFILE\adb\platform-tools"
-          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          & "$adbPath\adb.exe" version
+          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "platform-tools.zip"
+          
+          # Распаковываем
+          Expand-Archive -Path "platform-tools.zip" -DestinationPath "."
+          
+          # Добавляем в PATH
+          $env:Path += ";$env:USERPROFILE\adb\platform-tools"
+          [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::User)
+          
+          # Проверяем установку
+          adb version
 
       - name: Install ADB (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -134,89 +131,136 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y android-tools-adb
           sudo apt-get install -y libusb-1.0-0-dev
-          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
           adb version
 
       - name: Install ADB (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          # Обновляем Homebrew
-          brew update
-          
-          # Удаляем старые версии если есть
-          brew uninstall --cask android-platform-tools &>/dev/null || true
-          
-          # Устанавливаем необходимые пакеты
-          brew install --cask android-platform-tools
-          brew install libusb || true
-          
-          # Проверяем и фиксируем путь к ADB
-          ADB_PATH=$(which adb)
-          if [ -x "$ADB_PATH" ]; then
-            echo "ADB_PATH=$ADB_PATH" >> $GITHUB_ENV
-            echo "ADB installed successfully at: $ADB_PATH"
-            adb version
-          else
-            echo "Error: ADB installation failed or not executable"
-            exit 1
-          fi
-          
-          # Проверяем работоспособность ADB
-          if ! adb version &>/dev/null; then
-            echo "Error: ADB installation appears broken"
-            exit 1
-          fi
-        shell: bash
+          brew install android-platform-tools
+          brew install libusb
+          adb version
 
-      - name: Verify ADB installation
-        shell: bash
-        run: |
-          if [ -n "$ADB_PATH" ]; then
-            echo "ADB found at: $ADB_PATH"
-          else
-            echo "ADB path not set!"
-            exit 1
-          fi
-
-      - name: Build executable (Windows)
-        if: runner.os == 'Windows'
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install --upgrade setuptools wheel
+          
+          # Устанавливаем дополнительные компоненты для USB
+          pip install pyusb
+          pip install libusb1
+          
+          pip list
+
+      - name: Install dependencies (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install --upgrade setuptools wheel
+          pip list
+
+      - name: Install zip
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: Install zip (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install zip
+
+      - name: Prepare cache directories
+        shell: bash
+        run: |
+          mkdir -p build_cache
+          mkdir -p spec_cache
+          
+          if [ -d "build" ]; then
+            cp -r build/* build_cache/ || true
+          fi
+          
+          if [ -f "*.spec" ]; then
+            cp *.spec spec_cache/ || true
+          fi
+
+      - name: Cache PyInstaller build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build_cache
+            spec_cache
+          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('*.py', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
+      - name: Restore cache to build directory
+        shell: bash
+        run: |
+          if [ -d "build_cache" ] && [ "$(ls -A build_cache)" ]; then
+            mkdir -p build
+            cp -r build_cache/* build/ || true
+          fi
+          
+          if [ -d "spec_cache" ] && [ "$(ls -A spec_cache)" ]; then
+            cp spec_cache/*.spec . || true
+          fi
+
+      - name: Build executable with PyInstaller (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
           pyinstaller --clean `
                      --onefile `
                      --console `
                      --name=${{ env.APP_NAME }} `
-                     --add-binary "$env:ADB_PATH;." `
                      --log-level=DEBUG `
                      ${{ env.SOURCE_FILE }}
+          
+          if (-not (Test-Path "dist\${{ env.APP_NAME }}.exe")) {
+              throw "Build failed: Executable not found"
+          }
 
-      - name: Build executable (Unix)
-        if: runner.os != 'Windows'
+      - name: Build executable with PyInstaller (Unix)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          poetry run pyinstaller --clean \
+          set -ex
+          pyinstaller --clean \
                      --onefile \
                      --console \
                      --name=${{ env.APP_NAME }} \
-                     --add-binary "$ADB_PATH:." \
                      --log-level=DEBUG \
                      ${{ env.SOURCE_FILE }}
+          
+          if [ ! -f "dist/${{ env.APP_NAME }}${{ matrix.extension }}" ]; then
+            echo "Build failed: Executable not found"
+            exit 1
+          fi
+          
+          if [ "${{ matrix.os }}" != "windows-latest" ]; then
+            chmod +x dist/${{ env.APP_NAME }}
+          fi
 
       - name: Package build (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path "${{ env.APP_NAME }}${{ matrix.extension }}" -DestinationPath "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" -Force
+          Compress-Archive -Path AndroidTVTimeFixer.exe -DestinationPath AndroidTVTimeFixer-windows.zip
           cd ..
-
+          
       - name: Package build (Unix)
-        if: runner.os != 'Windows'
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           cd dist
-          chmod +x ${{ env.APP_NAME }}
-          zip ${{ env.APP_NAME }}-${{ matrix.platform }}.zip ${{ env.APP_NAME }}
+          zip -r AndroidTVTimeFixer-${{ matrix.platform }}.zip AndroidTVTimeFixer
           cd ..
 
       - name: Upload build artifact
@@ -227,26 +271,115 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+      - name: Create version file
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          echo "v1.0.0" > version.txt
+
   create-release:
     needs: setup-and-build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
 
+      - name: Update version number
+        id: update_version
+        run: |
+          # Считываем текущую версию
+          version=$(cat version.txt)
+          
+          # Извлекаем части версии: major, minor и patch
+          major=$(echo $version | cut -d. -f1)
+          minor=$(echo $version | cut -d. -f2)
+          patch=$(echo $version | cut -d. -f3)
+          
+          # Увеличиваем патч-версию на 1
+          new_patch=$((patch + 1))
+          new_version="$major.$minor.$new_patch"
+          
+          # Сохраняем новую версию в файл
+          echo "$new_version" > version.txt
+
+          # Используем Environment Files для передачи данных
+          echo "version=$new_version" >> $GITHUB_ENV
+
+      - name: Commit version update
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.txt
+          git commit -m "Update version to ${{ env.version }}"
+          git push origin ${{ github.ref }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/*.zip
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+          files: |
+            dist/*.zip
+          tag_name: v${{ env.version }}
+          name: 'Release v${{ env.version }}'
+          body: |
+            Release v${{ env.version }}
+            
+            ### Сборки для разных платформ
+            - Windows (AMD64): `${{ env.APP_NAME }}-windows.zip`
+            - Linux (AMD64): `${{ env.APP_NAME }}-linux.zip`
+            - macOS (AMD64): `${{ env.APP_NAME }}-macos.zip`
+            
+            ### Установка
+            
+            #### Windows
+            1. Распакуйте архив
+            2. Откройте PowerShell от имени администратора и перейдите в папку с файлом:
+               ```bash
+               cd "C:\путь\к\папке\с\программой"
+               ```
+            3. Запустите программу, введя команду:
+               ```bash
+               ./${{ env.APP_NAME }}
+               ```
+            
+            #### Linux
+            1. Распакуйте архив
+            2. Откройте терминал в папке с программой
+            3. Выполните команды:
+               ```bash
+               chmod +x ./${{ env.APP_NAME }}
+               ./${{ env.APP_NAME }}
+               ```
+            
+            #### macOS
+            1. Распакуйте архив
+            2. Откройте терминал в папке с программой
+            3. Выполните команды:
+               ```bash
+               chmod +x ./${{ env.APP_NAME }}
+               ./${{ env.APP_NAME }}
+               ```
+            
+            ### Примечания к выпуску
+            - Кросс-платформенная сборка для всех основных ОС
+    
           draft: false
           prerelease: false
           generate_release_notes: true
+
+      - name: Clean up
+        if: always()
+        shell: bash
+        run: |
+          echo "Cleaning up artifacts..."
+          rm -rf dist
+          echo "Cleanup complete"
