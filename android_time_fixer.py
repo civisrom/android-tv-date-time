@@ -568,7 +568,7 @@ def main():
             elif choice == '9':
                 fixer.manage_servers()
                 
-            elif choice == '6':
+            elif choice == '8':
                 print(Fore.YELLOW + "\nПодключение к устройству через USB.")
                 devices = list_devices()
                 if devices:
