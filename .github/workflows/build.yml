@@ -70,7 +70,6 @@ jobs:
           echo "adb-shell" > requirements.txt
           echo "pyperclip" >> requirements.txt
           echo "pyinstaller" >> requirements.txt
-          echo "colorama" >> requirements.txt
           cat requirements.txt
 
       - name: Install dependencies (Windows)
