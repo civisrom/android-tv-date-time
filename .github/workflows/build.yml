@@ -86,40 +86,20 @@ jobs:
           poetry --version
         shell: bash
 
-      # Добавляем шаг для сборки зависимостей
-      - name: Install build dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
-        shell: bash
-
-      - name: Install build dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install openssl libffi libusb
-        shell: bash
-
       # Устанавливаем зависимости через poetry
       - name: Install dependencies
         run: |
           poetry install --no-interaction --with dev
         shell: bash
 
-      # Устанавливаем дополнительные Windows-зависимости
+      # Устанавливаем Windows-специфичные зависимости с обновленными версиями
       - name: Install Windows-specific dependencies
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          poetry run pip install pywin32==306
-          poetry run pip install windows-curses==2.3.1
-
-      # Проверяем установленные зависимости
-      - name: Verify dependencies
-        run: |
-          poetry run pip freeze
-        shell: bash
+          poetry run pip install --upgrade pip
+          poetry run pip install pywin32>=308
+          poetry run pip install windows-curses>=2.3.2
 
       - name: Install ADB (Windows)
         if: matrix.os == 'windows-latest'
@@ -150,29 +130,58 @@ jobs:
         shell: bash
 
       # Модифицируем сборку PyInstaller для включения всех зависимостей
-      - name: Build executable
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          poetry run pyinstaller --clean `
+            --onefile `
+            --console `
+            --name=${{ env.APP_NAME }} `
+            --add-binary "$env:ADB_PATH;." `
+            --hidden-import=win32api `
+            --hidden-import=win32con `
+            --hidden-import=win32security `
+            --hidden-import=pyperclip `
+            --hidden-import=colorama `
+            --hidden-import=platformdirs `
+            --hidden-import=packaging `
+            --hidden-import=typing_extensions `
+            --hidden-import=cryptography `
+            --hidden-import=usb `
+            --hidden-import=usb.core `
+            --hidden-import=usb.util `
+            --hidden-import=rsa `
+            --collect-all adb_shell `
+            --collect-all libusb1 `
+            --collect-data colorama `
+            --log-level=DEBUG `
+            ${{ env.SOURCE_FILE }}
+
+      - name: Build executable (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           poetry run pyinstaller --clean \
-                               --onefile \
-                               --console \
-                               --name=${{ env.APP_NAME }} \
-                               --add-binary "$ADB_PATH:." \
-                               --hidden-import=pyperclip \
-                               --hidden-import=colorama \
-                               --hidden-import=platformdirs \
-                               --hidden-import=packaging \
-                               --hidden-import=typing_extensions \
-                               --hidden-import=cryptography \
-                               --hidden-import=usb \
-                               --hidden-import=usb.core \
-                               --hidden-import=usb.util \
-                               --hidden-import=rsa \
-                               --collect-all adb_shell \
-                               --collect-all libusb1 \
-                               --collect-data colorama \
-                               --log-level=DEBUG \
-                               ${{ env.SOURCE_FILE }}
+            --onefile \
+            --console \
+            --name=${{ env.APP_NAME }} \
+            --add-binary "$ADB_PATH:." \
+            --hidden-import=pyperclip \
+            --hidden-import=colorama \
+            --hidden-import=platformdirs \
+            --hidden-import=packaging \
+            --hidden-import=typing_extensions \
+            --hidden-import=cryptography \
+            --hidden-import=usb \
+            --hidden-import=usb.core \
+            --hidden-import=usb.util \
+            --hidden-import=rsa \
+            --collect-all adb_shell \
+            --collect-all libusb1 \
+            --collect-data colorama \
+            --log-level=DEBUG \
+            ${{ env.SOURCE_FILE }}
 
       - name: Package build
         shell: bash
