@@ -64,14 +64,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
           cache: 'pip'
-          
-      - name: Установка Android Platform Tools
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          Invoke-WebRequest -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" -OutFile "platform-tools.zip"
-          Expand-Archive -Path "platform-tools.zip" -DestinationPath $env:TEMP
-          $env:PATH = "$env:TEMP\platform-tools;$env:PATH"
-          
+
       - name: Install Poetry (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -121,18 +114,19 @@ jobs:
       - name: Export requirements
         run: poetry export -f requirements.txt --output requirements.txt --without-hashes
 
-      - name: Install ADB drivers (Windows)
+      - name: Install ADB (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          $ProgressPreference = 'SilentlyContinue'
           New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
-          cd "$env:USERPROFILE\adb"
           $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "platform-tools.zip"
-          Expand-Archive -Path "platform-tools.zip" -DestinationPath "."
-          $env:Path += ";$env:USERPROFILE\adb\platform-tools"
-          [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::User)
-          adb version
+          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
+          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
+          $adbPath = "$env:USERPROFILE\adb\platform-tools"
+          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$adbPath\adb.exe" version
 
       - name: Install ADB (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -140,6 +134,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y android-tools-adb
           sudo apt-get install -y libusb-1.0-0-dev
+          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
           adb version
 
       - name: Install ADB (macOS)
@@ -147,7 +142,18 @@ jobs:
         run: |
           brew install android-platform-tools
           brew install libusb
+          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
           adb version
+
+      - name: Verify ADB installation
+        shell: bash
+        run: |
+          if [ -n "$ADB_PATH" ]; then
+            echo "ADB found at: $ADB_PATH"
+          else
+            echo "ADB path not set!"
+            exit 1
+          fi
 
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
@@ -157,7 +163,7 @@ jobs:
                      --onefile `
                      --console `
                      --name=${{ env.APP_NAME }} `
-                     --add-binary "$(Get-Command adb).Path;." `
+                     --add-binary "$env:ADB_PATH;." `
                      --log-level=DEBUG `
                      ${{ env.SOURCE_FILE }}
 
@@ -169,7 +175,7 @@ jobs:
                      --onefile \
                      --console \
                      --name=${{ env.APP_NAME }} \
-                     --add-binary "$(which adb):." \
+                     --add-binary "$ADB_PATH:." \
                      --log-level=DEBUG \
                      ${{ env.SOURCE_FILE }}
 
