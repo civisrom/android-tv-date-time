@@ -8,6 +8,7 @@ packages = [{include = "android_time_fixer"}]  # Убедитесь, что пр
 
 [tool.poetry.dependencies]
 python = ">=3.13,<3.14"
+pywin32 = { version = ">=306", markers = "sys_platform == 'win32'" }
 adb-shell = {extras = ["usb"], version = "^0.4.3"}
 pyperclip = "^1.8.2"
 colorama = "^0.4.6"
