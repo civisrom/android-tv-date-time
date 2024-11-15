@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Time fixer for Android TV"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-packages = [{include = "android_time_fixer"}]  # Убедитесь, что правильно указали путь
+packages = [{include = "android_time_fixer.py"}]
 
 [tool.poetry.dependencies]
 python = ">=3.13,<3.14"
