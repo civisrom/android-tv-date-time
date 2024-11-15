@@ -539,6 +539,7 @@ def main():
                     fixer.connect(ip)
                     fixer.enable_usb_debugging()
                 else:
+                    print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
                     
             elif choice == '7':
                 print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
