@@ -184,6 +184,7 @@ jobs:
                      --console `
                      --name=${{ env.APP_NAME }} `
                      --add-binary "$env:ADB_PATH;." `
+                     --hidden-import pyperclip `
                      --log-level=DEBUG `
                      ${{ env.SOURCE_FILE }}
 
@@ -196,6 +197,7 @@ jobs:
                      --console \
                      --name=${{ env.APP_NAME }} \
                      --add-binary "$ADB_PATH:." \
+                     --hidden-import pyperclip \
                      --log-level=DEBUG \
                      ${{ env.SOURCE_FILE }}
 
