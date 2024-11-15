@@ -30,9 +30,9 @@ flake8 = "^6.0.0"
 optional = true
 
 [tool.poetry.group.windows.dependencies]
-pywin32 = {version = "^306", platform = "win32"}
+pywin32 = {version = ">=308", platform = "win32"}
 wmi = {version = "^1.5.1", platform = "win32"}
-windows-curses = {version = "^2.3.1", platform = "win32"}
+windows-curses = {version = ">=2.3.2", platform = "win32"}
 
 [build-system]
 requires = ["poetry-core"]
