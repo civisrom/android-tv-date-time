@@ -7,6 +7,7 @@ import platform
 import pyperclip
 import json
 import colorama
+import subprocess
 from pathlib import Path
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
@@ -208,17 +209,49 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(f"Не удалось загрузить ключи: {str(e)}")
 
-    def enable_usb_debugging(self):
-        """Включение отладки по USB на устройстве"""
-        if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+    def list_devices():
+        """Получить список подключенных устройств через adb."""
+        result = subprocess.run(['adb', 'devices'], capture_output=True, text=True)
+        lines = result.stdout.splitlines()
+        
+        devices = [line.split()[0] for line in lines[1:] if line.strip()]
+        
+        if len(devices) == 0:
+            print(Fore.RED + "Нет подключенных устройств.")
+            return None
+        
+        return devices
     
+    def select_device(devices):
+        """Выбор устройства из списка для подключения."""
+        print(Fore.GREEN + "Выберите устройство для подключения:")
+        for i, device in enumerate(devices, 1):
+            print(Fore.YELLOW + f"{i}. {device}")
+        
+        choice = input(Fore.WHITE + "Введите номер устройства: ")
+        
         try:
-            self.device.shell('settings put global adb_enabled 1')
-            logger.info("Отладка по USB включена")
-            print(Fore.GREEN + "Отладка по USB успешно включена")
-        except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось включить отладку по USB: {str(e)}")
+            choice = int(choice)
+            if 1 <= choice <= len(devices):
+                return devices[choice - 1]
+            else:
+                print(Fore.RED + "Неверный номер устройства.")
+                return None
+        except ValueError:
+            print(Fore.RED + "Некорректный ввод.")
+            return None
+    
+    def connect_to_device(device):
+        """Подключение к выбранному устройству через adb."""
+        print(Fore.GREEN + f"Подключение к устройству {device}...")
+        
+        subprocess.run(['adb', '-s', device, 'shell'], check=True)
+    
+    def show_device_info():
+        """Получение информации о текущем подключенном устройстве."""
+        result = subprocess.run(['adb', 'shell', 'getprop'], capture_output=True, text=True)
+        print(Fore.GREEN + "\nТекущая информация об устройстве:\n")
+        print(result.stdout)
     
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
@@ -486,7 +519,7 @@ def main():
             print(Fore.YELLOW + "4. Показать доступные альтернативные сервера времени NTP,(можно копировать в буфер обмена)")
             print(Fore.YELLOW + "5. Показать текущую информацию об устройстве")
            #print("6. Управление серверами")
-            #print(Fore.YELLOW + "6. Включить отладку по USB")
+            #print(Fore.YELLOW + "6. Подключиться к устройству через USB")
             print(Fore.YELLOW + "6. Расшифровка кодов стран,(можно копировать в буфер обмена)")
             print(Fore.YELLOW + "7. Выход")
 
@@ -535,16 +568,13 @@ def main():
             elif choice == '9':
                 fixer.manage_servers()
                 
-            elif choice == '8':
-                print(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ', end="")
-                code = input(Fore.WHITE).strip()
-                if fixer.validate_country_code(code):
-                    ntp_server = fixer.ntp_servers[code.lower()]
-                    fixer.fix_time(ntp_server)
-                    fixer.enable_usb_debugging()
-                    print(Fore.YELLOW + "\nНастройки времени успешно обновлены!")
-                else:
-                    print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+            elif choice == '6':
+                print(Fore.YELLOW + "\nПодключение к устройству через USB.")
+                devices = list_devices()
+                if devices:
+                    selected_device = select_device(devices)
+                    if selected_device:
+                        connect_to_device(selected_device)
                     
             elif choice == '6':
                 print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
