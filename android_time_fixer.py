@@ -528,7 +528,10 @@ def main():
                     fixer.show_device_info()
                 else:
                     print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
-
+            
+            elif choice == '9':
+                fixer.manage_servers()
+                
             elif choice == '6':
                 print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield): ', end="")
                 ip = input(Fore.WHITE).strip()
@@ -536,10 +539,7 @@ def main():
                     fixer.connect(ip)
                     fixer.enable_usb_debugging()
                 else:
-            
-            elif choice == '9':
-                fixer.manage_servers()
-
+                    
             elif choice == '7':
                 print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
                 print("ad: Андорра")
