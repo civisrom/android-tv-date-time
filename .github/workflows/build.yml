@@ -179,12 +179,17 @@ jobs:
     - name: Package build
       run: |
         cd dist
+        
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           7z a "AndroidTVTimeFixer-windows.zip" "AndroidTVTimeFixer.exe"
-        else
+        elif [[ "$RUNNER_OS" == "Linux" ]]; then
           chmod +x AndroidTVTimeFixer
           zip "AndroidTVTimeFixer-linux.zip" "AndroidTVTimeFixer"
+        else
+          echo "Unsupported operating system: $RUNNER_OS"
+          exit 1
         fi
+        
         cd ..
 
     - name: Upload build artifact
