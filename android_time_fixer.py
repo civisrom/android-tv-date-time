@@ -541,7 +541,7 @@ def main():
                     fixer.connect(ip)
                     fixer.show_current_settings()
                     print(Fore.GREEN + locales.get('enter_country_code'), end="")
-                    code = input(Fore.WHITE).strip().lower()
+                    code = input(Fore.WHITE).strip()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
