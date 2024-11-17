@@ -123,69 +123,35 @@ jobs:
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
         run: |
-          $pyinstallerArgs = @(
-            '--clean',
-            '--onefile',
-            '--console',
-            "--name=${{ env.APP_NAME }}",
-            "--add-binary=$env:ADB_PATH;.",
-            '--hidden-import=pyperclip',
-            '--hidden-import=colorama',
-            '--hidden-import=platformdirs',
-            '--hidden-import=packaging',
-            '--hidden-import=typing_extensions',
-            '--hidden-import=cryptography',
-            '--hidden-import=usb',
-            '--hidden-import=usb.core',
-            '--hidden-import=usb.util',
-            '--hidden-import=rsa',
-            '--hidden-import=aiofiles',
-            '--hidden-import=async_timeout',
-            '--hidden-import=asyncio',
-            '--hidden-import=socket',
-            '--hidden-import=subprocess',
-            '--hidden-import=threading',
-            '--hidden-import=psutil',
-            '--hidden-import=wmi',
-            '--hidden-import=click',
-            '--hidden-import=rich',
-            '--hidden-import=rich.console',
-            '--hidden-import=rich.progress',
-            '--hidden-import=loguru',
-            '--hidden-import=pywinusb',
-            '--hidden-import=pywinusb.hid',
-            '--hidden-import=win32api',
-            '--hidden-import=win32con',
-            '--hidden-import=win32gui',
-            '--collect-all=adb_shell',
-            '--collect-all=libusb1',
-            '--collect-all=async_timeout',
-            '--collect-all=psutil',
-            '--collect-all=wmi',
-            '--collect-all=click',
-            '--collect-all=rich',
-            '--collect-all=loguru',
-            '--collect-all=pywinusb',
-            '--collect-data=colorama',
-            '--collect-data=aiofiles',
-            '--collect-data=rich',
-            '--collect-data=click',
-            '--log-level=DEBUG',
-            "${{ env.SOURCE_FILE }}"
-          )
-          poetry run pyinstaller $pyinstallerArgs
+          poetry run pyinstaller --clean `
+            --onefile `
+            --console `
+            --name=${{ env.APP_NAME }} `
+            --add-binary "$env:ADB_PATH;." `
+            --hidden-import=pyperclip `
+            --hidden-import=colorama `
+            --hidden-import=platformdirs `
+            --hidden-import=packaging `
+            --hidden-import=typing_extensions `
+            --hidden-import=cryptography `
+            --hidden-import=usb `
+            --hidden-import=usb.core `
+            --hidden-import=usb.util `
+            --hidden-import=rsa `
+            --hidden-import=aiofiles `
+            --hidden-import=async_timeout `
+            --hidden-import=asyncio `
+            --hidden-import=socket `
+            --hidden-import=subprocess `
+            --hidden-import=threading `
+            --collect-all adb_shell `
+            --collect-all libusb1 `
+            --collect-all async_timeout `
+            --collect-data colorama `
+            --collect-data aiofiles `
+            --log-level=DEBUG `
+            ${{ env.SOURCE_FILE }}
         shell: pwsh
-        env:
-          PYTHON_VERSION: 3.11
-          APP_NAME: AndroidTVTimeFixer
-          SOURCE_FILE: android_time_fixer.py
-          CI_DEBUG: true
-          pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
-          PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
-          Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
-          Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
-          Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
-          ADB_PATH: C:\Users\runneradmin\adb\platform-tools\adb.exe
 
       - name: Build executable (Linux)
         if: runner.os == 'Linux'
