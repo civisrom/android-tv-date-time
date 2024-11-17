@@ -207,7 +207,7 @@ arising from the use of this program.
             ),
             "available_country_codes": Translation(
                 en="\nAvailable country codes:",
-                ru="\nДоступные коды стран:"
+                ru="\nДоступные коды стран (копируем в буфер обмена наприм. ru или by и вставляем в пункте 1 глав. меню):"
             ),
             "country_code_server": Translation(
                 en="{code} — {server}",
