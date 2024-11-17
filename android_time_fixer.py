@@ -142,7 +142,6 @@ class AndroidTVTimeFixer:
 	    '2.asia.pool.ntp.org',
 	    '3.asia.pool.ntp.org',
 	    'time.cloudflare.com',
-            'ntp0.NL.net',
             'clock.isc.org',
             'ntp2.vniiftri.ru',
             'ntps1-1.cs.tu-berlin.de',
