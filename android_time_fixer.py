@@ -535,29 +535,52 @@ def main():
             choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
 
             if choice == '1':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
-                if fixer.validate_ip(ip):
-                    fixer.connect(ip)
-                    fixer.show_current_settings()
-                    print(Fore.GREEN + locales.get('enter_country_code'), end="")
-                    code = input(Fore.WHITE).strip()
-                    if fixer.validate_country_code(code):
-                        ntp_server = fixer.ntp_servers[code.lower()]
-                        fixer.fix_time(ntp_server)
-                        print(Fore.YELLOW + locales.get('time_settings_updated'))
-                else:
-                    print(Fore.RED + locales.get('invalid_ip_format'))
-
+                try:
+                    print(Fore.GREEN + locales.get('enter_device_ip'), end="")
+                    ip = input(Fore.WHITE).strip()
+                    if fixer.validate_ip(ip):
+                        try:
+                            fixer.connect(ip)
+                            fixer.show_current_settings()
+                            print(Fore.GREEN + locales.get('enter_country_code'), end="")
+                            code = input(Fore.WHITE).strip()
+                            if fixer.validate_country_code(code):
+                                try:
+                                    ntp_server = fixer.ntp_servers[code.lower()]
+                                    fixer.fix_time(ntp_server)
+                                    print(Fore.YELLOW + locales.get('time_settings_updated'))
+                                except Exception as e:
+                                    print(Fore.RED + locales.get('time_update_error').format(str(e)))
+                            else:
+                                print(Fore.RED + locales.get('invalid_country_code'))
+                        except Exception as e:
+                            print(Fore.RED + locales.get('connection_error').format(str(e)))
+                    else:
+                        print(Fore.RED + locales.get('invalid_ip_format'))
+                except Exception as e:
+                    print(Fore.RED + locales.get('operation_failed').format(str(e)))
+                    continue
+                    
             elif choice == '2':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
-                if fixer.validate_ip(ip):
-                    fixer.connect(ip)
-                    fixer.show_current_settings()
-                    fixer.set_custom_ntp()
-                else:
-                    print(Fore.RED + locales.get('invalid_ip_format'))
+                try:
+                    print(Fore.GREEN + locales.get('enter_device_ip'), end="")
+                    ip = input(Fore.WHITE).strip()
+                    if fixer.validate_ip(ip):
+                        try:
+                            fixer.connect(ip)
+                            fixer.show_current_settings()
+                            try:
+                                fixer.set_custom_ntp()
+                                print(Fore.YELLOW + locales.get('ntp_settings_updated'))
+                            except Exception as e:
+                                print(Fore.RED + locales.get('ntp_update_error').format(str(e)))
+                        except Exception as e:
+                            print(Fore.RED + locales.get('connection_error').format(str(e)))
+                    else:
+                        print(Fore.RED + locales.get('invalid_ip_format'))
+                except Exception as e:
+                    print(Fore.RED + locales.get('operation_failed').format(str(e)))
+                    continue
 
             elif choice == '3':
                 fixer.show_country_codes()
