@@ -21,6 +21,22 @@ rsa = "^4.9.0"
 
 [tool.poetry.group.windows.dependencies]
 pywin32 = {version = "^306", platform = "win32"}
+psutil = "^5.9.0"
+wmi = "^1.5.1"
+click = "^8.1.0"
+rich = "^13.0.0"
+pywinusb = "^0.4.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.3.0"
+black = "^23.0.0"
+flake8 = "^6.0.0"
+mypy = "^1.0.0"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
 
 [build-system]
 requires = ["poetry-core"]
