@@ -384,7 +384,52 @@ class AndroidTVTimeFixer:
             return device_info
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
-            
+    def handle_device_connection():
+        # Ask for device IP and validate
+        print(Fore.GREEN + locales.get('enter_device_ip'), end="")
+        ip = input(Fore.WHITE).strip()
+    
+        if not fixer.validate_ip(ip):
+            print(Fore.RED + locales.get('invalid_ip_format'))
+            return None
+        
+        fixer.connect(ip)
+        fixer.show_current_settings()
+        return ip
+    
+    def handle_time_update():
+        # Ask for country code and validate
+        print(Fore.GREEN + locales.get('enter_country_code'), end="")
+        code = input(Fore.WHITE).strip()
+    
+        if not fixer.validate_country_code(code):
+            print(Fore.RED + locales.get('invalid_country_code'))
+            return False
+        
+        ntp_server = fixer.ntp_servers.get(code.lower())
+        if ntp_server:
+            fixer.fix_time(ntp_server)
+            print(Fore.YELLOW + locales.get('time_settings_updated'))
+            return True
+        else:
+            print(Fore.RED + locales.get('invalid_country_code'))
+            return False
+    
+    def handle_custom_ntp():
+        # Set custom NTP server settings
+        fixer.set_custom_ntp()
+    
+    def main():
+        if choice == '1':
+            ip = handle_device_connection()
+            if ip:
+                if handle_time_update():
+                    return  # Exit after time settings are updated
+        elif choice == '2':
+            ip = handle_device_connection()
+            if ip:
+                fixer.set_custom_ntp()
+		    
     def show_current_settings(self) -> None:
         """Показывает только текущий сервер NTP"""
         if not self.device:
@@ -533,54 +578,6 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_9"))
 
             choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
-
-            if choice == '1':
-                try:
-                    print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                    ip = input(Fore.WHITE).strip()
-                    if fixer.validate_ip(ip):
-                        try:
-                            fixer.connect(ip)
-                            fixer.show_current_settings()
-                            print(Fore.GREEN + locales.get('enter_country_code'), end="")
-                            code = input(Fore.WHITE).strip()
-                            if fixer.validate_country_code(code):
-                                try:
-                                    ntp_server = fixer.ntp_servers[code.lower()]
-                                    fixer.fix_time(ntp_server)
-                                    print(Fore.YELLOW + locales.get('time_settings_updated'))
-                                except Exception as e:
-                                    print(Fore.RED + locales.get('time_update_error').format(str(e)))
-                            else:
-                                print(Fore.RED + locales.get('invalid_country_code'))
-                        except Exception as e:
-                            print(Fore.RED + locales.get('connection_error').format(str(e)))
-                    else:
-                        print(Fore.RED + locales.get('invalid_ip_format'))
-                except Exception as e:
-                    print(Fore.RED + locales.get('operation_failed').format(str(e)))
-                    continue
-                    
-            elif choice == '2':
-                try:
-                    print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                    ip = input(Fore.WHITE).strip()
-                    if fixer.validate_ip(ip):
-                        try:
-                            fixer.connect(ip)
-                            fixer.show_current_settings()
-                            try:
-                                fixer.set_custom_ntp()
-                                print(Fore.YELLOW + locales.get('ntp_settings_updated'))
-                            except Exception as e:
-                                print(Fore.RED + locales.get('ntp_update_error').format(str(e)))
-                        except Exception as e:
-                            print(Fore.RED + locales.get('connection_error').format(str(e)))
-                    else:
-                        print(Fore.RED + locales.get('invalid_ip_format'))
-                except Exception as e:
-                    print(Fore.RED + locales.get('operation_failed').format(str(e)))
-                    continue
 
             elif choice == '3':
                 fixer.show_country_codes()
