@@ -7,33 +7,38 @@ import platform
 import pyperclip
 import json
 import colorama
+import subprocess
 from pathlib import Path
+from locales import locales, set_language
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+from locales import locales, set_language
 from colorama import Fore, Style, init
 init(autoreset=True)
 
-def show_disclaimer():
-    disclaimer = """
-    ==========================================
-    ВНИМАНИЕ: Эта программа предоставляется на условиях «как есть» (as is).
-    Автор(ы) не несут ответственности за любые возможные убытки или ущерб,
-    возникшие в результате использования данной программы.
-    ==========================================
-    """
-    print(disclaimer)
-
-# Вызов функции при запуске программы
-if __name__ == "__main__":
-    show_disclaimer()
-
 # Настройка логирования
+#logging.basicConfig(
+#    level=logging.INFO,
+#    format='%(asctime)s - %(levelname)s - %(message)s',
+#    handlers=[logging.StreamHandler(sys.stdout)]
+#)
+#logger = logging.getLogger(__name__)
+
+# Настройка логгера
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
+    level=logging.INFO,  # Уровень логирования
+    format='%(asctime)s - %(levelname)s - %(message)s',  # Формат сообщений
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Вывод в консоль
+    ]
 )
+
+# Установка кодировки для обработчика
+for handler in logging.getLogger().handlers:
+    if isinstance(handler, logging.StreamHandler):
+        handler.setStream(sys.stdout)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger = logging.getLogger(__name__)
 
 class AndroidTVTimeFixerError(Exception):
@@ -45,9 +50,9 @@ class AndroidTVTimeFixer:
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self.device = None
-        self.max_connection_retries = 3
+        self.max_connection_retries = 5
         self.connection_retry_delay = 7
-        self.connection_timeout = 60  # Таймаут ожидания подключения в секундах
+        self.connection_timeout = 80  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
         self.ntp_servers = {
@@ -114,21 +119,21 @@ class AndroidTVTimeFixer:
             '2.europe.pool.ntp.org',
             '3.europe.pool.ntp.org',
             '0.north-america.pool.ntp.org',
-            '1.north-america.pool.ntp.org',
-            '2.north-america.pool.ntp.org',
-            '3.north-america.pool.ntp.org',
+	    '1.north-america.pool.ntp.org',
+	    '2.north-america.pool.ntp.org',
+	    '3.north-america.pool.ntp.org',
             '0.asia.pool.ntp.org',
-            '1.asia.pool.ntp.org',
-            '2.asia.pool.ntp.org',
-            '3.asia.pool.ntp.org',
-            'time.cloudflare.com',
+	    '1.asia.pool.ntp.org',
+	    '2.asia.pool.ntp.org',
+	    '3.asia.pool.ntp.org',
+	    'time.cloudflare.com',
             'clock.isc.org',
             'ntp2.vniiftri.ru',
             'ntps1-1.cs.tu-berlin.de',
             'ntp.ix.ru',
             'time.android.com'
         ]
-
+    
     def load_saved_servers(self) -> dict:
         """Загружает сохраненные серверы из файла"""
         if self.servers_file.exists():
@@ -136,7 +141,7 @@ class AndroidTVTimeFixer:
                 with open(self.servers_file, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                logger.warning(f"Не удалось загрузить сохраненные серверы: {e}")
+                logger.warning(locales.get('logger_warning', error=str(e)))
         return {'favorite_servers': [], 'custom_servers': []}
 
     def save_servers(self):
@@ -145,7 +150,7 @@ class AndroidTVTimeFixer:
             with open(self.servers_file, 'w') as f:
                 json.dump(self.saved_servers, f, indent=2)
         except Exception as e:
-            logger.warning(f"Не удалось сохранить серверы: {e}")
+            logger.warning(locales.get('logger_warning_2', error=str(e)))
 
     def copy_server_to_clipboard(self, server: str) -> bool:
         """Копирует адрес сервера в буфер обмена"""
@@ -153,7 +158,7 @@ class AndroidTVTimeFixer:
             pyperclip.copy(server)
             return True
         except Exception as e:
-            logger.warning(f"Не удалось скопировать в буфер обмена: {e}")
+            logger.warning(locales.get('copy_to_clipboard', error=str(e)))
             return False
 
     def paste_server_from_clipboard(self) -> str:
@@ -161,7 +166,7 @@ class AndroidTVTimeFixer:
         try:
             return pyperclip.paste()
         except Exception as e:
-            logger.warning(f"Не удалось вставить из буфера обмена: {e}")
+            logger.warning(locales.get('copy_to_clipboard_2', error=str(e)))
             return ""
 
     def add_to_favorites(self, server: str):
@@ -188,11 +193,11 @@ class AndroidTVTimeFixer:
                 self.keys_folder.mkdir(parents=True)
                 priv_key = self.keys_folder / 'adbkey'
                 keygen(str(priv_key))
-                logger.info('Ключи ADB сгенерированы успешно')
+                logger.info(locales.get('gen_keys'))
             else:
-                logger.info('Используются существующие ключи ADB')
+                logger.info(locales.get('existing_adb_keys'))
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось сгенерировать ключи: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get('key_generation_error', error=str(e)))
 
     def load_keys(self):
         try:
@@ -202,14 +207,58 @@ class AndroidTVTimeFixer:
                 priv = f.read()
             return pub, priv
         except FileNotFoundError:
-            raise AndroidTVTimeFixerError("Ключи ADB не найдены. Пожалуйста, сначала сгенерируйте их.")
+            raise AndroidTVTimeFixerError(locales.get("adb_keys_not_found"))
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось загрузить ключи: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get("key_loading_error", error=str(e)))
 
+    def list_devices():
+        """Получить список подключенных устройств через adb."""
+        result = subprocess.run(['adb', 'devices'], capture_output=True, text=True)
+        lines = result.stdout.splitlines()
+        
+        devices = [line.split()[0] for line in lines[1:] if line.strip()]
+        
+        if len(devices) == 0:
+            print(Fore.RED + locales.get("no_connected_devices"))
+            return None
+        
+        return devices
+    
+    def select_device(devices):
+        """Выбор устройства из списка для подключения."""
+        print(Fore.GREEN + locales.get("choose_device_to_connect"))
+        for i, device in enumerate(devices, 1):
+            print(Fore.YELLOW + f"{i}. {device}")
+        
+        choice = input(Fore.WHITE + locales.get("enter_device_number"))
+        
+        try:
+            choice = int(choice)
+            if 1 <= choice <= len(devices):
+                return devices[choice - 1]
+            else:
+                print(Fore.RED + locales.get("invalid_device_number"))
+                return None
+        except ValueError:
+            print(Fore.RED + locales.get("invalid_input"))
+            return None
+    
+    def connect_to_device(device):
+        """Подключение к выбранному устройству через adb."""
+        print(Fore.GREEN + locales.get("connecting_to_device").format(device))
+        
+        subprocess.run(['adb', '-s', device, 'shell'], check=True)
+    
+    def show_device_info():
+        """Получение информации о текущем подключенном устройстве."""
+        result = subprocess.run(['adb', 'shell', 'getprop'], capture_output=True, text=True)
+        print(Fore.GREEN + locales.get("current_device_info"))
+        print(result.stdout)
+    
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
         if not self.validate_ip(ip):
-            raise AndroidTVTimeFixerError("Неверный формат IP-адреса")
+            raise AndroidTVTimeFixerError(locales.get("invalid_ip_format"))
 
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
@@ -218,91 +267,87 @@ class AndroidTVTimeFixer:
         connection_established = False
         last_error = None
         
-        print("\nОжидание подключения и разрешения на устройстве...")
-        print("Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос.")
+        print(locales.get("waiting_for_connection"))
+        print(locales.get("confirm_connection"))
         
         while time.time() - start_time < self.connection_timeout:
             try:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 connection_established = True
-                logger.info(f'Подключение к {ip}:5555 выполнено успешно')
+                logger.info(locales.get('connection_success', ip=ip))
                 break
             except Exception as e:
                 last_error = str(e)
                 remaining_time = int(self.connection_timeout - (time.time() - start_time))
-                print(f"\rОжидание подключения... {remaining_time} сек.", end='')
+                print(locales.get("waiting_for_connection", remaining_time=remaining_time), end='')
                 time.sleep(1)
 
         print()  # Новая строка после завершения ожидания
         
         if not connection_established:
             raise AndroidTVTimeFixerError(
-                f"Не удалось подключиться в течение {self.connection_timeout} секунд.\n"
-                "Убедитесь, что:\n"
-                "1. На вашем ТВ включен отладчик ADB\n"
-                "2. Ваш ТВ и ПК находятся в одной сети\n"
-                "3. IP-адрес введен правильно\n"
-                "4. Вы предоставили доступ устройству при появлении запроса на ТВ\n"
-                f"Последняя ошибка: {last_error}"
+                locales.get("connection_failed", timeout=self.connection_timeout) + "\n" +
+                locales.get("ensure_steps") + "\n" +
+                locales.get("last_error").format(last_error)
             )
 
     def get_current_ntp(self) -> str:
         if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+            raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
 
         try:
             current_ntp = self.device.shell('settings get global ntp_server')
             return current_ntp.strip()
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось получить текущий сервер NTP: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get('failed_to_get_ntp_server', error=str(e)))
 
     def set_ntp_server(self, ntp_server: str) -> None:
         if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+            raise AndroidTVTimeFixerError(locales.get('no_device_connected'))
 
         try:
             self.device.shell(f'settings put global ntp_server {ntp_server}')
-            logger.info(f'Сервер NTP установлен на {ntp_server}')
+            logger.info(locales.get('ntp_server_set', ntp_server=ntp_server))
 
             # Проверяем изменение
             new_ntp = self.get_current_ntp()
             if ntp_server not in new_ntp:
-                raise AndroidTVTimeFixerError("Не удалось подтвердить изменение сервера NTP")
+                raise AndroidTVTimeFixerError(locales.get("ntp_server_confirmation_failed"))
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось обновить сервер NTP: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get("ntp_server_update_failed", error=str(e)))
 
     def fix_time(self, ntp_server: str) -> None:
         if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+            raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
 
         self.set_ntp_server(ntp_server)
 
     def show_country_codes(self) -> None:
-        print(Fore.YELLOW + "\nДоступные коды стран:")
+        print(Fore.YELLOW + locales.get("available_country_codes"))
         for code, server in self.ntp_servers.items():
-            print(f"{code.upper()} — {server}")
+            print(locales.get("country_code_server", code=code.upper(), server=server))
 
     def show_custom_ntp_servers(self) -> None:
-        print(Fore.YELLOW + "\nДоступные альтернативные серверы NTP:")
+        print(Fore.YELLOW + locales.get("available_alternative_ntp_servers"))
         for server in self.custom_ntp_servers:
-            print(f"- {server}")
+            print(locales.get("custom_ntp_server", server=server))
 
     def set_custom_ntp(self) -> None:
         while True:
-            ntp_server = input(Fore.GREEN + "\nВведите свой NTP-сервер (или 'q' для выхода): " + Fore.WHITE).strip()
+            ntp_server = input(Fore.GREEN + locales.get("enter_ntp_server") + Fore.WHITE).strip()
             if ntp_server.lower() == 'q':
                 return
             try:
                 self.fix_time(ntp_server)
-                print(Fore.GREEN + f"Сервер NTP установлен на " + Fore.RED + f"{ntp_server}")
+                print(Fore.GREEN + locales.get("ntp_server_set").format(ntp_server) + Fore.RED + ntp_server)
                 return
             except AndroidTVTimeFixerError as e:
-                print(f"Ошибка: {str(e)}")
+                print(locales.get("error_message").format(error=str(e)))
 
     def get_device_info(self) -> dict:
         if not self.device:
-            raise AndroidTVTimeFixerError(Fore.RED + "Не подключено ни к одному устройству")
+            raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
 
         try:
             device_info = {
@@ -338,75 +383,75 @@ class AndroidTVTimeFixer:
             }
             return device_info
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
             
     def show_current_settings(self) -> None:
         """Показывает только текущий сервер NTP"""
         if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+            raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
 
         try:
             current_ntp = self.get_current_ntp()
-            print(Fore.GREEN + "- Текущий сервер времени, установленный на устройстве: ", end="")
+            print(Fore.GREEN + locales.get("current_ntp_server"), end="")
             print(Fore.RED + f"{current_ntp}")
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось получить информацию о сервере NTP: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get("ntp_server_info_error", error=str(e)))
 
     def show_device_info(self) -> None:
         """Показывает полную информацию об устройстве, включая NTP-сервер"""
         if not self.device:
-            raise AndroidTVTimeFixerError("Не подключено ни к одному устройству")
+            raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
     
         try:
             current_ntp = self.get_current_ntp()
             device_info = self.get_device_info()
-            print(Fore.GREEN + f"\nТекущая информация об устройстве:")
-            print(Fore.GREEN + "- Текущий сервер времени, установленный на устройстве: ", end="")
-            print(Fore.RED + f"{current_ntp}")
-            print(Fore.YELLOW + "- Информация об устройстве:")
+            print(Fore.GREEN + locales.get("current_device_info"))
+            print(Fore.GREEN + locales.get("current_ntp_server") + " ", end="")
+            print(Fore.RED + "{}".format(current_ntp))
+            print(Fore.YELLOW + locales.get("device_info"))
             for key, value in device_info.items():
                 print(f"  {key.capitalize()}: {value}")
         except Exception as e:
-            raise AndroidTVTimeFixerError(f"Не удалось получить информацию об устройстве: {str(e)}")
+            raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
             
     def manage_servers(self):
         """Управление сохраненными серверами"""
         while True:
-            print("\nУправление серверами:")
-            print("1. Показать избранные серверы")
-            print("2. Добавить текущий сервер в избранное")
-            print("3. Копировать сервер в буфер обмена")
-            print("4. Вставить сервер из буфера обмена")
-            print("5. Удалить сервер из избранного")
-            print("6. Вернуться в главное меню")
+            print(locales.get("server_management"))
+            print("1. " + locales.get("show_favorite_servers"))
+            print("2. " + locales.get("add_current_server_to_favorites"))
+            print("3. " + locales.get("copy_server_to_clipboard"))
+            print("4. " + locales.get("paste_server_from_clipboard"))
+            print("5. " + locales.get("remove_server_from_favorites"))
+            print("6. " + locales.get("return_to_main_menu"))
 
-            choice = input("Выберите действие: ").strip()
+            choice = input(locales.get("select_action")).strip()
 
             if choice == '1':
                 if self.saved_servers['favorite_servers']:
-                    print("\nИзбранные серверы:")
+                    print(locales.get("favorite_servers_list"))
                     for i, server in enumerate(self.saved_servers['favorite_servers'], 1):
                         print(f"{i}. {server}")
                 else:
-                    print("Список избранных серверов пуст")
+                    print(locales.get("no_favorite_servers"))
 
             elif choice == '2':
                 if self.device:
                     current_ntp = self.get_current_ntp()
                     self.add_to_favorites(current_ntp)
-                    print(f"Сервер {current_ntp} добавлен в избранное")
+                    print(locales.get("server_added_to_favorites", server=current_ntp))
                 else:
-                    print("Сначала подключитесь к устройству")
+                    print(locales.get("connect_device_first"))
 
             elif choice == '3':
                 if self.device:
                     current_ntp = self.get_current_ntp()
                     if self.copy_server_to_clipboard(current_ntp):
-                        print(f"Сервер {current_ntp} скопирован в буфер обмена")
+                        print(locales.get("server_copied_to_clipboard", server=current_ntp))
                     else:
-                        print("Не удалось скопировать сервер")
+                        print(locales.get("failed_to_copy_server"))
                 else:
-                    print("Сначала подключитесь к устройству")
+                    print(locales.get("connect_device_first"))
 
             elif choice == '4':
                 server = self.paste_server_from_clipboard()
@@ -414,93 +459,105 @@ class AndroidTVTimeFixer:
                     try:
                         if self.device:
                             self.fix_time(server)
-                            print(f"Установлен сервер из буфера обмена: {server}")
+                            print(locales.get("server_set_from_clipboard", server=server))
                         else:
-                            print("Сначала подключитесь к устройству")
+                            print(locales.get("connect_device_first"))
                     except AndroidTVTimeFixerError as e:
-                        print(f"Ошибка: {str(e)}")
+                        print(locales.get("error_occurred", error=str(e)))
                 else:
-                    print("Буфер обмена пуст или недоступен")
+                    print(locales.get("clipboard_empty_or_unavailable"))
 
             elif choice == '5':
                 if self.saved_servers['favorite_servers']:
-                    print("\nВыберите сервер для удаления:")
+                    print(locales.get("choose_server_to_remove"))
                     for i, server in enumerate(self.saved_servers['favorite_servers'], 1):
                         print(f"{i}. {server}")
                     try:
-                        idx = int(input("Введите номер сервера: ")) - 1
+                        idx = int(input(locales.get("enter_server_number"))) - 1
                         if 0 <= idx < len(self.saved_servers['favorite_servers']):
                             removed = self.saved_servers['favorite_servers'].pop(idx)
                             self.save_servers()
-                            print(f"Сервер {removed} удален из избранного")
+                            print(locales.get("server_removed_from_favorites", server=removed))
                         else:
-                            print("Неверный номер")
+                            print(locales.get("invalid_number"))
                     except ValueError:
-                        print("Введите корректный номер")
+                        print(locales.get("enter_valid_number"))
                 else:
-                    print("Список избранных серверов пуст")
+                    print(locales.get("no_favorite_servers"))
 
             elif choice == '6':
                 break
 
             else:
-                print("Неверный выбор")
+                print(locales.get("invalid_choice"))
 
 def main():
     fixer = AndroidTVTimeFixer()
-    
+    print(locales.get("select_language"))  # Выводим сообщение для выбора языка
+    print("1. " + locales.get("english"))  # Выбор для английского
+    print("2. " + locales.get("russian"))  # Выбор для русского
+    # Ввод пользователя
+    lang_choice = input(locales.get("enter_number")).strip()
+    # Назначение языка на основе выбора
+    if lang_choice == "2":
+        set_language("ru")
+        print(locales.get("language_set_ru"))  # Подтверждение выбора
+    else:
+        set_language("en")
+        print(locales.get("language_set_en"))  # Подтверждение выбора
+        
     try:
         # Показываем начальные инструкции
-        print(Fore.GREEN + "\nКорректировка сервера времени для Android TV")
-        print("\nПожалуйста, убедитесь, что следующее сделано:")
-        print("1. Включите отладку ADB на вашем ТВ или Nvidia Shield:")
-        print("   Настройки > Настройки устройства > Об устройстве > Сборка (нажмите 7 раз или более)")
-        print("   Затем: Настройки устройства > Для разработчиков > Отладка по сети (Включить)")
-        print("2. Установите время и дату в автоматический режим:")
-        print("   Настройки >  Настройки устройства > Дата и время > Автонастройка даты и времени > Использовать время сети")
-        print("3. Ваш ТВ, Nvidia Shield и ПК должны быть подключены к одной сети")
-        input("\nНажмите Enter, чтобы продолжить...")
+        print(Fore.GREEN + locales.get("program_title"))
+        print(Fore.WHITE + locales.get("please_ensure"))
+        print(Fore.YELLOW + locales.get("adb_setup"))
+        print(Fore.YELLOW + locales.get("adb_steps"))
+        print(Fore.YELLOW + locales.get("adb_network"))
+        print(Fore.YELLOW + locales.get("auto_time_date"))
+        print(Fore.YELLOW + locales.get("network_requirement"))
+        input(Fore.WHITE + locales.get("press_enter_to_continue"))
 
         # Генерируем ключи ADB
         fixer.gen_keys()
 
         while True:
-            print(Fore.GREEN + "\nГлавное меню:")
-            print(Fore.YELLOW + "1. Изменить сервер времени NTP по коду страны")
-            print(Fore.YELLOW + "2. Изменить сервер времени NTP на пользовательский")
-            print(Fore.YELLOW + "3. Показать доступные коды стран и серверов NTP,(можно копировать в буфер обмена)")
-            print(Fore.YELLOW + "4. Показать доступные альтернативные сервера времени NTP,(можно копировать в буфер обмена)")
-            print(Fore.YELLOW + "5. Показать текущую информацию об устройстве")
-           # print("6. Управление серверами")
-            print(Fore.YELLOW + "6. Расшифровка кодов стран,(можно копировать в буфер обмена)")
-            print(Fore.YELLOW + "7. Выход")
+            print(Fore.GREEN + locales.get("main_menu"))
+            print(Fore.YELLOW + locales.get("menu_item_1"))
+            print(Fore.YELLOW + locales.get("menu_item_2"))
+            print(Fore.YELLOW + locales.get("menu_item_3"))
+            print(Fore.YELLOW + locales.get("menu_item_4"))
+            print(Fore.YELLOW + locales.get("menu_item_5"))
+            print(Fore.YELLOW + locales.get("menu_item_6"))
+            #print(Fore.YELLOW + locales.get("menu_item_7"))
+            print(Fore.YELLOW + locales.get("menu_item_8"))
+            print(Fore.YELLOW + locales.get("menu_item_9"))
 
-            choice = input("Введите номер пункта меню: ").strip()
+            choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
 
             if choice == '1':
-                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ', end="")
+                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
                 ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
-                    print(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ', end="")
-                    code = input(Fore.WHITE).strip().lower()
+                    print(Fore.GREEN + locales.get('enter_country_code'), end="")
+                    code = input(Fore.WHITE).strip()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
-                        print(Fore.YELLOW + "\nНастройки времени успешно обновлены!")
+                        print(Fore.YELLOW + locales.get('time_settings_updated'))
                 else:
-                    print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+                    print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '2':
-                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ', end="")
+                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
                 ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_current_settings()
                     fixer.set_custom_ntp()
                 else:
-                    print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
+                    print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '3':
                 fixer.show_country_codes()
@@ -509,85 +566,46 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
-                print(Fore.GREEN + '\nВведите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): ', end="")
+                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
                 ip = input(Fore.WHITE).strip()
                 if fixer.validate_ip(ip):
                     fixer.connect(ip)
                     fixer.show_device_info()
                 else:
-                    print(Fore.RED + "Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx")
-
-            elif choice == '8':
-                fixer.manage_servers()
-
+                    print(Fore.RED + locales.get('invalid_ip_format'))
+            
             elif choice == '6':
-                print(Fore.GREEN + "\nРасшифровка кодов стран (можно копировать в буфер обмена):")
-                print("at: Австрия")
-                print("ba: Босния и Герцеговина")
-                print("be: Бельгия")
-                print("bg: Болгария")
-                print("by: Беларусь")
-                print("ch: Швейцария")
-                print("cy: Кипр")
-                print("cz: Чехия")
-                print("de: Германия")
-                print("dk: Дания")
-                print("ee: Эстония")
-                print("es: Испания")
-                print("fi: Финляндия")
-                print("fr: Франция")
-                print("gi: Гибралтар")
-                print("gr: Греция")
-                print("hr: Хорватия")
-                print("hu: Венгрия")
-                print("ie: Ирландия")
-                print("is: Исландия")
-                print("it: Италия")
-                print("li: Лихтенштейн")
-                print("lt: Литва")
-                print("lu: Люксембург")
-                print("lv: Латвия")
-                print("md: Молдова")
-                print("mk: Северная Македония")
-                print("nl: Нидерланды")
-                print("no: Норвегия")
-                print("pl: Польша")
-                print("pt: Португалия")
-                print("ro: Румыния")
-                print("rs: Сербия")
-                print("ru: Россия")
-                print("se: Швеция")
-                print("si: Словения")
-                print("sk: Словакия")
-                print("tr: Турция")
-                print("ua: Украина")
-                print("uk: Великобритания")
-                print("va: Ватикан")
-                print("us: США")
-                print("ca: Канада")
-                print("br: Бразилия")
-                print("au: Австралия")
-                print("cn: Китай")
-                print("jp: Япония")
-                print("kz: Казахстан")
-
+                fixer.manage_servers()
+                
             elif choice == '7':
-                print("\nВыход из программы...")
+                print(Fore.YELLOW + "\n" + locales.get('menu_item_7'))
+                devices = list_devices()
+                if devices:
+                    selected_device = select_device(devices)
+                    if selected_device:
+                        connect_to_device(selected_device)
+                    
+            elif choice == '8':
+                print(Fore.GREEN + locales.get('country_codes_description'))
+                print(locales.get('country_codes'))
+
+            elif choice == '9':
+                print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             
             elif choice.lower() == 'b':
                 continue
             else:
-                print(Fore.RED + "Неверный выбор. Пожалуйста, попробуйте еще раз.")
+                print(Fore.RED + locales.get('invalid_choice'))
         
     except AndroidTVTimeFixerError as e:
-        print(f"\nОшибка: {str(e)}")
+        print(Fore.RED + locales.get('error_message').format(str(e)))
         sys.exit(1)
     except KeyboardInterrupt:
-        print(Fore.RED + "\nОперация отменена пользователем")
+        print(Fore.RED + locales.get('operation_aborted'))
         sys.exit(0)
     except Exception as e:
-        print(Fore.RED + f"\nНепредвиденная ошибка: {str(e)}")
+        print(Fore.RED + locales.get('unexpected_error').format(str(e)))
         sys.exit(1)
 
 if __name__ == '__main__':
