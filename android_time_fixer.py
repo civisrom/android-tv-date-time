@@ -279,12 +279,12 @@ class AndroidTVTimeFixer:
         self.set_ntp_server(ntp_server)
 
     def show_country_codes(self) -> None:
-        print(Fore.YELLOW + "\nДоступные коды стран:")
+        print(Fore.YELLOW + "\nДоступные коды стран (копируем в буфер обмена наприм. ru или by и вставляем в пункте 1 глав. меню):")
         for code, server in self.ntp_servers.items():
             print(f"{code.upper()} — {server}")
 
     def show_custom_ntp_servers(self) -> None:
-        print(Fore.YELLOW + "\nДоступные альтернативные серверы NTP:")
+        print(Fore.YELLOW + "\nДоступные альтернативные серверы времени NTP (копируем в буфер обмена наприм. 1.asia.pool.ntp.org и вставляем в пункте 2 глав. меню):")
         for server in self.custom_ntp_servers:
             print(f"- {server}")
 
