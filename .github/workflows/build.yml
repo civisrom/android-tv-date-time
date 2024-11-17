@@ -29,6 +29,8 @@ env:
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
+  POETRY_VERSION: '1.7.1'
+  PYINSTALLER_VERSION: '6.11.0'
 
 jobs:
   setup-and-build:
@@ -45,7 +47,7 @@ jobs:
             platform: linux
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45  # Увеличено время для надежности
     
     steps:
       - name: Checkout repository
@@ -61,65 +63,108 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
           cache: 'pip'
+          cache-dependency-path: |
+            **/poetry.lock
+            **/requirements*.txt
 
+      # Расширенная установка системных зависимостей для Linux
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
           sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+          sudo apt-get install -y zlib1g-dev libjpeg-dev libpng-dev
+          sudo apt-get install -y libxml2-dev libxslt1-dev
+          sudo apt-get install -y libcurl4-openssl-dev
         shell: bash
 
       - name: Install Poetry
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry==1.7.1
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
 
-      - name: Configure Poetry
+      - name: Configure Poetry and verify installation
         run: |
           poetry config virtualenvs.in-project true
           poetry config virtualenvs.create true
+          poetry --version
+          poetry env info
         shell: bash
+
+      # Кэширование зависимостей Poetry
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
 
       - name: Install project dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          poetry install --no-interaction --only main --only windows
+          poetry install --no-interaction --only main --only windows --sync
+          poetry run pip list
         shell: pwsh
 
       - name: Install project dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          poetry install --no-interaction --only main
+          poetry install --no-interaction --only main --sync
+          poetry run pip list
         shell: bash
 
+      # Улучшенная установка ADB для Windows
       - name: Install ADB (Windows)
         if: runner.os == 'Windows'
         run: |
           $ProgressPreference = 'SilentlyContinue'
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
+          $adbDir = "$env:USERPROFILE\adb"
+          New-Item -ItemType Directory -Force -Path $adbDir
           $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
-          $adbPath = "$env:USERPROFILE\adb\platform-tools"
+          
+          Write-Host "Downloading platform-tools..."
+          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$adbDir\platform-tools.zip"
+          
+          Write-Host "Extracting platform-tools..."
+          Expand-Archive -Path "$adbDir\platform-tools.zip" -DestinationPath $adbDir -Force
+          
+          $adbPath = "$adbDir\platform-tools"
+          if (-not (Test-Path "$adbPath\adb.exe")) {
+              throw "ADB executable not found after extraction"
+          }
+          
           echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          
+          Write-Host "ADB version:"
+          & "$adbPath\adb.exe" version
         shell: pwsh
 
+      # Улучшенная установка ADB для Linux
       - name: Install ADB (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y android-tools-adb
+          adb version
           echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
+          if [ ! -f "$ADB_PATH" ]; then
+            echo "ADB installation failed"
+            exit 1
+          fi
         shell: bash
 
       - name: Install PyInstaller
         run: |
-          poetry run pip install pyinstaller==6.11.0
+          poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
+          poetry run pip install pefile  # Дополнительная зависимость для Windows
+          poetry run pyinstaller --version
         shell: bash
 
+      # Улучшенная сборка для Windows
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -144,15 +189,23 @@ jobs:
             --hidden-import=socket `
             --hidden-import=subprocess `
             --hidden-import=threading `
+            --hidden-import=pkg_resources `
+            --hidden-import=setuptools `
+            --hidden-import=pkg_resources.py2_warn `
             --collect-all adb_shell `
             --collect-all libusb1 `
             --collect-all async_timeout `
-            --collect-data colorama `
-            --collect-data aiofiles `
+            --collect-all colorama `
+            --collect-all aiofiles `
+            --collect-all platformdirs `
+            --collect-all typing_extensions `
+            --collect-all rsa `
+            --collect-all usb `
             --log-level=DEBUG `
             ${{ env.SOURCE_FILE }}
         shell: pwsh
 
+      # Улучшенная сборка для Linux
       - name: Build executable (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -177,25 +230,46 @@ jobs:
             --hidden-import=socket \
             --hidden-import=subprocess \
             --hidden-import=threading \
+            --hidden-import=pkg_resources \
+            --hidden-import=setuptools \
             --collect-all adb_shell \
             --collect-all libusb1 \
             --collect-all async_timeout \
-            --collect-data colorama \
-            --collect-data aiofiles \
+            --collect-all colorama \
+            --collect-all aiofiles \
+            --collect-all platformdirs \
+            --collect-all typing_extensions \
+            --collect-all rsa \
+            --collect-all usb \
             --log-level=DEBUG \
             ${{ env.SOURCE_FILE }}
         shell: bash
 
+      # Улучшенная упаковка сборки
       - name: Package build
         run: |
           cd dist
           if [ "${{ runner.os }}" == "Windows" ]; then
-            7z a "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}${{ matrix.extension }}"
+            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}${{ matrix.extension }}"
+            7z t "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
           else
             chmod +x ${{ env.APP_NAME }}
             zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
+            unzip -t "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
           fi
           cd ..
+        shell: bash
+
+      - name: Verify build
+        run: |
+          if [ ! -f "dist/${{ env.APP_NAME }}${{ matrix.extension }}" ]; then
+            echo "Build file not found!"
+            exit 1
+          fi
+          if [ ! -f "dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip" ]; then
+            echo "ZIP file not found!"
+            exit 1
+          fi
         shell: bash
 
       - name: Upload build artifact
@@ -217,6 +291,15 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Verify artifacts
+        run: |
+          ls -la dist/
+          if [ ! -f "dist/${APP_NAME}-windows.zip" ] || [ ! -f "dist/${APP_NAME}-linux.zip" ]; then
+            echo "Missing required artifacts!"
+            exit 1
+          fi
+        shell: bash
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
