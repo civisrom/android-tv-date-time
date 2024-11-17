@@ -446,10 +446,7 @@ arising from the use of this program.
             ),
             "country_codes": Translation(
                 en="""
-ad: Andorra
-al: Albania
 at: Austria
-ax: Åland Islands
 ba: Bosnia and Herzegovina
 be: Belgium
 bg: Bulgaria
@@ -462,27 +459,20 @@ dk: Denmark
 ee: Estonia
 es: Spain
 fi: Finland
-fo: Faroe Islands
 fr: France
-gg: Guernsey
 gi: Gibraltar
 gr: Greece
 hr: Croatia
 hu: Hungary
 ie: Ireland
-im: Isle of Man
 is: Iceland
 it: Italy
-je: Jersey
 li: Liechtenstein
 lt: Lithuania
 lu: Luxembourg
 lv: Latvia
-mc: Monaco
 md: Moldova
-me: Montenegro
 mk: North Macedonia
-mt: Malta
 nl: Netherlands
 no: Norway
 pl: Poland
@@ -492,15 +482,10 @@ rs: Serbia
 ru: Russia
 se: Sweden
 si: Slovenia
-sj: Svalbard and Jan Mayen
 sk: Slovakia
-sm: San Marino
 tr: Turkey
 ua: Ukraine
 uk: United Kingdom
-va: Vatican City
-xk: Kosovo
-yu: Yugoslavia
 us: United States
 ca: Canada
 br: Brazil
@@ -511,10 +496,7 @@ kz: Kazakhstan
 uk: United Kingdom
 """,
                 ru="""
-ad: Андорра
-al: Албания
 at: Австрия
-ax: Аландские острова
 ba: Босния и Герцеговина
 be: Бельгия
 bg: Болгария
@@ -527,27 +509,20 @@ dk: Дания
 ee: Эстония
 es: Испания
 fi: Финляндия
-fo: Фарерские острова
 fr: Франция
-gg: Гернси
 gi: Гибралтар
 gr: Греция
 hr: Хорватия
 hu: Венгрия
 ie: Ирландия
-im: Остров Мэн
 is: Исландия
 it: Италия
-je: Джерси
 li: Лихтенштейн
 lt: Литва
 lu: Люксембург
 lv: Латвия
-mc: Монако
 md: Молдова
-me: Черногория
 mk: Северная Македония
-mt: Мальта
 nl: Нидерланды
 no: Норвегия
 pl: Польша
@@ -557,15 +532,10 @@ rs: Сербия
 ru: Россия
 se: Швеция
 si: Словения
-sj: Шпицберген и Ян-Майен
 sk: Словакия
-sm: Сан-Марино
 tr: Турция
 ua: Украина
 uk: Великобритания
-va: Ватикан
-xk: Косово
-yu: Югославия
 us: США
 ca: Канада
 br: Бразилия
