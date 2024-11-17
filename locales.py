@@ -60,7 +60,7 @@ arising from the use of this program.
             ),
             "auto_time_date": Translation(
                 en="2. Set time and date to automatic mode:",
-                ru="2. Установите время и дату в автоматический режим:"
+                ru="2. Установите время и дату в автоматический режим: Настройки > Настройки устройства > Дата и Время > Автонастройка доты и времени > Использовать время сити"
             ),
             "network_requirement": Translation(
                 en="3. Your TV, Nvidia Shield, and PC must be connected to the same network.",
