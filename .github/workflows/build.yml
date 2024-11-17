@@ -144,11 +144,36 @@ jobs:
             --hidden-import=socket `
             --hidden-import=subprocess `
             --hidden-import=threading `
+            # Добавленные импорты
+            --hidden-import=psutil `
+            --hidden-import=wmi `
+            --hidden-import=click `
+            --hidden-import=rich `
+            --hidden-import=rich.console `
+            --hidden-import=rich.progress `
+            --hidden-import=loguru `
+            --hidden-import=pywinusb `
+            --hidden-import=pywinusb.hid `
+            --hidden-import=win32api `
+            --hidden-import=win32con `
+            --hidden-import=win32gui `
+            # Сбор дополнительных пакетов
             --collect-all adb_shell `
             --collect-all libusb1 `
             --collect-all async_timeout `
+            --collect-all psutil `
+            --collect-all wmi `
+            --collect-all click `
+            --collect-all rich `
+            --collect-all loguru `
+            --collect-all pywinusb `
+            # Сбор данных
             --collect-data colorama `
             --collect-data aiofiles `
+            --collect-data rich `
+            --collect-data click `
+            # Дополнительные данные
+            --add-data "VERSION;." `
             --log-level=DEBUG `
             ${{ env.SOURCE_FILE }}
         shell: pwsh
