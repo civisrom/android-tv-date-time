@@ -170,8 +170,6 @@ jobs:
             '--collect-data=aiofiles',
             '--collect-data=rich',
             '--collect-data=click',
-            '--add-data=VERSION;.',
-            '--add-data=README.md;.',
             '--log-level=DEBUG',
             "${{ env.SOURCE_FILE }}"
           )
