@@ -119,9 +119,9 @@ class AndroidTVTimeFixer:
             '2.europe.pool.ntp.org',
             '3.europe.pool.ntp.org',
             '0.north-america.pool.ntp.org',
-	    '1.north-america.pool.ntp.org',
-	    '2.north-america.pool.ntp.org',
-	    '3.north-america.pool.ntp.org',
+            '1.north-america.pool.ntp.org',
+            '2.north-america.pool.ntp.org',
+            '3.north-america.pool.ntp.org',
             '0.asia.pool.ntp.org',
 	    '1.asia.pool.ntp.org',
 	    '2.asia.pool.ntp.org',
@@ -541,7 +541,7 @@ def main():
                     fixer.connect(ip)
                     fixer.show_current_settings()
                     print(Fore.GREEN + locales.get('enter_country_code'), end="")
-                    code = input(Fore.WHITE).strip()
+		    code = input(Fore.WHITE).strip().lower()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
