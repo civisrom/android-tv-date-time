@@ -51,10 +51,7 @@ class AndroidTVTimeFixer:
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
         self.ntp_servers = {
-            'ad': 'ad.pool.ntp.org',
-            'al': 'al.pool.ntp.org',
             'at': 'at.pool.ntp.org',
-            'ax': 'ax.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
             'be': 'be.pool.ntp.org',
             'bg': 'bg.pool.ntp.org',
@@ -67,27 +64,20 @@ class AndroidTVTimeFixer:
             'ee': 'ee.pool.ntp.org',
             'es': 'es.pool.ntp.org',
             'fi': 'fi.pool.ntp.org',
-            'fo': 'fo.pool.ntp.org',
             'fr': 'fr.pool.ntp.org',
-            'gg': 'gg.pool.ntp.org',
             'gi': 'gi.pool.ntp.org',
             'gr': 'gr.pool.ntp.org',
             'hr': 'hr.pool.ntp.org',
             'hu': 'hu.pool.ntp.org',
             'ie': 'ie.pool.ntp.org',
-            'im': 'im.pool.ntp.org',
             'is': 'is.pool.ntp.org',
             'it': 'it.pool.ntp.org',
-            'je': 'je.pool.ntp.org',
             'li': 'li.pool.ntp.org',
             'lt': 'lt.pool.ntp.org',
             'lu': 'lu.pool.ntp.org',
             'lv': 'lv.pool.ntp.org',
-            'mc': 'mc.pool.ntp.org',
             'md': 'md.pool.ntp.org',
-            'me': 'me.pool.ntp.org',
             'mk': 'mk.pool.ntp.org',
-            'mt': 'mt.pool.ntp.org',
             'nl': 'nl.pool.ntp.org',
             'no': 'no.pool.ntp.org',
             'pl': 'pl.pool.ntp.org',
@@ -97,15 +87,10 @@ class AndroidTVTimeFixer:
             'ru': 'ru.pool.ntp.org',
             'se': 'se.pool.ntp.org',
             'si': 'si.pool.ntp.org',
-            'sj': 'sj.pool.ntp.org',
             'sk': 'sk.pool.ntp.org',
-            'sm': 'sm.pool.ntp.org',
             'tr': 'tr.pool.ntp.org',
             'ua': 'ua.pool.ntp.org',
             'uk': 'uk.pool.ntp.org',
-            'va': 'va.pool.ntp.org',
-            'xk': 'xk.pool.ntp.org',
-            'yu': 'yu.pool.ntp.org',
             'us': 'us.pool.ntp.org',
             'ca': 'ca.pool.ntp.org',
             'br': 'br.pool.ntp.org',
@@ -128,6 +113,19 @@ class AndroidTVTimeFixer:
             '1.europe.pool.ntp.org',
             '2.europe.pool.ntp.org',
             '3.europe.pool.ntp.org',
+            '0.north-america.pool.ntp.org',
+            '1.north-america.pool.ntp.org',
+            '2.north-america.pool.ntp.org',
+            '3.north-america.pool.ntp.org',
+            '0.asia.pool.ntp.org',
+            '1.asia.pool.ntp.org',
+            '2.asia.pool.ntp.org',
+            '3.asia.pool.ntp.org',
+            'time.cloudflare.com',
+            'clock.isc.org',
+            'ntp2.vniiftri.ru',
+            'ntps1-1.cs.tu-berlin.de',
+            'ntp.ix.ru',
             'time.android.com'
         ]
 
@@ -486,7 +484,7 @@ def main():
                     fixer.connect(ip)
                     fixer.show_current_settings()
                     print(Fore.GREEN + '\nВведите код вашей страны (например, ru для России, by для Беларусь, смотри в меню коды стран, для возврата q): ', end="")
-                    code = input(Fore.WHITE).strip()
+                    code = input(Fore.WHITE).strip().lower()
                     if fixer.validate_country_code(code):
                         ntp_server = fixer.ntp_servers[code.lower()]
                         fixer.fix_time(ntp_server)
