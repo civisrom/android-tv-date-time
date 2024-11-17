@@ -215,7 +215,7 @@ arising from the use of this program.
             ),
             "available_alternative_ntp_servers": Translation(
                 en="\nAvailable alternative NTP servers:",
-                ru="\nДоступные альтернативные серверы NTP:"
+                ru="\nДоступные альтернативные серверы времени NTP (копируем в буфер обмена наприм. 1.asia.pool.ntp.org и вставляем в пункте 2 глав. меню):"
             ),
             "custom_ntp_server": Translation(
                 en="- {server}",
@@ -442,7 +442,7 @@ arising from the use of this program.
 
             "country_codes_description": Translation(
                 en="\nCountry code decryption (can be copied to clipboard):",
-                ru="\nРасшифровка кодов стран (можно копировать в буфер обмена):"
+                ru="\nРасшифровка кодов стран (копируем в буфер обмена наприм. ru и вставляем в пункте 1 глав. меню):"
             ),
             "country_codes": Translation(
                 en="""
