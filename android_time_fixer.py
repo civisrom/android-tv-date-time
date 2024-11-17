@@ -592,7 +592,7 @@ def main():
             elif choice == '6':
                 fixer.manage_servers()
                 
-            elif choice == '9':
+            elif choice == '7':
                 print(Fore.YELLOW + "\n" + locales.get('menu_item_7'))
                 devices = list_devices()
                 if devices:
@@ -600,11 +600,11 @@ def main():
                     if selected_device:
                         connect_to_device(selected_device)
                     
-            elif choice == '7':
+            elif choice == '8':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 
-            elif choice == '8':
+            elif choice == '9':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             
