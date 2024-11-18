@@ -364,12 +364,12 @@ class AndroidTVTimeFixer:
                 #'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
                 'ip_address': self.device.shell('ip addr show wlan0').strip(),
                 'mac_address': self.device.shell('cat /sys/class/net/wlan0/address').strip(),
-                'wifi_ssid': self.device.shell('dumpsys wifi | grep "mWifiInfo"').strip(),
+                #'wifi_ssid': self.device.shell('dumpsys wifi | grep "mWifiInfo"').strip(),
                 # Дополнительные сетевые параметры
                 'network_type': self.device.shell('getprop gsm.network.type').strip(),
                 'cellular_operator': self.device.shell('getprop gsm.operator.alpha').strip(),
                 # Информация о подключениях
-                'active_connections': self.device.shell('netstat -tuln').strip(),
+                #'active_connections': self.device.shell('netstat -tuln').strip(),
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
                 'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
                 'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
