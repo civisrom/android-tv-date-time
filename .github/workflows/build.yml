@@ -31,6 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Clear Poetry cache
+        run: poetry cache clear pypi --all
+        
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -38,8 +41,7 @@ jobs:
 
       - name: Install Poetry
         run: |
-          pip install --upgrade poetry
-          poetry config virtualenvs.create false
+          curl -sSL https://install.python-poetry.org | python3 -
 
       - name: Install Security Tools
         run: |
