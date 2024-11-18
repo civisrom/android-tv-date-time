@@ -38,7 +38,7 @@ jobs:
 
       - name: Install Poetry
         run: |
-          pip install poetry
+          pip install --upgrade poetry
           poetry config virtualenvs.create false
 
       - name: Install Security Tools
