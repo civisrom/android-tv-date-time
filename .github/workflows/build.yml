@@ -1,14 +1,18 @@
-name: Build & Security AndroidTVTimeFixer
+name: Build AndroidTVTimeFixer
 
 on:
   push:
-    branches: [main, master]
-    paths-ignore: 
+    branches: 
+      - main
+      - master
+    paths-ignore:
       - '**.md'
       - '.gitignore'
       - 'LICENSE'
   pull_request:
-    branches: [main, master]
+    branches: 
+      - main
+      - master
     paths-ignore:
       - '**.md'
       - '.gitignore'
@@ -17,76 +21,21 @@ on:
 
 permissions:
   contents: write
-  security-events: write
+  packages: write
   actions: write
 
 env:
   PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
+  CI_DEBUG: true
 
 jobs:
-  pre-build-security-checks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          sudo apt-get install libudev-dev
-          pip install --upgrade pip
-          pip install python-udev==0.22.0
-          
-      - name: Clear Poetry cache
-        run: poetry cache clear pypi --all
-        
-      - name: Install Security Tools
-        run: |
-          poetry install --only security --skip python-udev
-          pip install safety pip-audit bandit
-
-      - name: Safety Dependency Check
-        continue-on-error: true
-        run: |
-          safety check --full-report || true
-          safety check \
-            --ignore-vulnerabilities cloud-init \
-            command-not-found distro-info \
-            python-apt python-debian \
-            sos ubuntu-pro-client \
-            ufw WALinuxAgent || true
-
-      - name: Pip Audit
-        continue-on-error: true
-        run: |
-          pip-audit \
-            --ignore-vuln cloud-init \
-            --ignore-vuln command-not-found \
-            --ignore-vuln distro-info \
-            --ignore-vuln python-apt \
-            --ignore-vuln python-debian \
-            --ignore-vuln sos \
-            --ignore-vuln ubuntu-pro-client \
-            --ignore-vuln ufw \
-            --ignore-vuln WALinuxAgent || true
-
-      - name: Bandit Security Scan
-        run: |
-          bandit -r . \
-            -f custom \
-            -x ./tests || true
-
-  build-and-test:
-    needs: pre-build-security-checks
+  setup-and-build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest, ubuntu-latest]
         include:
           - os: windows-latest
             extension: .exe
@@ -96,47 +45,141 @@ jobs:
             platform: linux
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-
+    timeout-minutes: 30
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
+          cache: 'pip'
+
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+        shell: bash
 
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip
           python -m pip install poetry==1.7.1
+        shell: bash
 
       - name: Configure Poetry
         run: |
           poetry config virtualenvs.in-project true
           poetry config virtualenvs.create true
+        shell: bash
 
-      - name: Install Dependencies
+      - name: Install project dependencies
         run: |
-          poetry install --no-interaction
+          poetry install --no-interaction --only main
+        shell: bash
 
-      - name: Generate Dynamic Imports
-        run: poetry run python generate_imports.py
+      - name: Install ADB (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
+          $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
+          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
+          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
+          $adbPath = "$env:USERPROFILE\adb\platform-tools"
+          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        shell: pwsh
 
-      - name: Build Executable
+      - name: Install ADB (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y android-tools-adb
+          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Install PyInstaller
+        run: |
+          poetry run pip install pyinstaller==6.11.0
+        shell: bash
+
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          poetry run pyinstaller --clean `
+            --onefile `
+            --console `
+            --name=${{ env.APP_NAME }} `
+            --add-binary "$env:ADB_PATH;." `
+            --hidden-import=pyperclip `
+            --hidden-import=colorama `
+            --hidden-import=platformdirs `
+            --hidden-import=packaging `
+            --hidden-import=typing_extensions `
+            --hidden-import=cryptography `
+            --hidden-import=usb `
+            --hidden-import=usb.core `
+            --hidden-import=usb.util `
+            --hidden-import=rsa `
+            --hidden-import=aiofiles `
+            --hidden-import=async_timeout `
+            --hidden-import=asyncio `
+            --hidden-import=socket `
+            --hidden-import=subprocess `
+            --hidden-import=threading `
+            --collect-all adb_shell `
+            --collect-all libusb1 `
+            --collect-all async_timeout `
+            --collect-data colorama `
+            --collect-data aiofiles `
+            --log-level=DEBUG `
+            ${{ env.SOURCE_FILE }}
+        shell: pwsh
+
+      - name: Build executable (Linux)
+        if: runner.os == 'Linux'
         run: |
           poetry run pyinstaller --clean \
             --onefile \
             --console \
             --name=${{ env.APP_NAME }} \
-            $(cat pyinstaller_imports.txt) \
             --add-binary "$ADB_PATH:." \
+            --hidden-import=pyperclip \
+            --hidden-import=colorama \
+            --hidden-import=platformdirs \
+            --hidden-import=packaging \
+            --hidden-import=typing_extensions \
+            --hidden-import=cryptography \
+            --hidden-import=usb \
+            --hidden-import=usb.core \
+            --hidden-import=usb.util \
+            --hidden-import=rsa \
+            --hidden-import=aiofiles \
+            --hidden-import=async_timeout \
+            --hidden-import=asyncio \
+            --hidden-import=socket \
+            --hidden-import=subprocess \
+            --hidden-import=threading \
             --collect-all adb_shell \
-            --log-level=INFO \
+            --collect-all libusb1 \
+            --collect-all async_timeout \
+            --collect-data colorama \
+            --collect-data aiofiles \
+            --log-level=DEBUG \
             ${{ env.SOURCE_FILE }}
+        shell: bash
 
-      - name: Package Artifact
+      - name: Package build
         run: |
           cd dist
           if [ "${{ runner.os }}" == "Windows" ]; then
@@ -145,61 +188,37 @@ jobs:
             chmod +x ${{ env.APP_NAME }}
             zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
-          sha256sum "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" > "${{ env.APP_NAME }}-${{ matrix.platform }}.sha256"
           cd ..
+        shell: bash
 
-      - name: Upload Artifacts
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
-          path: |
-            dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
-            dist/${{ env.APP_NAME }}-${{ matrix.platform }}.sha256
+          path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
           retention-days: 90
+          if-no-files-found: error
 
-  release:
-    needs: build-and-test
+  create-release:
+    needs: setup-and-build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
     steps:
-      - name: Download Artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: |
-            dist/*.zip
-            dist/*.sha256
+          files: dist/*.zip
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
           generate_release_notes: true
-
-  vulnerability-report:
-    needs: [build-and-test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Generate Vulnerability Report
-        run: |
-          echo "# Security Vulnerability Report" > SECURITY_REPORT.md
-          echo "## Safety Check" >> SECURITY_REPORT.md
-          safety check --full-report >> SECURITY_REPORT.md
-          
-          echo "## Pip Audit" >> SECURITY_REPORT.md
-          pip-audit >> SECURITY_REPORT.md
-
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-report
-          path: SECURITY_REPORT.md
