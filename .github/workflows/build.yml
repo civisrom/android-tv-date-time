@@ -1,22 +1,14 @@
-name: Build AndroidTVTimeFixer
+name: Build and Release AndroidTVTimeFixer
 
 on:
   push:
     branches: 
       - main
       - master
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'LICENSE'
   pull_request:
     branches: 
       - main
       - master
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
@@ -28,7 +20,6 @@ env:
   PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
-  CI_DEBUG: true
 
 jobs:
   setup-and-build:
@@ -52,23 +43,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          check-latest: true
           cache: 'pip'
-
-      - name: Install system dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
-        shell: bash
 
       - name: Install Poetry
         run: |
@@ -76,43 +56,16 @@ jobs:
           python -m pip install poetry==1.7.1
         shell: bash
 
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.in-project true
-          poetry config virtualenvs.create true
-        shell: bash
-
-      - name: Install project dependencies (Windows)
+      - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          poetry install --no-interaction --only main --only windows
+          poetry install --no-interaction --only main --with windows
         shell: pwsh
 
-      - name: Install project dependencies (Linux)
+      - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          poetry install --no-interaction --only main
-        shell: bash
-
-      - name: Install ADB (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
-          $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
-          $adbPath = "$env:USERPROFILE\adb\platform-tools"
-          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        shell: pwsh
-
-      - name: Install ADB (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y android-tools-adb
-          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
+          poetry install --no-interaction --only main --with linux
         shell: bash
 
       - name: Install PyInstaller
@@ -127,29 +80,8 @@ jobs:
             --onefile `
             --console `
             --name=${{ env.APP_NAME }} `
-            --add-binary "$env:ADB_PATH;." `
             --hidden-import=pyperclip `
             --hidden-import=colorama `
-            --hidden-import=platformdirs `
-            --hidden-import=packaging `
-            --hidden-import=typing_extensions `
-            --hidden-import=cryptography `
-            --hidden-import=usb `
-            --hidden-import=usb.core `
-            --hidden-import=usb.util `
-            --hidden-import=rsa `
-            --hidden-import=aiofiles `
-            --hidden-import=async_timeout `
-            --hidden-import=asyncio `
-            --hidden-import=socket `
-            --hidden-import=subprocess `
-            --hidden-import=threading `
-            --collect-all adb_shell `
-            --collect-all libusb1 `
-            --collect-all async_timeout `
-            --collect-data colorama `
-            --collect-data aiofiles `
-            --log-level=DEBUG `
             ${{ env.SOURCE_FILE }}
         shell: pwsh
 
@@ -160,29 +92,8 @@ jobs:
             --onefile \
             --console \
             --name=${{ env.APP_NAME }} \
-            --add-binary "$ADB_PATH:." \
             --hidden-import=pyperclip \
             --hidden-import=colorama \
-            --hidden-import=platformdirs \
-            --hidden-import=packaging \
-            --hidden-import=typing_extensions \
-            --hidden-import=cryptography \
-            --hidden-import=usb \
-            --hidden-import=usb.core \
-            --hidden-import=usb.util \
-            --hidden-import=rsa \
-            --hidden-import=aiofiles \
-            --hidden-import=async_timeout \
-            --hidden-import=asyncio \
-            --hidden-import=socket \
-            --hidden-import=subprocess \
-            --hidden-import=threading \
-            --collect-all adb_shell \
-            --collect-all libusb1 \
-            --collect-all async_timeout \
-            --collect-data colorama \
-            --collect-data aiofiles \
-            --log-level=DEBUG \
             ${{ env.SOURCE_FILE }}
         shell: bash
 
@@ -203,8 +114,6 @@ jobs:
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
           path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
-          retention-days: 90
-          if-no-files-found: error
 
   create-release:
     needs: setup-and-build
