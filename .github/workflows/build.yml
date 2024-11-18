@@ -1,14 +1,22 @@
-name: Build and Release AndroidTVTimeFixer
+name: Build AndroidTVTimeFixer
 
 on:
   push:
     branches: 
       - main
       - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches: 
       - main
       - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
@@ -20,9 +28,34 @@ env:
   PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
+  CI_DEBUG: true
 
 jobs:
+  pre-build-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --only dev
+      
+      - name: Run linters and type checks
+        run: |
+          poetry run black --check .
+          poetry run flake8 .
+          poetry run mypy .
+
   setup-and-build:
+    needs: pre-build-checks
     strategy:
       fail-fast: false
       matrix:
@@ -36,7 +69,7 @@ jobs:
             platform: linux
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     
     steps:
       - name: Checkout repository
@@ -48,54 +81,52 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          check-latest: true
           cache: 'pip'
 
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip
           python -m pip install poetry==1.7.1
-        shell: bash
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
+      - name: Configure Poetry
         run: |
-          poetry install --no-interaction --only main --with windows
-        shell: pwsh
+          poetry config virtualenvs.in-project true
+          poetry config virtualenvs.create true
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install system dependencies
         run: |
-          poetry install --no-interaction --only main --with linux
-        shell: bash
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential libssl-dev libusb-1.0-0-dev
+          fi
+
+      - name: Install project dependencies
+        run: |
+          poetry install --no-interaction
+
+      - name: Generate Dynamic Imports
+        run: |
+          poetry run python generate_imports.py
 
       - name: Install PyInstaller
-        run: |
-          poetry run pip install pyinstaller==6.11.0
-        shell: bash
+        run: poetry run pip install pyinstaller==6.11.0
 
-      - name: Build executable (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          poetry run pyinstaller --clean `
-            --onefile `
-            --console `
-            --name=${{ env.APP_NAME }} `
-            --hidden-import=pyperclip `
-            --hidden-import=colorama `
-            ${{ env.SOURCE_FILE }}
-        shell: pwsh
-
-      - name: Build executable (Linux)
-        if: runner.os == 'Linux'
+      - name: Build executable
+        env:
+          PYTHONPATH: .
         run: |
           poetry run pyinstaller --clean \
             --onefile \
             --console \
             --name=${{ env.APP_NAME }} \
-            --hidden-import=pyperclip \
-            --hidden-import=colorama \
+            $(cat pyinstaller_imports.txt) \
+            --add-binary "$ADB_PATH:." \
+            --collect-all adb_shell \
+            --collect-all libusb1 \
+            --collect-data colorama \
+            --log-level=INFO \
             ${{ env.SOURCE_FILE }}
-        shell: bash
 
       - name: Package build
         run: |
@@ -106,14 +137,18 @@ jobs:
             chmod +x ${{ env.APP_NAME }}
             zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
+          sha256sum "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" > "${{ env.APP_NAME }}-${{ matrix.platform }}.sha256"
           cd ..
-        shell: bash
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
-          path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
+          path: |
+            dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
+            dist/${{ env.APP_NAME }}-${{ matrix.platform }}.sha256
+          retention-days: 90
+          if-no-files-found: error
 
   create-release:
     needs: setup-and-build
@@ -132,9 +167,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/*.sha256
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
           generate_release_notes: true
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/gh-action-pip-audit@v1.0.8
