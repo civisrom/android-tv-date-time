@@ -34,6 +34,33 @@ jobs:
   pre-build-checks:
     runs-on: ubuntu-latest
     steps:
+      - name: Update dependencies
+        run: poetry update
+        
+      - name: Check code formatting with black
+        run: poetry run black --check .
+
+      - name: Auto-format code with black
+        run: poetry run black .
+
+      - name: Run flake8 for linting
+        run: poetry run flake8 .
+
+      - name: Run mypy for type checking
+        run: poetry run mypy .
+
+      - name: Install safety
+        run: poetry run pip install safety
+
+      - name: Check for vulnerabilities
+        run: poetry run safety check
+
+      - name: Install bandit
+        run: poetry run pip install bandit
+
+      - name: Run bandit to check for security issues
+        run: poetry run bandit -r .
+        
       - name: Checkout repository
         uses: actions/checkout@v4
       
