@@ -40,13 +40,15 @@ jobs:
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           sudo apt-get install libudev-dev
+          pip install --upgrade pip
+          pip install python-udev==0.22.0
           
       - name: Clear Poetry cache
         run: poetry cache clear pypi --all
         
       - name: Install Security Tools
         run: |
-          poetry install --only security
+          poetry install --only security --skip python-udev
           pip install safety pip-audit bandit
 
       - name: Safety Dependency Check
