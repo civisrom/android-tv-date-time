@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "androidtvtimefixer"
-version = "1.1.0"
+version = "1.2.0"
 description = "Time fixer for Android TV"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
@@ -45,6 +45,11 @@ flake8 = "^6.0.0"
 mypy = "^1.0.0"
 coverage = "^7.4.0"
 
+[tool.poetry.group.security.dependencies]
+safety = "^2.3.4"
+pip-audit = "^2.7.0"
+bandit = "^1.7.5"
+
 [tool.poetry.extras]
 linux = ["dbus-python", "python-udev"]
 
@@ -52,6 +57,23 @@ linux = ["dbus-python", "python-udev"]
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+
+[tool.safety]
+ignore-vulnerabilities = [
+    "cloud-init",
+    "command-not-found", 
+    "distro-info",
+    "python-apt",
+    "python-debian",
+    "sos",
+    "ubuntu-pro-client", 
+    "ufw",
+    "WALinuxAgent"
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B404"]
 
 [build-system]
 requires = ["poetry-core"]
