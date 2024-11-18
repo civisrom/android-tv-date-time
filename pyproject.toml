@@ -2,7 +2,7 @@
 name = "androidtvtimefixer"
 version = "1.0.0"
 description = "Time fixer for Android TV"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Orientalium"]
 readme = "README.md"
 packages = [{include = "android_time_fixer.py"}]
 
@@ -19,8 +19,13 @@ pyusb = "^1.2.1"
 libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 
+# Зависимости для Windows
 [tool.poetry.group.windows.dependencies]
 pywin32 = {version = "^306", platform = "win32"}
+
+# Зависимости для Linux
+[tool.poetry.group.linux.dependencies]
+some-linux-library = "^2.0"  # Пример, замените на реальные библиотеки, если необходимо
 
 [build-system]
 requires = ["poetry-core"]
