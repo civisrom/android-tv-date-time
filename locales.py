@@ -225,10 +225,6 @@ arising from the use of this program.
                 en="\nEnter your NTP server (or 'q' to quit): ",
                 ru="\nВведите свой NTP-сервер (или 'q' для выхода): "
             ),
-            "ntp_server_set": Translation(
-                en="NTP server set to: {}",
-                ru="Сервер NTP установлен на: {}"
-            ),
             "device_info_error": Translation(
                 en="Failed to retrieve device information: {error}",
                 ru="Не удалось получить информацию об устройстве: {error}"
