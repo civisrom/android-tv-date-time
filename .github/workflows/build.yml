@@ -82,7 +82,14 @@ jobs:
           poetry config virtualenvs.create true
         shell: bash
 
-      - name: Install project dependencies
+      - name: Install project dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          poetry install --no-interaction --only main --only windows
+        shell: pwsh
+
+      - name: Install project dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           poetry install --no-interaction --only main
         shell: bash
