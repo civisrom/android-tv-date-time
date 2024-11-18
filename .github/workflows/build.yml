@@ -31,7 +31,31 @@ env:
   CI_DEBUG: true
 
 jobs:
+  pre-build-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --only dev
+      
+      - name: Run linters and type checks
+        run: |
+          poetry run black --check .
+          poetry run flake8 .
+          poetry run mypy .
+
   setup-and-build:
+    needs: pre-build-checks
     strategy:
       fail-fast: false
       matrix:
@@ -45,146 +69,64 @@ jobs:
             platform: linux
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
           cache: 'pip'
 
-      - name: Install system dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
-        shell: bash
-
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip
           python -m pip install poetry==1.7.1
-        shell: bash
 
       - name: Configure Poetry
         run: |
           poetry config virtualenvs.in-project true
           poetry config virtualenvs.create true
-        shell: bash
 
-      - name: Install project dependencies (Windows)
-        if: runner.os == 'Windows'
+      - name: Install system dependencies
         run: |
-          poetry install --no-interaction --only main --only windows
-        shell: pwsh
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential libssl-dev libusb-1.0-0-dev
+          fi
 
-      - name: Install project dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install project dependencies
         run: |
-          poetry install --no-interaction --only main
-        shell: bash
+          poetry install --no-interaction
 
-      - name: Install ADB (Windows)
-        if: runner.os == 'Windows'
+      - name: Generate Dynamic Imports
         run: |
-          $ProgressPreference = 'SilentlyContinue'
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
-          $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
-          $adbPath = "$env:USERPROFILE\adb\platform-tools"
-          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        shell: pwsh
-
-      - name: Install ADB (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y android-tools-adb
-          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
-        shell: bash
+          poetry run python generate_imports.py
 
       - name: Install PyInstaller
-        run: |
-          poetry run pip install pyinstaller==6.11.0
-        shell: bash
+        run: poetry run pip install pyinstaller==6.11.0
 
-      - name: Build executable (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          poetry run pyinstaller --clean `
-            --onefile `
-            --console `
-            --name=${{ env.APP_NAME }} `
-            --add-binary "$env:ADB_PATH;." `
-            --hidden-import=pyperclip `
-            --hidden-import=colorama `
-            --hidden-import=platformdirs `
-            --hidden-import=packaging `
-            --hidden-import=typing_extensions `
-            --hidden-import=cryptography `
-            --hidden-import=usb `
-            --hidden-import=usb.core `
-            --hidden-import=usb.util `
-            --hidden-import=rsa `
-            --hidden-import=aiofiles `
-            --hidden-import=async_timeout `
-            --hidden-import=asyncio `
-            --hidden-import=socket `
-            --hidden-import=subprocess `
-            --hidden-import=threading `
-            --collect-all adb_shell `
-            --collect-all libusb1 `
-            --collect-all async_timeout `
-            --collect-data colorama `
-            --collect-data aiofiles `
-            --log-level=DEBUG `
-            ${{ env.SOURCE_FILE }}
-        shell: pwsh
-
-      - name: Build executable (Linux)
-        if: runner.os == 'Linux'
+      - name: Build executable
+        env:
+          PYTHONPATH: .
         run: |
           poetry run pyinstaller --clean \
             --onefile \
             --console \
             --name=${{ env.APP_NAME }} \
+            $(cat pyinstaller_imports.txt) \
             --add-binary "$ADB_PATH:." \
-            --hidden-import=pyperclip \
-            --hidden-import=colorama \
-            --hidden-import=platformdirs \
-            --hidden-import=packaging \
-            --hidden-import=typing_extensions \
-            --hidden-import=cryptography \
-            --hidden-import=usb \
-            --hidden-import=usb.core \
-            --hidden-import=usb.util \
-            --hidden-import=rsa \
-            --hidden-import=aiofiles \
-            --hidden-import=async_timeout \
-            --hidden-import=asyncio \
-            --hidden-import=socket \
-            --hidden-import=subprocess \
-            --hidden-import=threading \
             --collect-all adb_shell \
             --collect-all libusb1 \
-            --collect-all async_timeout \
             --collect-data colorama \
-            --collect-data aiofiles \
-            --log-level=DEBUG \
+            --log-level=INFO \
             ${{ env.SOURCE_FILE }}
-        shell: bash
 
       - name: Package build
         run: |
@@ -195,14 +137,16 @@ jobs:
             chmod +x ${{ env.APP_NAME }}
             zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
+          sha256sum "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" > "${{ env.APP_NAME }}-${{ matrix.platform }}.sha256"
           cd ..
-        shell: bash
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
-          path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
+          path: |
+            dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
+            dist/${{ env.APP_NAME }}-${{ matrix.platform }}.sha256
           retention-days: 90
           if-no-files-found: error
 
@@ -223,9 +167,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/*.sha256
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           draft: false
           prerelease: false
           generate_release_notes: true
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/gh-action-pip-audit@v1.0.8
