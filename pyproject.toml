@@ -19,13 +19,15 @@ pyusb = "^1.2.1"
 libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 
-[tool.poetry.group.windows.dependencies]
+# Указание зависимостей только для Windows с помощью markers
 pywin32 = { version = "306", markers = "sys_platform == 'win32'" }
-psutil = "^5.9.0"
-wmi = "^1.5.1"
+psutil = { version = "^5.9.0", markers = "sys_platform == 'win32'" }
+wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
+pywinusb = { version = "^0.4.2", markers = "sys_platform == 'win32'" }
+
+# Общие зависимости
 click = "^8.1.0"
 rich = "^13.0.0"
-pywinusb = "^0.4.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.3.0"
