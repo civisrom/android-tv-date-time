@@ -2,7 +2,7 @@ name: Build AndroidTVTimeFixer
 
 on:
   push:
-    branches: 
+    branches:
       - main
       - master
     paths-ignore:
@@ -10,7 +10,7 @@ on:
       - '.gitignore'
       - 'LICENSE'
   pull_request:
-    branches: 
+    branches:
       - main
       - master
     paths-ignore:
@@ -45,10 +45,10 @@ jobs:
           - os: ubuntu-latest
             extension: ''
             platform: linux
-    
+
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45  # Увеличено время таймаута
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
-          cache: 'pip'
+          cache: pip
           cache-dependency-path: |
             **/poetry.lock
             **/pyproject.toml
@@ -86,7 +86,6 @@ jobs:
       - name: Add Poetry to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Улучшенное кэширование зависимостей
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
@@ -134,7 +133,6 @@ jobs:
           poetry run pip check
         shell: bash
 
-      # Общие параметры для PyInstaller
       - name: Set PyInstaller params
         id: pyinstaller-params
         run: |
@@ -170,46 +168,30 @@ jobs:
           echo "params=$COMMON_PARAMS" >> $GITHUB_OUTPUT
         shell: bash
 
-      - name: Build executable (Windows)
-        if: runner.os == 'Windows'
+      - name: Build executable
         run: |
-          poetry run pyinstaller ${{ steps.pyinstaller-params.outputs.params }} `
-            --add-binary "$env:ADB_PATH;." `
-            --runtime-hook="hooks/win_hook.py" `
-            ${{ env.SOURCE_FILE }}
-        shell: pwsh
-
-      - name: Build executable (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          poetry run pyinstaller ${{ steps.pyinstaller-params.outputs.params }} \
-            --add-binary "$ADB_PATH:." \
-            --runtime-hook="hooks/linux_hook.py" \
-            ${{ env.SOURCE_FILE }}
-        shell: bash
-
-      - name: Test built executable
-        run: |
-          cd dist
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            ./${{ env.APP_NAME }}.exe --version || true
+          if [[ "${{ matrix.os }}" == "Windows" ]]; then
+            poetry run pyinstaller ${{ steps.pyinstaller-params.outputs.params }} `
+              --add-binary "$env:ADB_PATH;." `
+              --runtime-hook="hooks/win_hook.py" `
+              ${{ env.SOURCE_FILE }}
           else
-            chmod +x ${{ env.APP_NAME }}
-            ./${{ env.APP_NAME }} --version || true
+            poetry run pyinstaller ${{ steps.pyinstaller-params.outputs.params }} \
+              --add-binary "$ADB_PATH:." \
+              --runtime-hook="hooks/linux_hook.py" \
+              ${{ env.SOURCE_FILE }}
           fi
         shell: bash
-        continue-on-error: true
 
       - name: Package build
         run: |
           cd dist
-          if [ "${{ runner.os }}" == "Windows" ]; then
+          if [[ "${{ matrix.os }}" == "Windows" ]]; then
             7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}${{ matrix.extension }}"
           else
             chmod +x ${{ env.APP_NAME }}
             zip -j "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
-          cd ..
         shell: bash
 
       - name: Upload build artifact
@@ -218,13 +200,12 @@ jobs:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
           path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
           retention-days: 90
-          if-no-files-found: error
 
   create-release:
     needs: setup-and-build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
