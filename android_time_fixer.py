@@ -1,29 +1,23 @@
-import os
-import sys
-import re
-import time
+import json
 import logging
+import os
 import platform
 import pyperclip
-import json
-import colorama
+import re
 import subprocess
+import sys
+import time
 from pathlib import Path
-from locales import locales, set_language
-from adb_shell.auth.keygen import keygen
-from adb_shell.adb_device import AdbDeviceTcp
-from adb_shell.auth.sign_pythonrsa import PythonRSASigner
-from locales import locales, set_language
-from colorama import Fore, Style, init
-init(autoreset=True)
 
-# Настройка логирования
-#logging.basicConfig(
-#    level=logging.INFO,
-#    format='%(asctime)s - %(levelname)s - %(message)s',
-#    handlers=[logging.StreamHandler(sys.stdout)]
-#)
-#logger = logging.getLogger(__name__)
+import colorama
+from adb_shell.adb_device import AdbDeviceTcp
+from adb_shell.auth.keygen import keygen
+from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+from colorama import Fore, Style, init
+
+from locales import locales, set_language
+
+init(autoreset=True)
 
 # Настройка логгера
 logging.basicConfig(
@@ -356,7 +350,6 @@ class AndroidTVTimeFixer:
                 'name': self.device.shell('getprop ro.product.name').strip(),
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
                 'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
-                'serial': self.device.shell('getprop ro.serialno').strip(),
                 'serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
