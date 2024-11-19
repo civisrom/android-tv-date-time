@@ -35,11 +35,11 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b update-dependencies-${{ github.sha }}  # Генерируем уникальное имя ветки
-          git pull origin main
+          git checkout -b update-dependencies
+          git pull origin main  # Сначала подтягиваем изменения с main, чтобы избежать конфликтов
           git add poetry.lock
           git commit -m "Update dependencies"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} update-dependencies-${{ github.sha }}
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} update-dependencies
           
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
