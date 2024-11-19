@@ -20,7 +20,7 @@ libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 
 [tool.poetry.group.windows.dependencies]
-pywin32 = {version = "^306", platform = "win32"}
+pywin32 = { version = "306", markers = "sys_platform == 'win32'" }
 psutil = "^5.9.0"
 wmi = "^1.5.1"
 click = "^8.1.0"
