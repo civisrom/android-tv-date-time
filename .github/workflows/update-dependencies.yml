@@ -37,7 +37,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b update-dependencies
-          git pull origin main  # Сначала синхронизируем с основной веткой
+          git pull --rebase origin main  # Сначала синхронизируем с основной веткой
           git add poetry.lock
           git commit -m "Update dependencies"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} update-dependencies
