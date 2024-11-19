@@ -118,7 +118,7 @@ jobs:
           echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
         shell: bash
 
-      - name: Build executable
+      - name: Build executable (Windows and Linux)
         run: |
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             poetry run pyinstaller --clean --onefile --console --name="${{ env.APP_NAME }}" \
@@ -150,7 +150,7 @@ jobs:
               --collect-data typing_extensions \
               --collect-data cryptography \
               --log-level=DEBUG \
-              --add-binary="$env:ADB_PATH:." \
+              --add-binary="$ADB_PATH;." \
               --runtime-hook="hooks/win_hook.py" \
               "${{ env.SOURCE_FILE }}"
           else
