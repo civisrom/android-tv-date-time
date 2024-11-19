@@ -20,13 +20,29 @@ jobs:
       - name: Update dependencies with Poetry
         run: poetry update
 
-      - name: Commit updated dependencies
+      - name: Configure Git user
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Checkout or create update-dependencies branch
+        run: |
+          git fetch origin
+          if git show-ref --verify --quiet refs/heads/update-dependencies; then
+            git checkout update-dependencies
+          else
+            git checkout -b update-dependencies
+          fi
+
+      - name: Commit updated dependencies
+        run: |
           git add poetry.lock
           git commit -m "Update dependencies"
-          
+
+      - name: Push changes
+        run: |
+          git push origin update-dependencies
+
       - name: Create pull request with updated dependencies
         uses: peter-evans/create-pull-request@v5
         with:
