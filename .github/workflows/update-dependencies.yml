@@ -1,49 +1,39 @@
-name: Update Dependencies
+name: Update dependencies
 
 on:
   schedule:
-    - cron: "0 2 * * 1" # Запуск каждую неделю в понедельник в 02:00 UTC
-  workflow_dispatch: # Возможность ручного запуска
+    - cron: "0 0 1 * *"  # Пример расписания для обновления зависимостей раз в месяц
+  workflow_dispatch:  # Также можно запускать вручную
 
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-
-      - name: Install dependencies
-        run: |
-          poetry install
-
-      - name: Update dependencies
+      - name: Update dependencies with Poetry
         run: |
           poetry update
 
-      - name: Commit changes
+      - name: Commit updated dependencies
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b update-dependencies
-          git pull origin main  # Сначала подтягиваем изменения с main, чтобы избежать конфликтов
           git add poetry.lock
           git commit -m "Update dependencies"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} update-dependencies
           
-      - name: Create Pull Request
+      - name: Create pull request with updated dependencies
         uses: peter-evans/create-pull-request@v5
         with:
-          branch: update-dependencies
-          title: "Update dependencies"
-          body: "This PR updates dependencies to their latest versions."
+          branch: update-dependencies-${{ github.sha }}
+          title: Update dependencies
+          body: This PR updates dependencies to their latest versions.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "[create-pull-request] automated change"
+          committer: GitHub <noreply@github.com>
+          author: civisrom <civisrom@users.noreply.github.com>
+          base: main  # Целевая ветка для PR
+          signoff: false
+          delete-branch: false
+          draft: false
