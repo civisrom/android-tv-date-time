@@ -207,3 +207,28 @@ jobs:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
           path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
           retention-days: 90
+          if-no-files-found: error
+
+  create-release:
+    needs: setup-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: dist/*.zip
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
