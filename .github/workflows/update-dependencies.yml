@@ -11,7 +11,7 @@ jobs:
     steps:
       # Шаг 1: Клонируем репозиторий
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Шаг 2: Устанавливаем Python 3.11
       - name: Set up Python 3.11
