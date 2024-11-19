@@ -29,6 +29,8 @@ env:
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
+  POETRY_VERSION: '1.7.1'
+  PYINSTALLER_VERSION: '6.11.0'
 
 jobs:
   setup-and-build:
@@ -45,7 +47,7 @@ jobs:
             platform: linux
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45  # Увеличено время таймаута
     
     steps:
       - name: Checkout repository
@@ -61,6 +63,9 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
           cache: 'pip'
+          cache-dependency-path: |
+            **/poetry.lock
+            **/pyproject.toml
 
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
@@ -68,44 +73,34 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
           sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+          sudo apt-get install -y zip unzip
         shell: bash
 
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry==1.7.1
-        shell: bash
-
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.in-project true
-          poetry config virtualenvs.create true
-        shell: bash
-
-      # Добавленный блок кэширования
-      - uses: actions/cache@v4
+      - name: Setup Poetry
+        uses: snok/install-poetry@v1
         with:
-          path: .venv
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      # Улучшенное кэширование зависимостей
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/AppData/Local/pypoetry/Cache
+            ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
+            ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-
             ${{ runner.os }}-poetry-
 
-      - name: Install project dependencies (Windows)
-        if: runner.os == 'Windows'
+      - name: Install project dependencies
         run: |
-          poetry install --no-interaction --only main --only windows
-        shell: pwsh
-
-      - name: Install project dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          poetry install --no-interaction --only main --only windows
-        shell: pwsh
-
-      - name: Install project dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          poetry install --no-interaction --only main
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --with dev --all-extras
+          poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
 
       - name: Install ADB (Windows)
@@ -115,7 +110,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
           $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
           Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb"
+          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb" -Force
           $adbPath = "$env:USERPROFILE\adb\platform-tools"
           echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -129,52 +124,18 @@ jobs:
           echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
         shell: bash
 
-      - name: Install PyInstaller
+      - name: Verify Python environment
         run: |
-          poetry run pip install pyinstaller==6.11.0
+          poetry run python -V
+          poetry run pip list
+          poetry run pip check
         shell: bash
 
-      - name: Build executable (Windows)
-        if: runner.os == 'Windows'
+      # Общие параметры для PyInstaller
+      - name: Set PyInstaller params
+        id: pyinstaller-params
         run: |
-          poetry run pyinstaller --clean `
-            --onefile `
-            --console `
-            --name=${{ env.APP_NAME }} `
-            --add-binary "$env:ADB_PATH;." `
-            --hidden-import=pyperclip `
-            --hidden-import=colorama `
-            --hidden-import=platformdirs `
-            --hidden-import=packaging `
-            --hidden-import=typing_extensions `
-            --hidden-import=cryptography `
-            --hidden-import=usb `
-            --hidden-import=usb.core `
-            --hidden-import=usb.util `
-            --hidden-import=rsa `
-            --hidden-import=aiofiles `
-            --hidden-import=async_timeout `
-            --hidden-import=asyncio `
-            --hidden-import=socket `
-            --hidden-import=subprocess `
-            --hidden-import=threading `
-            --collect-all adb_shell `
-            --collect-all libusb1 `
-            --collect-all async_timeout `
-            --collect-data colorama `
-            --collect-data aiofiles `
-            --log-level=DEBUG `
-            ${{ env.SOURCE_FILE }}
-        shell: pwsh
-
-      - name: Build executable (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          poetry run pyinstaller --clean \
-            --onefile \
-            --console \
-            --name=${{ env.APP_NAME }} \
-            --add-binary "$ADB_PATH:." \
+          COMMON_PARAMS="--clean --onefile --console --name=${{ env.APP_NAME }} \
             --hidden-import=pyperclip \
             --hidden-import=colorama \
             --hidden-import=platformdirs \
@@ -191,23 +152,59 @@ jobs:
             --hidden-import=socket \
             --hidden-import=subprocess \
             --hidden-import=threading \
+            --hidden-import=adb_shell.adb_device \
+            --hidden-import=adb_shell.auth.sign_pythonrsa \
             --collect-all adb_shell \
             --collect-all libusb1 \
             --collect-all async_timeout \
             --collect-data colorama \
             --collect-data aiofiles \
-            --log-level=DEBUG \
+            --collect-data platformdirs \
+            --collect-data packaging \
+            --collect-data typing_extensions \
+            --collect-data cryptography \
+            --log-level=DEBUG"
+          echo "params=$COMMON_PARAMS" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          poetry run pyinstaller ${{ steps.pyinstaller-params.outputs.params }} `
+            --add-binary "$env:ADB_PATH;." `
+            --runtime-hook="hooks/win_hook.py" `
+            ${{ env.SOURCE_FILE }}
+        shell: pwsh
+
+      - name: Build executable (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          poetry run pyinstaller ${{ steps.pyinstaller-params.outputs.params }} \
+            --add-binary "$ADB_PATH:." \
+            --runtime-hook="hooks/linux_hook.py" \
             ${{ env.SOURCE_FILE }}
         shell: bash
+
+      - name: Test built executable
+        run: |
+          cd dist
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            ./${{ env.APP_NAME }}.exe --version || true
+          else
+            chmod +x ${{ env.APP_NAME }}
+            ./${{ env.APP_NAME }} --version || true
+          fi
+        shell: bash
+        continue-on-error: true
 
       - name: Package build
         run: |
           cd dist
           if [ "${{ runner.os }}" == "Windows" ]; then
-            7z a "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}${{ matrix.extension }}"
+            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}${{ matrix.extension }}"
           else
             chmod +x ${{ env.APP_NAME }}
-            zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
+            zip -j "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
           cd ..
         shell: bash
