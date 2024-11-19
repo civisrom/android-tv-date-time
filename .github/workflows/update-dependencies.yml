@@ -12,9 +12,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Update dependencies with Poetry
+      - name: Install Poetry
         run: |
-          poetry update
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в путь
+
+      - name: Update dependencies with Poetry
+        run: poetry update
 
       - name: Commit updated dependencies
         run: |
