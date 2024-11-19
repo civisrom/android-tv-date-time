@@ -8,13 +8,11 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-
 import colorama
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.keygen import keygen
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 from colorama import Fore, Style, init
-
 from locales import locales, set_language
 
 init(autoreset=True)
