@@ -93,10 +93,12 @@ jobs:
       - name: Install project dependencies
         run: |
           poetry config virtualenvs.in-project true
-          poetry lock --no-update
-          poetry install --no-interaction --no-root
-          poetry install --no-interaction --with dev --all-extras
-          poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
+          poetry env remove --all  # Удалить все виртуальные окружения (если они уже существуют)
+          poetry cache clear --all pypi  # Очистить кэш Poetry
+          poetry lock  # Перегенерировать poetry.lock
+          poetry install --no-interaction --no-root  # Установить зависимости из нового poetry.lock
+          poetry install --no-interaction --with dev --all-extras  # Установить дополнительные зависимости
+          poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}  # Установить pyinstaller
         shell: bash
         
       - name: Install ADB (Windows)
