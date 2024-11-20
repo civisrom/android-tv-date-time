@@ -353,7 +353,39 @@ arising from the use of this program.
                 en="Invalid choice",
                 ru="Неверный выбор"
             ),
-                        
+            "menu_item_apk": Translation(
+                en="Install APK on Android TV",
+                ru="Установить APK на Android TV"
+            ),
+            "enter_apk_path": Translation(
+                en="Enter the full path to the APK file: ",
+                ru="Введите полный путь к APK-файлу: "
+            ),
+            "apk_installation_started": Translation(
+                en="APK installation started...",
+                ru="Начата установка APK..."
+            ),
+            "apk_installation_success": Translation(
+                en="APK installed successfully!",
+                ru="APK успешно установлен!"
+            ),
+            "apk_installation_error": Translation(
+                en="APK installation failed: {}",
+                ru="Ошибка установки APK: {}"
+            ),
+            "verify_apk_installation": Translation(
+                en="Verifying APK installation...",
+                ru="Проверка установки APK..."
+            ),
+            "apk_verification_success": Translation(
+                en="APK verified successfully!",
+                ru="APK проверен успешно!"
+            ),
+            "apk_verification_failed": Translation(
+                en="APK verification failed.",
+                ru="Проверка APK не удалась."
+            ),
+            
             # Main menu items
             "main_menu": Translation(
                 en="\nMain Menu:",
