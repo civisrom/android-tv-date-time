@@ -97,7 +97,11 @@ jobs:
           poetry install --no-interaction --with dev --all-extras
           poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
-
+        
+      - name: Install ntplib explicitly (если потребуется)
+        run: |
+          poetry add ntplib  # Добавить ntplib, если это необходимо
+        
       - name: Install ADB (Windows)
         if: runner.os == 'Windows'
         run: |
