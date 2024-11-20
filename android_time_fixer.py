@@ -17,6 +17,7 @@ from typing import List, Dict, Optional
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+from concurrent.futures import ThreadPoolExecutor, as_completed
 init(autoreset=True)
 
 # Настройка логирования
