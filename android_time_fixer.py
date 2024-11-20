@@ -12,7 +12,6 @@ import subprocess
 from ntplib import NTPClient, NTPException
 from ping3 import ping
 from pathlib import Path
-from locales import locales, set_language
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
