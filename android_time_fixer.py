@@ -136,95 +136,114 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def ping_ntp_servers(self, timeout=2, count=3):
-        """Ping NTP servers to check their responsiveness"""
-        print(Fore.GREEN + "Starting NTP server ping tests...")
+    def ping_server(server: str, count: int = 3, timeout: int = 2) -> Optional[Dict]:
+        """
+        Ping сервер с использованием системной команды
         
-        # Настройка логирования
-        logging.basicConfig(level=logging.DEBUG)
+        Args:
+            server (str): IP или домен сервера
+            count (int): Количество попыток пинга
+            timeout (int): Таймаут для каждой попытки
         
-        # Объединяем встроенные и пользовательские NTP-серверы
-        all_servers = list(set(list(self.ntp_servers.values()) + self.custom_ntp_servers))
-        server_ping_results = []
+        Returns:
+            Dict с результатами пинга или None
+        """
+        # Определение параметров ping в зависимости от операционной системы
+        os_name = platform.system().lower()
         
-        for server in all_servers:
-            try:
-                # Проверка через NTPClient
-                client = NTPClient()
-                try:
-                    logging.debug(f"Attempting NTP connection to {server}")
-                    response = client.request(server, version=3, timeout=timeout)
-                    avg_rtt = response.delay * 1000  # RTT в миллисекундах
-                    server_ping_results.append({
-                        'server': server,
-                        'status': 'Reachable',
-                        'avg_rtt': avg_rtt,
-                        'color': Fore.GREEN
-                    })
-                    continue  # Успех, идём к следующему серверу
-                except NTPException as e:
-                    logging.warning(f"NTP request failed for {server}: {e}")
-                
-                # Проверка через ping3
-                ping_attempts = []
-                for _ in range(count):
-                    try:
-                        rtt = ping(server, timeout=timeout, unit='ms')
-                        ping_attempts.append(rtt)
-                    except Exception as e:
-                        logging.warning(f"Ping attempt to {server} failed: {e}")
-                        ping_attempts.append(None)
-                
-                # Обработка результатов пинга
-                valid_pings = [p for p in ping_attempts if p is not None]
-                if valid_pings:
-                    avg_rtt = sum(valid_pings) / len(valid_pings)
-                    server_ping_results.append({
-                        'server': server,
-                        'status': 'Reachable',
-                        'avg_rtt': avg_rtt,
-                        'color': Fore.GREEN
-                    })
-                else:
-                    server_ping_results.append({
-                        'server': server,
-                        'status': 'Unreachable',
-                        'avg_rtt': None,
-                        'color': Fore.RED
-                    })
+        if os_name == "windows":
+            ping_cmd = ['ping', '-n', str(count), '-w', str(timeout * 1000), server]
+        else:  # Linux/macOS
+            ping_cmd = ['ping', '-c', str(count), '-W', str(timeout), server]
+        
+        try:
+            # Выполнение ping с перенаправлением stderr
+            result = subprocess.run(
+                ping_cmd, 
+                capture_output=True, 
+                text=True, 
+                timeout=timeout * count + 1
+            )
             
-            except socket.gaierror:
-                logging.error(f"DNS resolution failed for {server}")
-                server_ping_results.append({
+            # Анализ результата
+            if result.returncode == 0:
+                # Извлечение статистики RTT
+                if os_name == "windows":
+                    rtt_lines = [line for line in result.stdout.split('\n') if 'Average' in line]
+                    rtt = float(rtt_lines[0].split('=')[-1].strip().split()[0]) if rtt_lines else None
+                else:
+                    rtt_lines = [line for line in result.stdout.split('\n') if 'avg' in line]
+                    rtt = float(rtt_lines[0].split('/')[4]) if rtt_lines else None
+                
+                return {
                     'server': server,
-                    'status': 'DNS Error',
-                    'avg_rtt': None,
-                    'color': Fore.RED
-                })
-            except Exception as e:
-                logging.error(f"Unexpected error while processing {server}: {e}")
-                server_ping_results.append({
+                    'status': 'Reachable',
+                    'avg_rtt': rtt,
+                    'output': result.stdout
+                }
+            else:
+                return {
                     'server': server,
-                    'status': f'Error: {str(e)}',
+                    'status': 'Unreachable',
                     'avg_rtt': None,
-                    'color': Fore.RED
-                })
+                    'output': result.stderr
+                }
+        
+        except subprocess.TimeoutExpired:
+            logging.warning(f"Timeout while pinging {server}")
+            return {
+                'server': server,
+                'status': 'Timeout',
+                'avg_rtt': None,
+                'output': 'Ping timeout'
+            }
+        except Exception as e:
+            logging.error(f"Error pinging {server}: {e}")
+            return {
+                'server': server,
+                'status': f'Error: {str(e)}',
+                'avg_rtt': None,
+                'output': str(e)
+            }
+    
+    def ping_ntp_servers(self, timeout=2, count=3):
+        """Улучшенный метод проверки NTP-серверов"""
+        print("Начало проверки NTP-серверов...")
+        
+        # Объединение серверов
+        all_servers = list(set(list(self.ntp_servers.values()) + self.custom_ntp_servers))
+        
+        # Параллельный пинг серверов
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        results = []
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_server = {
+                executor.submit(ping_server, server, count, timeout): server 
+                for server in all_servers
+            }
+            
+            for future in as_completed(future_to_server):
+                result = future.result()
+                results.append(result)
         
         # Сортировка результатов
-        server_ping_results.sort(
+        results.sort(
             key=lambda x: (x['status'] != 'Reachable', x['avg_rtt'] or float('inf'))
         )
         
-        # Отображение результатов
-        print(Fore.YELLOW + f"{'Server':<25} {'Status':<15} {'RTT (ms)':<10}")
+        # Вывод результатов
+        print(f"{'Сервер':<25} {'Статус':<15} {'RTT (мс)':<10}")
         print("-" * 50)
         
-        for result in server_ping_results:
+        for result in results:
+            color = '\033[92m' if result['status'] == 'Reachable' else '\033[91m'
             rtt_display = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
             print(
-                result['color'] +
-                f"{result['server']:<25} {result['status']:<15} {rtt_display:<10}"
+                f"{color}{result['server']:<25} {result['status']:<15} {rtt_display:<10}\033[0m"
             )
+        
+        return results
 	
     def load_saved_servers(self) -> dict:
         """Загружает сохраненные серверы из файла"""
