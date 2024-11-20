@@ -141,6 +141,7 @@ jobs:
               --hidden-import=threading \
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
+              --hidden-import=ntplib \
               --collect-all adb_shell \
               --collect-all libusb1 \
               --collect-all async_timeout \
@@ -174,6 +175,7 @@ jobs:
               --hidden-import=threading \
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
+              --hidden-import=ntplib \
               --collect-all adb_shell \
               --collect-all libusb1 \
               --collect-all async_timeout \
