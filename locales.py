@@ -420,8 +420,16 @@ arising from the use of this program.
                 ru="Недействительный код страны"
             ),
 
-
-                
+            "ping_servers": Translation(
+                en="Ping NTP Servers",
+                ru="Пинговать NTP-серверы"
+            ),
+            
+            "ping_ntp_servers_start": Translation(
+                en="Checking NTP server connectivity...",
+                ru="Проверка доступности NTP-серверов..."
+            ),
+            
             # Setup instructions
             "adb_setup": Translation(
                 en="1. Enable ADB debugging on your TV or Nvidia Shield:",
