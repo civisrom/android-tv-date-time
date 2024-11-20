@@ -51,8 +51,8 @@ class AndroidTVTimeFixer:
         self.keys_folder = self.current_path / 'keys'
         self.device = None
         self.max_connection_retries = 5
-        self.connection_retry_delay = 7
-        self.connection_timeout = 80  # Таймаут ожидания подключения в секундах
+        self.connection_retry_delay = 5
+        self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
         self.ntp_servers = {
