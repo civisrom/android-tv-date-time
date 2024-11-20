@@ -2,34 +2,46 @@ name: Update dependencies
 
 on:
   schedule:
-    - cron: "0 0 1 * *"  # Запуск раз в месяц
-  workflow_dispatch:  # Возможность запуска вручную
+    - cron: "0 0 1 * *"  # Пример расписания для обновления зависимостей раз в месяц
+  workflow_dispatch:  # Также можно запускать вручную
 
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
     steps:
+      # Шаг 1: Клонируем репозиторий
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # Шаг 2: Устанавливаем Python 3.11
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Шаг 3: Устанавливаем Poetry
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в путь
 
+      # Шаг 4: Устанавливаем зависимости проекта
+      - name: Install dependencies with Poetry
+        run: poetry install
+
+      # Шаг 5: Обновляем зависимости
       - name: Update dependencies with Poetry
         run: poetry update
 
+      # Шаг 6: Настраиваем пользователя Git
       - name: Configure Git user
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit updated dependencies
+      # Шаг 7: Коммитим и пушим изменения в основную ветку
+      - name: Commit and push changes to main
         run: |
           git add poetry.lock
-          git commit -m "Update dependencies"
-
-      - name: Push changes to main
-        run: |
-          git push origin main
+          git commit -m "Update dependencies" || echo "No changes to commit"
+          git push origin main || echo "No changes to push"
