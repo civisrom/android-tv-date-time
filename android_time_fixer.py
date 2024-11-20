@@ -9,6 +9,8 @@ import pyperclip
 import json
 import colorama
 import subprocess
+from ntplib import NTPClient, NTPException
+from ping3 import ping
 from pathlib import Path
 from locales import locales, set_language
 from adb_shell.auth.keygen import keygen
@@ -137,40 +139,45 @@ class AndroidTVTimeFixer:
 
     def ping_ntp_servers(self, timeout=2, count=3):
         """Ping NTP servers to check their responsiveness"""
-        print(Fore.GREEN + locales.get("ping_ntp_servers_start"))
+        print(Fore.GREEN + "Starting NTP server ping tests...")
         
-        # Combine country NTP servers and custom NTP servers
+        # Настройка логирования
+        logging.basicConfig(level=logging.DEBUG)
+        
+        # Объединяем встроенные и пользовательские NTP-серверы
         all_servers = list(set(list(self.ntp_servers.values()) + self.custom_ntp_servers))
-        
         server_ping_results = []
         
         for server in all_servers:
             try:
-                import socket
-                import time
+                # Проверка через NTPClient
+                client = NTPClient()
+                try:
+                    logging.debug(f"Attempting NTP connection to {server}")
+                    response = client.request(server, version=3, timeout=timeout)
+                    avg_rtt = response.delay * 1000  # RTT в миллисекундах
+                    server_ping_results.append({
+                        'server': server,
+                        'status': 'Reachable',
+                        'avg_rtt': avg_rtt,
+                        'color': Fore.GREEN
+                    })
+                    continue  # Успех, идём к следующему серверу
+                except NTPException as e:
+                    logging.warning(f"NTP request failed for {server}: {e}")
                 
-                # Multiple ping attempts to improve accuracy
+                # Проверка через ping3
                 ping_attempts = []
                 for _ in range(count):
                     try:
-                        start_time = time.time()
-                        socket.setdefaulttimeout(timeout)
-                        
-                        # Resolve and connect
-                        ip = socket.gethostbyname(server)
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        sock.connect((ip, 123))
-                        
-                        end_time = time.time()
-                        ping_attempts.append((end_time - start_time) * 1000)
-                        
-                        sock.close()
-                    except Exception:
+                        rtt = ping(server, timeout=timeout, unit='ms')
+                        ping_attempts.append(rtt)
+                    except Exception as e:
+                        logging.warning(f"Ping attempt to {server} failed: {e}")
                         ping_attempts.append(None)
                 
-                # Process ping results
+                # Обработка результатов пинга
                 valid_pings = [p for p in ping_attempts if p is not None]
-                
                 if valid_pings:
                     avg_rtt = sum(valid_pings) / len(valid_pings)
                     server_ping_results.append({
@@ -187,7 +194,16 @@ class AndroidTVTimeFixer:
                         'color': Fore.RED
                     })
             
+            except socket.gaierror:
+                logging.error(f"DNS resolution failed for {server}")
+                server_ping_results.append({
+                    'server': server,
+                    'status': 'DNS Error',
+                    'avg_rtt': None,
+                    'color': Fore.RED
+                })
             except Exception as e:
+                logging.error(f"Unexpected error while processing {server}: {e}")
                 server_ping_results.append({
                     'server': server,
                     'status': f'Error: {str(e)}',
@@ -195,19 +211,19 @@ class AndroidTVTimeFixer:
                     'color': Fore.RED
                 })
         
-        # Sort results: reachable servers first, sorted by avg RTT
+        # Сортировка результатов
         server_ping_results.sort(
             key=lambda x: (x['status'] != 'Reachable', x['avg_rtt'] or float('inf'))
         )
         
-        # Display results
+        # Отображение результатов
         print(Fore.YELLOW + f"{'Server':<25} {'Status':<15} {'RTT (ms)':<10}")
         print("-" * 50)
         
         for result in server_ping_results:
             rtt_display = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
             print(
-                result['color'] + 
+                result['color'] +
                 f"{result['server']:<25} {result['status']:<15} {rtt_display:<10}"
             )
 	
