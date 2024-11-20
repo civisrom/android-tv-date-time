@@ -137,68 +137,123 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def check_ntp_server(server: str, timeout: float = 2) -> dict:
+    def ping_server(server: str, count: int = 3, timeout: int = 2) -> Optional[Dict]:
         """
-        Проверка NTP-сервера с помощью NTPClient
+        Ping сервер с использованием системной команды
         
         Args:
-            server (str): NTP-сервер
-            timeout (float): Таймаут соединения
+            server (str): IP или домен сервера
+            count (int): Количество попыток пинга
+            timeout (int): Таймаут для каждой попытки
         
         Returns:
-            dict: Результаты проверки сервера
+            Dict с результатами пинга или None
         """
-        client = NTPClient()
+        # Определение параметров ping в зависимости от операционной системы
+        os_name = platform.system().lower()
+        current_locale = locale.getdefaultlocale()[0]
+        
+        if os_name == "windows":
+            ping_cmd = ['ping', '-n', str(count), '-w', str(timeout * 1000), server]
+        else:  # Linux/macOS
+            # Локализация для разных языков
+            if current_locale and 'ru' in current_locale.lower():
+                # Русские параметры
+                ping_cmd = ['ping', '-c', str(count), '-W', str(timeout), server]
+            else:
+                # Стандартные параметры
+                ping_cmd = ['ping', '-c', str(count), '-W', str(timeout), server]
+        
         try:
-            response = client.request(server, version=3, timeout=timeout)
+            # Выполнение ping с перенаправлением stderr
+            result = subprocess.run(
+                ping_cmd, 
+                capture_output=True, 
+                text=True, 
+                timeout=timeout * count + 1
+            )
+            
+            # Анализ результата
+            if result.returncode == 0:
+                # Извлечение статистики RTT
+                if os_name == "windows":
+                    rtt_lines = [line for line in result.stdout.split('\n') if 'Среднее' in line or 'Average' in line]
+                    rtt = float(rtt_lines[0].split('=')[-1].strip().split()[0]) if rtt_lines else None
+                else:
+                    rtt_lines = [line for line in result.stdout.split('\n') if 'avg' in line]
+                    rtt = float(rtt_lines[0].split('/')[4]) if rtt_lines else None
+                
+                return {
+                    'server': server,
+                    'status': 'Доступен' if current_locale and 'ru' in current_locale.lower() else 'Reachable',
+                    'avg_rtt': rtt,
+                    'output': result.stdout
+                }
+            else:
+                return {
+                    'server': server,
+                    'status': 'Недоступен' if current_locale and 'ru' in current_locale.lower() else 'Unreachable',
+                    'avg_rtt': None,
+                    'output': result.stderr
+                }
+        
+        except subprocess.TimeoutExpired:
+            logging.warning(f"Тайм-аут при пинге {server}" if current_locale and 'ru' in current_locale.lower() else f"Timeout while pinging {server}")
             return {
                 'server': server,
-                'status': 'Reachable',
-                'avg_rtt': response.delay * 1000,  # в миллисекундах
-                'offset': response.offset * 1000,  # смещение времени
-                'precision': response.precision
-            }
-        except (NTPException, socket.error) as e:
-            return {
-                'server': server,
-                'status': 'Unreachable',
+                'status': 'Тайм-аут' if current_locale and 'ru' in current_locale.lower() else 'Timeout',
                 'avg_rtt': None,
-                'error': str(e)
+                'output': 'Тайм-аут пинга' if current_locale and 'ru' in current_locale.lower() else 'Ping timeout'
+            }
+        except Exception as e:
+            logging.error(f"Ошибка при пинге {server}: {e}" if current_locale and 'ru' in current_locale.lower() else f"Error pinging {server}: {e}")
+            return {
+                'server': server,
+                'status': f'Ошибка: {str(e)}' if current_locale and 'ru' in current_locale.lower() else f'Error: {str(e)}',
+                'avg_rtt': None,
+                'output': str(e)
             }
     
-    def ping_ntp_servers(self, timeout=2, max_workers=10):
-        """
-        Параллельная проверка NTP-серверов
+    def ping_ntp_servers(self, timeout=2, count=3):
+        """Улучшенный метод проверки NTP-серверов"""
+        current_locale = locale.getdefaultlocale()[0]
         
-        Args:
-            timeout (float): Таймаут для каждого сервера
-            max_workers (int): Максимальное количество потоков
-        """
+        print("Начало проверки NTP-серверов..." if current_locale and 'ru' in current_locale.lower() else "Starting NTP server tests...")
+        
         # Объединение серверов
         all_servers = list(set(list(self.ntp_servers.values()) + self.custom_ntp_servers))
         
-        # Параллельная проверка
+        # Параллельный пинг серверов
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         results = []
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             future_to_server = {
-                executor.submit(check_ntp_server, server, timeout): server 
+                executor.submit(ping_server, server, count, timeout): server 
                 for server in all_servers
             }
             
             for future in as_completed(future_to_server):
-                results.append(future.result())
+                result = future.result()
+                results.append(result)
         
         # Сортировка результатов
         results.sort(
-            key=lambda x: (x['status'] != 'Reachable', x['avg_rtt'] or float('inf'))
+            key=lambda x: (x['status'] != 'Reachable' and x['status'] != 'Доступен', x['avg_rtt'] or float('inf'))
         )
         
         # Вывод результатов
+        if current_locale and 'ru' in current_locale.lower():
+            print(f"{'Сервер':<25} {'Статус':<15} {'RTT (мс)':<10}")
+        else:
+            print(f"{'Server':<25} {'Status':<15} {'RTT (ms)':<10}")
+        print("-" * 50)
+        
         for result in results:
-            color = '\033[92m' if result['status'] == 'Reachable' else '\033[91m'
-            rtt = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
+            color = '\033[92m' if result['status'] in ['Reachable', 'Доступен'] else '\033[91m'
+            rtt_display = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
             print(
-                f"{color}{result['server']:<25} {result['status']:<15} {rtt:<10}\033[0m"
+                f"{color}{result['server']:<25} {result['status']:<15} {rtt_display:<10}\033[0m"
             )
         
         return results
