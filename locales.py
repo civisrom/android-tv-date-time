@@ -420,14 +420,24 @@ arising from the use of this program.
                 ru="Недействительный код страны"
             ),
 
-            "ping_servers": Translation(
-                en="Ping NTP Servers",
-                ru="Пинговать NTP-серверы"
+            "ping_ntp_servers_start": Translation(
+                en="Starting NTP server connectivity check...",
+                ru="Начинаю проверку связи с NTP-серверами..."
             ),
             
-            "ping_ntp_servers_start": Translation(
-                en="Checking NTP server connectivity...",
-                ru="Проверка доступности NTP-серверов..."
+            "ntp_server_reachable": Translation(
+                en="NTP server is reachable",
+                ru="NTP-сервер доступен"
+            ),
+            
+            "ntp_server_unreachable": Translation(
+                en="NTP server is unreachable",
+                ru="NTP-сервер недоступен"
+            ),
+
+            "connection_error": Translation(
+                en="Connection error occurred",
+                ru="Произошла ошибка подключения"
             ),
             
             # Setup instructions
