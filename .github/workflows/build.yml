@@ -93,13 +93,19 @@ jobs:
       - name: Install project dependencies
         run: |
           poetry config virtualenvs.in-project true
-          poetry env remove --all  # Удалить все виртуальные окружения (если они уже существуют)
-          poetry cache clear --all pypi  # Очистить кэш Poetry
           poetry lock  # Перегенерировать poetry.lock
           poetry install --no-interaction --no-root  # Установить зависимости из нового poetry.lock
           poetry install --no-interaction --with dev --all-extras  # Установить дополнительные зависимости
           poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}  # Установить pyinstaller
         shell: bash
+
+      - name: Commit poetry.lock changes (if any)
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git diff --exit-code poetry.lock || (git add poetry.lock && git commit -m "Update poetry.lock" && git push)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Этот токен автоматически доступен для использования в GitHub Actions
         
       - name: Install ADB (Windows)
         if: runner.os == 'Windows'
