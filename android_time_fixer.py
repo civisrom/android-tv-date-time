@@ -135,6 +135,77 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
+    def install_apk(self, apk_path: str) -> bool:
+        """
+        Install an APK on the connected Android TV device with enhanced error handling and verification.
+        
+        Args:
+            apk_path (str): Full path to the APK file
+        
+        Returns:
+            bool: True if installation was successful, False otherwise
+        """
+        if not self.device:
+            raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
+        
+        # Validate APK file existence
+        if not os.path.exists(apk_path):
+            raise AndroidTVTimeFixerError(locales.get("apk_file_not_found"))
+        
+        if not apk_path.lower().endswith('.apk'):
+            raise AndroidTVTimeFixerError(locales.get("invalid_apk_file"))
+        
+        try:
+            # Print started message
+            print(Fore.GREEN + locales.get("apk_installation_started"))
+            
+            # Use subprocess for APK installation
+            result = subprocess.run(
+                ['adb', '-s', f'{self.device.serial}', 'install', '-r', apk_path], 
+                capture_output=True, 
+                text=True, 
+                timeout=120  # 2-minute timeout
+            )
+            
+            # Check installation result
+            if result.returncode == 0 and "Success" in result.stdout:
+                print(Fore.GREEN + locales.get("apk_installation_success"))
+                
+                # Verify package installation
+                print(Fore.YELLOW + locales.get("verify_apk_installation"))
+                package_name = self._get_package_name(apk_path)
+                verify_result = self.device.shell(f'pm list packages | grep {package_name}')
+                
+                if package_name in verify_result:
+                    print(Fore.GREEN + locales.get("apk_verification_success"))
+                    return True
+                else:
+                    print(Fore.RED + locales.get("apk_verification_failed"))
+                    return False
+            else:
+                print(Fore.RED + locales.get("apk_installation_error").format(result.stderr))
+                return False
+        
+        except subprocess.TimeoutExpired:
+            print(Fore.RED + locales.get("apk_installation_error").format("Installation timed out"))
+            return False
+        except Exception as e:
+            print(Fore.RED + locales.get("apk_installation_error").format(str(e)))
+            return False
+        
+    def _get_package_name(self, apk_path: str) -> str:
+        """Extract package name from APK file using aapt"""
+        try:
+            result = subprocess.run(
+                ['aapt', 'dump', 'badging', apk_path], 
+                capture_output=True, 
+                text=True
+            )
+            package_match = re.search(r"package: name='([^']+)'", result.stdout)
+            return package_match.group(1) if package_match else None
+        except Exception:
+            return None
+	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
@@ -642,6 +713,7 @@ def main():
             #print(Fore.YELLOW + locales.get("menu_item_7"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
+            print(Fore.YELLOW + locales.get("menu_item_apk"))
 
             choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
 
@@ -713,10 +785,28 @@ def main():
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 
-            elif choice == '9':
+            elif choice == '10':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
-            
+		    
+            elif choice == '9':  # Assuming this becomes the APK install menu option
+                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
+                ip = input(Fore.WHITE).strip()
+                if fixer.validate_ip(ip):
+                    try:
+                        fixer.connect(ip)
+                        print(Fore.GREEN + locales.get('enter_apk_path'), end="")
+                        apk_path = input(Fore.WHITE).strip()
+                        
+                        if fixer.install_apk(apk_path):
+                            print(Fore.GREEN + "APK installed successfully!")
+                        else:
+                            print(Fore.RED + "APK installation failed.")
+                    except AndroidTVTimeFixerError as e:
+                        print(Fore.RED + locales.get('error_message', error=str(e)))
+                else:
+                    print(Fore.RED + locales.get('invalid_ip_format'))
+		
             elif choice.lower() == 'b':
                 continue
             else:
