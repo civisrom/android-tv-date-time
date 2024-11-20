@@ -133,7 +133,77 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
-    
+
+    def ping_ntp_servers(self, timeout=2, count=3):
+        """Ping NTP servers to check their responsiveness"""
+        print(Fore.GREEN + locales.get("ping_ntp_servers_start"))
+        
+        # Combine country NTP servers and custom NTP servers
+        all_servers = list(self.ntp_servers.values()) + self.custom_ntp_servers
+        
+        server_ping_results = []
+        
+        for server in all_servers:
+            try:
+                # Use subprocess to ping servers
+                result = subprocess.run(
+                    ['ping', '-c', str(count), '-W', str(timeout), server], 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=timeout * count
+                )
+                
+                # Parse ping results
+                if result.returncode == 0:
+                    # Extract avg round trip time
+                    rtt_match = re.search(r'avg/(\d+\.\d+)', result.stdout)
+                    avg_rtt = float(rtt_match.group(1)) if rtt_match else 0.0
+                    
+                    server_ping_results.append({
+                        'server': server,
+                        'status': 'Reachable',
+                        'avg_rtt': avg_rtt,
+                        'color': Fore.GREEN
+                    })
+                else:
+                    server_ping_results.append({
+                        'server': server,
+                        'status': 'Unreachable',
+                        'avg_rtt': None,
+                        'color': Fore.RED
+                    })
+            
+            except subprocess.TimeoutExpired:
+                server_ping_results.append({
+                    'server': server,
+                    'status': 'Timeout',
+                    'avg_rtt': None,
+                    'color': Fore.YELLOW
+                })
+            except Exception as e:
+                server_ping_results.append({
+                    'server': server,
+                    'status': f'Error: {str(e)}',
+                    'avg_rtt': None,
+                    'color': Fore.RED
+                })
+        
+        # Sort results: reachable servers first, sorted by avg RTT
+        server_ping_results.sort(
+            key=lambda x: (x['status'] != 'Reachable', x['avg_rtt'] or float('inf'))
+        )
+        
+        # Display results
+        print(Fore.YELLOW + f"{'Server':<25} {'Status':<15} {'Avg RTT (ms)':<10}")
+        print("-" * 50)
+        
+        for result in server_ping_results:
+            rtt_display = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
+            print(
+                result['color'] + 
+                f"{result['server']:<25} {result['status']:<15} {rtt_display:<10}"
+            )
+	
     def load_saved_servers(self) -> dict:
         """Загружает сохраненные серверы из файла"""
         if self.servers_file.exists():
@@ -431,7 +501,8 @@ class AndroidTVTimeFixer:
             print("3. " + locales.get("copy_server_to_clipboard"))
             print("4. " + locales.get("paste_server_from_clipboard"))
             print("5. " + locales.get("remove_server_from_favorites"))
-            print("6. " + locales.get("return_to_main_menu"))
+            print("6. " + locales.get("ping_servers"))
+            print("7. " + locales.get("return_to_main_menu"))
 
             choice = input(locales.get("select_action")).strip()
 
@@ -494,6 +565,9 @@ class AndroidTVTimeFixer:
                     print(locales.get("no_favorite_servers"))
 
             elif choice == '6':
+            self.ping_ntp_servers()
+            
+            elif choice == '7':
                 break
 
             else:
