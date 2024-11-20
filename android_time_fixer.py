@@ -565,7 +565,7 @@ class AndroidTVTimeFixer:
                     print(locales.get("no_favorite_servers"))
 
             elif choice == '6':
-            self.ping_ntp_servers()
+                self.ping_ntp_servers()
             
             elif choice == '7':
                 break
