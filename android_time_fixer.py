@@ -13,6 +13,7 @@ import pyperclip
 import colorama
 from colorama import Fore, Style, init
 from locales import locales, set_language
+from typing import List, Dict, Optional
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
