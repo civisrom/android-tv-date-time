@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import socket
 import time
 import logging
 import platform
@@ -126,7 +127,7 @@ class AndroidTVTimeFixer:
             '1.asia.pool.ntp.org',
             '2.asia.pool.ntp.org',
             '3.asia.pool.ntp.org',
-	    'time.cloudflare.com',
+            'time.cloudflare.com',
             'clock.isc.org',
             'ntp2.vniiftri.ru',
             'ntps1-1.cs.tu-berlin.de',
@@ -145,19 +146,25 @@ class AndroidTVTimeFixer:
         
         for server in all_servers:
             try:
-                # Use subprocess to ping servers
-                result = subprocess.run(
-                    ['ping', '-c', str(count), '-W', str(timeout), server], 
-                    capture_output=True, 
-                    text=True, 
-                    timeout=timeout * count
-                )
+                # Cross-platform ping using socket for connectivity check
+                import socket
+                import time
+    
+                start_time = time.time()
                 
-                # Parse ping results
-                if result.returncode == 0:
-                    # Extract avg round trip time
-                    rtt_match = re.search(r'avg/(\d+\.\d+)', result.stdout)
-                    avg_rtt = float(rtt_match.group(1)) if rtt_match else 0.0
+                # Try resolving the server and establishing a connection
+                socket.setdefaulttimeout(timeout)
+                
+                try:
+                    # Attempt to resolve the address
+                    ip = socket.gethostbyname(server)
+                    
+                    # Attempt to connect to NTP port (123)
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    sock.connect((ip, 123))
+                    
+                    end_time = time.time()
+                    avg_rtt = (end_time - start_time) * 1000  # Convert to milliseconds
                     
                     server_ping_results.append({
                         'server': server,
@@ -165,7 +172,10 @@ class AndroidTVTimeFixer:
                         'avg_rtt': avg_rtt,
                         'color': Fore.GREEN
                     })
-                else:
+                    
+                    sock.close()
+                
+                except (socket.gaierror, socket.timeout, ConnectionRefusedError) as e:
                     server_ping_results.append({
                         'server': server,
                         'status': 'Unreachable',
@@ -173,13 +183,6 @@ class AndroidTVTimeFixer:
                         'color': Fore.RED
                     })
             
-            except subprocess.TimeoutExpired:
-                server_ping_results.append({
-                    'server': server,
-                    'status': 'Timeout',
-                    'avg_rtt': None,
-                    'color': Fore.YELLOW
-                })
             except Exception as e:
                 server_ping_results.append({
                     'server': server,
@@ -194,7 +197,7 @@ class AndroidTVTimeFixer:
         )
         
         # Display results
-        print(Fore.YELLOW + f"{'Server':<25} {'Status':<15} {'Avg RTT (ms)':<10}")
+        print(Fore.YELLOW + f"{'Server':<25} {'Status':<15} {'RTT (ms)':<10}")
         print("-" * 50)
         
         for result in server_ping_results:
