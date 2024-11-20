@@ -137,96 +137,56 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def ping_server(server: str, count: int = 3, timeout: int = 2) -> Optional[Dict]:
+    def check_ntp_server(server: str, timeout: float = 2) -> dict:
         """
-        Ping сервер с использованием системной команды
+        Проверка NTP-сервера с помощью NTPClient
         
         Args:
-            server (str): IP или домен сервера
-            count (int): Количество попыток пинга
-            timeout (int): Таймаут для каждой попытки
+            server (str): NTP-сервер
+            timeout (float): Таймаут соединения
         
         Returns:
-            Dict с результатами пинга или None
+            dict: Результаты проверки сервера
         """
-        # Определение параметров ping в зависимости от операционной системы
-        os_name = platform.system().lower()
-        
-        if os_name == "windows":
-            ping_cmd = ['ping', '-n', str(count), '-w', str(timeout * 1000), server]
-        else:  # Linux/macOS
-            ping_cmd = ['ping', '-c', str(count), '-W', str(timeout), server]
-        
+        client = NTPClient()
         try:
-            # Выполнение ping с перенаправлением stderr
-            result = subprocess.run(
-                ping_cmd, 
-                capture_output=True, 
-                text=True, 
-                timeout=timeout * count + 1
-            )
-            
-            # Анализ результата
-            if result.returncode == 0:
-                # Извлечение статистики RTT
-                if os_name == "windows":
-                    rtt_lines = [line for line in result.stdout.split('\n') if 'Average' in line]
-                    rtt = float(rtt_lines[0].split('=')[-1].strip().split()[0]) if rtt_lines else None
-                else:
-                    rtt_lines = [line for line in result.stdout.split('\n') if 'avg' in line]
-                    rtt = float(rtt_lines[0].split('/')[4]) if rtt_lines else None
-                
-                return {
-                    'server': server,
-                    'status': 'Reachable',
-                    'avg_rtt': rtt,
-                    'output': result.stdout
-                }
-            else:
-                return {
-                    'server': server,
-                    'status': 'Unreachable',
-                    'avg_rtt': None,
-                    'output': result.stderr
-                }
-        
-        except subprocess.TimeoutExpired:
-            logging.warning(f"Timeout while pinging {server}")
+            response = client.request(server, version=3, timeout=timeout)
             return {
                 'server': server,
-                'status': 'Timeout',
-                'avg_rtt': None,
-                'output': 'Ping timeout'
+                'status': 'Reachable',
+                'avg_rtt': response.delay * 1000,  # в миллисекундах
+                'offset': response.offset * 1000,  # смещение времени
+                'precision': response.precision
             }
-        except Exception as e:
-            logging.error(f"Error pinging {server}: {e}")
+        except (NTPException, socket.error) as e:
             return {
                 'server': server,
-                'status': f'Error: {str(e)}',
+                'status': 'Unreachable',
                 'avg_rtt': None,
-                'output': str(e)
+                'error': str(e)
             }
     
-    def ping_ntp_servers(self, timeout=2, count=3):
-        """Улучшенный метод проверки NTP-серверов"""
-        print("Начало проверки NTP-серверов...")
+    def ping_ntp_servers(self, timeout=2, max_workers=10):
+        """
+        Параллельная проверка NTP-серверов
         
+        Args:
+            timeout (float): Таймаут для каждого сервера
+            max_workers (int): Максимальное количество потоков
+        """
         # Объединение серверов
         all_servers = list(set(list(self.ntp_servers.values()) + self.custom_ntp_servers))
         
-        # Параллельный пинг серверов
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        
+        # Параллельная проверка
         results = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_server = {
-                executor.submit(ping_server, server, count, timeout): server 
+                executor.submit(check_ntp_server, server, timeout): server 
                 for server in all_servers
             }
             
             for future in as_completed(future_to_server):
-                result = future.result()
-                results.append(result)
+                results.append(future.result())
         
         # Сортировка результатов
         results.sort(
@@ -234,14 +194,11 @@ class AndroidTVTimeFixer:
         )
         
         # Вывод результатов
-        print(f"{'Сервер':<25} {'Статус':<15} {'RTT (мс)':<10}")
-        print("-" * 50)
-        
         for result in results:
             color = '\033[92m' if result['status'] == 'Reachable' else '\033[91m'
-            rtt_display = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
+            rtt = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
             print(
-                f"{color}{result['server']:<25} {result['status']:<15} {rtt_display:<10}\033[0m"
+                f"{color}{result['server']:<25} {result['status']:<15} {rtt:<10}\033[0m"
             )
         
         return results
