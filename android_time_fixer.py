@@ -140,42 +140,46 @@ class AndroidTVTimeFixer:
         print(Fore.GREEN + locales.get("ping_ntp_servers_start"))
         
         # Combine country NTP servers and custom NTP servers
-        all_servers = list(self.ntp_servers.values()) + self.custom_ntp_servers
+        all_servers = list(set(list(self.ntp_servers.values()) + self.custom_ntp_servers))
         
         server_ping_results = []
         
         for server in all_servers:
             try:
-                # Cross-platform ping using socket for connectivity check
                 import socket
                 import time
-    
-                start_time = time.time()
                 
-                # Try resolving the server and establishing a connection
-                socket.setdefaulttimeout(timeout)
+                # Multiple ping attempts to improve accuracy
+                ping_attempts = []
+                for _ in range(count):
+                    try:
+                        start_time = time.time()
+                        socket.setdefaulttimeout(timeout)
+                        
+                        # Resolve and connect
+                        ip = socket.gethostbyname(server)
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.connect((ip, 123))
+                        
+                        end_time = time.time()
+                        ping_attempts.append((end_time - start_time) * 1000)
+                        
+                        sock.close()
+                    except Exception:
+                        ping_attempts.append(None)
                 
-                try:
-                    # Attempt to resolve the address
-                    ip = socket.gethostbyname(server)
-                    
-                    # Attempt to connect to NTP port (123)
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    sock.connect((ip, 123))
-                    
-                    end_time = time.time()
-                    avg_rtt = (end_time - start_time) * 1000  # Convert to milliseconds
-                    
+                # Process ping results
+                valid_pings = [p for p in ping_attempts if p is not None]
+                
+                if valid_pings:
+                    avg_rtt = sum(valid_pings) / len(valid_pings)
                     server_ping_results.append({
                         'server': server,
                         'status': 'Reachable',
                         'avg_rtt': avg_rtt,
                         'color': Fore.GREEN
                     })
-                    
-                    sock.close()
-                
-                except (socket.gaierror, socket.timeout, ConnectionRefusedError) as e:
+                else:
                     server_ping_results.append({
                         'server': server,
                         'status': 'Unreachable',
