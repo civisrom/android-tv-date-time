@@ -151,9 +151,7 @@ jobs:
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
               --hidden-import=ntplib \
-              --hidden-import=ping3 \
               --collect-all ntplib \
-              --collect-all ping3 \
               --collect-all adb_shell \
               --collect-all libusb1 \
               --collect-all async_timeout \
