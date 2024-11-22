@@ -135,6 +135,10 @@ jobs:
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
               --hidden-import=ntplib \
+              --hidden-import=androguard \
+              --hidden-import=aapt \
+              --collect-all androguard \
+              --collect-all aapt \
               --collect-all ntplib \
               --collect-all adb_shell \
               --collect-all libusb1 \
