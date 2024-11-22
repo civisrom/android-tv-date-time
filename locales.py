@@ -354,25 +354,25 @@ arising from the use of this program.
                 ru="Неверный выбор"
             ),
             "menu_item_9": Translation(
-                "en": "9. Terminal mode (ADB and system commands)",
-                "ru": "9. Режим терминала (команды ADB и системные)"
+                 en="9. Terminal mode (ADB and system commands)",
+                 ru="9. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
-                "en": "Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
-                "ru": "Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
+                 en="Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
+                 ru="Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
             ),
             "terminal_mode_help": Translation(
-                "en": "You can execute any ADB or system commands.",
-                "ru": "Вы можете выполнять любые команды ADB или системные команды."
+                 en="You can execute any ADB or system commands.",
+                 ru="Вы можете выполнять любые команды ADB или системные команды."
             ),
             "terminal_mode_commands": Translation(
-                "en": """Available commands:
+                 en="""Available commands:
         - Any ADB command (e.g., 'adb devices', 'adb shell')
         - System commands
         - 'help' or '?' - Show this help
         - 'clear' - Clear screen
         - 'exit', 'quit', or 'q' - Exit terminal mode""",
-                "ru": """Доступные команды:
+                 ru="""Доступные команды:
         - Любые команды ADB (например, 'adb devices', 'adb shell')
         - Системные команды
         - 'help' или '?' - Показать эту справку
@@ -380,20 +380,20 @@ arising from the use of this program.
         - 'exit', 'quit' или 'q' - Выйти из режима терминала"""
             ),
             "terminal_mode_exit_ctrl_c": Translation(
-                "en": "Terminal mode deactivated.",
-                "ru": "Режим терминала деактивирован."
+                 en="Terminal mode deactivated.",
+                 ru="Режим терминала деактивирован."
             ),
             "terminal_mode_error": Translation(
-                "en": "Error executing command: {error}",
-                "ru": "Ошибка выполнения команды: {error}"
+                 en="Error executing command: {error}",
+                 ru="Ошибка выполнения команды: {error}"
             ),
             "command_error": Translation(
-                "en": "Command execution failed",
-                "ru": "Ошибка выполнения команды"
+                 en="Command execution failed",
+                 ru="Ошибка выполнения команды"
             ),
             "command_execution_error": Translation(
-                "en": "Error executing command: {error}",
-                "ru": "Ошибка выполнения команды: {error}"
+                 en="Error executing command: {error}",
+                 ru=""Ошибка выполнения команды: {error}"
             ),
                 
             # Main menu items
