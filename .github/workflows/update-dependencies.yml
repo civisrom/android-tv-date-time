@@ -2,12 +2,13 @@ name: Update dependencies
 
 on:
   schedule:
-    - cron: "0 0 1 * *"  # Пример расписания для обновления зависимостей раз в месяц
-  workflow_dispatch:  # Также можно запускать вручную
+    - cron: "0 0 1 * *"  # Обновление зависимостей раз в месяц
+  workflow_dispatch:  # Возможность запуска вручную
 
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
+
     steps:
       # Шаг 1: Клонируем репозиторий
       - name: Checkout repository
@@ -19,19 +20,31 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Шаг 3: Устанавливаем Poetry
+      # Шаг 3: Кэшируем зависимости Poetry
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+
+      # Шаг 4: Устанавливаем Poetry
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в путь
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Принудительное обновление зависимостей
+      # Шаг 5: Принудительное обновление зависимостей
       - name: Update dependencies
         run: |
           poetry self update
           poetry lock
           poetry install
           poetry update
+        env:
+          POETRY_CACHE_DIR: ~/.cache/pypoetry  # Используем кэш Poetry
 
       # Шаг 6: Настраиваем пользователя Git
       - name: Configure Git user
@@ -39,9 +52,13 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Шаг 7: Коммитим и пушим изменения в основную ветку
+      # Шаг 7: Проверяем изменения и пушим их
       - name: Commit and push changes to main
         run: |
           git add poetry.lock
-          git commit -m "Update dependencies" || echo "No changes to commit"
-          git push origin main || echo "No changes to push"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update dependencies"
+            git push origin main
+          fi
