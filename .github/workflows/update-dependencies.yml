@@ -1,47 +1,84 @@
-name: Update dependencies
+name: Update Dependencies
 
 on:
   schedule:
-    - cron: "0 0 1 * *"  # Пример расписания для обновления зависимостей раз в месяц
-  workflow_dispatch:  # Также можно запускать вручную
+    - cron: "0 0 1 * *"  # Обновление раз в месяц
+  workflow_dispatch:  # Ручной запуск
 
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Явное разрешение на запись в репозиторий
+
     steps:
-      # Шаг 1: Клонируем репозиторий
+      # Клонируем репозиторий с полной историей
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Загружаем полную историю
+          token: ${{ secrets.GITHUB_TOKEN }}  # Используем токен для пуша
 
-      # Шаг 2: Устанавливаем Python 3.11
+      # Устанавливаем Python
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # Шаг 3: Устанавливаем Poetry
+      # Кэширование зависимостей Poetry
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.local/share/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      # Устанавливаем Poetry
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в путь
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Шаг 4: Устанавливаем зависимости проекта
-      - name: Install dependencies with Poetry
-        run: poetry install
-
-      # Шаг 5: Обновляем зависимости
-      - name: Update dependencies with Poetry
-        run: poetry update
-
-      # Шаг 6: Настраиваем пользователя Git
-      - name: Configure Git user
+      # Подробное обновление зависимостей с логированием
+      - name: Update Dependencies
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          poetry self update
+          poetry lock --no-update
+          poetry update
+          echo "Dependency update completed"
 
-      # Шаг 7: Коммитим и пушим изменения в основную ветку
-      - name: Commit and push changes to main
+      # Расширенная проверка изменений
+      - name: Check Dependency Changes
+        id: dep_changes
         run: |
+          git diff --quiet poetry.lock || {
+            echo "Dependencies have changed"
+            echo "status=changed" >> $GITHUB_OUTPUT
+            git diff poetry.lock
+          }
+
+      # Коммит и пуш изменений с расширенной информативностью
+      - name: Commit and Push Changes
+        if: steps.dep_changes.outputs.status == 'changed'
+        run: |
+          git config user.name "GitHub Dependencies Bot"
+          git config user.email "<>"
+          
+          # Генерируем подробный лог изменений
+          changes=$(git diff --stat poetry.lock)
+          
           git add poetry.lock
-          git commit -m "Update dependencies" || echo "No changes to commit"
-          git push origin main || echo "No changes to push"
+          git commit -m "🔄 Update project dependencies
+
+          Automated dependency updates:
+          ${changes}"
+          
+          git push origin main
+
+      # Уведомление о статусе обновления
+      - name: Dependency Update Status
+        if: steps.dep_changes.outputs.status == 'changed'
+        run: echo "✅ Dependencies successfully updated and pushed"
