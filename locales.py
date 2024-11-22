@@ -353,7 +353,7 @@ arising from the use of this program.
                 en="Invalid choice",
                 ru="Неверный выбор"
             ),
-            "menu_item_11": Translation(
+            "menu_item_9": Translation(
                 "en": "9. Terminal mode (ADB and system commands)",
                 "ru": "9. Режим терминала (команды ADB и системные)"
             ),
@@ -433,7 +433,7 @@ arising from the use of this program.
                 en="8. Country codes explanation (can be copied to clipboard)",
                 ru="8. Расшифровка кодов стран (можно копировать в буфер обмена)"
             ),
-            "menu_item_9": Translation(
+            "menu_item_10": Translation(
                 en="10. Exit",
                 ru="10. Выход"
             ),
