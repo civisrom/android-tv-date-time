@@ -784,10 +784,6 @@ def main():
             elif choice == '8':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
-
-            elif choice == '10':
-                print(Fore.GREEN + locales.get('exit_message'))
-                sys.exit(0)
 		    
             elif choice == '9':  # Assuming this becomes the APK install menu option
                 print(Fore.GREEN + locales.get('enter_device_ip'), end="")
@@ -806,6 +802,10 @@ def main():
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
                     print(Fore.RED + locales.get('invalid_ip_format'))
+			
+            elif choice == '10':
+                print(Fore.GREEN + locales.get('exit_message'))
+                sys.exit(0)
 		
             elif choice.lower() == 'b':
                 continue
