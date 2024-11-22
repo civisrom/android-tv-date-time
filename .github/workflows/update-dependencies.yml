@@ -37,18 +37,21 @@ jobs:
             ${{ runner.os }}-poetry-
 
       # Устанавливаем Poetry
-      - name: Install Poetry
+      - name: Install and Configure Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          $HOME/.local/bin/poetry --version
+        shell: bash
 
-      # Подробное обновление зависимостей с логированием
       - name: Update Dependencies
         run: |
-          poetry self update
-          poetry lock --no-update
-          poetry update
+          $HOME/.local/bin/poetry self update
+          $HOME/.local/bin/poetry lock --no-update
+          $HOME/.local/bin/poetry update
           echo "Dependency update completed"
+        shell: bash
 
       # Расширенная проверка изменений
       - name: Check Dependency Changes
