@@ -22,7 +22,7 @@ jobs:
 
       # Шаг 3: Кэшируем зависимости Poetry
       - name: Cache Poetry dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pypoetry
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
