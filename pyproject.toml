@@ -8,7 +8,7 @@ packages = [{include = "android_time_fixer.py"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
-#adb-shell = {extras = ["usb", "network"], version = "^0.4.4"}
+adb-shell = {extras = ["usb", "network"], version = "^0.4.4"}
 pyperclip = "^1.8.2"
 colorama = "^0.4.6"
 platformdirs = "^3.5.0"
