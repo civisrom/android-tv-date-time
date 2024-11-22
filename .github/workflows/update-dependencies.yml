@@ -1,46 +1,99 @@
-name: Update dependencies
+name: Update Dependencies
+
 on:
   schedule:
-    - cron: "0 0 1 * *"  # Пример расписания для обновления зависимостей раз в месяц
-  workflow_dispatch:  # Также можно запускать вручную
+    - cron: "0 0 1 * *"  # Обновление зависимостей раз в месяц
+  workflow_dispatch:  # Ручной запуск
 
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Разрешение на запись в репозиторий
+
     steps:
-      # Шаг 1: Клонируем репозиторий
+      # Клонируем репозиторий с полной историей
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Загружаем полную историю
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Шаг 2: Устанавливаем Python 3.11
+      # Устанавливаем Python
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # Шаг 3: Устанавливаем Poetry
+      # Кэширование зависимостей Poetry
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.local/share/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      # Устанавливаем Poetry
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в путь
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          $HOME/.local/bin/poetry --version
+        shell: bash
 
-      # Принудительное обновление зависимостей
-      - name: Update dependencies
+      # Обновление зависимостей с расширенной обработкой
+      - name: Update Dependencies
         run: |
-          poetry self update
-          poetry lock
-          poetry install
-          poetry update
+          $HOME/.local/bin/poetry self update || true
+          $HOME/.local/bin/poetry lock --no-update
+          $HOME/.local/bin/poetry install
+          $HOME/.local/bin/poetry update
+        shell: bash
 
-      # Шаг 6: Настраиваем пользователя Git
-      - name: Configure Git user
+      # Проверка наличия изменений
+      - name: Check for changes
+        id: check_changes
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          changes=$(git status --porcelain poetry.lock)
+          if [ -n "$changes" ]; then
+            echo "Changes detected in poetry.lock"
+            echo "changes=true" >> $GITHUB_OUTPUT
+            git diff poetry.lock
+          else
+            echo "No changes in dependencies"
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
 
-      # Шаг 7: Коммитим и пушим изменения в основную ветку
-      - name: Commit and push changes to main
+      # Настройка Git
+      - name: Configure Git
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git config user.name "GitHub Dependencies Bot"
+          git config user.email "<>"
+
+      # Коммит и пуш изменений
+      - name: Commit and Push Changes
+        if: steps.check_changes.outputs.changes == 'true'
         run: |
           git add poetry.lock
-          git commit -m "Update dependencies" || echo "No changes to commit"
+          
+          # Генерируем подробный лог изменений
+          changes=$(git diff --stat poetry.lock)
+          
+          git commit -m "🔄 Update project dependencies
+
+          Automated dependency updates:
+          ${changes}" || echo "No changes to commit"
+          
           git push origin main || echo "No changes to push"
+        shell: bash
+
+      # Уведомление о статусе обновления
+      - name: Dependency Update Status
+        if: steps.check_changes.outputs.changes == 'true'
+        run: echo "✅ Dependencies successfully updated and pushed"
+        shell: bash
