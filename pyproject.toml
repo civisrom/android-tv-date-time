@@ -8,9 +8,9 @@ packages = [{include = "android_time_fixer.py"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
-#adb-shell = {extras = ["usb", "network"], version = "^0.4.4"}
+adb-shell = {extras = ["usb", "network"], version = "^0.4.4"}
 pyperclip = "^1.8.2"
-#colorama = "^0.4.6"
+colorama = "^0.4.6"
 platformdirs = "^3.5.0"
 packaging = "^23.0"
 typing-extensions = "^4.5.0"
@@ -33,8 +33,8 @@ rich = "^13.0.0"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.3.0"
 black = "^23.0.0"
-#flake8 = "^6.0.0"
-#mypy = "^1.0.0"
+flake8 = "^6.0.0"
+mypy = "^1.0.0"
 
 [tool.mypy]
 python_version = "3.11"
