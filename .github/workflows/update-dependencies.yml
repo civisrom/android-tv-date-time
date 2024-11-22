@@ -40,12 +40,11 @@ jobs:
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          $HOME/.local/bin/poetry --version
-          $HOME/.local/bin/poetry env use python3.11
+          export PATH="/home/runner/work/android-tv-date-time/android-tv-date-time/poetry/bin:$PATH"
+          echo "/home/runner/work/android-tv-date-time/android-tv-date-time/poetry/bin" >> $GITHUB_PATH
+          /home/runner/work/android-tv-date-time/android-tv-date-time/poetry/bin/poetry --version
+          /home/runner/work/android-tv-date-time/android-tv-date-time/poetry/bin/poetry env use python3.11
         shell: bash
-        env:
-         POETRY_HOME: ${{ github.workspace }}/poetry
 
       # Подробное обновление зависимостей с логированием
       - name: Update Dependencies
