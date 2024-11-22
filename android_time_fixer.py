@@ -138,70 +138,93 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def execute_terminal_command(self, command: str) -> None:
-        """
-        Выполняет команду в терминале и выводит результат
-        
-        Args:
-            command (str): Команда для выполнения
-        """
-        try:
-            # Разбиваем команду на аргументы, сохраняя кавычки
-            args = shlex.split(command)
-            
-            # Создаем процесс с перенаправлением stdout и stderr
-            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            
-            # Получаем вывод команды в реальном времени
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    print(Fore.GREEN + output.strip())
-            
-            # Получаем код возврата и stderr
-            return_code = process.poll()
-            _, stderr = process.communicate()
-            
-            if return_code != 0:
-                print(Fore.RED + locales.get("command_error"))
-                if stderr:
-                    print(Fore.RED + stderr)
-            
-        except Exception as e:
-            print(Fore.RED + locales.get("command_execution_error", error=str(e)))
-
-    def terminal_mode(self):
-        """Режим терминала для выполнения команд"""
-        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
-        print(Fore.YELLOW + locales.get("terminal_mode_help"))
-        
-        while True:
+    def get_adb_path(self):
+            """Получает путь к ADB из runtime hook или ресурсов"""
             try:
-                # Показываем приглашение командной строки
-                command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
+                from hooks.win_hook import ADB_PATH
+                return ADB_PATH
+            except ImportError:
+                try:
+                    from hooks.linux_hook import ADB_PATH
+                    return ADB_PATH
+                except ImportError:
+                    # Fallback для разработки
+                    if getattr(sys, 'frozen', False):
+                        base_path = sys._MEIPASS
+                    else:
+                        base_path = os.path.abspath(os.path.dirname(__file__))
+                    
+                    if sys.platform == 'win32':
+                        return os.path.join(base_path, 'resources', 'adb.exe')
+                    else:
+                        return os.path.join(base_path, 'resources', 'adb')
+    
+        def execute_terminal_command(self, command: str) -> None:
+            """
+            Выполняет команду в терминале и выводит результат
+            
+            Args:
+                command (str): Команда для выполнения
+            """
+            try:
+                # Если команда начинается с 'adb', используем полный путь к ADB
+                args = shlex.split(command)
+                if args[0] == 'adb':
+                    args[0] = self.get_adb_path()
                 
-                # Проверяем специальные команды
-                if command.lower() in ['exit', 'quit', 'q']:
-                    break
-                elif command.lower() in ['help', '?']:
-                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
-                    continue
-                elif command.lower() == 'clear':
-                    os.system('cls' if platform.system() == 'Windows' else 'clear')
-                    continue
-                elif not command:
-                    continue
+                # Создаем процесс с перенаправлением stdout и stderr
+                process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
                 
-                # Выполняем команду
-                self.execute_terminal_command(command)
+                # Получаем вывод команды в реальном времени
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        print(Fore.GREEN + output.strip())
                 
-            except KeyboardInterrupt:
-                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-                break
+                # Получаем код возврата и stderr
+                return_code = process.poll()
+                _, stderr = process.communicate()
+                
+                if return_code != 0:
+                    print(Fore.RED + locales.get("command_error"))
+                    if stderr:
+                        print(Fore.RED + stderr)
+                
             except Exception as e:
-                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
+                print(Fore.RED + locales.get("command_execution_error", error=str(e)))
+    
+        def terminal_mode(self):
+            """Режим терминала для выполнения команд"""
+            print(Fore.GREEN + locales.get("terminal_mode_welcome"))
+            print(Fore.YELLOW + locales.get("terminal_mode_help"))
+            
+            while True:
+                try:
+                    # Показываем приглашение командной строки
+                    command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
+                    
+                    # Проверяем специальные команды
+                    if command.lower() in ['exit', 'quit', 'q']:
+                        break
+                    elif command.lower() in ['help', '?']:
+                        print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                        continue
+                    elif command.lower() == 'clear':
+                        os.system('cls' if platform.system() == 'Windows' else 'clear')
+                        continue
+                    elif not command:
+                        continue
+                    
+                    # Выполняем команду
+                    self.execute_terminal_command(command)
+                    
+                except KeyboardInterrupt:
+                    print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+                    break
+                except Exception as e:
+                    print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
