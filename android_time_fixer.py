@@ -2,11 +2,13 @@ import os
 import sys
 import re
 import socket
+import shlex
 import time
 import logging
 import platform
 import json
 import subprocess
+from subprocess import Popen, PIPE
 import ntplib
 from pathlib import Path
 import pyperclip
@@ -135,6 +137,71 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
+    def execute_terminal_command(self, command: str) -> None:
+        """
+        Выполняет команду в терминале и выводит результат
+        
+        Args:
+            command (str): Команда для выполнения
+        """
+        try:
+            # Разбиваем команду на аргументы, сохраняя кавычки
+            args = shlex.split(command)
+            
+            # Создаем процесс с перенаправлением stdout и stderr
+            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            
+            # Получаем вывод команды в реальном времени
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    print(Fore.GREEN + output.strip())
+            
+            # Получаем код возврата и stderr
+            return_code = process.poll()
+            _, stderr = process.communicate()
+            
+            if return_code != 0:
+                print(Fore.RED + locales.get("command_error"))
+                if stderr:
+                    print(Fore.RED + stderr)
+            
+        except Exception as e:
+            print(Fore.RED + locales.get("command_execution_error", error=str(e)))
+
+    def terminal_mode(self):
+        """Режим терминала для выполнения команд"""
+        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
+        print(Fore.YELLOW + locales.get("terminal_mode_help"))
+        
+        while True:
+            try:
+                # Показываем приглашение командной строки
+                command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
+                
+                # Проверяем специальные команды
+                if command.lower() in ['exit', 'quit', 'q']:
+                    break
+                elif command.lower() in ['help', '?']:
+                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                    continue
+                elif command.lower() == 'clear':
+                    os.system('cls' if platform.system() == 'Windows' else 'clear')
+                    continue
+                elif not command:
+                    continue
+                
+                # Выполняем команду
+                self.execute_terminal_command(command)
+                
+            except KeyboardInterrupt:
+                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+                break
+            except Exception as e:
+                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
+	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
@@ -642,6 +709,7 @@ def main():
             #print(Fore.YELLOW + locales.get("menu_item_7"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
+            print(Fore.YELLOW + locales.get("menu_item_10"))
 
             choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
 
@@ -712,8 +780,11 @@ def main():
             elif choice == '8':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
-
+		    
             elif choice == '9':
+                fixer.terminal_mode()
+		    
+            elif choice == '10':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             
