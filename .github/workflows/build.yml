@@ -178,7 +178,6 @@ jobs:
               --collect-data typing_extensions \
               --collect-data cryptography \
               --log-level=DEBUG \
-              --add-binary="$ADB_PATH;." \
               --runtime-hook="hooks/win_hook.py" \
               "${{ env.SOURCE_FILE }}"
           else
@@ -214,7 +213,6 @@ jobs:
               --collect-data typing_extensions \
               --collect-data cryptography \
               --log-level=DEBUG \
-              --add-binary="$ADB_PATH:." \
               --runtime-hook="hooks/linux_hook.py" \
               "${{ env.SOURCE_FILE }}"
           fi
