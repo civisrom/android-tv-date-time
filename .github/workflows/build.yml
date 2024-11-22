@@ -104,21 +104,31 @@ jobs:
           echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         shell: pwsh
         
+      # Для Windows:
       - name: Install Android SDK and AAPT (Windows)
         if: runner.os == 'Windows'
         run: |
           $ProgressPreference = 'SilentlyContinue'
+          
+          # Создаем каталог для SDK
           New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\android-sdk"
+          
+          # Скачиваем platform-tools (adb)
           $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
           Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\android-sdk\platform-tools.zip"
           Expand-Archive -Path "$env:USERPROFILE\android-sdk\platform-tools.zip" -DestinationPath "$env:USERPROFILE\android-sdk" -Force
-          $aaptUrl = "https://dl.google.com/android/repository/build-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $aaptUrl -OutFile "$env:USERPROFILE\android-sdk\build-tools.zip"
+          
+          # Скачиваем Android Build Tools (версия r35)
+          $buildToolsUrl = "https://mirrors.cloud.tencent.com/AndroidSDK/build-tools_r35_windows.zip"
+          Invoke-WebRequest -Uri $buildToolsUrl -OutFile "$env:USERPROFILE\android-sdk\build-tools.zip"
           Expand-Archive -Path "$env:USERPROFILE\android-sdk\build-tools.zip" -DestinationPath "$env:USERPROFILE\android-sdk" -Force
-          $aaptPath = "$env:USERPROFILE\android-sdk\build-tools\29.0.2\aapt.exe"  # Укажите нужную версию
+          
+          # Путь к aapt.exe, папка "android-15" внутри архива
+          $aaptPath = "$env:USERPROFILE\android-sdk\android-15\build-tools\35.0.0\aapt.exe"  # Укажите нужную версию, если необходимо
           echo $aaptPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "AAPT_PATH=$aaptPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         shell: pwsh
+      
         
       - name: Install ADB (Linux)
         if: runner.os == 'Linux'
