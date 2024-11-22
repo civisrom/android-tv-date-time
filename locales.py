@@ -145,10 +145,6 @@ arising from the use of this program.
                 en="\nCurrent device information:\n",
                 ru="\nТекущая информация об устройстве:\n"
             ),
-            "waiting_for_connection": Translation(
-                en="\nWaiting for connection and permission on the device...",
-                ru="\nОжидание подключения и разрешения на устройстве..."
-            ),
             "confirm_connection": Translation(
                 en="Please confirm the connection on the TV screen if prompted.",
                 ru="Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос."
@@ -393,7 +389,7 @@ arising from the use of this program.
             ),
             "command_execution_error": Translation(
                  en="Error executing command: {error}",
-                 ru=""Ошибка выполнения команды: {error}"
+                 ru="Ошибка выполнения команды: {error}"
             ),
                 
             # Main menu items
