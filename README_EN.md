@@ -2,7 +2,7 @@
 
 ## Problem Description
 
-Many TVs and devices with Android TV, especially in sanctioned regions such as Crimea, DNR, and LNR, have an unpleasant feature: the clock resets after disconnecting the device from power. Despite having the "automatic time update" function enabled, time synchronization with the server doesn't occur. This leads to:
+Many TVs and devices with Android TV, have an unpleasant feature: the clock resets after disconnecting the device from power. Despite having the "automatic time update" function enabled, time synchronization with the server doesn't occur. This leads to:
 
 - Loss of access to all internet applications
 - Need for manual time setting
