@@ -9,7 +9,6 @@ import json
 import subprocess
 import ntplib
 from pathlib import Path
-from androguard.core.bytecodes import apk
 import pyperclip
 import colorama
 from colorama import Fore, Style, init
