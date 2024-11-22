@@ -1,3 +1,5 @@
+[English](https://github.com/civisrom/android-tv-date-time/blob/main/README_EN.md)
+
 # Android TV Time Fixer
 
 ## Описание проблемы
