@@ -148,7 +148,7 @@ class AndroidTVTimeFixer:
         if not self.device:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
         
-        # Validate APK file existence
+        # Validate APK file existence and type
         if not os.path.exists(apk_path):
             raise AndroidTVTimeFixerError(locales.get("apk_file_not_found"))
         
@@ -156,12 +156,18 @@ class AndroidTVTimeFixer:
             raise AndroidTVTimeFixerError(locales.get("invalid_apk_file"))
         
         try:
-            # Print started message
+            # Start ADB server if not running
+            subprocess.run(['adb', 'start-server'], capture_output=True)
+            
+            # Connect to device via IP if not already connected
+            device_ip = self.device.serial  # Assuming device serial is the IP
+            subprocess.run(['adb', 'connect', device_ip], capture_output=True)
+            
             print(Fore.GREEN + locales.get("apk_installation_started"))
             
-            # Use subprocess for APK installation
+            # Install APK with retry and replace options
             result = subprocess.run(
-                ['adb', '-s', f'{self.device.serial}', 'install', '-r', apk_path], 
+                ['adb', '-s', device_ip, 'install', '-r', '-d', apk_path], 
                 capture_output=True, 
                 text=True, 
                 timeout=120  # 2-minute timeout
@@ -174,9 +180,13 @@ class AndroidTVTimeFixer:
                 # Verify package installation
                 print(Fore.YELLOW + locales.get("verify_apk_installation"))
                 package_name = self._get_package_name(apk_path)
-                verify_result = self.device.shell(f'pm list packages | grep {package_name}')
+                verify_result = subprocess.run(
+                    ['adb', '-s', device_ip, 'shell', f'pm list packages | grep {package_name}'], 
+                    capture_output=True, 
+                    text=True
+                )
                 
-                if package_name in verify_result:
+                if package_name in verify_result.stdout:
                     print(Fore.GREEN + locales.get("apk_verification_success"))
                     return True
                 else:
@@ -192,7 +202,7 @@ class AndroidTVTimeFixer:
         except Exception as e:
             print(Fore.RED + locales.get("apk_installation_error").format(str(e)))
             return False
-        
+    
     def _get_package_name(self, apk_path: str) -> str:
         """Extract package name from APK file using aapt"""
         try:
