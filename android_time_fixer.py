@@ -149,7 +149,9 @@ class AndroidTVTimeFixer:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
         
         # Validate APK file existence and type
+        print(f"APK Path: {apk_path}")  # Логирование пути к APK
         if not os.path.exists(apk_path):
+            print(f"APK file does not exist: {apk_path}")  # Логирование ошибки, если файл не найден
             raise AndroidTVTimeFixerError(locales.get("apk_file_not_found"))
         
         if not apk_path.lower().endswith('.apk'):
@@ -167,11 +169,15 @@ class AndroidTVTimeFixer:
             
             # Install APK with retry and replace options
             result = subprocess.run(
-                ['adb', '-s', device_ip, 'install', '-r', '-d', apk_path], 
+                ['adb', '-s', device_ip, 'install', '-r', '-d', f'"{apk_path}"'],  # Оборачиваем путь в кавычки
                 capture_output=True, 
                 text=True, 
                 timeout=120  # 2-minute timeout
             )
+            
+            # Логирование вывода
+            print(f"stdout: {result.stdout}")
+            print(f"stderr: {result.stderr}")
             
             # Check installation result
             if result.returncode == 0 and "Success" in result.stdout:
@@ -202,19 +208,6 @@ class AndroidTVTimeFixer:
         except Exception as e:
             print(Fore.RED + locales.get("apk_installation_error").format(str(e)))
             return False
-    
-    def _get_package_name(self, apk_path: str) -> str:
-        """Extract package name from APK file using aapt"""
-        try:
-            result = subprocess.run(
-                ['aapt', 'dump', 'badging', apk_path], 
-                capture_output=True, 
-                text=True
-            )
-            package_match = re.search(r"package: name='([^']+)'", result.stdout)
-            return package_match.group(1) if package_match else None
-        except Exception:
-            return None
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
