@@ -37,12 +37,15 @@ jobs:
             ${{ runner.os }}-poetry-
 
       # Устанавливаем Poetry
-      - name: Install and Configure Poetry
+      - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-          source "$HOME/.local/bin/poetry" env use python3.11
+          $HOME/.local/bin/poetry --version
+          $HOME/.local/bin/poetry env use python3.11
         shell: bash
+        env:
+         POETRY_HOME: ${{ github.workspace }}/poetry
 
       # Подробное обновление зависимостей с логированием
       - name: Update Dependencies
