@@ -15,6 +15,7 @@ env:
   CI_DEBUG: true
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
+  ADB_VERSION: '34.0.5'
 
 jobs:
   setup-and-build:
@@ -91,33 +92,64 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Этот токен автоматически доступен для использования в GitHub Actions
         
-      - name: Install ADB (Windows)
+      - name: Create resources directory
+        run: |
+          mkdir -p resources
+        shell: bash
+
+      - name: Download and Setup ADB (Windows)
         if: runner.os == 'Windows'
         run: |
           $ProgressPreference = 'SilentlyContinue'
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
+          
+          # Создаем временную директорию для ADB
+          New-Item -ItemType Directory -Force -Path ".\temp_adb"
+          
+          # Загружаем platform-tools
           $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb" -Force
-          $adbPath = "$env:USERPROFILE\adb\platform-tools"
-          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Invoke-WebRequest -Uri $platformToolsUrl -OutFile ".\temp_adb\platform-tools.zip"
+          
+          # Распаковываем
+          Expand-Archive -Path ".\temp_adb\platform-tools.zip" -DestinationPath ".\temp_adb" -Force
+          
+          # Копируем adb.exe и необходимые DLL в resources
+          Copy-Item ".\temp_adb\platform-tools\adb.exe" -Destination ".\resources\"
+          Copy-Item ".\temp_adb\platform-tools\AdbWinApi.dll" -Destination ".\resources\"
+          Copy-Item ".\temp_adb\platform-tools\AdbWinUsbApi.dll" -Destination ".\resources\"
+          
+          # Устанавливаем переменную среды для сборки
+          echo "ADB_RESOURCES_PATH=$pwd\resources" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         shell: pwsh
-        
-      - name: Install ADB (Linux)
+
+      - name: Download and Setup ADB (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y android-tools-adb
-          echo "ADB_PATH=$(which adb)" >> $GITHUB_ENV
+          # Создаем временную директорию для ADB
+          mkdir -p temp_adb
+          
+          # Загружаем platform-tools
+          wget https://dl.google.com/android/repository/platform-tools-latest-linux.zip -O temp_adb/platform-tools.zip
+          
+          # Распаковываем
+          unzip temp_adb/platform-tools.zip -d temp_adb/
+          
+          # Копируем adb в resources
+          cp temp_adb/platform-tools/adb ./resources/
+          
+          # Устанавливаем права на выполнение
+          chmod +x ./resources/adb
+          
+          echo "ADB_RESOURCES_PATH=$PWD/resources" >> $GITHUB_ENV
         shell: bash
-
       - name: Build executable (Windows and Linux)
         run: |
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             poetry run pyinstaller --clean --onefile --console --name="${{ env.APP_NAME }}" \
               --hidden-import=pyperclip \
               --hidden-import=colorama \
+              --add-data="resources/adb.exe;resources/" \
+              --add-data="resources/AdbWinApi.dll;resources/" \
+              --add-data="resources/AdbWinUsbApi.dll;resources/" \
               --hidden-import=platformdirs \
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
@@ -153,6 +185,7 @@ jobs:
             poetry run pyinstaller --clean --onefile --console --name="${{ env.APP_NAME }}" \
               --hidden-import=pyperclip \
               --hidden-import=colorama \
+              --add-data="resources/adb:resources/" \
               --hidden-import=platformdirs \
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
