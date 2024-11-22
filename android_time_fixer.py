@@ -9,15 +9,16 @@ import platform
 import json
 import subprocess
 from subprocess import Popen, PIPE
-import ntplib
 from pathlib import Path
+import ntplib
 import pyperclip
 import colorama
 from colorama import Fore, Style, init
-from locales import locales, set_language
 from adb_shell.auth.keygen import keygen
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+sys.path.append(str(Path(__file__).parent))
+from locales import locales, set_language
 init(autoreset=True)
 
 # Настройка логирования
