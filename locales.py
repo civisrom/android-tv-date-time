@@ -353,39 +353,49 @@ arising from the use of this program.
                 en="Invalid choice",
                 ru="Неверный выбор"
             ),
-            "menu_item_apk": Translation(
-                en="Install APK on Android TV",
-                ru="Установить APK на Android TV"
+            "menu_item_11": Translation(
+                "en": "9. Terminal mode (ADB and system commands)",
+                "ru": "9. Режим терминала (команды ADB и системные)"
             ),
-            "enter_apk_path": Translation(
-                en="Enter the full path to the APK file: ",
-                ru="Введите полный путь к APK-файлу: "
+            "terminal_mode_welcome": Translation(
+                "en": "Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
+                "ru": "Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
             ),
-            "apk_installation_started": Translation(
-                en="APK installation started...",
-                ru="Начата установка APK..."
+            "terminal_mode_help": Translation(
+                "en": "You can execute any ADB or system commands.",
+                "ru": "Вы можете выполнять любые команды ADB или системные команды."
             ),
-            "apk_installation_success": Translation(
-                en="APK installed successfully!",
-                ru="APK успешно установлен!"
+            "terminal_mode_commands": Translation(
+                "en": """Available commands:
+        - Any ADB command (e.g., 'adb devices', 'adb shell')
+        - System commands
+        - 'help' or '?' - Show this help
+        - 'clear' - Clear screen
+        - 'exit', 'quit', or 'q' - Exit terminal mode""",
+                "ru": """Доступные команды:
+        - Любые команды ADB (например, 'adb devices', 'adb shell')
+        - Системные команды
+        - 'help' или '?' - Показать эту справку
+        - 'clear' - Очистить экран
+        - 'exit', 'quit' или 'q' - Выйти из режима терминала"""
             ),
-            "apk_installation_error": Translation(
-                en="APK installation failed: {}",
-                ru="Ошибка установки APK: {}"
+            "terminal_mode_exit_ctrl_c": Translation(
+                "en": "Terminal mode deactivated.",
+                "ru": "Режим терминала деактивирован."
             ),
-            "verify_apk_installation": Translation(
-                en="Verifying APK installation...",
-                ru="Проверка установки APK..."
+            "terminal_mode_error": Translation(
+                "en": "Error executing command: {error}",
+                "ru": "Ошибка выполнения команды: {error}"
             ),
-            "apk_verification_success": Translation(
-                en="APK verified successfully!",
-                ru="APK проверен успешно!"
+            "command_error": Translation(
+                "en": "Command execution failed",
+                "ru": "Ошибка выполнения команды"
             ),
-            "apk_verification_failed": Translation(
-                en="APK verification failed.",
-                ru="Проверка APK не удалась."
+            "command_execution_error": Translation(
+                "en": "Error executing command: {error}",
+                "ru": "Ошибка выполнения команды: {error}"
             ),
-            
+                
             # Main menu items
             "main_menu": Translation(
                 en="\nMain Menu:",
@@ -424,8 +434,8 @@ arising from the use of this program.
                 ru="8. Расшифровка кодов стран (можно копировать в буфер обмена)"
             ),
             "menu_item_9": Translation(
-                en="9. Exit",
-                ru="9. Выход"
+                en="10. Exit",
+                ru="10. Выход"
             ),
             "menu_prompt": Translation(
                 en="Enter menu option number:",
