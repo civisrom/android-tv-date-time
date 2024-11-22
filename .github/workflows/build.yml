@@ -91,18 +91,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Этот токен автоматически доступен для использования в GitHub Actions
         
-      - name: Install ADB (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
-          $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
-          Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb" -Force
-          $adbPath = "$env:USERPROFILE\adb\platform-tools"
-          echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        shell: pwsh
+      #- name: Install ADB (Windows)
+        #if: runner.os == 'Windows'
+        #run: |
+          #$ProgressPreference = 'SilentlyContinue'
+          #New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\adb"
+          #$platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
+          #Invoke-WebRequest -Uri $platformToolsUrl -OutFile "$env:USERPROFILE\adb\platform-tools.zip"
+          #Expand-Archive -Path "$env:USERPROFILE\adb\platform-tools.zip" -DestinationPath "$env:USERPROFILE\adb" -Force
+          #$adbPath = "$env:USERPROFILE\adb\platform-tools"
+          #echo $adbPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          #echo "ADB_PATH=$adbPath\adb.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        #shell: pwsh
         
       # Для Windows:
       - name: Install Android SDK and AAPT (Windows)
