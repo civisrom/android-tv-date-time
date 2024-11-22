@@ -1,3 +1,4 @@
+name: Update dependencies
 on:
   schedule:
     - cron: "0 0 1 * *"  # Пример расписания для обновления зависимостей раз в месяц
