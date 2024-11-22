@@ -41,16 +41,15 @@ jobs:
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-          $HOME/.local/bin/poetry --version
         shell: bash
 
       # Обновление зависимостей с расширенной обработкой
       - name: Update Dependencies
         run: |
-          $HOME/.local/bin/poetry self update || true
-          $HOME/.local/bin/poetry lock --no-update
-          $HOME/.local/bin/poetry install
-          $HOME/.local/bin/poetry update
+          poetry self update || true
+          poetry lock --no-update
+          poetry install
+          poetry update
         shell: bash
 
       # Проверка наличия изменений
