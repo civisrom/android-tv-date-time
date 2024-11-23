@@ -138,8 +138,9 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
+
     def get_adb_path(self):
-        """Получает путь к ADB из runtime hook или ресурсов"""
+        """Gets the path to ADB based on the platform"""
         try:
             from hooks.win_hook import ADB_PATH
             return ADB_PATH
@@ -148,138 +149,96 @@ class AndroidTVTimeFixer:
                 from hooks.linux_hook import ADB_PATH
                 return ADB_PATH
             except ImportError:
-                # Fallback для разработки
-                if getattr(sys, 'frozen', False):
-                    base_path = sys._MEIPASS
-                else:
-                    base_path = os.path.abspath(os.path.dirname(__file__))
-                
-                if sys.platform == 'win32':
-                    return os.path.join(base_path, 'resources', 'adb.exe')
-                else:
-                    return os.path.join(base_path, 'resources', 'adb')
+                base_path = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.abspath(os.path.dirname(__file__))
+                adb_name = 'adb.exe' if system() == 'Windows' else 'adb'
+                return os.path.join(base_path, 'resources', adb_name)
 
-    def execute_terminal_command(self, command: str) -> None:
+    def execute_terminal_command(self, command: str, retries: int = 3) -> None:
         """
-        Executes terminal command and displays the output with proper handling for different platforms
+        Executes a command in the terminal with retry logic.
         
         Args:
-            command (str): Command to execute
+            command (str): Command to execute.
+            retries (int): Number of retries in case of failure.
         """
-        try:
-            # Determine if it's an ADB command
-            is_adb_command = command.strip().lower().startswith('adb')
-            
-            # Split command into arguments
-            args = shlex.split(command)
-            
-            # Replace 'adb' with full path if it's an ADB command
-            if is_adb_command:
-                args[0] = self.get_adb_path()
-            
-            # Set up process environment
-            env = os.environ.copy()
-            if platform.system() == 'Windows':
-                # For Windows, use shell=True for system commands
-                shell = not is_adb_command
-                # For CMD internal commands like 'dir', 'cd', etc.
-                if not is_adb_command and args[0].lower() in ['dir', 'cd', 'type', 'copy', 'move', 'del', 'md', 'rd', 'echo']:
-                    args = ['cmd', '/c'] + args
-            else:
-                # For Unix-like systems
-                shell = not is_adb_command
-                # For shell built-ins like 'ls', 'cd', etc.
-                if not is_adb_command and args[0].lower() in ['ls', 'cd', 'pwd', 'cp', 'mv', 'rm', 'mkdir', 'rmdir', 'echo']:
-                    args = ['bash', '-c', command]
-    
-            # Create process with proper output handling
-            process = Popen(
-                args,
-                stdout=PIPE,
-                stderr=PIPE,
-                universal_newlines=True,
-                shell=shell,
-                env=env,
-                cwd=os.getcwd()
-            )
-    
-            # Handle output in real-time
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
+        attempt = 0
+        while attempt < retries:
+            try:
+                args = shlex.split(command)
+                if args[0] == 'adb':
+                    args[0] = self.get_adb_path()
+                
+                process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        print(output.strip())
+                
+                return_code = process.poll()
+                _, stderr = process.communicate()
+                
+                if return_code != 0:
+                    self.logger.error(f"Error executing command: {command}")
+                    if stderr:
+                        print(stderr)
+                    attempt += 1
+                    if attempt < retries:
+                        print(f"Retrying... ({attempt}/{retries})")
+                        sleep(self.connection_retry_delay)
+                    else:
+                        print(f"Failed after {retries} retries.")
+                else:
                     break
-                if output:
-                    print(Fore.GREEN + output.strip())
-    
-            # Get return code and stderr
-            return_code = process.poll()
-            _, stderr = process.communicate()
-    
-            # Handle errors if any
-            if return_code != 0:
-                print(Fore.RED + locales.get("command_error"))
-                if stderr:
-                    print(Fore.RED + stderr)
-    
-        except FileNotFoundError:
-            print(Fore.RED + locales.get("command_not_found"))
-        except PermissionError:
-            print(Fore.RED + locales.get("permission_denied"))
-        except Exception as e:
-            print(Fore.RED + locales.get("command_execution_error", error=str(e)))
+            except Exception as e:
+                self.logger.error(f"Command execution error: {str(e)}")
+                if attempt < retries:
+                    print(f"Retrying... ({attempt}/{retries})")
+                    sleep(self.connection_retry_delay)
+                    attempt += 1
+                else:
+                    print(f"Failed after {retries} retries.")
     
     def terminal_mode(self):
-        """Enhanced terminal mode supporting Windows, Linux and ADB commands"""
-        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
-        print(Fore.YELLOW + locales.get("terminal_mode_help"))
-        
-        special_commands = {
-            'exit': lambda: 'exit',
-            'quit': lambda: 'exit',
-            'q': lambda: 'exit',
-            'help': lambda: print(Fore.YELLOW + locales.get("terminal_mode_commands")),
-            'clear': lambda: os.system('cls' if platform.system() == 'Windows' else 'clear'),
-            'pwd': lambda: print(Fore.GREEN + os.getcwd()),
-            'cd': lambda: None  # Special handling below
-        }
+        """Terminal mode for executing commands interactively."""
+        print("Welcome to the terminal mode. Type 'help' for commands.")
         
         while True:
             try:
-                # Show current directory in prompt
-                current_dir = os.getcwd()
-                command = input(f"{Fore.CYAN}{current_dir}> {Fore.WHITE}").strip()
-                
-                if not command:
+                command = input("terminal> ").strip()
+                if command.lower() in ['exit', 'quit', 'q']:
+                    break
+                elif command.lower() in ['help', '?']:
+                    print("Available commands: help, exit, clear, adb commands, etc.")
                     continue
-                    
-                # Handle special commands
-                if command.lower() in special_commands:
-                    result = special_commands[command.lower()]()
-                    if result == 'exit':
-                        break
+                elif command.lower() == 'clear':
+                    os.system('cls' if system() == 'Windows' else 'clear')
                     continue
-                    
-                # Special handling for 'cd' command
-                if command.lower().startswith('cd '):
-                    try:
-                        new_dir = command[3:].strip()
-                        # Handle relative paths and user home directory
-                        if new_dir.startswith('~'):
-                            new_dir = os.path.expanduser(new_dir)
-                        os.chdir(os.path.abspath(new_dir))
-                        continue
-                    except Exception as e:
-                        print(Fore.RED + locales.get("directory_change_error", error=str(e)))
-                        continue
-                
-                # Execute the command
+                elif not command:
+                    continue
+
                 self.execute_terminal_command(command)
-                
+
             except KeyboardInterrupt:
-                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+                print("\nExiting terminal mode. Use 'exit' to quit.")
                 break
             except Exception as e:
-                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
+                print(f"Error: {str(e)}")
+
+    def check_device_connection(self):
+        """Checks if the Android device is connected via ADB."""
+        print("Checking device connection...")
+        self.execute_terminal_command('adb devices')
+        
+    def fetch_ntp_time(self, server: str) -> str:
+        """Fetches current time from a given NTP server."""
+        try:
+            ntp_time = os.popen(f'ntpdate -q {server}').read()
+            return ntp_time
+        except Exception as e:
+            self.logger.error(f"Failed to fetch NTP time from {server}: {str(e)}")
+            return None
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
