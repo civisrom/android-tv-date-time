@@ -152,9 +152,6 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-
-      init()
-
         # Initialize locales
         self.locales = self._load_locales()
 
