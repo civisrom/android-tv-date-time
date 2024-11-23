@@ -222,6 +222,76 @@ class AndroidTVTimeFixer:
             process.kill()
             raise TimeoutError("Превышено время ожидания выполнения команды")
 
+    def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
+        """
+        Пытается переподключиться к устройству несколько раз
+        
+        Args:
+            command (str): Выполняемая команда
+            max_retries (int): Максимальное количество попыток
+            delay (int): Задержка между попытками в секундах
+            
+        Returns:
+            bool: True если подключение успешно, False в противном случае
+        """
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                args = shlex.split(command)
+                if not args:
+                    return False
+    
+                if args[0] == 'adb':
+                    args[0] = self.get_adb_path()
+    
+                process = Popen(
+                    args,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True,
+                    bufsize=1
+                )
+                
+                return_code, stdout, stderr = self._process_command_output(process)
+                
+                # Проверяем наличие ошибок подключения
+                connection_errors = [
+                    "error: no devices/emulators found",
+                    "error: device not found",
+                    "error: device offline",
+                    "error: device unauthorized"
+                ]
+                
+                if return_code == 0:
+                    return True
+                    
+                if any(error in stderr.lower() for error in connection_errors):
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
+                        print(Fore.YELLOW + f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        self.logger.error("Все попытки подключения не удались")
+                        print(Fore.RED + "Все попытки подключения не удались")
+                        return False
+                else:
+                    # Если ошибка не связана с подключением, прекращаем попытки
+                    if stderr:
+                        self.logger.error(f"STDERR: {stderr}")
+                        print(Fore.RED + stderr)
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Ошибка при попытке подключения: {str(e)}", exc_info=True)
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    continue
+                return False
+                
+        return False
+    
     def execute_terminal_command(self, command: str) -> None:
         """
         Выполняет команду в терминале и выводит результат
@@ -231,35 +301,38 @@ class AndroidTVTimeFixer:
         """
         if not command:
             return
-
+    
         try:
-            args = shlex.split(command)
-            if not args:
-                return
-
-            # Если команда начинается с 'adb', используем полный путь к ADB
-            if args[0] == 'adb':
-                args[0] = self.get_adb_path()
-
-            self.logger.debug(f"Выполняется команда: {' '.join(args)}")
-            
-            process = Popen(
-                args,
-                stdout=PIPE,
-                stderr=PIPE,
-                universal_newlines=True,
-                bufsize=1
-            )
-            
-            return_code, stdout, stderr = self._process_command_output(process)
-            
-            if return_code != 0:
-                self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
-                print(Fore.RED + locales.get("command_error"))
-                if stderr:
-                    self.logger.error(f"STDERR: {stderr}")
-                    print(Fore.RED + stderr)
-
+            # Пробуем выполнить команду с автоматическими попытками переподключения
+            if 'adb' in command:
+                connection_success = self._retry_adb_connection(command)
+                if not connection_success:
+                    return
+    
+            else:
+                args = shlex.split(command)
+                if not args:
+                    return
+    
+                self.logger.debug(f"Выполняется команда: {' '.join(args)}")
+                
+                process = Popen(
+                    args,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True,
+                    bufsize=1
+                )
+                
+                return_code, stdout, stderr = self._process_command_output(process)
+                
+                if return_code != 0:
+                    self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
+                    print(Fore.RED + locales.get("command_error"))
+                    if stderr:
+                        self.logger.error(f"STDERR: {stderr}")
+                        print(Fore.RED + stderr)
+    
         except FileNotFoundError as e:
             error_msg = f"Команда не найдена: {e}"
             self.logger.error(error_msg)
