@@ -112,13 +112,6 @@ class AndroidTVTimeFixer:
             'kz': 'kz.pool.ntp.org'
         }
         self.custom_ntp_servers = [
-            'ntp0.ntp-servers.net',
-            'ntp1.ntp-servers.net',
-            'ntp2.ntp-servers.net',
-            'ntp3.ntp-servers.net',
-            'ntp4.ntp-servers.net',
-            'ntp5.ntp-servers.net',
-            'ntp6.ntp-servers.net',
             'time.windows.com',
             'twc.trafficmanager.net',
             '0.europe.pool.ntp.org',

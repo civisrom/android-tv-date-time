@@ -702,7 +702,7 @@ arising from the use of this program.
                 ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx"
             ),
             "enter_country_code": Translation(
-                en="Enter your country code (e.g. ru for Russia, uk for United Kingdom, see country codes menu, q to exit): ",
+                en="Enter your country code (e.g. us for USA, uk for United Kingdom, see country codes menu, q to exit): ",
                 ru="Введите код вашей страны (например, ru для России, by для Беларуси, смотри в меню коды стран, для возврата q): "
             ),
             "time_settings_updated": Translation(
