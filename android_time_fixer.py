@@ -205,19 +205,33 @@ class AndroidTVTimeFixer:
         """
         stdout_lines = []
         try:
-            sys.stdout.reconfigure(encoding='utf-8')
-
             while True:
                 output = process.stdout.readline()
                 if output == '' and process.poll() is not None:
                     break
                 if output:
-                    clean_output = output.strip()
+                    # Декодируем вывод в правильной кодировке
+                    try:
+                        if platform.system() == 'Windows':
+                            clean_output = output.encode('cp1251').decode('cp866')
+                        else:
+                            clean_output = output.strip()
+                    except UnicodeError:
+                        clean_output = output.strip()
+                    
                     stdout_lines.append(clean_output)
                     print(Fore.GREEN + clean_output)
 
             return_code = process.poll()
             _, stderr = process.communicate(timeout=5)
+            
+            # Декодируем stderr в правильной кодировке
+            if stderr and platform.system() == 'Windows':
+                try:
+                    stderr = stderr.encode('cp1251').decode('cp866')
+                except UnicodeError:
+                    pass
+                    
             return return_code, '\n'.join(stdout_lines), stderr
 
         except TimeoutError:
@@ -226,16 +240,15 @@ class AndroidTVTimeFixer:
 
     def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
         """
-        Пытается переподключиться к устройству несколько раз.
-        Если устройство не авторизовано, пытается перезапустить сервер ADB и запрашивает авторизацию.
+        Пытается переподключиться к устройству несколько раз
         
         Args:
-            command (str): Выполняемая команда.
-            max_retries (int): Максимальное количество попыток.
-            delay (int): Задержка между попытками в секундах.
-        
+            command (str): Выполняемая команда
+            max_retries (int): Максимальное количество попыток
+            delay (int): Задержка между попытками в секундах
+            
         Returns:
-            bool: True если подключение успешно, False в противном случае.
+            bool: True если подключение успешно, False в противном случае
         """
         import time
         
@@ -255,90 +268,46 @@ class AndroidTVTimeFixer:
                     universal_newlines=True,
                     bufsize=1
                 )
-    
+                
                 return_code, stdout, stderr = self._process_command_output(process)
-    
+                
+                # Проверяем наличие ошибок подключения
                 connection_errors = [
                     "error: no devices/emulators found",
                     "error: device not found",
                     "error: device offline",
                     "error: device unauthorized"
                 ]
-    
+                
                 if return_code == 0:
-                    self.logger.info("Устройство успешно подключено.")
                     return True
-    
+                    
                 if any(error in stderr.lower() for error in connection_errors):
-                    self.logger.warning(f"Попытка {attempt + 1} не удалась: {stderr.strip()}")
-                    
-                    # Если ошибка связана с авторизацией, пробуем перезапустить сервер ADB
-                    if "unauthorized" in stderr.lower():
-                        print(Fore.YELLOW + "Устройство не авторизовано. Перезапуск ADB и повторный запрос авторизации...")
-                        self._restart_adb_server()
-                    
                     if attempt < max_retries - 1:
-                        self.logger.info(f"Повторная попытка подключения через {delay} секунд...")
-                        print(Fore.YELLOW + f"Повторная попытка подключения через {delay} секунд...")
+                        self.logger.warning(f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
+                        print(Fore.YELLOW + f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
                         time.sleep(delay)
                         continue
                     else:
-                        self.logger.error("Все попытки подключения не удались.")
-                        print(Fore.RED + "Все попытки подключения не удались.")
+                        self.logger.error("Все попытки подключения не удались")
+                        print(Fore.RED + "Все попытки подключения не удались")
                         return False
                 else:
+                    # Если ошибка не связана с подключением, прекращаем попытки
                     if stderr:
-                        self.logger.error(f"Неизвестная ошибка: {stderr}")
+                        self.logger.error(f"STDERR: {stderr}")
                         print(Fore.RED + stderr)
                     return False
-    
+                    
             except Exception as e:
                 self.logger.error(f"Ошибка при попытке подключения: {str(e)}", exc_info=True)
                 if attempt < max_retries - 1:
                     time.sleep(delay)
                     continue
                 return False
-    
+                
         return False
     
-    def _restart_adb_server(self) -> None:
-        """
-        Перезапускает сервер ADB для устранения возможных проблем с авторизацией.
-        """
-        try:
-            self.logger.info("Перезапуск сервера ADB...")
-            print(Fore.YELLOW + "Перезапуск сервера ADB...")
-            
-            # Останавливаем сервер
-            disconnect_process = Popen(
-                [self.get_adb_path(), "disconnect"],
-                stdout=PIPE, stderr=PIPE,
-                universal_newlines=True
-            )
-            _, _, _ = self._process_command_output(disconnect_process)
-            
-            # Перезапускаем сервер
-            kill_process = Popen(
-                [self.get_adb_path(), "kill-server"],
-                stdout=PIPE, stderr=PIPE,
-                universal_newlines=True
-            )
-            _, _, _ = self._process_command_output(kill_process)
-            
-            start_process = Popen(
-                [self.get_adb_path(), "start-server"],
-                stdout=PIPE, stderr=PIPE,
-                universal_newlines=True
-            )
-            _, _, _ = self._process_command_output(start_process)
-            
-            self.logger.info("Сервер ADB успешно перезапущен.")
-            print(Fore.GREEN + "Сервер ADB успешно перезапущен.")
-    
-        except Exception as e:
-            self.logger.error(f"Ошибка при перезапуске сервера ADB: {str(e)}", exc_info=True)
-            print(Fore.RED + f"Ошибка при перезапуске сервера ADB: {str(e)}")
-
     def execute_terminal_command(self, command: str) -> None:
         """
         Выполняет команду в терминале и выводит результат
@@ -350,9 +319,6 @@ class AndroidTVTimeFixer:
             return
     
         try:
-            if platform.system() == 'Windows':
-                os.system('chcp 65001')
-
             # Пробуем выполнить команду с автоматическими попытками переподключения
             if 'adb' in command:
                 connection_success = self._retry_adb_connection(command)
@@ -366,13 +332,18 @@ class AndroidTVTimeFixer:
     
                 self.logger.debug(f"Выполняется команда: {' '.join(args)}")
                 
+                # Настраиваем кодировку для процесса
+                env = os.environ.copy()
+                if platform.system() == 'Windows':
+                    env['PYTHONIOENCODING'] = 'cp866'
+                
                 process = Popen(
                     args,
                     stdout=PIPE,
                     stderr=PIPE,
                     universal_newlines=True,
                     bufsize=1,
-                    encoding='utf-8'
+                    env=env
                 )
                 
                 return_code, stdout, stderr = self._process_command_output(process)
@@ -935,7 +906,6 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_4"))
             print(Fore.YELLOW + locales.get("menu_item_5"))
             print(Fore.YELLOW + locales.get("menu_item_6"))
-            #print(Fore.YELLOW + locales.get("menu_item_7"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
@@ -998,22 +968,15 @@ def main():
             elif choice == '6':
                 fixer.manage_servers()
                 
-            elif choice == '7':
-                print(Fore.YELLOW + "\n" + locales.get('menu_item_7'))
-                devices = list_devices()
-                if devices:
-                    selected_device = select_device(devices)
-                    if selected_device:
-                        connect_to_device(selected_device)
                     
-            elif choice == '8':
+            elif choice == '7':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 		    
-            elif choice == '9':
+            elif choice == '8':
                 fixer.terminal_mode()
 		    
-            elif choice == '10':
+            elif choice == '9':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             

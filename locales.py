@@ -350,8 +350,8 @@ arising from the use of this program.
                 ru="Неверный выбор"
             ),
             "menu_item_9": Translation(
-                 en="9. Terminal mode (ADB and system commands)",
-                 ru="9. Режим терминала (команды ADB и системные)"
+                 en="8. Terminal mode (ADB and system commands)",
+                 ru="8. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
                  en="Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
@@ -681,17 +681,13 @@ arising from the use of this program.
                 en="6. Server management",
                 ru="6. Управление серверами"
             ),
-            "menu_item_7": Translation(
-                en="7. Connect to device via USB",
-                ru="7. Подключиться к устройству через USB"
-            ),
             "menu_item_8": Translation(
-                en="8. Country codes explanation (can be copied to clipboard)",
-                ru="8. Расшифровка кодов стран (можно копировать в буфер обмена)"
+                en="7. Country codes explanation (can be copied to clipboard)",
+                ru="7. Расшифровка кодов стран (можно копировать в буфер обмена)"
             ),
             "menu_item_10": Translation(
-                en="10. Exit",
-                ru="10. Выход"
+                en="9. Exit",
+                ru="9. Выход"
             ),
             "menu_prompt": Translation(
                 en="Enter menu option number:",
