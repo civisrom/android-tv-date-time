@@ -382,7 +382,7 @@ class AndroidTVTimeFixer:
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
-     def terminal_mode(self) -> None:
+    def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
         self.logger.info("Запущен режим терминала")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
