@@ -53,6 +53,8 @@ class AndroidTVTimeFixer:
     def __init__(self):
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
+        self._setup_logging()
+        self._adb_path: Optional[str] = None
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -138,26 +140,86 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def get_adb_path(self):
-        """Получает путь к ADB из runtime hook или ресурсов"""
+    def _setup_logging(self) -> None:
+        """Настраивает логирование для класса"""
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('android_tv_fixer.log'),
+                logging.StreamHandler()
+            ]
+        )
+        self.logger = logging.getLogger(__name__)
+
+    def get_adb_path(self) -> str:
+        """
+        Получает путь к ADB из runtime hook или ресурсов
+        
+        Returns:
+            str: Полный путь к исполняемому файлу ADB
+            
+        Raises:
+            FileNotFoundError: Если файл ADB не найден
+        """
+        if self._adb_path:
+            return self._adb_path
+
         try:
-            from hooks.win_hook import ADB_PATH
-            return ADB_PATH
-        except ImportError:
+            # Пытаемся импортировать из hook'ов
             try:
-                from hooks.linux_hook import ADB_PATH
-                return ADB_PATH
+                from hooks.win_hook import ADB_PATH
+                self._adb_path = ADB_PATH
             except ImportError:
-                # Fallback для разработки
-                if getattr(sys, 'frozen', False):
-                    base_path = sys._MEIPASS
-                else:
-                    base_path = os.path.abspath(os.path.dirname(__file__))
-                
-                if sys.platform == 'win32':
-                    return os.path.join(base_path, 'resources', 'adb.exe')
-                else:
-                    return os.path.join(base_path, 'resources', 'adb')
+                from hooks.linux_hook import ADB_PATH
+                self._adb_path = ADB_PATH
+        except ImportError:
+            # Fallback для разработки
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.abspath(os.path.dirname(__file__))
+            
+            self._adb_path = os.path.join(
+                base_path, 
+                'resources', 
+                'adb.exe' if sys.platform == 'win32' else 'adb'
+            )
+
+        if not os.path.exists(self._adb_path):
+            raise FileNotFoundError(f"ADB не найден по пути: {self._adb_path}")
+
+        self.logger.info(f"Используется ADB по пути: {self._adb_path}")
+        return self._adb_path
+
+    def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
+        """
+        Обрабатывает вывод команды и возвращает результат
+        
+        Args:
+            process (Popen): Процесс для обработки
+            
+        Returns:
+            Tuple[int, str, str]: (код возврата, stdout, stderr)
+        """
+        stdout_lines = []
+        try:
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    clean_output = output.strip()
+                    stdout_lines.append(clean_output)
+                    print(Fore.GREEN + clean_output)
+
+            return_code = process.poll()
+            _, stderr = process.communicate(timeout=5)
+            return return_code, '\n'.join(stdout_lines), stderr
+
+        except TimeoutError:
+            process.kill()
+            raise TimeoutError("Превышено время ожидания выполнения команды")
 
     def execute_terminal_command(self, command: str) -> None:
         """
@@ -166,47 +228,63 @@ class AndroidTVTimeFixer:
         Args:
             command (str): Команда для выполнения
         """
+        if not command:
+            return
+
         try:
-            # Если команда начинается с 'adb', используем полный путь к ADB
             args = shlex.split(command)
+            if not args:
+                return
+
+            # Если команда начинается с 'adb', используем полный путь к ADB
             if args[0] == 'adb':
                 args[0] = self.get_adb_path()
+
+            self.logger.debug(f"Выполняется команда: {' '.join(args)}")
             
-            # Создаем процесс с перенаправлением stdout и stderr
-            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            process = Popen(
+                args,
+                stdout=PIPE,
+                stderr=PIPE,
+                universal_newlines=True,
+                bufsize=1
+            )
             
-            # Получаем вывод команды в реальном времени
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    print(Fore.GREEN + output.strip())
-            
-            # Получаем код возврата и stderr
-            return_code = process.poll()
-            _, stderr = process.communicate()
+            return_code, stdout, stderr = self._process_command_output(process)
             
             if return_code != 0:
+                self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
                 print(Fore.RED + locales.get("command_error"))
                 if stderr:
+                    self.logger.error(f"STDERR: {stderr}")
                     print(Fore.RED + stderr)
-            
-        except Exception as e:
-            print(Fore.RED + locales.get("command_execution_error", error=str(e)))
 
-    def terminal_mode(self):
+        except FileNotFoundError as e:
+            error_msg = f"Команда не найдена: {e}"
+            self.logger.error(error_msg)
+            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+        except TimeoutError as e:
+            error_msg = f"Таймаут выполнения команды: {e}"
+            self.logger.error(error_msg)
+            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+        except Exception as e:
+            error_msg = f"Ошибка выполнения команды: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+
+    def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
+        self.logger.info("Запущен режим терминала")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
         
         while True:
             try:
-                # Показываем приглашение командной строки
                 command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
                 
                 # Проверяем специальные команды
                 if command.lower() in ['exit', 'quit', 'q']:
+                    self.logger.info("Выход из режима терминала")
                     break
                 elif command.lower() in ['help', '?']:
                     print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -221,9 +299,11 @@ class AndroidTVTimeFixer:
                 self.execute_terminal_command(command)
                 
             except KeyboardInterrupt:
+                self.logger.info("Прерывание работы терминала (Ctrl+C)")
                 print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                 break
             except Exception as e:
+                self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
 	
     def ping_ntp_servers(self, timeout=2, count=3):
