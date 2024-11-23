@@ -15,7 +15,7 @@ env:
   CI_DEBUG: true
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
-  ADB_VERSION: '34.0.5'
+  ADB_VERSION: '35.0.2'
 
 jobs:
   setup-and-build:
