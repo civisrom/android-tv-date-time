@@ -45,12 +45,212 @@ for handler in logging.getLogger().handlers:
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger = logging.getLogger(__name__)
 
+class TerminalHandler:
+    """Handles terminal operations and command execution"""
+    def __init__(self, device_manager):
+        self.device_manager = device_manager
+        self.system = platform.system()
+        self.encoding = locale.getpreferredencoding()
+        self.command_history = []
+        self.max_history = 100
+        self.special_commands = {
+            'exit': self._handle_exit,
+            'quit': self._handle_exit,
+            'q': self._handle_exit,
+            'help': self._handle_help,
+            '?': self._handle_help,
+            'clear': self._handle_clear,
+            'history': self._handle_history,
+            'locale': self._handle_locale,
+            'adb devices': self._handle_adb_devices,
+            'adb connect': self._handle_adb_connect
+        }
+
+    async def _handle_exit(self, _: str) -> None:
+        """Handles exit command"""
+        print(self._format_output(self.device_manager.get_locale("terminal_mode_exit"), Fore.YELLOW))
+        sys.exit(0)
+
+    async def _handle_help(self, _: str) -> None:
+        """Handles help command"""
+        help_text = self.device_manager.get_locale("terminal_mode_help")
+        commands_help = self.device_manager.get_locale("terminal_mode_commands")
+        print(self._format_output(f"{help_text}\n\n{commands_help}", Fore.YELLOW))
+
+    async def _handle_clear(self, _: str) -> None:
+        """Handles clear screen command"""
+        os.system('cls' if self.system == 'Windows' else 'clear')
+
+    async def _handle_history(self, _: str) -> None:
+        """Handles command history display"""
+        for i, cmd in enumerate(self.command_history, 1):
+            print(self._format_output(f"{i}: {cmd}", Fore.CYAN))
+
+    async def _handle_locale(self, _: str) -> None:
+        """Handles locale display"""
+        print(self._format_output(
+            self.device_manager.get_locale("current_locale", locale=self.device_manager.current_locale),
+            Fore.CYAN
+        ))
+
+    async def _handle_adb_devices(self, _: str) -> None:
+        """Handles ADB devices command"""
+        returncode, stdout, stderr = await self.execute_command_async('adb devices -l')
+        if stdout:
+            devices = self._parse_adb_devices(stdout)
+            if devices:
+                for device in devices:
+                    print(self._format_output(
+                        self.device_manager.get_locale("device_info",
+                            id=device['id'],
+                            model=device.get('model', 'Unknown'),
+                            status=device['status']
+                        ),
+                        Fore.CYAN
+                    ))
+            else:
+                print(self._format_output(
+                    self.device_manager.get_locale("no_devices_found"),
+                    Fore.YELLOW
+                ))
+
+    async def _handle_adb_connect(self, command: str) -> None:
+        """Handles ADB connect command"""
+        args = command.split()
+        if len(args) != 3:
+            print(self._format_output(
+                self.device_manager.get_locale("invalid_adb_connect"),
+                Fore.RED
+            ))
+            return
+        
+        ip_address = args[2]
+        returncode, stdout, stderr = await self.execute_command_async(f'adb connect {ip_address}')
+        if 'connected' in stdout.lower():
+            print(self._format_output(
+                self.device_manager.get_locale("device_connected", ip=ip_address),
+                Fore.GREEN
+            ))
+        else:
+            print(self._format_output(
+                self.device_manager.get_locale("device_connection_failed", ip=ip_address),
+                Fore.RED
+            ))
+
+    def _format_output(self, text: str, color: str = Fore.GREEN) -> str:
+        """Formats output with color"""
+        return f"{color}{text}{Style.RESET_ALL}"
+
+    async def execute_command_async(self, command: str) -> Tuple[int, str, str]:
+        """Executes command asynchronously"""
+        try:
+            args = self._prepare_command(command)
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            return (
+                process.returncode,
+                stdout.decode(self.encoding, errors='replace'),
+                stderr.decode(self.encoding, errors='replace')
+            )
+        except Exception as e:
+            return (1, '', str(e))
+
+    def _prepare_command(self, command: str) -> List[str]:
+        """Prepares command for execution"""
+        args = shlex.split(command, posix=self.system != 'Windows')
+        if args and args[0] == 'adb':
+            args[0] = self.device_manager.get_adb_path()
+        return args
+
+    def _parse_adb_devices(self, output: str) -> List[dict]:
+        """Parses ADB devices output"""
+        devices = []
+        lines = output.strip().split('\n')[1:]  # Skip header
+        for line in lines:
+            if line.strip():
+                parts = line.split()
+                device = {'id': parts[0], 'status': parts[1]}
+                if len(parts) > 2:
+                    for part in parts[2:]:
+                        if '=' in part:
+                            key, value = part.split('=')
+                            device[key] = value
+                devices.append(device)
+        return devices
+
+    def _add_to_history(self, command: str) -> None:
+        """Adds command to history"""
+        if command and (not self.command_history or command != self.command_history[-1]):
+            self.command_history.append(command)
+            if len(self.command_history) > self.max_history:
+                self.command_history.pop(0)
+
+    async def execute_terminal_command(self, command: str) -> None:
+        """Executes terminal command"""
+        try:
+            self._add_to_history(command)
+            
+            # Check special commands
+            cmd_lower = command.lower()
+            if cmd_lower in self.special_commands:
+                await self.special_commands[cmd_lower](command)
+                return
+                
+            returncode, stdout, stderr = await self.execute_command_async(command)
+            
+            if stdout:
+                print(self._format_output(stdout))
+            if stderr:
+                print(self._format_output(stderr, Fore.RED))
+            if returncode != 0:
+                print(self._format_output(
+                    self.device_manager.get_locale("command_error", code=returncode),
+                    Fore.RED
+                ))
+                
+        except Exception as e:
+            print(self._format_output(
+                self.device_manager.get_locale("command_execution_error", error=str(e)),
+                Fore.RED
+            ))
+
+    async def terminal_mode(self):
+        """Starts terminal mode"""
+        await self.terminal_handler.terminal_mode()
+        """Interactive terminal mode"""
+        print(self._format_output(self.device_manager.get_locale("terminal_mode_welcome"), Fore.GREEN))
+        print(self._format_output(self.device_manager.get_locale("terminal_mode_help"), Fore.YELLOW))
+        
+        while True:
+            try:
+                command = input(self._format_output("terminal> ", Fore.CYAN)).strip()
+                if command:
+                    await self.execute_terminal_command(command)
+                    
+            except KeyboardInterrupt:
+                print("\n" + self._format_output(
+                    self.device_manager.get_locale("terminal_mode_exit_ctrl_c"),
+                    Fore.YELLOW
+                ))
+                break
+            except Exception as e:
+                print(self._format_output(
+                    self.device_manager.get_locale("terminal_mode_error", error=str(e)),
+                    Fore.RED
+                ))
+
 class AndroidTVTimeFixerError(Exception):
     """Базовый класс исключений для AndroidTVTimeFixer"""
     pass
 
 class AndroidTVTimeFixer:
     def __init__(self):
+        self.terminal_handler = TerminalHandler(self)
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self.device = None
@@ -138,94 +338,6 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def get_adb_path(self):
-        """Получает путь к ADB из runtime hook или ресурсов"""
-        try:
-            from hooks.win_hook import ADB_PATH
-            return ADB_PATH
-        except ImportError:
-            try:
-                from hooks.linux_hook import ADB_PATH
-                return ADB_PATH
-            except ImportError:
-                # Fallback для разработки
-                if getattr(sys, 'frozen', False):
-                    base_path = sys._MEIPASS
-                else:
-                    base_path = os.path.abspath(os.path.dirname(__file__))
-                
-                if sys.platform == 'win32':
-                    return os.path.join(base_path, 'resources', 'adb.exe')
-                else:
-                    return os.path.join(base_path, 'resources', 'adb')
-
-    def execute_terminal_command(self, command: str) -> None:
-        """
-        Выполняет команду в терминале и выводит результат
-        
-        Args:
-            command (str): Команда для выполнения
-        """
-        try:
-            # Если команда начинается с 'adb', используем полный путь к ADB
-            args = shlex.split(command)
-            if args[0] == 'adb':
-                args[0] = self.get_adb_path()
-            
-            # Создаем процесс с перенаправлением stdout и stderr
-            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            
-            # Получаем вывод команды в реальном времени
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    print(Fore.GREEN + output.strip())
-            
-            # Получаем код возврата и stderr
-            return_code = process.poll()
-            _, stderr = process.communicate()
-            
-            if return_code != 0:
-                print(Fore.RED + locales.get("command_error"))
-                if stderr:
-                    print(Fore.RED + stderr)
-            
-        except Exception as e:
-            print(Fore.RED + locales.get("command_execution_error", error=str(e)))
-
-    def terminal_mode(self):
-        """Режим терминала для выполнения команд"""
-        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
-        print(Fore.YELLOW + locales.get("terminal_mode_help"))
-        
-        while True:
-            try:
-                # Показываем приглашение командной строки
-                command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
-                
-                # Проверяем специальные команды
-                if command.lower() in ['exit', 'quit', 'q']:
-                    break
-                elif command.lower() in ['help', '?']:
-                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
-                    continue
-                elif command.lower() == 'clear':
-                    os.system('cls' if platform.system() == 'Windows' else 'clear')
-                    continue
-                elif not command:
-                    continue
-                
-                # Выполняем команду
-                self.execute_terminal_command(command)
-                
-            except KeyboardInterrupt:
-                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-                break
-            except Exception as e:
-                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
-	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
