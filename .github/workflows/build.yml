@@ -56,6 +56,18 @@ jobs:
           sudo apt-get install -y zip unzip
         shell: bash
 
+      - name: Install readline (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pip install gnureadline
+        shell: bash
+
+      - name: Install readline (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pip install pyreadline3
+        shell: bash
+
       - name: Setup Poetry
         uses: snok/install-poetry@v1
         with:
