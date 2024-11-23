@@ -360,10 +360,10 @@ arising from the use of this program.
             "terminal_mode_help": Translation(
                  en="\nYou can execute any ADB or system commands."
                  "\nBefore running commands in the terminal, you must connect to the device adb connect <ip>:<port>"
-                 "\nAvoid Cyrillic and spaces in file paths or use quotes <"C:\Users\Desktop\file.apk">",
+                 "\nAvoid Cyrillic and spaces in file paths or use quotes",
                  ru="\nВы можете выполнять любые команды ADB или системные команды."
                  "\nПрежде чем выполнять команды в терминале необходимо подключиться к устройству adb connect <ip>:<port>"
-                 "\nИзбегайте кириллицы и пробелов в путях к файлам или используйте кавычки <"C:\Users\Desktop\file.apk">"
+                 "\nИзбегайте кириллицы и пробелов в путях к файлам или используйте кавычки"
             ),
             "terminal_mode_commands": Translation(
                  en="""Available commands:
