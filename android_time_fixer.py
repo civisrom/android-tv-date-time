@@ -386,7 +386,7 @@ class AndroidTVTimeFixer:
                 ))
 
 if __name__ == "__main__":
-    terminal = TerminalHandler()
+    terminal = AndroidTVTimeFixer()
     asyncio.run(terminal.terminal_mode())
 	
     def ping_ntp_servers(self, timeout=2, count=3):
