@@ -362,9 +362,7 @@ arising from the use of this program.
                  ru="Вы можете выполнять любые команды ADB или системные команды."
             ),
             "terminal_mode_commands": Translation(
-                 en="""Before executing commands in the terminal, you need to connect to the device adb connect <ip>:<port>
-                      Avoid Cyrillic and spaces in file paths or use quotes ("C:\Users\Desktop\file.apk").
-                      Available commands:
+                 en="""Available commands:
                     - Any ADB command (e.g., 'adb devices', 'adb shell')
                     - System commands
                     - 'help' or '?' - Show this help
@@ -499,8 +497,7 @@ arising from the use of this program.
                 adb unroot
                     Restart ADB in non-root mode.
 """,
-                 ru="""Доступные команды: Прежде чем выполнять команды в терминале необходимо подключиться к устройству adb connect <ip>:<port>
-				      Избегайте кириллицы и пробелов в путях к файлам или используйте кавычки ("C:\Users\Desktop\file.apk")
+                 ru="""Доступные команды:
                     - Любые команды ADB (например, 'adb devices', 'adb shell')
                     - Системные команды
                     - 'help' или '?' - Показать эту справку
@@ -634,7 +631,6 @@ arising from the use of this program.
                     adb unroot
                         Перезапустить ADB в обычном режиме."""
             ),
-            
             "terminal_mode_exit_ctrl_c": Translation(
                  en="Terminal mode deactivated.",
                  ru="Режим терминала деактивирован."
