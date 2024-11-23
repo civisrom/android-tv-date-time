@@ -358,12 +358,12 @@ arising from the use of this program.
                  ru="Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
             ),
             "terminal_mode_help": Translation(
-                 en="You can execute any ADB or system commands.\n"
-                 "Before running commands in the terminal, you must connect to the device adb connect <ip>:<port>\n"
-                 "Avoid Cyrillic and spaces in file paths or use quotes ("C:\Users\Desktop\file.apk")\n",
-                 ru="Вы можете выполнять любые команды ADB или системные команды.\n"
-                 "Прежде чем выполнять команды в терминале необходимо подключиться к устройству adb connect <ip>:<port>\n"
-                 "Избегайте кириллицы и пробелов в путях к файлам или используйте кавычки ("C:\Users\Desktop\file.apk")\n"
+                 en="\nYou can execute any ADB or system commands."
+                 "\nBefore running commands in the terminal, you must connect to the device adb connect <ip>:<port>"
+                 "\nAvoid Cyrillic and spaces in file paths or use quotes ("C:\Users\Desktop\file.apk")",
+                 ru="\nВы можете выполнять любые команды ADB или системные команды."
+                 "\nПрежде чем выполнять команды в терминале необходимо подключиться к устройству adb connect <ip>:<port>"
+                 "\nИзбегайте кириллицы и пробелов в путях к файлам или используйте кавычки ("C:\Users\Desktop\file.apk")"
             ),
             "terminal_mode_commands": Translation(
                  en="""Available commands:
