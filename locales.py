@@ -353,98 +353,21 @@ arising from the use of this program.
                  en="9. Terminal mode (ADB and system commands)",
                  ru="9. Режим терминала (команды ADB и системные)"
             ),
-            "terminal_mode_welcome": Translation(
-                en="Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
-                ru="Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
-            ),
-            
-            "terminal_mode_help": Translation(
-                en="You can execute any ADB or system commands.",
-                ru="Вы можете выполнять любые команды ADB или системные команды."
-            ),
-            
-            "terminal_mode_commands": Translation(
-                en="""Available commands:
-            • help, ? - Show this help
-            • exit, quit, q - Exit terminal mode
-            • clear - Clear screen
-            • history - Show command history
-            • locale - Show current locale
-            • adb devices - List connected devices
-            • adb connect <ip> - Connect to device by IP""",
-                ru="""Доступные команды:
-            • help, ? - Показать эту справку
-            • exit, quit, q - Выйти из режима терминала
-            • clear - Очистить экран
-            • history - Показать историю команд
-            • locale - Показать текущую локаль
-            • adb devices - Список подключенных устройств
-            • adb connect <ip> - Подключиться к устройству по IP"""
-            ),
-            
-            "terminal_mode_exit": Translation(
-                en="Exiting terminal mode...",
-                ru="Выход из режима терминала..."
-            ),
-            
-            "terminal_mode_exit_ctrl_c": Translation(
-                en="Terminal mode interrupted. Exiting...",
-                ru="Режим терминала прерван. Выход..."
-            ),
-            
-            "terminal_mode_error": Translation(
-                en="Error in terminal mode: {error}",
-                ru="Ошибка в режиме терминала: {error}"
-            ),
-            
-            "command_error": Translation(
-                en="Command failed with code {code}",
-                ru="Команда завершилась с ошибкой, код {code}"
-            ),
-            
-            "command_execution_error": Translation(
-                en="Error executing command: {error}",
-                ru="Ошибка выполнения команды: {error}"
-            ),
-            
-            "current_locale": Translation(
-                en="Current locale: {locale}",
-                ru="Текущая локаль: {locale}"
-            ),
-            
-            "device_info": Translation(
-                en="Device ID: {id}\nModel: {model}\nStatus: {status}",
-                ru="ID устройства: {id}\nМодель: {model}\nСтатус: {status}"
-            ),
-            
-            "no_devices_found": Translation(
-                en="No devices found",
-                ru="Устройства не найдены"
-            ),
-            
-            "invalid_adb_connect": Translation(
-                en="Invalid adb connect command. Usage: adb connect <ip>",
-                ru="Неверная команда adb connect. Использование: adb connect <ip>"
-            ),
-            
-            "device_connected": Translation(
-                en="Successfully connected to device at {ip}",
-                ru="Успешное подключение к устройству по адресу {ip}"
-            ),
-            
-            "device_connection_failed": Translation(
-                en="Failed to connect to device at {ip}",
-                ru="Не удалось подключиться к устройству по адресу {ip}"
-            ),
-            
             "command_not_found": Translation(
-                en="Command not found: {command}",
-                ru="Команда не найдена: {command}"
+                en="Command not found. Please check if the command exists and is spelled correctly.",
+                ru="Команда не найдена. Проверьте существование команды и правильность написания."
             ),
-            
-            "history_empty": Translation(
-                en="Command history is empty",
-                ru="История команд пуста"
+            "permission_denied": Translation(
+                en="Permission denied. Try running with appropriate privileges.",
+                ru="Отказано в доступе. Попробуйте запустить с необходимыми привилегиями."
+            ),
+            "directory_change_error": Translation(
+                en="Error changing directory: {error}",
+                ru="Ошибка при смене директории: {error}"
+            ),
+            "terminal_mode_commands": Translation(
+                en="Available commands:\n- Any system command (Windows/Linux)\n- Any ADB command\n- clear: Clear screen\n- pwd: Show current directory\n- cd: Change directory\n- help: Show this help\n- exit/quit/q: Exit terminal mode",
+                ru="Доступные команды:\n- Любые системные команды (Windows/Linux)\n- Любые команды ADB\n- clear: Очистить экран\n- pwd: Показать текущую директорию\n- cd: Сменить директорию\n- help: Показать эту справку\n- exit/quit/q: Выйти из режима терминала"
             ),
                 
             # Main menu items
