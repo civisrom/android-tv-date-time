@@ -199,7 +199,7 @@ class AndroidTVTimeFixer:
         
         Args:
             process (Popen): Процесс для обработки
-        
+            
         Returns:
             Tuple[int, str, str]: (код возврата, stdout, stderr)
         """
@@ -220,17 +220,14 @@ class AndroidTVTimeFixer:
                             pass
                     stdout_lines.append(clean_output)
                     print(Fore.GREEN + clean_output)
-    
+
             return_code = process.poll()
             _, stderr = process.communicate(timeout=5)
             return return_code, '\n'.join(stdout_lines), stderr
-    
+
         except TimeoutError:
             process.kill()
             raise TimeoutError("Превышено время ожидания выполнения команды")
-        finally:
-            if process.poll() is None:
-                process.terminate()
 
     def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
         """
@@ -312,19 +309,19 @@ class AndroidTVTimeFixer:
         """
         if not command:
             return
-     
+    
         try:
             # Пробуем выполнить команду с автоматическими попытками переподключения
             if 'adb' in command:
                 connection_success = self._retry_adb_connection(command)
                 if not connection_success:
                     return
-     
+    
             else:
                 args = shlex.split(command)
                 if not args:
                     return
-     
+    
                 self.logger.debug(f"Выполняется команда: {' '.join(args)}")
                 
                 process = Popen(
@@ -344,7 +341,7 @@ class AndroidTVTimeFixer:
                     if stderr:
                         self.logger.error(f"STDERR: {stderr}")
                         print(Fore.RED + stderr)
-     
+    
         except FileNotFoundError as e:
             error_msg = f"Команда не найдена: {e}"
             self.logger.error(error_msg)
@@ -357,13 +354,10 @@ class AndroidTVTimeFixer:
             error_msg = f"Ошибка выполнения команды: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
-        finally:
-            if process.poll() is None:  # Если процесс не завершился, принудительно завершаем
-                process.terminate()  # Закрываем процесс adb
 
     def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
-                # Установка кодировки для Windows
+        # Установка кодировки для Windows
         if sys.platform == 'win32':
             os.system('chcp 866')
             
@@ -967,13 +961,21 @@ def main():
                 fixer.manage_servers()
                 
             elif choice == '7':
+                print(Fore.YELLOW + "\n" + locales.get('menu_item_7'))
+                devices = list_devices()
+                if devices:
+                    selected_device = select_device(devices)
+                    if selected_device:
+                        connect_to_device(selected_device)
+                    
+            elif choice == '8':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 		    
-            elif choice == '8':
+            elif choice == '9':
                 fixer.terminal_mode()
 		    
-            elif choice == '9':
+            elif choice == '10':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             
