@@ -362,19 +362,276 @@ arising from the use of this program.
                  ru="Вы можете выполнять любые команды ADB или системные команды."
             ),
             "terminal_mode_commands": Translation(
-                 en="""Available commands:
-        - Any ADB command (e.g., 'adb devices', 'adb shell')
-        - System commands
-        - 'help' or '?' - Show this help
-        - 'clear' - Clear screen
-        - 'exit', 'quit', or 'q' - Exit terminal mode""",
-                 ru="""Доступные команды:
-        - Любые команды ADB (например, 'adb devices', 'adb shell')
-        - Системные команды
-        - 'help' или '?' - Показать эту справку
-        - 'clear' - Очистить экран
-        - 'exit', 'quit' или 'q' - Выйти из режима терминала"""
+                en="""Available commands:
+                    - Any ADB command (e.g., 'adb devices', 'adb shell')
+                    - System commands
+                    - 'help' or '?' - Show this help
+                    - 'clear' - Clear screen
+                    - 'exit', 'quit', or 'q' - Exit terminal mode
+            
+            Basic commands:
+            Connecting to a device:
+                adb devices
+                    Show connected devices.
+                adb connect <ip>:<port>
+                    Connect to a device over Wi-Fi.
+                adb disconnect [<ip>:<port>]
+                    Disconnect from a device (default: all).
+            
+            Device state information:
+                adb get-state
+                    Show device state: device, offline, or unauthorized.
+                adb get-serialno
+                    Get the device's serial number.
+                adb get-devpath
+                    Get the device's system path.
+            
+            Working with apps:
+            Installing and uninstalling apps:
+                adb install <APK path>
+                    Install APK on the device.
+                adb install-multiple <file paths>
+                    Install split APKs.
+                adb uninstall <package name>
+                    Uninstall an app.
+                adb shell pm uninstall --user <user_id> <package_name>
+                    Uninstall an app for a specific user.
+            
+            List installed apps:
+                adb shell pm list packages
+                    Show all installed packages.
+                adb shell pm list packages -s
+                    System apps only.
+                adb shell pm list packages -3
+                    Third-party apps only.
+            
+            App management:
+                adb shell pm enable <package_name>
+                    Enable an app.
+                adb shell pm disable <package_name>
+                    Disable an app.
+                adb shell am start -n <package_name>/<activity_name>
+                    Start a specific app activity.
+                adb shell am force-stop <package_name>
+                    Force stop an app.
+                adb shell am broadcast -a <action>
+                    Send a broadcast intent.
+            
+            File operations:
+            File transfer:
+                adb push <local path> <device path>
+                    Copy a file to the device.
+                adb pull <device path> [local path]
+                    Copy a file from the device.
+            
+            File system management:
+                adb shell ls <path>
+                    List directory contents.
+                adb shell mkdir <path>
+                    Create a directory.
+                adb shell rm <path>
+                    Delete a file or directory.
+                adb shell mv <source> <destination>
+                    Move or rename a file/directory.
+            
+            Device operations:
+            Rebooting the device:
+                adb reboot
+                    Reboot the device.
+                adb reboot bootloader
+                    Reboot into bootloader mode.
+                adb reboot recovery
+                    Reboot into recovery mode.
+            
+            Input and interactions:
+                adb shell input keyevent <key_code>
+                    Simulate a key press (e.g., Home, Back).
+                adb shell input text "<text>"
+                    Input text.
+                adb shell input tap <x> <y>
+                    Simulate a tap.
+                adb shell input swipe <x1> <y1> <x2> <y2> <duration>
+                    Simulate a swipe.
+            
+            Capturing the screen:
+                adb exec-out screencap -p > screen.png
+                    Save a screenshot to the PC.
+                adb shell screenrecord <path>
+                    Record screen video.
+            
+            System information:
+            Logs and diagnostics:
+                adb logcat
+                    Show device logs.
+                adb bugreport > bugreport.zip
+                    Save a bug report.
+            
+            Process information:
+                adb shell top
+                    Show active processes.
+                adb shell ps
+                    List all processes.
+            
+            System details:
+                adb shell getprop
+                    Show system properties.
+                adb shell cat /proc/cpuinfo
+                    CPU information.
+                adb shell dumpsys
+                    General system diagnostics.
+            
+            Debugging:
+            Shell access:
+                adb shell
+                    Start a shell on the device.
+            
+            Port management:
+                adb forward <local port> <remote port>
+                    Forward a port for debugging.
+                adb reverse <remote port> <local port>
+                    Reverse port forwarding.
+            
+            Root commands:
+                adb root
+                    Restart ADB in root mode (if supported).
+                adb unroot
+                    Restart ADB in non-root mode.
+            """,
+                ru="""Доступные команды:
+                    - Любые команды ADB (например, 'adb devices', 'adb shell')
+                    - Системные команды
+                    - 'help' или '?' - Показать эту справку
+                    - 'clear' - Очистить экран
+                    - 'exit', 'quit' или 'q' - Выйти из режима терминала
+            
+            Основные команды:
+            Подключение к устройству:
+                adb devices
+                    Показать список подключенных устройств.
+                adb connect <ip>:<port>
+                    Подключиться к устройству по Wi-Fi.
+                adb disconnect [<ip>:<port>]
+                    Отключиться от устройства (по умолчанию от всех).
+             Информация о состоянии:
+                    adb get-state
+                        Показать состояние устройства: device, offline или unauthorized.
+                    adb get-serialno
+                        Получить серийный номер устройства.
+                    adb get-devpath
+                        Получить путь к устройству в системе.
+            
+                Работа с приложениями:
+                Установка и удаление приложений:
+                    adb install <путь к APK>
+                        Установить APK на устройство.
+                    adb install-multiple <путь к файлам>
+                        Установить APK с несколькими компонентами (split APK).
+                    adb uninstall <имя пакета>
+                        Удалить приложение.
+                    adb shell pm uninstall --user <user_id> <package_name>
+                        Удалить приложение для конкретного пользователя.
+            
+                Список установленных приложений:
+                    adb shell pm list packages
+                        Показать все установленные пакеты.
+                    adb shell pm list packages -s
+                        Только системные приложения.
+                    adb shell pm list packages -3
+                        Только сторонние приложения.
+            
+                Управление приложениями:
+                    adb shell pm enable <package_name>
+                        Включить приложение.
+                    adb shell pm disable <package_name>
+                        Отключить приложение.
+                    adb shell am start -n <package_name>/<activity_name>
+                        Запустить определенное Activity приложения.
+                    adb shell am force-stop <package_name>
+                        Принудительно остановить приложение.
+                    adb shell am broadcast -a <action>
+                        Отправить широковещательное сообщение.
+            
+                Работа с файлами:
+                Передача файлов:
+                    adb push <локальный путь> <путь на устройстве>
+                        Скопировать файл на устройство.
+                    adb pull <путь на устройстве> [локальный путь]
+                        Скопировать файл с устройства.
+            
+                Работа с файловой системой:
+                    adb shell ls <путь>
+                        Просмотреть содержимое каталога.
+                    adb shell mkdir <путь>
+                        Создать каталог.
+                    adb shell rm <путь>
+                        Удалить файл или каталог.
+                    adb shell mv <откуда> <куда>
+                        Переместить или переименовать файл/каталог.
+            
+                Работа с устройством:
+                Перезагрузка устройства:
+                    adb reboot
+                        Перезагрузить устройство.
+                    adb reboot bootloader
+                        Перезагрузить в режим загрузчика.
+                    adb reboot recovery
+                        Перезагрузить в режим восстановления.
+            
+                Управление состояниями:
+                    adb shell input keyevent <key_code>
+                        Отправить клавишу (например, Home, Back).
+                    adb shell input text "<текст>"
+                        Ввести текст.
+                    adb shell input tap <x> <y>
+                        Эмулировать нажатие.
+                    adb shell input swipe <x1> <y1> <x2> <y2> <duration>
+                        Эмулировать свайп.
+            
+                Захват экрана:
+                    adb exec-out screencap -p > screen.png
+                        Сохранить снимок экрана на ПК.
+                    adb shell screenrecord <путь>
+                        Записать видео с экрана.
+            
+                Системная информация:
+                Журналы и диагностика:
+                    adb logcat
+                        Вывести логи устройства.
+                    adb bugreport > bugreport.zip
+                        Сохранить отчет о состоянии устройства.
+            
+                Информация о процессах:
+                    adb shell top
+                        Показать активные процессы.
+                    adb shell ps
+                        Список всех процессов.
+            
+                Получение информации о системе:
+                    adb shell getprop
+                        Показать системные свойства устройства.
+                    adb shell cat /proc/cpuinfo
+                        Информация о процессоре.
+                    adb shell dumpsys
+                        Общая диагностика устройства.
+            
+                Отладка:
+                Открытие shell:
+                    adb shell
+                        Запустить терминал на устройстве.
+            
+                Управление портами:
+                    adb forward <локальный порт> <удаленный порт>
+                        Перенаправить порт для отладки.
+                    adb reverse <удаленный порт> <локальный порт>
+                        Перенаправить порт в обратном направлении.
+            
+                Запуск команд от имени root:
+                    adb root
+                        Перезапустить ADB в режиме root (если устройство поддерживает).
+                    adb unroot
+                        Перезапустить ADB в обычном режиме."""
             ),
+            
             "terminal_mode_exit_ctrl_c": Translation(
                  en="Terminal mode deactivated.",
                  ru="Режим терминала деактивирован."
