@@ -354,42 +354,97 @@ arising from the use of this program.
                  ru="9. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
-                 en="Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
-                 ru="Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
+                en="Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
+                ru="Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
             ),
+            
             "terminal_mode_help": Translation(
-                 en="You can execute any ADB or system commands.",
-                 ru="Вы можете выполнять любые команды ADB или системные команды."
+                en="You can execute any ADB or system commands.",
+                ru="Вы можете выполнять любые команды ADB или системные команды."
             ),
+            
             "terminal_mode_commands": Translation(
-                 en="""Available commands:
-        - Any ADB command (e.g., 'adb devices', 'adb shell')
-        - System commands
-        - 'help' or '?' - Show this help
-        - 'clear' - Clear screen
-        - 'exit', 'quit', or 'q' - Exit terminal mode""",
-                 ru="""Доступные команды:
-        - Любые команды ADB (например, 'adb devices', 'adb shell')
-        - Системные команды
-        - 'help' или '?' - Показать эту справку
-        - 'clear' - Очистить экран
-        - 'exit', 'quit' или 'q' - Выйти из режима терминала"""
+                en="""Available commands:
+            • help, ? - Show this help
+            • exit, quit, q - Exit terminal mode
+            • clear - Clear screen
+            • history - Show command history
+            • locale - Show current locale
+            • adb devices - List connected devices
+            • adb connect <ip> - Connect to device by IP""",
+                ru="""Доступные команды:
+            • help, ? - Показать эту справку
+            • exit, quit, q - Выйти из режима терминала
+            • clear - Очистить экран
+            • history - Показать историю команд
+            • locale - Показать текущую локаль
+            • adb devices - Список подключенных устройств
+            • adb connect <ip> - Подключиться к устройству по IP"""
             ),
+            
+            "terminal_mode_exit": Translation(
+                en="Exiting terminal mode...",
+                ru="Выход из режима терминала..."
+            ),
+            
             "terminal_mode_exit_ctrl_c": Translation(
-                 en="Terminal mode deactivated.",
-                 ru="Режим терминала деактивирован."
+                en="Terminal mode interrupted. Exiting...",
+                ru="Режим терминала прерван. Выход..."
             ),
+            
             "terminal_mode_error": Translation(
-                 en="Error executing command: {error}",
-                 ru="Ошибка выполнения команды: {error}"
+                en="Error in terminal mode: {error}",
+                ru="Ошибка в режиме терминала: {error}"
             ),
+            
             "command_error": Translation(
-                 en="Command execution failed",
-                 ru="Ошибка выполнения команды"
+                en="Command failed with code {code}",
+                ru="Команда завершилась с ошибкой, код {code}"
             ),
+            
             "command_execution_error": Translation(
-                 en="Error executing command: {error}",
-                 ru="Ошибка выполнения команды: {error}"
+                en="Error executing command: {error}",
+                ru="Ошибка выполнения команды: {error}"
+            ),
+            
+            "current_locale": Translation(
+                en="Current locale: {locale}",
+                ru="Текущая локаль: {locale}"
+            ),
+            
+            "device_info": Translation(
+                en="Device ID: {id}\nModel: {model}\nStatus: {status}",
+                ru="ID устройства: {id}\nМодель: {model}\nСтатус: {status}"
+            ),
+            
+            "no_devices_found": Translation(
+                en="No devices found",
+                ru="Устройства не найдены"
+            ),
+            
+            "invalid_adb_connect": Translation(
+                en="Invalid adb connect command. Usage: adb connect <ip>",
+                ru="Неверная команда adb connect. Использование: adb connect <ip>"
+            ),
+            
+            "device_connected": Translation(
+                en="Successfully connected to device at {ip}",
+                ru="Успешное подключение к устройству по адресу {ip}"
+            ),
+            
+            "device_connection_failed": Translation(
+                en="Failed to connect to device at {ip}",
+                ru="Не удалось подключиться к устройству по адресу {ip}"
+            ),
+            
+            "command_not_found": Translation(
+                en="Command not found: {command}",
+                ru="Команда не найдена: {command}"
+            ),
+            
+            "history_empty": Translation(
+                en="Command history is empty",
+                ru="История команд пуста"
             ),
                 
             # Main menu items
