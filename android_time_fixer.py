@@ -10,6 +10,7 @@ import json
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
+from typing import Optional, Tuple
 import ntplib
 import pyperclip
 import colorama
