@@ -22,21 +22,29 @@ sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language
 init(autoreset=True)
 
+# Настройка readline
 if platform.system() == 'Windows':
     try:
-        import pyreadline3 as readline
+        import pyreadline3.readline as readline
+        READLINE_AVAILABLE = True
     except ImportError:
-        print("Для работы истории команд установите pyreadline3: pip install pyreadline3")
-        readline = None
+        try:
+            import pyreadline3 as readline
+            READLINE_AVAILABLE = True
+        except ImportError:
+            print("Установите pyreadline3: pip install pyreadline3")
+            READLINE_AVAILABLE = False
 else:
     try:
         import gnureadline as readline
+        READLINE_AVAILABLE = True
     except ImportError:
         try:
             import readline
+            READLINE_AVAILABLE = True
         except ImportError:
-            print("Для работы истории команд установите gnureadline: pip install gnureadline")
-            readline = None
+            print("Установите gnureadline: pip install gnureadline")
+            READLINE_AVAILABLE = False
 
 # Настройка логирования
 #logging.basicConfig(
@@ -72,7 +80,7 @@ class AndroidTVTimeFixer:
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
         self._adb_path: Optional[str] = None
-        if readline:
+        if READLINE_AVAILABLE:
             self._setup_history()
         self.device = None
         self.max_connection_retries = 5
@@ -161,50 +169,76 @@ class AndroidTVTimeFixer:
 
     def _setup_history(self) -> None:
         """Настраивает сохранение истории команд"""
-        # Создаем директорию для истории если её нет
-        history_dir = os.path.expanduser('~/.android_tv_fixer')
+        # Указываем конкретный путь для истории
+        history_dir = r"C:\Users\civem\Desktop\PC17112024\222"
+        
+        # Создаем директорию если её нет
         if not os.path.exists(history_dir):
-            os.makedirs(history_dir)
-            
-        self.history_file = os.path.join(history_dir, 'command_history')
+            try:
+                os.makedirs(history_dir)
+            except Exception as e:
+                self.logger.error(f"Не удалось создать директорию для истории: {str(e)}")
+                return
+                
+        self.history_file = os.path.join(history_dir, 'command_history.txt')
         
         try:
+            # Если файл истории существует, читаем его
             if os.path.exists(self.history_file):
-                readline.read_history_file(self.history_file)
+                try:
+                    readline.read_history_file(self.history_file)
+                    self.logger.info(f"История загружена из: {self.history_file}")
+                except Exception as e:
+                    self.logger.error(f"Ошибка при чтении файла истории: {str(e)}")
+            
+            # Устанавливаем максимальную длину истории
             readline.set_history_length(1000)
             
-            # Включаем автодополнение на Tab если это поддерживается
+            # Настраиваем автодополнение если это не Windows
             if platform.system() != 'Windows':
                 readline.parse_and_bind('tab: complete')
-            
+                
         except Exception as e:
-            self.logger.warning(f"Не удалось настроить историю команд: {str(e)}")
+            self.logger.error(f"Ошибка при настройке истории команд: {str(e)}")
             
-        # Сохраняем историю при выходе
+        # Регистрируем функцию сохранения истории при выходе
         import atexit
         atexit.register(self._save_history)
         
     def _save_history(self):
         """Сохраняет историю команд в файл"""
-        if readline and hasattr(self, 'history_file'):
+        if READLINE_AVAILABLE and hasattr(self, 'history_file'):
             try:
                 readline.write_history_file(self.history_file)
+                self.logger.info(f"История сохранена в: {self.history_file}")
             except Exception as e:
-                self.logger.warning(f"Не удалось сохранить историю команд: {str(e)}")
+                self.logger.error(f"Ошибка при сохранении истории: {str(e)}")
                 
     def show_history(self):
         """Показывает историю команд с нумерацией"""
-        if not readline:
-            print(Fore.YELLOW + "История команд недоступна - установите pyreadline3 или gnureadline")
+        if not READLINE_AVAILABLE:
+            print(Fore.YELLOW + "История команд недоступна - проверьте установку pyreadline3")
             return
             
         try:
-            history_length = readline.get_current_history_length()
-            for i in range(1, history_length + 1):
-                cmd = readline.get_history_item(i)
-                if cmd:
-                    print(f"{Fore.CYAN}{i:4d}{Fore.WHITE} {cmd}")
+            # Пробуем прочитать историю из файла
+            if os.path.exists(self.history_file):
+                with open(self.history_file, 'r', encoding='utf-8') as f:
+                    history = f.readlines()
+                for i, cmd in enumerate(history, 1):
+                    print(f"{Fore.CYAN}{i:4d}{Fore.WHITE} {cmd.strip()}")
+            else:
+                # Если файла нет, показываем текущую историю сессии
+                history_length = readline.get_current_history_length()
+                if history_length > 0:
+                    for i in range(1, history_length + 1):
+                        cmd = readline.get_history_item(i)
+                        if cmd:
+                            print(f"{Fore.CYAN}{i:4d}{Fore.WHITE} {cmd}")
+                else:
+                    print(Fore.YELLOW + "История команд пуста")
         except Exception as e:
+            self.logger.error(f"Ошибка при отображении истории: {str(e)}")
             print(Fore.RED + f"Ошибка при отображении истории: {str(e)}")
 
     def _setup_logging(self) -> None:
@@ -447,8 +481,7 @@ class AndroidTVTimeFixer:
                 # Проверяем специальные команды
                 if command.lower() in ['exit', 'quit', 'q']:
                     self.logger.info("Выход из режима терминала")
-                    if readline:
-                        self._save_history()
+                    self._save_history()  # Явно сохраняем историю при выходе
                     break
                 elif command.lower() in ['help', '?']:
                     print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -459,7 +492,7 @@ class AndroidTVTimeFixer:
                 elif command.lower() == 'history':
                     self.show_history()
                     continue
-                elif command.startswith('!') and readline:
+                elif command.startswith('!') and READLINE_AVAILABLE:
                     # Выполнение команды по номеру из истории
                     try:
                         history_num = int(command[1:])
@@ -481,6 +514,7 @@ class AndroidTVTimeFixer:
             except KeyboardInterrupt:
                 self.logger.info("Прерывание работы терминала (Ctrl+C)")
                 print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+                self._save_history()  # Сохраняем историю при прерывании
                 break
             except Exception as e:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
