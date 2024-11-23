@@ -239,7 +239,11 @@ class AndroidTVTimeFixer:
         except Exception as e:
             self.logger.error(f"Failed to fetch NTP time from {server}: {str(e)}")
             return None
-	
+		
+if __name__ == "__main__":
+    fixer = AndroidTVTimeFixer()
+    fixer.terminal_mode()
+
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
