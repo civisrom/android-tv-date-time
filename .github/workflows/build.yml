@@ -22,12 +22,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest]
         include:
           - os: windows-latest
             platform: windows
-          - os: ubuntu-latest
-            platform: linux
+          #- os: ubuntu-latest
+            #platform: linux
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -83,6 +83,12 @@ jobs:
           poetry install --no-interaction --with dev --all-extras  # Установить дополнительные зависимости
           poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}  # Установить pyinstaller
         shell: bash
+
+      - name: Install psutil (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pip install psutil
+        shell: pwsh
 
       - name: Commit poetry.lock changes (if any)
         run: |
@@ -167,6 +173,8 @@ jobs:
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
               --hidden-import=ntplib \
+              --hidden-import=psutil \
+              --collect-all psutil \
               --collect-all ntplib \
               --collect-all adb_shell \
               --collect-all libusb1 \

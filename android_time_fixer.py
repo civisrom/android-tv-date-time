@@ -7,6 +7,9 @@ import time
 import logging
 import platform
 import json
+import atexit
+import signal
+import psutil
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -52,6 +55,8 @@ class AndroidTVTimeFixerError(Exception):
 
 class AndroidTVTimeFixer:
     def __init__(self):
+        self._running_processes = set()
+        self._setup_cleanup_handlers()
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
@@ -140,6 +145,94 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
+
+    def _setup_cleanup_handlers(self):
+        """Настраивает обработчики для корректного завершения процессов"""
+        atexit.register(self._cleanup_processes)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _signal_handler(self, signum, frame):
+        """Обработчик сигналов завершения"""
+        self.logger.info(f"Получен сигнал завершения: {signum}")
+        self._cleanup_processes()
+        sys.exit(0)
+
+    def _cleanup_processes(self):
+        """Завершает все запущенные процессы ADB"""
+        try:
+            # Завершаем сохранённые процессы
+            for process in self._running_processes:
+                try:
+                    if process.poll() is None:  # процесс всё ещё работает
+                        process.terminate()
+                        process.wait(timeout=5)
+                except Exception as e:
+                    self.logger.error(f"Ошибка при завершении процесса: {e}")
+
+            # Находим и завершаем все процессы adb.exe
+            for proc in psutil.process_iter(['name']):
+                try:
+                    if 'adb' in proc.info['name'].lower():
+                        proc.terminate()
+                        proc.wait(timeout=5)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
+                    self.logger.error(f"Ошибка при завершении ADB процесса: {e}")
+
+            # Для надёжности выполняем kill-server
+            try:
+                kill_server = Popen(
+                    [self.get_adb_path(), 'kill-server'],
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True
+                )
+                kill_server.wait(timeout=5)
+            except Exception as e:
+                self.logger.error(f"Ошибка при выполнении adb kill-server: {e}")
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при очистке процессов: {e}")
+        finally:
+            self._running_processes.clear()
+
+    def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
+        """
+        Обрабатывает вывод команды и возвращает результат
+        
+        Args:
+            process (Popen): Процесс для обработки
+            
+        Returns:
+            Tuple[int, str, str]: (код возврата, stdout, stderr)
+        """
+        stdout_lines = []
+        try:
+            # Добавляем процесс в список отслеживаемых
+            self._running_processes.add(process)
+            
+            # Устанавливаем кодировку для вывода
+            sys.stdout.reconfigure(encoding='utf-8')
+            
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    clean_output = output.strip()
+                    stdout_lines.append(clean_output)
+                    print(Fore.GREEN + clean_output)
+
+            return_code = process.poll()
+            _, stderr = process.communicate(timeout=5)
+            return return_code, '\n'.join(stdout_lines), stderr
+
+        except TimeoutError:
+            process.kill()
+            raise TimeoutError("Превышено время ожидания выполнения команды")
+        finally:
+            # Удаляем процесс из списка отслеживаемых
+            self._running_processes.discard(process)
 
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
@@ -401,6 +494,10 @@ class AndroidTVTimeFixer:
             except Exception as e:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
+
+            finally:
+                # Очищаем процессы при выходе из терминального режима
+                self._cleanup_processes()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
