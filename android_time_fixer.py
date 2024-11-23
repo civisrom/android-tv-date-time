@@ -292,6 +292,52 @@ class AndroidTVTimeFixer:
                 
         return False
     
+    def _prepare_command(self, command: str) -> list:
+        """
+        Подготавливает команду для выполнения, корректно обрабатывая пути с пробелами и кириллицей
+        
+        Args:
+            command (str): Исходная команда
+            
+        Returns:
+            list: Список аргументов команды
+        """
+        try:
+            # Если это команда adb install или push, обрабатываем специальным образом
+            if any(cmd in command for cmd in ['adb install', 'adb push', 'adb pull']):
+                # Разделяем команду на части (учитываем, что может быть несколько параметров)
+                parts = command.split(' ', 2)
+                if len(parts) >= 3:
+                    # Получаем путь и нормализуем его
+                    path_part = parts[2]
+                    # Обрабатываем случай, когда в пути несколько параметров
+                    path_parts = path_part.strip().split()
+                    normalized_paths = []
+                    
+                    for path in path_parts:
+                        # Убираем кавычки если они есть
+                        path = path.strip('"\'')
+                        # Нормализуем путь
+                        normalized_path = os.path.normpath(path)
+                        # Если путь существует, используем абсолютный путь
+                        if os.path.exists(normalized_path):
+                            normalized_path = os.path.abspath(normalized_path)
+                        # Экранируем пробелы и специальные символы
+                        if ' ' in normalized_path or any(ord(c) > 127 for c in normalized_path):
+                            normalized_path = f'"{normalized_path}"'
+                        normalized_paths.append(normalized_path)
+                    
+                    # Собираем команду заново
+                    args = [parts[0], parts[1]] + normalized_paths
+                    return args
+            
+            # Для других команд используем стандартный разбор
+            return shlex.split(command, posix=False)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка при подготовке команды: {str(e)}", exc_info=True)
+            raise
+    
     def execute_terminal_command(self, command: str) -> None:
         """
         Выполняет команду в терминале и выводит результат
@@ -303,35 +349,43 @@ class AndroidTVTimeFixer:
             return
     
         try:
+            # Подготавливаем команду
+            args = self._prepare_command(command)
+            if not args:
+                return
+    
             # Пробуем выполнить команду с автоматическими попытками переподключения
-            if 'adb' in command:
-                connection_success = self._retry_adb_connection(command)
+            if args[0] == 'adb':
+                # Заменяем 'adb' на полный путь
+                args[0] = self.get_adb_path()
+                connection_success = self._retry_adb_connection(' '.join(args))
                 if not connection_success:
                     return
     
-            else:
-                args = shlex.split(command)
-                if not args:
-                    return
-    
-                self.logger.debug(f"Выполняется команда: {' '.join(args)}")
-                
-                process = Popen(
-                    args,
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    universal_newlines=True,
-                    bufsize=1
-                )
-                
-                return_code, stdout, stderr = self._process_command_output(process)
-                
-                if return_code != 0:
-                    self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
-                    print(Fore.RED + locales.get("command_error"))
-                    if stderr:
-                        self.logger.error(f"STDERR: {stderr}")
-                        print(Fore.RED + stderr)
+            self.logger.debug(f"Выполняется команда: {' '.join(args)}")
+            
+            # Настраиваем кодировку для процесса
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
+            process = Popen(
+                args,
+                stdout=PIPE,
+                stderr=PIPE,
+                universal_newlines=True,
+                bufsize=1,
+                env=env,
+                encoding='utf-8'
+            )
+            
+            return_code, stdout, stderr = self._process_command_output(process)
+            
+            if return_code != 0:
+                self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
+                print(Fore.RED + locales.get("command_error"))
+                if stderr:
+                    self.logger.error(f"STDERR: {stderr}")
+                    print(Fore.RED + stderr)
     
         except FileNotFoundError as e:
             error_msg = f"Команда не найдена: {e}"
