@@ -362,7 +362,9 @@ arising from the use of this program.
                  ru="Вы можете выполнять любые команды ADB или системные команды."
             ),
             "terminal_mode_commands": Translation(
-                en="""Available commands:
+                en="""Before executing commands in the terminal, you need to connect to the device adb connect <ip>:<port>
+                      Avoid Cyrillic and spaces in file paths or use quotes "C:\Users\Desktop\file.apk"
+                      Available commands:
                     - Any ADB command (e.g., 'adb devices', 'adb shell')
                     - System commands
                     - 'help' or '?' - Show this help
