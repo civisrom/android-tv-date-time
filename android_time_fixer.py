@@ -161,63 +161,118 @@ class AndroidTVTimeFixer:
 
     def execute_terminal_command(self, command: str) -> None:
         """
-        Выполняет команду в терминале и выводит результат
+        Executes terminal command and displays the output with proper handling for different platforms
         
         Args:
-            command (str): Команда для выполнения
+            command (str): Command to execute
         """
         try:
-            # Если команда начинается с 'adb', используем полный путь к ADB
+            # Determine if it's an ADB command
+            is_adb_command = command.strip().lower().startswith('adb')
+            
+            # Split command into arguments
             args = shlex.split(command)
-            if args[0] == 'adb':
+            
+            # Replace 'adb' with full path if it's an ADB command
+            if is_adb_command:
                 args[0] = self.get_adb_path()
             
-            # Создаем процесс с перенаправлением stdout и stderr
-            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            
-            # Получаем вывод команды в реальном времени
+            # Set up process environment
+            env = os.environ.copy()
+            if platform.system() == 'Windows':
+                # For Windows, use shell=True for system commands
+                shell = not is_adb_command
+                # For CMD internal commands like 'dir', 'cd', etc.
+                if not is_adb_command and args[0].lower() in ['dir', 'cd', 'type', 'copy', 'move', 'del', 'md', 'rd', 'echo']:
+                    args = ['cmd', '/c'] + args
+            else:
+                # For Unix-like systems
+                shell = not is_adb_command
+                # For shell built-ins like 'ls', 'cd', etc.
+                if not is_adb_command and args[0].lower() in ['ls', 'cd', 'pwd', 'cp', 'mv', 'rm', 'mkdir', 'rmdir', 'echo']:
+                    args = ['bash', '-c', command]
+    
+            # Create process with proper output handling
+            process = Popen(
+                args,
+                stdout=PIPE,
+                stderr=PIPE,
+                universal_newlines=True,
+                shell=shell,
+                env=env,
+                cwd=os.getcwd()
+            )
+    
+            # Handle output in real-time
             while True:
                 output = process.stdout.readline()
                 if output == '' and process.poll() is not None:
                     break
                 if output:
                     print(Fore.GREEN + output.strip())
-            
-            # Получаем код возврата и stderr
+    
+            # Get return code and stderr
             return_code = process.poll()
             _, stderr = process.communicate()
-            
+    
+            # Handle errors if any
             if return_code != 0:
                 print(Fore.RED + locales.get("command_error"))
                 if stderr:
                     print(Fore.RED + stderr)
-            
+    
+        except FileNotFoundError:
+            print(Fore.RED + locales.get("command_not_found"))
+        except PermissionError:
+            print(Fore.RED + locales.get("permission_denied"))
         except Exception as e:
             print(Fore.RED + locales.get("command_execution_error", error=str(e)))
-
+    
     def terminal_mode(self):
-        """Режим терминала для выполнения команд"""
+        """Enhanced terminal mode supporting Windows, Linux and ADB commands"""
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
         
+        special_commands = {
+            'exit': lambda: 'exit',
+            'quit': lambda: 'exit',
+            'q': lambda: 'exit',
+            'help': lambda: print(Fore.YELLOW + locales.get("terminal_mode_commands")),
+            'clear': lambda: os.system('cls' if platform.system() == 'Windows' else 'clear'),
+            'pwd': lambda: print(Fore.GREEN + os.getcwd()),
+            'cd': lambda: None  # Special handling below
+        }
+        
         while True:
             try:
-                # Показываем приглашение командной строки
-                command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
+                # Show current directory in prompt
+                current_dir = os.getcwd()
+                command = input(f"{Fore.CYAN}{current_dir}> {Fore.WHITE}").strip()
                 
-                # Проверяем специальные команды
-                if command.lower() in ['exit', 'quit', 'q']:
-                    break
-                elif command.lower() in ['help', '?']:
-                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                if not command:
                     continue
-                elif command.lower() == 'clear':
-                    os.system('cls' if platform.system() == 'Windows' else 'clear')
+                    
+                # Handle special commands
+                if command.lower() in special_commands:
+                    result = special_commands[command.lower()]()
+                    if result == 'exit':
+                        break
                     continue
-                elif not command:
-                    continue
+                    
+                # Special handling for 'cd' command
+                if command.lower().startswith('cd '):
+                    try:
+                        new_dir = command[3:].strip()
+                        # Handle relative paths and user home directory
+                        if new_dir.startswith('~'):
+                            new_dir = os.path.expanduser(new_dir)
+                        os.chdir(os.path.abspath(new_dir))
+                        continue
+                    except Exception as e:
+                        print(Fore.RED + locales.get("directory_change_error", error=str(e)))
+                        continue
                 
-                # Выполняем команду
+                # Execute the command
                 self.execute_terminal_command(command)
                 
             except KeyboardInterrupt:
