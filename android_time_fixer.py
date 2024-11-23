@@ -76,6 +76,7 @@ class AndroidTVTimeFixer:
             'locale': self._handle_locale,
             'adb devices': self._handle_adb_devices,
             'adb connect': self._handle_adb_connect
+        }
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
