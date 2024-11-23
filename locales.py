@@ -497,7 +497,9 @@ arising from the use of this program.
                 adb unroot
                     Restart ADB in non-root mode.
             """,
-                ru="""Доступные команды:
+                ru="""Прежде чем выполнять команды в терминале необходимо подключиться к устройству adb connect <ip>:<port>
+                      Избегайте кириллицы и пробелов в путях к файлам или используйте кавычки "C:\Users\Desktop\file.apk"
+                      Доступные команды:
                     - Любые команды ADB (например, 'adb devices', 'adb shell')
                     - Системные команды
                     - 'help' или '?' - Показать эту справку
