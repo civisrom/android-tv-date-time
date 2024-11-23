@@ -7,8 +7,10 @@ import time
 import logging
 import platform
 import json
+import asyncio
 import subprocess
 from subprocess import Popen, PIPE
+from typing import List, Tuple
 from pathlib import Path
 import ntplib
 import pyperclip
