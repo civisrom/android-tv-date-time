@@ -59,7 +59,7 @@ class AndroidTVTimeFixer:
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
-	self.system = platform.system()
+        self.system = platform.system()
         self.encoding = locale.getpreferredencoding()
         # Определяем текущую локаль
         self.current_locale = locale.getdefaultlocale()[0][:2] or 'en'
