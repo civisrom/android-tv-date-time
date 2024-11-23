@@ -8,6 +8,7 @@ import logging
 import platform
 import json
 import asyncio
+import locale
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
