@@ -353,23 +353,7 @@ arising from the use of this program.
                  en="9. Terminal mode (ADB and system commands)",
                  ru="9. Режим терминала (команды ADB и системные)"
             ),
-            "command_not_found": Translation(
-                en="Command not found. Please check if the command exists and is spelled correctly.",
-                ru="Команда не найдена. Проверьте существование команды и правильность написания."
-            ),
-            "permission_denied": Translation(
-                en="Permission denied. Try running with appropriate privileges.",
-                ru="Отказано в доступе. Попробуйте запустить с необходимыми привилегиями."
-            ),
-            "directory_change_error": Translation(
-                en="Error changing directory: {error}",
-                ru="Ошибка при смене директории: {error}"
-            ),
-            "terminal_mode_commands": Translation(
-                en="Available commands:\n- Any system command (Windows/Linux)\n- Any ADB command\n- clear: Clear screen\n- pwd: Show current directory\n- cd: Change directory\n- help: Show this help\n- exit/quit/q: Exit terminal mode",
-                ru="Доступные команды:\n- Любые системные команды (Windows/Linux)\n- Любые команды ADB\n- clear: Очистить экран\n- pwd: Показать текущую директорию\n- cd: Сменить директорию\n- help: Показать эту справку\n- exit/quit/q: Выйти из режима терминала"
-            ),
-                
+            
             # Main menu items
             "main_menu": Translation(
                 en="\nMain Menu:",
