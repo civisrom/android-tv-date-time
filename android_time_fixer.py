@@ -263,7 +263,7 @@ class AndroidTVTimeFixer:
 
     def _setup_history(self) -> None:
         """Настраивает сохранение истории команд"""
-        history_dir = r"C:\Users\civem\Desktop\PC17112024\222"
+        history_dir = r"C:\Users\civem\Desktop\222"
         
         if not os.path.exists(history_dir):
             try:
