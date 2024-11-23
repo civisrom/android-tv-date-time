@@ -7,7 +7,6 @@ import time
 import logging
 import platform
 import json
-import readline
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -22,6 +21,22 @@ from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language
 init(autoreset=True)
+
+if platform.system() == 'Windows':
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        print("Для работы истории команд установите pyreadline3: pip install pyreadline3")
+        readline = None
+else:
+    try:
+        import gnureadline as readline
+    except ImportError:
+        try:
+            import readline
+        except ImportError:
+            print("Для работы истории команд установите gnureadline: pip install gnureadline")
+            readline = None
 
 # Настройка логирования
 #logging.basicConfig(
@@ -57,7 +72,8 @@ class AndroidTVTimeFixer:
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
         self._adb_path: Optional[str] = None
-        self._setup_history()
+        if readline:
+            self._setup_history()
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -145,15 +161,51 @@ class AndroidTVTimeFixer:
 
     def _setup_history(self) -> None:
         """Настраивает сохранение истории команд"""
-        history_file = os.path.expanduser('~/.android_tv_fixer_history')
+        # Создаем директорию для истории если её нет
+        history_dir = os.path.expanduser('~/.android_tv_fixer')
+        if not os.path.exists(history_dir):
+            os.makedirs(history_dir)
+            
+        self.history_file = os.path.join(history_dir, 'command_history')
+        
         try:
-            readline.read_history_file(history_file)
-        except FileNotFoundError:
-            open(history_file, 'a').close()
-        readline.set_history_length(1000)
+            if os.path.exists(self.history_file):
+                readline.read_history_file(self.history_file)
+            readline.set_history_length(1000)
+            
+            # Включаем автодополнение на Tab если это поддерживается
+            if platform.system() != 'Windows':
+                readline.parse_and_bind('tab: complete')
+            
+        except Exception as e:
+            self.logger.warning(f"Не удалось настроить историю команд: {str(e)}")
+            
         # Сохраняем историю при выходе
         import atexit
-        atexit.register(lambda: readline.write_history_file(history_file))
+        atexit.register(self._save_history)
+        
+    def _save_history(self):
+        """Сохраняет историю команд в файл"""
+        if readline and hasattr(self, 'history_file'):
+            try:
+                readline.write_history_file(self.history_file)
+            except Exception as e:
+                self.logger.warning(f"Не удалось сохранить историю команд: {str(e)}")
+                
+    def show_history(self):
+        """Показывает историю команд с нумерацией"""
+        if not readline:
+            print(Fore.YELLOW + "История команд недоступна - установите pyreadline3 или gnureadline")
+            return
+            
+        try:
+            history_length = readline.get_current_history_length()
+            for i in range(1, history_length + 1):
+                cmd = readline.get_history_item(i)
+                if cmd:
+                    print(f"{Fore.CYAN}{i:4d}{Fore.WHITE} {cmd}")
+        except Exception as e:
+            print(Fore.RED + f"Ошибка при отображении истории: {str(e)}")
 
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
@@ -395,6 +447,8 @@ class AndroidTVTimeFixer:
                 # Проверяем специальные команды
                 if command.lower() in ['exit', 'quit', 'q']:
                     self.logger.info("Выход из режима терминала")
+                    if readline:
+                        self._save_history()
                     break
                 elif command.lower() in ['help', '?']:
                     print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -403,10 +457,21 @@ class AndroidTVTimeFixer:
                     os.system('cls' if platform.system() == 'Windows' else 'clear')
                     continue
                 elif command.lower() == 'history':
-                    # Показываем историю команд
-                    for i in range(readline.get_current_history_length()):
-                        print(f"{i + 1}: {readline.get_history_item(i + 1)}")
+                    self.show_history()
                     continue
+                elif command.startswith('!') and readline:
+                    # Выполнение команды по номеру из истории
+                    try:
+                        history_num = int(command[1:])
+                        command = readline.get_history_item(history_num)
+                        if command:
+                            print(Fore.CYAN + f"Выполняется команда: {command}")
+                        else:
+                            print(Fore.YELLOW + "Команда не найдена в истории")
+                            continue
+                    except ValueError:
+                        print(Fore.RED + "Неверный номер команды")
+                        continue
                 elif not command:
                     continue
                 
