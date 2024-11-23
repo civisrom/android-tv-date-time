@@ -7,9 +7,6 @@ import time
 import logging
 import platform
 import json
-import atexit
-import signal
-import psutil
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -55,8 +52,6 @@ class AndroidTVTimeFixerError(Exception):
 
 class AndroidTVTimeFixer:
     def __init__(self):
-        self._running_processes = set()
-        self._setup_cleanup_handlers()
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
@@ -146,94 +141,6 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-    def _setup_cleanup_handlers(self):
-        """Настраивает обработчики для корректного завершения процессов"""
-        atexit.register(self._cleanup_processes)
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
-
-    def _signal_handler(self, signum, frame):
-        """Обработчик сигналов завершения"""
-        self.logger.info(f"Получен сигнал завершения: {signum}")
-        self._cleanup_processes()
-        sys.exit(0)
-
-    def _cleanup_processes(self):
-        """Завершает все запущенные процессы ADB"""
-        try:
-            # Завершаем сохранённые процессы
-            for process in self._running_processes:
-                try:
-                    if process.poll() is None:  # процесс всё ещё работает
-                        process.terminate()
-                        process.wait(timeout=5)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при завершении процесса: {e}")
-
-            # Находим и завершаем все процессы adb.exe
-            for proc in psutil.process_iter(['name']):
-                try:
-                    if 'adb' in proc.info['name'].lower():
-                        proc.terminate()
-                        proc.wait(timeout=5)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
-                    self.logger.error(f"Ошибка при завершении ADB процесса: {e}")
-
-            # Для надёжности выполняем kill-server
-            try:
-                kill_server = Popen(
-                    [self.get_adb_path(), 'kill-server'],
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    universal_newlines=True
-                )
-                kill_server.wait(timeout=5)
-            except Exception as e:
-                self.logger.error(f"Ошибка при выполнении adb kill-server: {e}")
-
-        except Exception as e:
-            self.logger.error(f"Ошибка при очистке процессов: {e}")
-        finally:
-            self._running_processes.clear()
-
-    def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
-        """
-        Обрабатывает вывод команды и возвращает результат
-        
-        Args:
-            process (Popen): Процесс для обработки
-            
-        Returns:
-            Tuple[int, str, str]: (код возврата, stdout, stderr)
-        """
-        stdout_lines = []
-        try:
-            # Добавляем процесс в список отслеживаемых
-            self._running_processes.add(process)
-            
-            # Устанавливаем кодировку для вывода
-            sys.stdout.reconfigure(encoding='utf-8')
-            
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    clean_output = output.strip()
-                    stdout_lines.append(clean_output)
-                    print(Fore.GREEN + clean_output)
-
-            return_code = process.poll()
-            _, stderr = process.communicate(timeout=5)
-            return return_code, '\n'.join(stdout_lines), stderr
-
-        except TimeoutError:
-            process.kill()
-            raise TimeoutError("Превышено время ожидания выполнения команды")
-        finally:
-            # Удаляем процесс из списка отслеживаемых
-            self._running_processes.discard(process)
-
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
         logging.basicConfig(
@@ -292,7 +199,7 @@ class AndroidTVTimeFixer:
         
         Args:
             process (Popen): Процесс для обработки
-            
+        
         Returns:
             Tuple[int, str, str]: (код возврата, stdout, stderr)
         """
@@ -303,33 +210,27 @@ class AndroidTVTimeFixer:
                 if output == '' and process.poll() is not None:
                     break
                 if output:
-                    # Декодируем вывод в правильной кодировке
-                    try:
-                        if platform.system() == 'Windows':
-                            clean_output = output.encode('cp1251').decode('cp866')
-                        else:
-                            clean_output = output.strip()
-                    except UnicodeError:
-                        clean_output = output.strip()
-                    
+                    clean_output = output.strip()
+                    if sys.platform == 'win32':
+                        try:
+                            # Пробуем декодировать как cp866 (кодировка командной строки Windows)
+                            clean_output = clean_output.encode('cp866').decode('cp866')
+                        except UnicodeEncodeError:
+                            # Если не получилось, оставляем как есть
+                            pass
                     stdout_lines.append(clean_output)
                     print(Fore.GREEN + clean_output)
-
+    
             return_code = process.poll()
             _, stderr = process.communicate(timeout=5)
-            
-            # Декодируем stderr в правильной кодировке
-            if stderr and platform.system() == 'Windows':
-                try:
-                    stderr = stderr.encode('cp1251').decode('cp866')
-                except UnicodeError:
-                    pass
-                    
             return return_code, '\n'.join(stdout_lines), stderr
-
+    
         except TimeoutError:
             process.kill()
             raise TimeoutError("Превышено время ожидания выполнения команды")
+        finally:
+            if process.poll() is None:
+                process.terminate()
 
     def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
         """
@@ -359,6 +260,7 @@ class AndroidTVTimeFixer:
                     stdout=PIPE,
                     stderr=PIPE,
                     universal_newlines=True,
+                    encoding='utf-8' if sys.platform != 'win32' else 'cp866',
                     bufsize=1
                 )
                 
@@ -410,33 +312,28 @@ class AndroidTVTimeFixer:
         """
         if not command:
             return
-    
+     
         try:
             # Пробуем выполнить команду с автоматическими попытками переподключения
             if 'adb' in command:
                 connection_success = self._retry_adb_connection(command)
                 if not connection_success:
                     return
-    
+     
             else:
                 args = shlex.split(command)
                 if not args:
                     return
-    
+     
                 self.logger.debug(f"Выполняется команда: {' '.join(args)}")
-                
-                # Настраиваем кодировку для процесса
-                env = os.environ.copy()
-                if platform.system() == 'Windows':
-                    env['PYTHONIOENCODING'] = 'cp866'
                 
                 process = Popen(
                     args,
                     stdout=PIPE,
                     stderr=PIPE,
                     universal_newlines=True,
-                    bufsize=1,
-                    env=env
+                    encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+                    bufsize=1
                 )
                 
                 return_code, stdout, stderr = self._process_command_output(process)
@@ -447,7 +344,7 @@ class AndroidTVTimeFixer:
                     if stderr:
                         self.logger.error(f"STDERR: {stderr}")
                         print(Fore.RED + stderr)
-    
+     
         except FileNotFoundError as e:
             error_msg = f"Команда не найдена: {e}"
             self.logger.error(error_msg)
@@ -460,9 +357,16 @@ class AndroidTVTimeFixer:
             error_msg = f"Ошибка выполнения команды: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+        finally:
+            if process.poll() is None:  # Если процесс не завершился, принудительно завершаем
+                process.terminate()  # Закрываем процесс adb
 
     def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
+                # Установка кодировки для Windows
+        if sys.platform == 'win32':
+            os.system('chcp 866')
+            
         self.logger.info("Запущен режим терминала")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
@@ -494,10 +398,6 @@ class AndroidTVTimeFixer:
             except Exception as e:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
-
-            finally:
-                # Очищаем процессы при выходе из терминального режима
-                self._cleanup_processes()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
@@ -1003,6 +903,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_4"))
             print(Fore.YELLOW + locales.get("menu_item_5"))
             print(Fore.YELLOW + locales.get("menu_item_6"))
+            #print(Fore.YELLOW + locales.get("menu_item_7"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
@@ -1065,15 +966,22 @@ def main():
             elif choice == '6':
                 fixer.manage_servers()
                 
-                    
             elif choice == '7':
+                print(Fore.YELLOW + "\n" + locales.get('menu_item_7'))
+                devices = list_devices()
+                if devices:
+                    selected_device = select_device(devices)
+                    if selected_device:
+                        connect_to_device(selected_device)
+                    
+            elif choice == '8':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 		    
-            elif choice == '8':
+            elif choice == '9':
                 fixer.terminal_mode()
 		    
-            elif choice == '9':
+            elif choice == '10':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             

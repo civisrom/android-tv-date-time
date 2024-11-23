@@ -84,12 +84,6 @@ jobs:
           poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}  # Установить pyinstaller
         shell: bash
 
-      - name: Install psutil (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          pip install psutil
-        shell: pwsh
-
       - name: Commit poetry.lock changes (if any)
         run: |
           git config --global user.name "GitHub Actions"
@@ -173,8 +167,6 @@ jobs:
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
               --hidden-import=ntplib \
-              --hidden-import=psutil \
-              --collect-all psutil \
               --collect-all ntplib \
               --collect-all adb_shell \
               --collect-all libusb1 \
