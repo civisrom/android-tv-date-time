@@ -897,7 +897,6 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_4"))
             print(Fore.YELLOW + locales.get("menu_item_5"))
             print(Fore.YELLOW + locales.get("menu_item_6"))
-            #print(Fore.YELLOW + locales.get("menu_item_7"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
