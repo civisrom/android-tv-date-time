@@ -923,7 +923,7 @@ def main():
                 print(locales.get('country_codes'))
 		    
             elif choice == '9':
-                fixer.terminal_mode()
+                asyncio.run(fixer.terminal_mode())
 		    
             elif choice == '10':
                 print(Fore.GREEN + locales.get('exit_message'))
