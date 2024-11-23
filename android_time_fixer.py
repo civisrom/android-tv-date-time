@@ -360,7 +360,7 @@ class AndroidTVTimeFixer:
         # Установка кодировки для Windows
         if sys.platform == 'win32':
             os.system('chcp 866')
-            
+
         self.logger.info("Запущен режим терминала")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
@@ -959,23 +959,15 @@ def main():
             
             elif choice == '6':
                 fixer.manage_servers()
-                
-            elif choice == '7':
-                print(Fore.YELLOW + "\n" + locales.get('menu_item_7'))
-                devices = list_devices()
-                if devices:
-                    selected_device = select_device(devices)
-                    if selected_device:
-                        connect_to_device(selected_device)
                     
-            elif choice == '8':
+            elif choice == '7':
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 		    
-            elif choice == '9':
+            elif choice == '8':
                 fixer.terminal_mode()
 		    
-            elif choice == '10':
+            elif choice == '9':
                 print(Fore.GREEN + locales.get('exit_message'))
                 sys.exit(0)
             
