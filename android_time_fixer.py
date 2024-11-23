@@ -223,8 +223,6 @@ class TerminalHandler:
             ))
 
     async def terminal_mode(self):
-        """Starts terminal mode"""
-        await self.terminal_handler.terminal_mode()
         """Interactive terminal mode"""
         print(self._format_output(self.device_manager.get_locale("terminal_mode_welcome"), Fore.GREEN))
         print(self._format_output(self.device_manager.get_locale("terminal_mode_help"), Fore.YELLOW))
@@ -340,6 +338,10 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
+
+    async def terminal_mode(self):
+        """Delegates to TerminalHandler's terminal_mode"""
+        await self.terminal_handler.terminal_mode()
 
     def ping_ntp_servers(self, timeout=2, count=3):
         """
