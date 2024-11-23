@@ -22,18 +22,20 @@ sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language
 init(autoreset=True)
 
-# Настройка readline
+# Настройка readline с явным указанием пути к модулю
 if platform.system() == 'Windows':
     try:
+        import site
+        site_packages = site.getsitepackages()[0]
+        pyreadline3_path = os.path.join(site_packages, 'pyreadline3')
+        if os.path.exists(pyreadline3_path):
+            sys.path.insert(0, pyreadline3_path)
+        import pyreadline3
         import pyreadline3.readline as readline
         READLINE_AVAILABLE = True
-    except ImportError:
-        try:
-            import pyreadline3 as readline
-            READLINE_AVAILABLE = True
-        except ImportError:
-            print("Установите pyreadline3: pip install pyreadline3")
-            READLINE_AVAILABLE = False
+    except ImportError as e:
+        print(f"Ошибка импорта pyreadline3: {e}")
+        READLINE_AVAILABLE = False
 else:
     try:
         import gnureadline as readline
@@ -86,6 +88,7 @@ class AndroidTVTimeFixer:
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
+        self.auth_timeout = 2
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
         self.ntp_servers = {
@@ -166,19 +169,127 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
+    def _retry_auth_connection(self, command: str, max_retries: int = 3, delay: int = 3) -> bool:
+        """
+        Пытается установить соединение с устройством с повторными попытками авторизации
+        
+        Args:
+            command (str): Выполняемая команда
+            max_retries (int): Максимальное количество попыток
+            delay (int): Задержка между попытками в секундах
+            
+        Returns:
+            bool: True если соединение установлено, False в противном случае
+        """
+        for attempt in range(max_retries):
+            try:
+                # Попытка подключения с RSA ключом если это команда connect
+                if 'connect' in command:
+                    # Генерируем или загружаем RSA ключ
+                    key_path = os.path.join(os.path.expanduser('~'), '.android', 'adbkey')
+                    if not os.path.exists(key_path):
+                        self.execute_terminal_command(f"{self.get_adb_path()} keygen")
+                    
+                    # Добавляем параметры авторизации к команде
+                    if ' -a' not in command:
+                        command += f" -a {self.auth_timeout}"
+
+                args = shlex.split(command)
+                if not args:
+                    return False
+
+                if args[0] == 'adb':
+                    args[0] = self.get_adb_path()
+
+                self.logger.info(f"Попытка подключения {attempt + 1} из {max_retries}")
+                process = Popen(
+                    args,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True,
+                    bufsize=1
+                )
+                
+                return_code, stdout, stderr = self._process_command_output(process)
+                
+                # Проверяем различные ошибки авторизации
+                auth_errors = [
+                    "error: device unauthorized",
+                    "device unauthorized",
+                    "device still unauthorized",
+                    "device offline",
+                    "no devices/emulators found",
+                    "failed to authenticate"
+                ]
+                
+                if return_code == 0:
+                    return True
+                    
+                if any(error in (stderr + stdout).lower() for error in auth_errors):
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Ошибка авторизации. Повторная попытка через {delay} сек...")
+                        print(Fore.YELLOW + f"Ошибка авторизации. Повторная попытка через {delay} сек...")
+                        
+                        # Пробуем переподключиться
+                        self.execute_terminal_command(f"{self.get_adb_path()} kill-server")
+                        time.sleep(1)
+                        self.execute_terminal_command(f"{self.get_adb_path()} start-server")
+                        time.sleep(delay)
+                        
+                        # Если устройство неавторизовано, пробуем сбросить авторизацию
+                        if "unauthorized" in (stderr + stdout).lower():
+                            self.logger.info("Попытка сброса авторизации устройства")
+                            self.execute_terminal_command(f"{self.get_adb_path()} reconnect")
+                            time.sleep(2)
+                        continue
+                    else:
+                        self.logger.error("Все попытки авторизации не удались")
+                        print(Fore.RED + "Все попытки авторизации не удались. Проверьте, что на устройстве разрешена отладка по USB и подтверждена авторизация.")
+                        return False
+                else:
+                    if stderr:
+                        self.logger.error(f"STDERR: {stderr}")
+                        print(Fore.RED + stderr)
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Ошибка при попытке подключения: {str(e)}", exc_info=True)
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    continue
+                return False
+                
+        return False
 
     def _setup_history(self) -> None:
         """Настраивает сохранение истории команд"""
-        # Указываем конкретный путь для истории
         history_dir = r"C:\Users\civem\Desktop\PC17112024\222"
         
-        # Создаем директорию если её нет
         if not os.path.exists(history_dir):
             try:
                 os.makedirs(history_dir)
             except Exception as e:
                 self.logger.error(f"Не удалось создать директорию для истории: {str(e)}")
                 return
+                
+        self.history_file = os.path.join(history_dir, 'command_history.txt')
+        
+        try:
+            if READLINE_AVAILABLE:
+                if os.path.exists(self.history_file):
+                    readline.read_history_file(self.history_file)
+                readline.set_history_length(1000)
+                
+                # Сохраняем историю при выходе
+                import atexit
+                atexit.register(self._save_history)
+                
+                self.logger.info("История команд успешно инициализирована")
+            else:
+                self.logger.warning("Модуль readline недоступен")
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка при настройке истории команд: {str(e)}")
                 
         self.history_file = os.path.join(history_dir, 'command_history.txt')
         
@@ -217,18 +328,17 @@ class AndroidTVTimeFixer:
     def show_history(self):
         """Показывает историю команд с нумерацией"""
         if not READLINE_AVAILABLE:
-            print(Fore.YELLOW + "История команд недоступна - проверьте установку pyreadline3")
+            print(Fore.YELLOW + "История команд недоступна - убедитесь, что pyreadline3 установлен корректно")
+            self.logger.error("История недоступна: READLINE_AVAILABLE = False")
             return
             
         try:
-            # Пробуем прочитать историю из файла
-            if os.path.exists(self.history_file):
+            if hasattr(self, 'history_file') and os.path.exists(self.history_file):
                 with open(self.history_file, 'r', encoding='utf-8') as f:
                     history = f.readlines()
                 for i, cmd in enumerate(history, 1):
                     print(f"{Fore.CYAN}{i:4d}{Fore.WHITE} {cmd.strip()}")
             else:
-                # Если файла нет, показываем текущую историю сессии
                 history_length = readline.get_current_history_length()
                 if history_length > 0:
                     for i in range(1, history_length + 1):
@@ -419,12 +529,16 @@ class AndroidTVTimeFixer:
             return
     
         try:
-            # Пробуем выполнить команду с автоматическими попытками переподключения
             if 'adb' in command:
-                connection_success = self._retry_adb_connection(command)
-                if not connection_success:
-                    return
-    
+                # Проверяем, является ли команда командой подключения
+                if any(cmd in command for cmd in ['connect', 'devices', 'unauthorized']):
+                    connection_success = self._retry_auth_connection(command)
+                    if not connection_success:
+                        return
+                else:
+                    connection_success = self._retry_adb_connection(command)
+                    if not connection_success:
+                        return
             else:
                 args = shlex.split(command)
                 if not args:
@@ -432,18 +546,12 @@ class AndroidTVTimeFixer:
     
                 self.logger.debug(f"Выполняется команда: {' '.join(args)}")
                 
-                # Настраиваем кодировку для процесса
-                env = os.environ.copy()
-                if platform.system() == 'Windows':
-                    env['PYTHONIOENCODING'] = 'cp866'
-                
                 process = Popen(
                     args,
                     stdout=PIPE,
                     stderr=PIPE,
                     universal_newlines=True,
-                    bufsize=1,
-                    env=env
+                    bufsize=1
                 )
                 
                 return_code, stdout, stderr = self._process_command_output(process)
@@ -455,14 +563,6 @@ class AndroidTVTimeFixer:
                         self.logger.error(f"STDERR: {stderr}")
                         print(Fore.RED + stderr)
     
-        except FileNotFoundError as e:
-            error_msg = f"Команда не найдена: {e}"
-            self.logger.error(error_msg)
-            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
-        except TimeoutError as e:
-            error_msg = f"Таймаут выполнения команды: {e}"
-            self.logger.error(error_msg)
-            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
         except Exception as e:
             error_msg = f"Ошибка выполнения команды: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
