@@ -6,6 +6,13 @@ import shlex
 import time
 import logging
 import platform
+from platform import system
+from time import sleep
+from typing import Optional, List, Dict, Union
+from datetime import datetime
+import threading
+import queue
+import signal
 import json
 import subprocess
 from subprocess import Popen, PIPE
@@ -53,12 +60,19 @@ class AndroidTVTimeFixer:
     def __init__(self):
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
+        self.logger = self._setup_logger()
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
+        self.history_index = 0
+        self.command_queue = queue.Queue()
+        self.is_running = True
+        self.last_command_output = ""
+        self.aliases: Dict[str, str] = {}
+        self._load_aliases()
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
@@ -139,110 +153,334 @@ class AndroidTVTimeFixer:
         ]
 
 
-    def get_adb_path(self):
-        """Gets the path to ADB based on the platform"""
+      init()
+
+        # Initialize locales
+        self.locales = self._load_locales()
+
+    def _setup_logger(self) -> logging.Logger:
+        """Configure logging with proper format and handlers."""
+        logger = logging.getLogger('AndroidTVTimeFixer')
+        logger.setLevel(logging.INFO)
+        
+        os.makedirs('logs', exist_ok=True)
+        
+        file_handler = logging.FileHandler(
+            f'logs/androidtv_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+        )
+        
+        console_handler = logging.StreamHandler()
+        
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s'
+        )
+        
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+        return logger
+
+    def _load_locales(self):
+        """Load localization strings."""
         try:
-            from hooks.win_hook import ADB_PATH
-            return ADB_PATH
-        except ImportError:
-            try:
-                from hooks.linux_hook import ADB_PATH
+            # Implement your locales loading logic here
+            pass
+        except Exception as e:
+            self.logger.error(f"Failed to load locales: {e}")
+            return {}
+
+    def _load_aliases(self) -> None:
+        """Load command aliases from config file."""
+        try:
+            if os.path.exists('aliases.conf'):
+                with open('aliases.conf', 'r') as f:
+                    for line in f:
+                        if '=' in line:
+                            alias, command = line.strip().split('=', 1)
+                            self.aliases[alias.strip()] = command.strip()
+        except Exception as e:
+            self.logger.error(f"Failed to load aliases: {e}")
+
+    def _save_aliases(self) -> None:
+        """Save command aliases to config file."""
+        try:
+            with open('aliases.conf', 'w') as f:
+                for alias, command in self.aliases.items():
+                    f.write(f"{alias}={command}\n")
+        except Exception as e:
+            self.logger.error(f"Failed to save aliases: {e}")
+
+    def get_adb_path(self):
+        """Gets the path to ADB based on the platform with enhanced error handling."""
+        try:
+            # Try to get platform-specific ADB path
+            if system() == 'Windows':
+                from hooks.win_hook import ADB_PATH
+                if not os.path.exists(ADB_PATH):
+                    raise FileNotFoundError(f"ADB not found at {ADB_PATH}")
                 return ADB_PATH
-            except ImportError:
+            else:
+                from hooks.linux_hook import ADB_PATH
+                if not os.path.exists(ADB_PATH):
+                    raise FileNotFoundError(f"ADB not found at {ADB_PATH}")
+                return ADB_PATH
+        except ImportError:
+            # Fallback to local resources
+            try:
                 base_path = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.abspath(os.path.dirname(__file__))
                 adb_name = 'adb.exe' if system() == 'Windows' else 'adb'
-                return os.path.join(base_path, 'resources', adb_name)
+                adb_path = os.path.join(base_path, 'resources', adb_name)
+                
+                if not os.path.exists(adb_path):
+                    raise FileNotFoundError(f"ADB not found at {adb_path}")
+                
+                return adb_path
+            except Exception as e:
+                self.logger.error(f"Failed to locate ADB: {e}")
+                raise
 
-    def execute_terminal_command(self, command: str, retries: int = 3) -> None:
+    def execute_terminal_command(self, command: str, retries: int = 3) -> Optional[str]:
         """
-        Executes a command in the terminal with retry logic.
-        
-        Args:
-            command (str): Command to execute.
-            retries (int): Number of retries in case of failure.
+        Executes a command in the terminal with enhanced retry logic and output capture.
         """
+        if not command:
+            return None
+
+        # Check for aliases
+        if command in self.aliases:
+            command = self.aliases[command]
+
+        self.logger.info(f"Executing command: {command}")
+        output_lines = []
         attempt = 0
+
         while attempt < retries:
             try:
                 args = shlex.split(command)
                 if args[0] == 'adb':
                     args[0] = self.get_adb_path()
                 
-                process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-                while True:
-                    output = process.stdout.readline()
-                    if output == '' and process.poll() is not None:
-                        break
-                    if output:
-                        print(output.strip())
-                
-                return_code = process.poll()
-                _, stderr = process.communicate()
-                
-                if return_code != 0:
-                    self.logger.error(f"Error executing command: {command}")
-                    if stderr:
-                        print(stderr)
+                process = Popen(
+                    args,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True,
+                    bufsize=1
+                )
+
+                def read_output(pipe, queue):
+                    for line in iter(pipe.readline, ''):
+                        queue.put(line.strip())
+                    pipe.close()
+
+                output_queue = queue.Queue()
+                error_queue = queue.Queue()
+
+                output_thread = threading.Thread(
+                    target=read_output,
+                    args=(process.stdout, output_queue)
+                )
+                error_thread = threading.Thread(
+                    target=read_output,
+                    args=(process.stderr, error_queue)
+                )
+
+                output_thread.daemon = True
+                error_thread.daemon = True
+                output_thread.start()
+                error_thread.start()
+
+                while process.poll() is None:
+                    # Handle stdout
+                    try:
+                        while True:
+                            line = output_queue.get_nowait()
+                            print(Fore.GREEN + line + Style.RESET_ALL)
+                            output_lines.append(line)
+                    except queue.Empty:
+                        pass
+
+                    # Handle stderr
+                    try:
+                        while True:
+                            line = error_queue.get_nowait()
+                            print(Fore.RED + line + Style.RESET_ALL)
+                            output_lines.append(f"ERROR: {line}")
+                    except queue.Empty:
+                        pass
+
+                    sleep(0.1)
+
+                output_thread.join(timeout=1)
+                error_thread.join(timeout=1)
+
+                if process.returncode == 0:
+                    self.last_command_output = '\n'.join(output_lines)
+                    return self.last_command_output
+                else:
                     attempt += 1
                     if attempt < retries:
-                        print(f"Retrying... ({attempt}/{retries})")
+                        self.logger.warning(f"Command failed, retrying ({attempt}/{retries})...")
                         sleep(self.connection_retry_delay)
                     else:
-                        print(f"Failed after {retries} retries.")
-                else:
-                    break
+                        self.logger.error(f"Command failed after {retries} attempts")
+                        return None
+
             except Exception as e:
-                self.logger.error(f"Command execution error: {str(e)}")
+                self.logger.error(f"Command execution error: {e}")
+                attempt += 1
                 if attempt < retries:
-                    print(f"Retrying... ({attempt}/{retries})")
                     sleep(self.connection_retry_delay)
-                    attempt += 1
                 else:
-                    print(f"Failed after {retries} retries.")
-    
+                    return None
+
     def terminal_mode(self):
-        """Terminal mode for executing commands interactively."""
-        print("Welcome to the terminal mode. Type 'help' for commands.")
+        """Enhanced terminal mode with additional features."""
+        print(Fore.CYAN + """
+╔═══════════════════════════════════════════╗
+║           Enhanced Terminal Mode           ║
+║     Type 'help' to see available commands  ║
+╚═══════════════════════════════════════════╝
+""" + Style.RESET_ALL)
+
+        def signal_handler(signum, frame):
+            print("\nGracefully shutting down terminal mode...")
+            self.is_running = False
         
-        while True:
-            try:
-                command = input("terminal> ").strip()
-                if command.lower() in ['exit', 'quit', 'q']:
+        original_handler = signal.signal(signal.SIGINT, signal_handler)
+
+        try:
+            while self.is_running:
+                try:
+                    command = input(Fore.YELLOW + "terminal> " + Style.RESET_ALL).strip()
+                    
+                    if not command:
+                        continue
+
+                    self.command_history.append(command)
+                    self.history_index = len(self.command_history)
+
+                    if command.lower() in ['exit', 'quit', 'q', 'back']:
+                        print(self.locales.get("terminal_exit_message", "Exiting terminal mode..."))
+                        break
+                    
+                    elif command.lower() in ['help', '?']:
+                        self._show_terminal_help()
+                        continue
+                    
+                    elif command.lower() == 'clear':
+                        os.system('cls' if system() == 'Windows' else 'clear')
+                        continue
+                    
+                    elif command.lower() == 'history':
+                        self._show_history()
+                        continue
+                    
+                    elif command.startswith('alias '):
+                        self._handle_alias(command[6:])
+                        continue
+                    
+                    elif command.lower() == 'aliases':
+                        self._show_aliases()
+                        continue
+                    
+                    elif command.lower() == 'save':
+                        if self.last_command_output:
+                            self._save_output()
+                        else:
+                            print(self.locales.get("no_output_to_save", "No output to save"))
+                        continue
+
+                    elif command.lower() == 'devices':
+                        self.check_device_connection()
+                        continue
+
+                    # Execute the command
+                    self.execute_terminal_command(command)
+
+                except EOFError:
+                    print("\n" + self.locales.get("terminal_exit_message", "Exiting terminal mode..."))
                     break
-                elif command.lower() in ['help', '?']:
-                    print("Available commands: help, exit, clear, adb commands, etc.")
-                    continue
-                elif command.lower() == 'clear':
-                    os.system('cls' if system() == 'Windows' else 'clear')
-                    continue
-                elif not command:
-                    continue
+                except Exception as e:
+                    self.logger.error(f"Error in terminal mode: {e}")
+                    print(Fore.RED + f"Error: {str(e)}" + Style.RESET_ALL)
 
-                self.execute_terminal_command(command)
+        finally:
+            # Restore original signal handler
+            signal.signal(signal.SIGINT, original_handler)
 
-            except KeyboardInterrupt:
-                print("\nExiting terminal mode. Use 'exit' to quit.")
-                break
-            except Exception as e:
-                print(f"Error: {str(e)}")
+    def _show_terminal_help(self):
+        """Display available terminal commands and their descriptions."""
+        help_text = f"""
+{self.locales.get("available_commands", "Available Commands")}:
+------------------
+help, ?          : {self.locales.get("help_command_desc", "Show this help message")}
+exit, quit, q    : {self.locales.get("exit_command_desc", "Exit terminal mode")}
+clear            : {self.locales.get("clear_command_desc", "Clear the screen")}
+history          : {self.locales.get("history_command_desc", "Show command history")}
+alias name=cmd   : {self.locales.get("alias_command_desc", "Create command alias")}
+aliases          : {self.locales.get("aliases_command_desc", "List all aliases")}
+save             : {self.locales.get("save_command_desc", "Save last command output to file")}
+devices          : {self.locales.get("devices_command_desc", "Check connected devices")}
+adb commands     : {self.locales.get("adb_commands_desc", "Standard ADB commands")}
+</command>       : {self.locales.get("system_command_desc", "Execute system command")}
+"""
+        print(Fore.CYAN + help_text + Style.RESET_ALL)
+
+    def _show_history(self):
+        """Display command history."""
+        for i, cmd in enumerate(self.command_history, 1):
+            print(f"{i:3d}: {cmd}")
+
+    def _handle_alias(self, alias_str: str):
+        """Handle alias creation and management."""
+        try:
+            name, command = alias_str.split('=', 1)
+            name = name.strip()
+            command = command.strip()
+            
+            if name and command:
+                self.aliases[name] = command
+                self._save_aliases()
+                print(self.locales.get("alias_created").format(name=name, command=command))
+            else:
+                print(self.locales.get("invalid_alias_format"))
+        except ValueError:
+            print(self.locales.get("invalid_alias_format"))
+
+    def _show_aliases(self):
+        """Display all defined aliases."""
+        if self.aliases:
+            print("\n" + self.locales.get("defined_aliases", "Defined Aliases:"))
+            print("--------------")
+            for alias, command in self.aliases.items():
+                print(f"{alias} = {command}")
+        else:
+            print(self.locales.get("no_aliases_defined", "No aliases defined"))
+
+    def _save_output(self):
+        """Save the last command output to a file."""
+        if not self.last_command_output:
+            return
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"output_{timestamp}.txt"
+        
+        try:
+            with open(filename, 'w') as f:
+                f.write(self.last_command_output)
+            print(self.locales.get("output_saved").format(filename=filename))
+        except Exception as e:
+            self.logger.error(f"Failed to save output: {e}")
+            print(self.locales.get("output_save_error").format(error=str(e)))
 
     def check_device_connection(self):
         """Checks if the Android device is connected via ADB."""
-        print("Checking device connection...")
+        print(self.locales.get("checking_device_connection", "Checking device connection..."))
         self.execute_terminal_command('adb devices')
-        
-    def fetch_ntp_time(self, server: str) -> str:
-        """Fetches current time from a given NTP server."""
-        try:
-            ntp_time = os.popen(f'ntpdate -q {server}').read()
-            return ntp_time
-        except Exception as e:
-            self.logger.error(f"Failed to fetch NTP time from {server}: {str(e)}")
-            return None
-		
-if __name__ == "__main__":
-    fixer = AndroidTVTimeFixer()
-    fixer.terminal_mode()
 
     def ping_ntp_servers(self, timeout=2, count=3):
         """
@@ -750,7 +988,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_6"))
             #print(Fore.YELLOW + locales.get("menu_item_7"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
-            print(Fore.YELLOW + locales.get("menu_item_9"))
+            print(Fore.YELLOW + fixer.locales.get("menu_item_9", "9. Terminal Mode"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
 
             choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
@@ -823,7 +1061,9 @@ def main():
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
 		    
-            elif choice == '9':
+            choice = input(fixer.locales.get("enter_choice", "Enter your choice: "))
+            
+            if choice == '9':
                 fixer.terminal_mode()
 		    
             elif choice == '10':
@@ -834,16 +1074,45 @@ def main():
                 continue
             else:
                 print(Fore.RED + locales.get('invalid_choice'))
-        
+		    
+            except KeyboardInterrupt:
+                # Обработка Ctrl+C внутри цикла меню
+                print("\n" + fixer.locales.get("menu_interrupted"))
+                if input(fixer.locales.get("confirm_exit", "Exit? (y/n): ")).lower() == 'y':
+                    raise KeyboardInterrupt  # Пробрасываем исключение для выхода из программы
+                continue  # Возвращаемся к меню если пользователь не хочет выходить
+            
+            except Exception as e:
+                # Обработка ошибок внутри цикла меню
+                fixer.logger.error(f"Menu operation error: {e}")
+                print(Fore.RED + fixer.locales.get("menu_error").format(error=str(e)) + Style.RESET_ALL)
+                # Даем пользователю время прочитать сообщение об ошибке
+                sleep(2)
+                continue  # Возвращаемся к меню
+                
     except AndroidTVTimeFixerError as e:
-        print(Fore.RED + locales.get('error_message').format(str(e)))
+        # Обработка специфических ошибок приложения
+        fixer.logger.error(f"Application error: {e}")
+        print(Fore.RED + fixer.locales.get("error_message").format(error=str(e)) + Style.RESET_ALL)
         sys.exit(1)
+        
     except KeyboardInterrupt:
-        print(Fore.RED + locales.get('operation_aborted'))
+        # Финальная обработка Ctrl+C для выхода из программы
+        print("\n" + fixer.locales.get("operation_aborted"))
         sys.exit(0)
+        
     except Exception as e:
-        print(Fore.RED + locales.get('unexpected_error').format(str(e)))
+        # Обработка всех остальных непредвиденных ошибок
+        fixer.logger.critical(f"Unexpected error: {e}")
+        print(Fore.RED + fixer.locales.get("unexpected_error").format(error=str(e)) + Style.RESET_ALL)
         sys.exit(1)
+        
+    finally:
+        # Очистка ресурсов при выходе
+        try:
+            fixer.cleanup()  # Если у вас есть метод очистки
+        except Exception as e:
+            fixer.logger.error(f"Cleanup error: {e}")
 
 if __name__ == '__main__':
     main()
