@@ -7,6 +7,7 @@ import time
 import logging
 import platform
 import json
+import pyreadline3
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
