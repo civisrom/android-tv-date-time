@@ -7,6 +7,7 @@ import time
 import logging
 import platform
 import json
+import readline
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -56,6 +57,7 @@ class AndroidTVTimeFixer:
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
         self._adb_path: Optional[str] = None
+        self._setup_history()
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -141,13 +143,25 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
+    def _setup_history(self) -> None:
+        """Настраивает сохранение истории команд"""
+        history_file = os.path.expanduser('~/.android_tv_fixer_history')
+        try:
+            readline.read_history_file(history_file)
+        except FileNotFoundError:
+            open(history_file, 'a').close()
+        readline.set_history_length(1000)
+        # Сохраняем историю при выходе
+        import atexit
+        atexit.register(lambda: readline.write_history_file(history_file))
+
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('android_tv_fixer.log'),
+                logging.FileHandler('android_tv_fixer.log', encoding='utf-8'),
                 logging.StreamHandler()
             ]
         )
@@ -210,12 +224,28 @@ class AndroidTVTimeFixer:
                 if output == '' and process.poll() is not None:
                     break
                 if output:
-                    clean_output = output.strip()
+                    # Декодируем вывод в правильной кодировке
+                    try:
+                        if platform.system() == 'Windows':
+                            clean_output = output.encode('cp1251').decode('cp866')
+                        else:
+                            clean_output = output.strip()
+                    except UnicodeError:
+                        clean_output = output.strip()
+                    
                     stdout_lines.append(clean_output)
                     print(Fore.GREEN + clean_output)
 
             return_code = process.poll()
             _, stderr = process.communicate(timeout=5)
+            
+            # Декодируем stderr в правильной кодировке
+            if stderr and platform.system() == 'Windows':
+                try:
+                    stderr = stderr.encode('cp1251').decode('cp866')
+                except UnicodeError:
+                    pass
+                    
             return return_code, '\n'.join(stdout_lines), stderr
 
         except TimeoutError:
@@ -316,12 +346,18 @@ class AndroidTVTimeFixer:
     
                 self.logger.debug(f"Выполняется команда: {' '.join(args)}")
                 
+                # Настраиваем кодировку для процесса
+                env = os.environ.copy()
+                if platform.system() == 'Windows':
+                    env['PYTHONIOENCODING'] = 'cp866'
+                
                 process = Popen(
                     args,
                     stdout=PIPE,
                     stderr=PIPE,
                     universal_newlines=True,
-                    bufsize=1
+                    bufsize=1,
+                    env=env
                 )
                 
                 return_code, stdout, stderr = self._process_command_output(process)
@@ -346,7 +382,7 @@ class AndroidTVTimeFixer:
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
-    def terminal_mode(self) -> None:
+     def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
         self.logger.info("Запущен режим терминала")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
@@ -365,6 +401,11 @@ class AndroidTVTimeFixer:
                     continue
                 elif command.lower() == 'clear':
                     os.system('cls' if platform.system() == 'Windows' else 'clear')
+                    continue
+                elif command.lower() == 'history':
+                    # Показываем историю команд
+                    for i in range(readline.get_current_history_length()):
+                        print(f"{i + 1}: {readline.get_history_item(i + 1)}")
                     continue
                 elif not command:
                     continue
