@@ -8,6 +8,7 @@ import logging
 import platform
 import json
 import psutil
+import atexit
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -134,6 +135,9 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
+
+        # Регистрация завершения процессов при выходе
+        atexit.register(self.kill_adb_processes)
 
     def kill_adb_processes(self) -> None:
         """Завершает все процессы adb.exe."""
