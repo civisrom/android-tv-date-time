@@ -7,6 +7,7 @@ import time
 import logging
 import platform
 import json
+import psutil
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -133,6 +134,16 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
+
+    def kill_adb_processes(self) -> None:
+        """Завершает все процессы adb.exe."""
+        try:
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
+                    proc.terminate()
+                    self.logger.info(f"Процесс {proc.info['name']} завершен.")
+        except Exception as e:
+            self.logger.error(f"Ошибка при завершении процессов adb: {e}", exc_info=True)
 
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
