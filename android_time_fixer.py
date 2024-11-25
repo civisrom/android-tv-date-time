@@ -337,78 +337,80 @@ class AndroidTVTimeFixer:
                 
         return False
     
-def execute_terminal_command(self, command: str) -> Optional[Union[Tuple[int, str, str], None]]:
-    """
-    Выполняет команду в терминале с расширенной обработкой
-
-    Args:
-        command (str): Команда для выполнения
-
-    Returns:
-        Кортеж (return_code, stdout, stderr) или None при ошибке
-    """
-    if not command:
-        return None
-
-    try:
-        # Специальная обработка ADB-команд с возможностью переподключения
-        if 'adb' in command:
-            connection_success = self._retry_adb_connection(command)
-            if not connection_success:
-                return None
-
-        # Безопасное разделение команды на аргументы
-        args = shlex.split(command)
-        if not args:
-            return None
-
-        # Логирование выполняемой команды
-        self.logger.debug(f"Выполняется команда: {' '.join(args)}")
-
-        # Запуск процесса с расширенной настройкой
-        process = subprocess.Popen(
-            args,
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            encoding='utf-8' if sys.platform != 'win32' else 'cp866',
-            bufsize=1
-        )
-
-        # Захват вывода с таймаутом
-        try:
-            stdout, stderr = process.communicate(timeout=30)  # 30 секунд таймаут
-            return_code = process.returncode
-
-            # Обработка ошибок выполнения
-            if return_code != 0:
-                self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
-                print(Fore.RED + locales.get("command_error"))
-                
-                if stderr:
-                    self.logger.error(f"STDERR: {stderr}")
-                    print(Fore.RED + stderr)
-
-            return return_code, stdout.strip(), stderr.strip()
-
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = process.communicate()
-            error_msg = "Превышено время выполнения команды"
-            self.logger.error(error_msg)
-            print(Fore.RED + error_msg)
-            return -1, '', error_msg
-
-    except FileNotFoundError as e:
-        error_msg = f"Команда не найдена: {e}"
-        self.logger.error(error_msg)
-        print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+    def execute_terminal_command(self, command: str) -> Optional[Union[Tuple[int, str, str], None]]:
+        """
+        Выполняет команду в терминале с расширенной обработкой
     
-    except Exception as e:
-        error_msg = f"Ошибка выполнения команды: {str(e)}"
-        self.logger.error(error_msg, exc_info=True)
-        print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+        Args:
+            command (str): Команда для выполнения
+    
+        Returns:
+            Кортеж (return_code, stdout, stderr) или None при ошибке
+        """
+        if not command:
+            return None
+    
+        try:
+            # Специальная обработка ADB-команд с возможностью переподключения
+            if 'adb' in command:
+                connection_success = self._retry_adb_connection(command)
+                if not connection_success:
+                    return None
+    
+            # Безопасное разделение команды на аргументы
+            args = shlex.split(command)
+            if not args:
+                return None
+    
+            # Логирование выполняемой команды
+            self.logger.debug(f"Выполняется команда: {' '.join(args)}")
+    
+            # Запуск процесса с расширенной настройкой
+            process = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+                bufsize=1
+            )
+    
+            # Захват вывода с таймаутом
+            try:
+                stdout, stderr = process.communicate(timeout=30)  # 30 секунд таймаут
+                return_code = process.returncode
+    
+                # Обработка ошибок выполнения
+                if return_code != 0:
+                    self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
+                    print(Fore.RED + locales.get("command_error"))
+                    
+                    if stderr:
+                        self.logger.error(f"STDERR: {stderr}")
+                        print(Fore.RED + stderr)
+    
+                return return_code, stdout.strip(), stderr.strip()
+    
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+                error_msg = "Превышено время выполнения команды"
+                self.logger.error(error_msg)
+                print(Fore.RED + error_msg)
+                return -1, '', error_msg
+    
+        except FileNotFoundError as e:
+            error_msg = f"Команда не найдена: {e}"
+            self.logger.error(error_msg)
+            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+        
+        except Exception as e:
+            error_msg = f"Ошибка выполнения команды: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
+        return None
+    
     def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
         # Установка кодировки для Windows
@@ -670,7 +672,7 @@ def execute_terminal_command(self, command: str) -> Optional[Union[Tuple[int, st
         """Улучшенная версия метода подключения с ожиданием разрешения"""
         if not self.validate_ip(ip):
             raise AndroidTVTimeFixerError(locales.get("invalid_ip_format"))
-
+    
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
         
@@ -678,6 +680,12 @@ def execute_terminal_command(self, command: str) -> Optional[Union[Tuple[int, st
         connection_established = False
         last_error = None
         
+        # Выполнение команды подключения с обработкой
+        connect_result = self.execute_terminal_command(f"adb connect {ip}")
+        if connect_result and connect_result[0] != 0:
+            # Если команда вернула ненулевой код возврата
+            logger.error(f"Ошибка подключения: {connect_result[2]}")
+    
         print(locales.get("waiting_for_connection"))
         print(locales.get("confirm_connection"))
         
@@ -691,9 +699,9 @@ def execute_terminal_command(self, command: str) -> Optional[Union[Tuple[int, st
             except Exception as e:
                 last_error = str(e)
                 remaining_time = int(self.connection_timeout - (time.time() - start_time))
-                print(locales.get("waiting_for_connection", remaining_time=remaining_time), end='')
+                print(locales.get("waiting_for_connection", remaining_time=remaining_time), end='\r')
                 time.sleep(1)
-
+    
         print()  # Новая строка после завершения ожидания
         
         if not connection_established:
