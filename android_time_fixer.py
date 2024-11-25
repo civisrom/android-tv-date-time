@@ -138,7 +138,7 @@ class AndroidTVTimeFixer:
         ]
 
         # Регистрация завершения процессов при выходе
-        atexit.register(self.kill_adb_processes)
+        atexit.register(self.cleanup_adb)
 
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
@@ -153,7 +153,7 @@ class AndroidTVTimeFixer:
         self.logger = logging.getLogger(__name__)
 
     def kill_adb_processes(self) -> None:
-        """Принудительно завершает все процессы adb.exe."""
+        """Принудительно завершает все процессы adb.exe"""
         try:
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
@@ -161,13 +161,19 @@ class AndroidTVTimeFixer:
                     if proc.info['cmdline'] and 'adb' in ' '.join(proc.info['cmdline']).lower():
                         self.logger.info(f"Принудительно завершаем процесс: PID={proc.info['pid']} NAME={proc.info['name']}")
                         proc.kill()  # Принудительное завершение процесса
-                        proc.wait(timeout=5)  # Ждем завершения
+                        proc.wait(timeout=5)  # Ждём завершения
         except psutil.NoSuchProcess:
             self.logger.warning("Процесс adb уже завершен.")
         except psutil.AccessDenied:
             self.logger.error("Нет доступа для завершения процесса adb.")
         except Exception as e:
             self.logger.error(f"Ошибка при завершении процессов adb: {e}", exc_info=True)
+
+    def cleanup_adb(self) -> None:
+        """Комбинированный метод для очистки всех процессов и остановки сервера ADB"""
+        self.logger.info("Выполняется очистка ADB: завершение процессов и остановка сервера.")
+        self.kill_adb_server()  # Останавливаем сервер
+        self.kill_adb_processes()  # Убиваем оставшиеся процессы
 
     def execute_adb_command(self, command: str):
         """Выполняет команду ADB и сохраняет процесс."""
@@ -217,6 +223,15 @@ class AndroidTVTimeFixer:
             self.logger.info("Попытка завершить процессы adb через таймер...")
             self.kill_adb_processes()
         threading.Timer(delay, delayed_kill).start()
+
+    def kill_adb_server(self) -> None:
+        """Завершает сервер ADB"""
+        try:
+            self.logger.info("Выполняется команда adb kill-server.")
+            self.execute_adb_command("adb kill-server")
+            self.logger.info("ADB server успешно завершён.")
+        except Exception as e:
+            self.logger.error(f"Ошибка при завершении ADB server: {e}")
 
     def get_adb_path(self) -> str:
         """
@@ -457,7 +472,11 @@ class AndroidTVTimeFixer:
             except Exception as e:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
-	
+            finally:
+                self.kill_adb_server()
+                self.kill_adb_processes()
+                print("Режим терминала завершён. Все процессы ADB остановлены.")
+
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
