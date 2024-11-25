@@ -9,6 +9,7 @@ import platform
 import json
 import psutil
 import atexit
+import threading
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -139,16 +140,6 @@ class AndroidTVTimeFixer:
         # Регистрация завершения процессов при выходе
         atexit.register(self.kill_adb_processes)
 
-    def kill_adb_processes(self) -> None:
-        """Завершает все процессы adb.exe."""
-        try:
-            for proc in psutil.process_iter(['name']):
-                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
-                    proc.terminate()
-                    self.logger.info(f"Процесс {proc.info['name']} завершен.")
-        except Exception as e:
-            self.logger.error(f"Ошибка при завершении процессов adb: {e}", exc_info=True)
-
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
         logging.basicConfig(
@@ -160,6 +151,72 @@ class AndroidTVTimeFixer:
             ]
         )
         self.logger = logging.getLogger(__name__)
+
+    def kill_adb_processes(self) -> None:
+        """Принудительно завершает все процессы adb.exe."""
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
+                    # Убедимся, что это действительно процесс adb
+                    if proc.info['cmdline'] and 'adb' in ' '.join(proc.info['cmdline']).lower():
+                        self.logger.info(f"Принудительно завершаем процесс: PID={proc.info['pid']} NAME={proc.info['name']}")
+                        proc.kill()  # Принудительное завершение процесса
+                        proc.wait(timeout=5)  # Ждем завершения
+        except psutil.NoSuchProcess:
+            self.logger.warning("Процесс adb уже завершен.")
+        except psutil.AccessDenied:
+            self.logger.error("Нет доступа для завершения процесса adb.")
+        except Exception as e:
+            self.logger.error(f"Ошибка при завершении процессов adb: {e}", exc_info=True)
+
+    def execute_adb_command(self, command: str):
+        """Выполняет команду ADB и сохраняет процесс."""
+        args = shlex.split(command)
+        args[0] = self.get_adb_path()  # Получаем путь к adb.exe
+        process = Popen(args, stdout=PIPE, stderr=PIPE)
+        self.adb_processes.append(process)  # Сохраняем процесс
+        return process
+
+    def cleanup_adb_processes(self):
+        """Завершает все запущенные процессы ADB."""
+        for process in self.adb_processes:
+            try:
+                self.logger.info(f"Завершаем процесс ADB PID={process.pid}")
+                process.terminate()
+                process.wait(timeout=5)
+            except Exception as e:
+                self.logger.error(f"Ошибка завершения процесса ADB: {e}", exc_info=True)
+            finally:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+
+    def check_and_wake_adb(self):
+        """Проверяет процессы adb и завершает зависшие."""
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'status']):
+                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
+                    if proc.status() in [psutil.STATUS_SLEEPING, psutil.STATUS_STOPPED]:
+                        self.logger.warning(f"Процесс ADB PID={proc.pid} завис, завершаем...")
+                        proc.kill()
+        except Exception as e:
+            self.logger.error(f"Ошибка при проверке процессов adb: {e}", exc_info=True)
+
+    def force_kill_adb(self):
+        """Принудительное завершение процессов adb через taskkill."""
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", "adb.exe"], check=True)
+            self.logger.info("Все процессы adb.exe завершены через taskkill.")
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Ошибка при завершении adb.exe через taskkill: {e}")
+
+    def delayed_kill_adb(self, delay: int = 10):
+        """Отложенное завершение процессов adb."""
+        def delayed_kill():
+            self.logger.info("Попытка завершить процессы adb через таймер...")
+            self.kill_adb_processes()
+        threading.Timer(delay, delayed_kill).start()
 
     def get_adb_path(self) -> str:
         """
