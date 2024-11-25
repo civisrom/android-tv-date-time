@@ -463,7 +463,7 @@ class AndroidTVTimeFixer:
                     continue
                 
                 # Выполняем команду
-                self.execute_terminal_command(command)
+                self.execute_adb_command(command)
                 
             except KeyboardInterrupt:
                 self.logger.info("Прерывание работы терминала (Ctrl+C)")
