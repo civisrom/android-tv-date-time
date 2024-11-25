@@ -473,9 +473,7 @@ class AndroidTVTimeFixer:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
             finally:
-                self.kill_adb_server()
-                self.kill_adb_processes()
-                print("Режим терминала завершён. Все процессы ADB остановлены.")
+                print("Режим терминала завершён.")
 
     def ping_ntp_servers(self, timeout=2, count=3):
         """
