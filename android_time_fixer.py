@@ -7,8 +7,8 @@ import time
 import logging
 import platform
 import json
-import psutil
 import atexit
+import psutil
 import threading
 import subprocess
 from subprocess import Popen, PIPE
@@ -54,10 +54,12 @@ class AndroidTVTimeFixerError(Exception):
     pass
 
 class AndroidTVTimeFixer:
-    def __init__(self):
+    def __init__(self, adb_path=None):
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
+        self.adb_processes = []
+        atexit.register(self.cleanup_adb)
         self._adb_path: Optional[str] = None
         self.device = None
         self.max_connection_retries = 5
@@ -137,9 +139,6 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
-        # Регистрация завершения процессов при выходе
-        atexit.register(self.cleanup_adb)
-
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
         logging.basicConfig(
@@ -152,39 +151,53 @@ class AndroidTVTimeFixer:
         )
         self.logger = logging.getLogger(__name__)
 
-    def kill_adb_processes(self) -> None:
-        """Принудительно завершает все процессы adb.exe"""
+    def execute_adb_command(self, command: str, save_process: bool = False):
+        """
+        Выполняет команду ADB и (опционально) сохраняет процесс.
+        
+        Args:
+            command (str): Команда ADB для выполнения.
+            save_process (bool): Сохранять ли процесс в список adb_processes.
+        
+        Returns:
+            Popen: Процесс, выполняющий команду.
+        """
+        args = shlex.split(command)
+        args[0] = self.get_adb_path()  # Устанавливаем путь к adb.exe
+        
+        process = Popen(args, stdout=PIPE, stderr=PIPE)
+        
+        if save_process:
+            self.adb_processes.append(process)
+        
+        return process
+    
+    def kill_all_adb_processes(self) -> None:
+        """Принудительное завершение всех процессов ADB и остановка сервера."""
+        self.logger.info("Завершаем все процессы ADB и останавливаем сервер.")
+        
+        # Завершение сервера ADB
+        try:
+            self.execute_adb_command("adb kill-server")
+            self.logger.info("ADB сервер успешно остановлен.")
+        except Exception as e:
+            self.logger.warning(f"Сервер ADB уже завершён или не запущен: {e}")
+        
+        # Завершение процессов ADB через psutil
         try:
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
-                    # Убедимся, что это действительно процесс adb
-                    if proc.info['cmdline'] and 'adb' in ' '.join(proc.info['cmdline']).lower():
-                        self.logger.info(f"Принудительно завершаем процесс: PID={proc.info['pid']} NAME={proc.info['name']}")
-                        proc.kill()  # Принудительное завершение процесса
-                        proc.wait(timeout=5)  # Ждём завершения
+                    self.logger.info(f"Принудительно завершаем процесс: PID={proc.info['pid']} NAME={proc.info['name']}")
+                    proc.kill()
+                    proc.wait(timeout=5)
         except psutil.NoSuchProcess:
             self.logger.warning("Процесс adb уже завершен.")
         except psutil.AccessDenied:
             self.logger.error("Нет доступа для завершения процесса adb.")
         except Exception as e:
             self.logger.error(f"Ошибка при завершении процессов adb: {e}", exc_info=True)
-
-    def cleanup_adb(self) -> None:
-        """Комбинированный метод для очистки всех процессов и остановки сервера ADB"""
-        self.logger.info("Выполняется очистка ADB: завершение процессов и остановка сервера.")
-        self.kill_adb_server()  # Останавливаем сервер
-        self.kill_adb_processes()  # Убиваем оставшиеся процессы
-
-    def execute_adb_command(self, command: str):
-        """Выполняет команду ADB и сохраняет процесс."""
-        args = shlex.split(command)
-        args[0] = self.get_adb_path()  # Получаем путь к adb.exe
-        process = Popen(args, stdout=PIPE, stderr=PIPE)
-        self.adb_processes.append(process)  # Сохраняем процесс
-        return process
-
-    def cleanup_adb_processes(self):
-        """Завершает все запущенные процессы ADB."""
+        
+        # Завершение процессов ADB из списка
         for process in self.adb_processes:
             try:
                 self.logger.info(f"Завершаем процесс ADB PID={process.pid}")
@@ -197,57 +210,27 @@ class AndroidTVTimeFixer:
                     process.kill()
                 except Exception:
                     pass
-
-    def check_and_wake_adb(self):
-        """Проверяет процессы adb и завершает зависшие."""
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'status']):
-                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
-                    if proc.status() in [psutil.STATUS_SLEEPING, psutil.STATUS_STOPPED]:
-                        self.logger.warning(f"Процесс ADB PID={proc.pid} завис, завершаем...")
-                        proc.kill()
-        except Exception as e:
-            self.logger.error(f"Ошибка при проверке процессов adb: {e}", exc_info=True)
-
-    def force_kill_adb(self):
-        """Принудительное завершение процессов adb через taskkill."""
-        try:
-            subprocess.run(["taskkill", "/F", "/IM", "adb.exe"], check=True)
-            self.logger.info("Все процессы adb.exe завершены через taskkill.")
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Ошибка при завершении adb.exe через taskkill: {e}")
-
-    def delayed_kill_adb(self, delay: int = 10):
-        """Отложенное завершение процессов adb."""
-        def delayed_kill():
-            self.logger.info("Попытка завершить процессы adb через таймер...")
-            self.kill_adb_processes()
-        threading.Timer(delay, delayed_kill).start()
-
-    def kill_adb_server(self) -> None:
-        """Завершает сервер ADB"""
-        try:
-            self.logger.info("Выполняется команда adb kill-server.")
-            self.execute_adb_command("adb kill-server")
-            self.logger.info("ADB server успешно завершён.")
-        except Exception as e:
-            self.logger.error(f"Ошибка при завершении ADB server: {e}")
+        
+        # Очистка списка процессов
+        self.adb_processes.clear()
+    
+    def cleanup_adb(self) -> None:
+        """Очищает процессы ADB и останавливает сервер."""
+        self.logger.info("Выполняется очистка процессов ADB.")
+        self.kill_all_adb_processes()
 
     def get_adb_path(self) -> str:
         """
-        Получает путь к ADB из runtime hook или ресурсов
+        Получает путь к ADB из настроек или ресурсов.
         
         Returns:
-            str: Полный путь к исполняемому файлу ADB
-            
-        Raises:
-            FileNotFoundError: Если файл ADB не найден
+            str: Полный путь к исполняемому файлу ADB.
         """
         if self._adb_path:
             return self._adb_path
-
+    
         try:
-            # Пытаемся импортировать из hook'ов
+            # Проверяем наличие hook'ов
             try:
                 from hooks.win_hook import ADB_PATH
                 self._adb_path = ADB_PATH
@@ -266,10 +249,10 @@ class AndroidTVTimeFixer:
                 'resources', 
                 'adb.exe' if sys.platform == 'win32' else 'adb'
             )
-
+        
         if not os.path.exists(self._adb_path):
             raise FileNotFoundError(f"ADB не найден по пути: {self._adb_path}")
-
+        
         self.logger.info(f"Используется ADB по пути: {self._adb_path}")
         return self._adb_path
 
@@ -436,45 +419,42 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
     def terminal_mode(self) -> None:
-        """Режим терминала для выполнения команд"""
-        # Установка кодировки для Windows
+        """Режим терминала для выполнения команд."""
         if sys.platform == 'win32':
-            os.system('chcp 866')
-
-        self.logger.info("Запущен режим терминала")
-        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
-        print(Fore.YELLOW + locales.get("terminal_mode_help"))
+            os.system('chcp 866')  # Установка кодировки для Windows
         
-        while True:
-            try:
+        self.logger.info("Запущен режим терминала")
+        print(Fore.GREEN + "Добро пожаловать в режим терминала! Для выхода введите 'exit'.")
+        
+        try:
+            while True:
                 command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
                 
                 # Проверяем специальные команды
                 if command.lower() in ['exit', 'quit', 'q']:
-                    self.logger.info("Выход из режима терминала")
+                    self.logger.info("Выход из режима терминала.")
                     break
-                elif command.lower() in ['help', '?']:
-                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
-                    continue
                 elif command.lower() == 'clear':
-                    os.system('cls' if platform.system() == 'Windows' else 'clear')
+                    os.system('cls' if sys.platform == 'win32' else 'clear')
                     continue
                 elif not command:
                     continue
                 
-                # Выполняем команду
-                self.execute_adb_command(command)
+                # Защита от выполнения `adb kill-server`
+                if "adb kill-server" in command.lower():
+                    print(Fore.RED + "Команда 'adb kill-server' запрещена в режиме терминала.")
+                    continue
                 
-            except KeyboardInterrupt:
-                self.logger.info("Прерывание работы терминала (Ctrl+C)")
-                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-                break
-            except Exception as e:
-                self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
-                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
-            finally:
-                print("Режим терминала завершён.")
-
+                # Выполнение команды
+                self.execute_adb_command(command)
+        except KeyboardInterrupt:
+            self.logger.info("Прерывание работы терминала (Ctrl+C).")
+        except Exception as e:
+            self.logger.error(f"Ошибка в режиме терминала: {e}", exc_info=True)
+            print(Fore.RED + f"Ошибка выполнения команды: {e}")
+        finally:
+            print(Fore.YELLOW + "Режим терминала завершён.")
+	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
