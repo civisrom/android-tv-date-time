@@ -7,6 +7,9 @@ import time
 import logging
 import platform
 import json
+import psutil
+import signal
+import atexit
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -57,6 +60,8 @@ class AndroidTVTimeFixer:
         self._setup_logging()
         self._adb_path: Optional[str] = None
         self.device = None
+        self.adb_processes = []
+        self._register_exit_handlers()
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -133,6 +138,45 @@ class AndroidTVTimeFixer:
             'ntp.ix.ru',
             'time.android.com'
         ]
+
+    def _register_exit_handlers(self):
+        """Register exit handlers for process cleanup"""
+        atexit.register(self._cleanup_adb_processes)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _signal_handler(self, signum, frame):
+        """Handle termination signals"""
+        self._cleanup_adb_processes()
+        sys.exit(0)
+
+    def _cleanup_adb_processes(self):
+        """Terminate all spawned ADB processes"""
+        for process in self.adb_processes:
+            try:
+                # First try to terminate gracefully
+                if process.poll() is None:
+                    process.terminate()
+                    
+                # Wait for process to exit
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                # Force kill if process doesn't respond
+                process.kill()
+            except Exception as e:
+                print(f"Error cleaning up ADB process: {e}")
+
+        # Kill lingering ADB processes
+        self._kill_orphaned_adb_processes()
+
+    def _kill_orphaned_adb_processes(self):
+        """Find and kill any remaining ADB processes"""
+        for proc in psutil.process_iter(['name']):
+            try:
+                if proc.info['name'] == 'adb.exe':
+                    proc.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
 
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса"""
@@ -293,60 +337,77 @@ class AndroidTVTimeFixer:
                 
         return False
     
-    def execute_terminal_command(self, command: str) -> None:
-        """
-        Выполняет команду в терминале и выводит результат
-        
-        Args:
-            command (str): Команда для выполнения
-        """
-        if not command:
-            return
-    
+def execute_terminal_command(self, command: str) -> Optional[Union[Tuple[int, str, str], None]]:
+    """
+    Выполняет команду в терминале с расширенной обработкой
+
+    Args:
+        command (str): Команда для выполнения
+
+    Returns:
+        Кортеж (return_code, stdout, stderr) или None при ошибке
+    """
+    if not command:
+        return None
+
+    try:
+        # Специальная обработка ADB-команд с возможностью переподключения
+        if 'adb' in command:
+            connection_success = self._retry_adb_connection(command)
+            if not connection_success:
+                return None
+
+        # Безопасное разделение команды на аргументы
+        args = shlex.split(command)
+        if not args:
+            return None
+
+        # Логирование выполняемой команды
+        self.logger.debug(f"Выполняется команда: {' '.join(args)}")
+
+        # Запуск процесса с расширенной настройкой
+        process = subprocess.Popen(
+            args,
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+            bufsize=1
+        )
+
+        # Захват вывода с таймаутом
         try:
-            # Пробуем выполнить команду с автоматическими попытками переподключения
-            if 'adb' in command:
-                connection_success = self._retry_adb_connection(command)
-                if not connection_success:
-                    return
-    
-            else:
-                args = shlex.split(command)
-                if not args:
-                    return
-    
-                self.logger.debug(f"Выполняется команда: {' '.join(args)}")
+            stdout, stderr = process.communicate(timeout=30)  # 30 секунд таймаут
+            return_code = process.returncode
+
+            # Обработка ошибок выполнения
+            if return_code != 0:
+                self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
+                print(Fore.RED + locales.get("command_error"))
                 
-                process = Popen(
-                    args,
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    universal_newlines=True,
-                    encoding='utf-8' if sys.platform != 'win32' else 'cp866',
-                    bufsize=1
-                )
-                
-                return_code, stdout, stderr = self._process_command_output(process)
-                
-                if return_code != 0:
-                    self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
-                    print(Fore.RED + locales.get("command_error"))
-                    if stderr:
-                        self.logger.error(f"STDERR: {stderr}")
-                        print(Fore.RED + stderr)
-    
-        except FileNotFoundError as e:
-            error_msg = f"Команда не найдена: {e}"
+                if stderr:
+                    self.logger.error(f"STDERR: {stderr}")
+                    print(Fore.RED + stderr)
+
+            return return_code, stdout.strip(), stderr.strip()
+
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate()
+            error_msg = "Превышено время выполнения команды"
             self.logger.error(error_msg)
-            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
-        except TimeoutError as e:
-            error_msg = f"Таймаут выполнения команды: {e}"
-            self.logger.error(error_msg)
-            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
-        except Exception as e:
-            error_msg = f"Ошибка выполнения команды: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+            print(Fore.RED + error_msg)
+            return -1, '', error_msg
+
+    except FileNotFoundError as e:
+        error_msg = f"Команда не найдена: {e}"
+        self.logger.error(error_msg)
+        print(Fore.RED + locales.get("command_execution_error", error=error_msg))
+    
+    except Exception as e:
+        error_msg = f"Ошибка выполнения команды: {str(e)}"
+        self.logger.error(error_msg, exc_info=True)
+        print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
     def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
