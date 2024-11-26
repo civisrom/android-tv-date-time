@@ -163,11 +163,10 @@ class AndroidTVTimeFixer:
         Завершает сервер ADB и связанные процессы.
         """
         self.logger.info("Остановка сервера ADB и завершение процессов adb.")
-    
-        # Остановка сервера ADB через adb kill-server
+
+        # Попытка остановить сервер ADB через adb kill-server
         try:
-            adb_path = self.get_adb_path()
-            process = Popen([adb_path, 'kill-server'], stdout=PIPE, stderr=PIPE)
+            process = Popen([self.adb_path, 'kill-server'], stdout=PIPE, stderr=PIPE)
             _, stderr = process.communicate(timeout=5)
             if process.returncode == 0:
                 self.logger.info("ADB сервер успешно остановлен.")
@@ -175,36 +174,44 @@ class AndroidTVTimeFixer:
                 self.logger.error(f"Ошибка остановки ADB сервера: {stderr.decode(errors='ignore').strip()}")
         except Exception as e:
             self.logger.warning(f"Не удалось остановить сервер ADB: {e}")
-    
-        # Завершение процессов adb.exe в Windows или Unix
+
+        # Завершение процессов adb.exe через psutil
         try:
-            if sys.platform == 'win32':
-                # Используем taskkill для завершения процессов adb.exe
-                self.logger.info("Используем taskkill для завершения процессов adb.exe.")
-                taskkill_command = ['taskkill', '/F', '/IM', 'adb.exe']
-                process = Popen(taskkill_command, stdout=PIPE, stderr=PIPE)
-                stdout, stderr = process.communicate(timeout=5)
-                encoding = 'cp1251' if sys.getdefaultencoding() != 'utf-8' else 'utf-8'
-                if process.returncode == 0:
-                    self.logger.info(f"Все процессы adb.exe успешно завершены: {stdout.decode(encoding, errors='ignore').strip()}")
-                else:
-                    self.logger.error(f"Ошибка завершения процессов adb.exe: {stderr.decode(encoding, errors='ignore').strip()}")
-            else:
-                # Используем pkill для завершения процессов adb
-                self.logger.info("Используем pkill для завершения процессов adb.")
-                pkill_command = ['pkill', '-f', 'adb']
-                process = Popen(pkill_command, stdout=PIPE, stderr=PIPE)
-                stdout, stderr = process.communicate(timeout=5)
-                if process.returncode == 0:
-                    self.logger.info(f"Все процессы adb успешно завершены: {stdout.decode(errors='ignore').strip()}")
-                else:
-                    self.logger.error(f"Ошибка завершения процессов adb: {stderr.decode(errors='ignore').strip()}")
-        except FileNotFoundError as e:
-            self.logger.warning(f"Команда taskkill/pkill не найдена: {e}")
-        except TimeoutError:
-            self.logger.error("Команда завершения процессов adb превысила допустимое время ожидания.")
+            for proc in psutil.process_iter(['pid', 'name']):
+                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
+                    self.logger.info(f"Завершаем процесс ADB: PID={proc.info['pid']} NAME={proc.info['name']}")
+                    proc.terminate()
+                    proc.wait(timeout=5)
+        except psutil.NoSuchProcess:
+            self.logger.info("Процесс ADB уже завершен.")
+        except psutil.AccessDenied:
+            self.logger.error("Нет доступа для завершения процесса ADB.")
         except Exception as e:
-            self.logger.error(f"Ошибка завершения процессов adb: {e}", exc_info=True)
+            self.logger.error(f"Ошибка завершения процесса ADB через psutil: {e}", exc_info=True)
+
+        # Резервное завершение через системные команды
+        if sys.platform == 'win32':
+            try:
+                self.logger.info("Резервный способ: taskkill для завершения adb.exe.")
+                process = Popen(['taskkill', '/F', '/IM', 'adb.exe'], stdout=PIPE, stderr=PIPE)
+                stdout, stderr = process.communicate(timeout=5)
+                if process.returncode == 0:
+                    self.logger.info(f"Taskkill завершил процессы adb.exe: {stdout.decode('cp1251', errors='ignore').strip()}")
+                else:
+                    self.logger.error(f"Ошибка taskkill: {stderr.decode('cp1251', errors='ignore').strip()}")
+            except Exception as e:
+                self.logger.error(f"Ошибка выполнения taskkill: {e}", exc_info=True)
+        else:
+            try:
+                self.logger.info("Резервный способ: pkill для завершения adb.")
+                process = Popen(['pkill', '-f', 'adb'], stdout=PIPE, stderr=PIPE)
+                stdout, stderr = process.communicate(timeout=5)
+                if process.returncode == 0:
+                    self.logger.info(f"Pkill завершил процессы adb: {stdout.decode(errors='ignore').strip()}")
+                else:
+                    self.logger.error(f"Ошибка pkill: {stderr.decode(errors='ignore').strip()}")
+            except Exception as e:
+                self.logger.error(f"Ошибка выполнения pkill: {e}", exc_info=True)
 
     def get_adb_path(self) -> str:
         """
