@@ -208,6 +208,7 @@ jobs:
               --hidden-import=adb_shell.adb_device \
               --hidden-import=adb_shell.auth.sign_pythonrsa \
               --hidden-import=ntplib \
+              --hidden-import=psutil \
               --collect-all ntplib \
               --collect-all adb_shell \
               --collect-all libusb1 \
