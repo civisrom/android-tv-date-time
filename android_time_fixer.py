@@ -8,8 +8,10 @@ import logging
 import platform
 import json
 import psutil
+import ctypes
 import atexit
 import signal
+import threading
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -58,8 +60,10 @@ class AndroidTVTimeFixer:
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
+        self.current_path = Path.cwd()
         self._adb_path = None
         self.adb_path = self.get_adb_path()
+        self._kill_event = threading.Event()
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -69,6 +73,11 @@ class AndroidTVTimeFixer:
         atexit.register(self.kill_adb_processes)
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
+        self._monitor_thread = threading.Thread(
+            target=self._adb_process_monitor, 
+            daemon=True
+        )
+        self._monitor_thread.start()
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
@@ -153,128 +162,127 @@ class AndroidTVTimeFixer:
         )
         self.logger = logging.getLogger(__name__)
 
-    def _handle_signal(self, signum, frame) -> None:
-        """Обработчик сигналов для завершения программы"""
-        try:
-            self.logger.info(f"Получен сигнал завершения: {signum}")
-            self.kill_adb_processes()
-        finally:
-            sys.exit(0)
 
-    def kill_adb_processes(self) -> None:
+
+    def _handle_signal(self, signum, frame):
+        """Обработчик системных сигналов"""
+        self.logger.info(f"Получен сигнал завершения: {signum}")
+        self._kill_event.set()
+        self.kill_adb_processes()
+        sys.exit(0)
+
+    def _adb_process_monitor(self):
         """
-        Комплексный метод завершения процессов ADB с многоуровневой обработкой.
-        
-        Этапы завершения:
-        1. Мягкое завершение через ADB kill-server
-        2. Завершение через psutil
-        3. Принудительное завершение через taskkill (только для Windows)
-        4. Резервное завершение через системные команды
+        Фоновый поток для мониторинга и завершения процессов ADB
         """
-        self.logger.info("Начало процедуры завершения процессов ADB.")
-    
-        # Этап 1: Остановка ADB сервера через adb kill-server
-        try:
-            process = subprocess.Popen(
-                [self.adb_path, 'kill-server'], 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = process.communicate(timeout=5)
+        while not self._kill_event.is_set():
+            try:
+                import psutil
+                for proc in psutil.process_iter(['name', 'pid']):
+                    if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
+                        try:
+                            self.logger.info(f"Обнаружен процесс ADB: {proc.info['pid']}")
+                            proc.terminate()
+                            proc.wait(timeout=1)
+                        except Exception as e:
+                            self.logger.warning(f"Не удалось завершить процесс {proc.info['pid']}: {e}")
+            except ImportError:
+                # Резервный механизм без psutil
+                self._kill_adb_without_psutil()
             
-            if process.returncode == 0:
-                self.logger.info("ADB сервер успешно остановлен через adb kill-server.")
+            time.sleep(2)
+
+    def _kill_adb_without_psutil(self):
+        """
+        Резервный метод завершения ADB процессов без psutil
+        """
+        try:
+            if sys.platform == 'win32':
+                subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE, 
+                               timeout=2)
             else:
-                self.logger.warning(f"ADB kill-server завершен с ошибкой. Код: {process.returncode}")
-                if stderr:
-                    self.logger.error(f"Детали ошибки: {stderr.strip()}")
-        except subprocess.TimeoutExpired:
-            self.logger.error("Превышено время ожидания завершения ADB сервера.")
-        except FileNotFoundError:
-            self.logger.error(f"ADB не найден по пути: {self.adb_path}")
+                subprocess.run(['pkill', '-9', '-f', 'adb'], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE, 
+                               timeout=2)
         except Exception as e:
-            self.logger.error(f"Неожиданная ошибка при остановке ADB сервера: {e}", exc_info=True)
-    
-        # Этап 2: Завершение через psutil
+            self.logger.error(f"Ошибка при завершении ADB: {e}")
+
+    def kill_adb_processes(self):
+        """
+        Комплексный метод завершения ADB процессов
+        """
+        # Установка флага завершения
+        self._kill_event.set()
+
+        self.logger.info("Начало процедуры завершения ADB процессов")
+
+        # Список методов завершения
+        kill_methods = [
+            # 1. Штатное завершение через ADB
+            lambda: subprocess.run([self.adb_path, 'kill-server'], 
+                                   stdout=subprocess.PIPE, 
+                                   stderr=subprocess.PIPE, 
+                                   timeout=3),
+            
+            # 2. Завершение через taskkill (Windows)
+            lambda: subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
+                                   stdout=subprocess.PIPE, 
+                                   stderr=subprocess.PIPE, 
+                                   timeout=3) if sys.platform == 'win32' else None,
+            
+            # 3. Завершение через psutil
+            lambda: self._kill_with_psutil(),
+            
+            # 4. Низкоуровневое завершение через ctypes (Windows)
+            lambda: self._kill_with_ctypes() if sys.platform == 'win32' else None
+        ]
+
+        # Последовательное применение методов
+        for method in kill_methods:
+            try:
+                if method:
+                    method()
+            except Exception as e:
+                self.logger.warning(f"Метод завершения не сработал: {e}")
+
+        self.logger.info("Процедура завершения ADB процессов завершена")
+
+    def _kill_with_psutil(self):
+        """Завершение процессов через psutil"""
         try:
             import psutil
-            adb_processes = [
-                proc for proc in psutil.process_iter(['pid', 'name']) 
-                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower()
-            ]
-    
-            if adb_processes:
-                self.logger.info(f"Найдено процессов ADB: {len(adb_processes)}")
-                
-                for proc in adb_processes:
+            for proc in psutil.process_iter(['name', 'pid']):
+                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
                     try:
-                        self.logger.info(f"Завершение процесса ADB: PID={proc.pid}, Name={proc.info['name']}")
-                        proc.terminate()  # Мягкое завершение
-                        
-                        try:
-                            # Ожидание завершения с таймаутом
-                            proc.wait(timeout=3)
-                        except psutil.TimeoutExpired:
-                            self.logger.warning(f"Процесс {proc.pid} не завершился, принудительное закрытие.")
-                            proc.kill()  # Принудительное закрытие
-                    
-                    except psutil.NoSuchProcess:
-                        self.logger.info(f"Процесс {proc.pid} уже завершен.")
-                    except psutil.AccessDenied:
-                        self.logger.error(f"Нет доступа для завершения процесса {proc.pid}")
+                        proc.terminate()
+                        proc.wait(timeout=2)
                     except Exception as e:
-                        self.logger.error(f"Ошибка при завершении процесса {proc.pid}: {e}")
-            else:
-                self.logger.info("Процессов ADB не найдено.")
-    
+                        self.logger.warning(f"Не удалось завершить процесс {proc.info['pid']}: {e}")
         except ImportError:
-            self.logger.warning("Библиотека psutil не установлена, пропуск этапа.")
+            self.logger.warning("Библиотека psutil не установлена")
+
+    def _kill_with_ctypes(self):
+        """Низкоуровневое завершение процессов через ctypes (Windows)"""
+        try:
+            import ctypes
+            import psutil
+
+            kernel32 = ctypes.windll.kernel32
+            for pid in psutil.pids():
+                try:
+                    process = psutil.Process(pid)
+                    if process.name().lower() == 'adb.exe':
+                        handle = kernel32.OpenProcess(1, False, pid)
+                        if handle:
+                            kernel32.TerminateProcess(handle, 0)
+                            kernel32.CloseHandle(handle)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
         except Exception as e:
-            self.logger.error(f"Ошибка при работе с psutil: {e}", exc_info=True)
-    
-        # Этап 3: Принудительное завершение через taskkill (Windows)
-        if sys.platform == 'win32':
-            try:
-                self.logger.info("Применение принудительного завершения через taskkill.")
-                
-                # Мягкое завершение
-                subprocess.run(
-                    ['taskkill', '/T', '/IM', 'adb.exe'], 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE,
-                    timeout=5
-                )
-                
-                # Жесткое завершение, если не помогло мягкое
-                subprocess.run(
-                    ['taskkill', '/F', '/T', '/IM', 'adb.exe'], 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE,
-                    timeout=5
-                )
-                
-                self.logger.info("Все процессы adb.exe завершены через taskkill.")
-            
-            except subprocess.TimeoutExpired:
-                self.logger.error("Превышено время ожидания taskkill.")
-            except Exception as e:
-                self.logger.error(f"Ошибка при использовании taskkill: {e}", exc_info=True)
-    
-        # Этап 4: Резервный механизм для Unix-подобных систем
-        else:
-            try:
-                subprocess.run(
-                    ['pkill', '-9', '-f', 'adb'], 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE,
-                    timeout=5
-                )
-                self.logger.info("Процессы ADB завершены через pkill.")
-            except Exception as e:
-                self.logger.error(f"Ошибка при резервном завершении процессов: {e}")
-    
-        self.logger.info("Процедура завершения процессов ADB завершена.")
+            self.logger.error(f"Ошибка при низкоуровневом завершении: {e}")
 
     def get_adb_path(self) -> str:
         """
