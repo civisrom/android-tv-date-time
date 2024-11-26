@@ -58,6 +58,7 @@ class AndroidTVTimeFixer:
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
+        self._adb_path = None
         self.adb_path = self.get_adb_path()
         self.device = None
         self.max_connection_retries = 5
@@ -223,9 +224,10 @@ class AndroidTVTimeFixer:
         Raises:
             FileNotFoundError: Если файл ADB не найден
         """
+        # Проверяем, если путь уже установлен
         if self._adb_path:
             return self._adb_path
-
+    
         try:
             # Пытаемся импортировать из hook'ов
             try:
@@ -236,20 +238,21 @@ class AndroidTVTimeFixer:
                 self._adb_path = ADB_PATH
         except ImportError:
             # Fallback для разработки
-            if getattr(sys, 'frozen', False):
+            if getattr(sys, 'frozen', False):  # Если программа упакована
                 base_path = sys._MEIPASS
-            else:
+            else:  # В случае обычного запуска
                 base_path = os.path.abspath(os.path.dirname(__file__))
-            
+    
             self._adb_path = os.path.join(
                 base_path, 
                 'resources', 
                 'adb.exe' if sys.platform == 'win32' else 'adb'
             )
-
+    
+        # Проверяем, существует ли файл
         if not os.path.exists(self._adb_path):
             raise FileNotFoundError(f"ADB не найден по пути: {self._adb_path}")
-
+    
         self.logger.info(f"Используется ADB по пути: {self._adb_path}")
         return self._adb_path
 
