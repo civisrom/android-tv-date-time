@@ -73,10 +73,6 @@ class AndroidTVTimeFixer:
         atexit.register(self.kill_adb_processes)
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
-        self._monitor_thread = threading.Thread(
-            target=self._adb_process_monitor, 
-            daemon=True
-        )
         self._monitor_thread.start()
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
@@ -192,77 +188,133 @@ class AndroidTVTimeFixer:
             
             time.sleep(2)
 
-    def _kill_adb_without_psutil(self):
+    def kill_adb_processes(self) -> None:
         """
-        Резервный метод завершения ADB процессов без psutil
+        Комплексный метод завершения процессов ADB с максимальной надежностью
         """
-        try:
-            if sys.platform == 'win32':
-                subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
-                               stdout=subprocess.PIPE, 
-                               stderr=subprocess.PIPE, 
-                               timeout=2)
-            else:
-                subprocess.run(['pkill', '-9', '-f', 'adb'], 
-                               stdout=subprocess.PIPE, 
-                               stderr=subprocess.PIPE, 
-                               timeout=2)
-        except Exception as e:
-            self.logger.error(f"Ошибка при завершении ADB: {e}")
-
-    def kill_adb_processes(self):
-        """
-        Комплексный метод завершения ADB процессов
-        """
-        # Установка флага завершения
-        self._kill_event.set()
-
         self.logger.info("Начало процедуры завершения ADB процессов")
-
-        # Список методов завершения
+    
+        # Список методов завершения ADB процессов
         kill_methods = [
-            # 1. Штатное завершение через ADB
-            lambda: subprocess.run([self.adb_path, 'kill-server'], 
-                                   stdout=subprocess.PIPE, 
-                                   stderr=subprocess.PIPE, 
-                                   timeout=3),
+            # 1. Штатное завершение через ADB kill-server
+            self._kill_adb_server,
             
-            # 2. Завершение через taskkill (Windows)
-            lambda: subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
-                                   stdout=subprocess.PIPE, 
-                                   stderr=subprocess.PIPE, 
-                                   timeout=3) if sys.platform == 'win32' else None,
+            # 2. Завершение через psutil (если установлен)
+            self._kill_adb_with_psutil,
             
-            # 3. Завершение через psutil
-            lambda: self._kill_with_psutil(),
-            
-            # 4. Низкоуровневое завершение через ctypes (Windows)
-            lambda: self._kill_with_ctypes() if sys.platform == 'win32' else None
+            # 3. Системные утилиты (taskkill для Windows, pkill для Unix)
+            self._kill_adb_with_system_tools
         ]
-
-        # Последовательное применение методов
+    
+        # Последовательное применение методов завершения
         for method in kill_methods:
             try:
-                if method:
-                    method()
+                method()
             except Exception as e:
                 self.logger.warning(f"Метод завершения не сработал: {e}")
-
+    
         self.logger.info("Процедура завершения ADB процессов завершена")
-
-    def _kill_with_psutil(self):
-        """Завершение процессов через psutil"""
+    
+    def _kill_adb_server(self):
+        """Завершение ADB сервера штатным способом"""
+        try:
+            subprocess.run(
+                [self.adb_path, 'kill-server'], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                timeout=3,
+                check=True
+            )
+            self.logger.info("ADB сервер успешно остановлен через kill-server")
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Ошибка kill-server: {e.stderr.decode('utf-8', errors='ignore')}")
+        except Exception as e:
+            self.logger.error(f"Неожиданная ошибка при остановке ADB сервера: {e}")
+    
+    def _kill_adb_with_psutil(self):
+        """Завершение ADB процессов через psutil"""
         try:
             import psutil
+            
+            # Список найденных процессов ADB
+            adb_processes = []
+            
             for proc in psutil.process_iter(['name', 'pid']):
-                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
+                try:
+                    # Проверка имени процесса с учетом регистра
+                    if proc.info['name'] and 'adb' in proc.info['name'].lower():
+                        adb_processes.append(proc)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            # Завершение найденных процессов
+            for proc in adb_processes:
+                try:
+                    self.logger.info(f"Завершение процесса ADB: PID={proc.pid}, Name={proc.info['name']}")
+                    proc.terminate()
+                    
+                    # Ожидание завершения с таймаутом
                     try:
-                        proc.terminate()
                         proc.wait(timeout=2)
-                    except Exception as e:
-                        self.logger.warning(f"Не удалось завершить процесс {proc.info['pid']}: {e}")
+                    except psutil.TimeoutExpired:
+                        proc.kill()  # Принудительное закрытие
+                
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            if adb_processes:
+                self.logger.info(f"Завершено процессов ADB через psutil: {len(adb_processes)}")
+            
         except ImportError:
-            self.logger.warning("Библиотека psutil не установлена")
+            self.logger.warning("Библиотека psutil не установлена, пропуск метода")
+        except Exception as e:
+            self.logger.error(f"Ошибка при использовании psutil: {e}")
+    
+    def _kill_adb_with_system_tools(self):
+        """Завершение ADB процессов системными утилитами"""
+        if sys.platform == 'win32':
+            # Методы завершения для Windows
+            kill_commands = [
+                ['taskkill', '/F', '/IM', 'adb.exe'],
+                ['taskkill', '/F', '/T', '/IM', 'adb.exe']
+            ]
+            
+            for cmd in kill_commands:
+                try:
+                    subprocess.run(
+                        cmd, 
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE, 
+                        timeout=3,
+                        text=True
+                    )
+                    self.logger.info(f"Завершение ADB через команду: {' '.join(cmd)}")
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Ошибка выполнения {cmd}: {e.stderr}")
+                except Exception as e:
+                    self.logger.error(f"Неожиданная ошибка при завершении ADB: {e}")
+        
+        else:
+            # Методы завершения для Unix-подобных систем
+            kill_commands = [
+                ['pkill', '-9', '-f', 'adb'],
+                ['killall', '-9', 'adb']
+            ]
+            
+            for cmd in kill_commands:
+                try:
+                    subprocess.run(
+                        cmd, 
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE, 
+                        timeout=3,
+                        text=True
+                    )
+                    self.logger.info(f"Завершение ADB через команду: {' '.join(cmd)}")
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Ошибка выполнения {cmd}: {e.stderr}")
+                except Exception as e:
+                    self.logger.error(f"Неожиданная ошибка при завершении ADB: {e}")
 
     def _kill_with_ctypes(self):
         """Низкоуровневое завершение процессов через ctypes (Windows)"""
