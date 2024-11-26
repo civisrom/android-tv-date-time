@@ -172,7 +172,7 @@ class AndroidTVTimeFixer:
             if process.returncode == 0:
                 self.logger.info("ADB сервер успешно остановлен.")
             elif stderr:
-                self.logger.error(f"Ошибка остановки ADB сервера: {stderr.decode().strip()}")
+                self.logger.error(f"Ошибка остановки ADB сервера: {stderr.decode(errors='ignore').strip()}")
         except Exception as e:
             self.logger.warning(f"Не удалось остановить сервер ADB: {e}")
     
@@ -184,10 +184,11 @@ class AndroidTVTimeFixer:
                 taskkill_command = ['taskkill', '/F', '/IM', 'adb.exe']
                 process = Popen(taskkill_command, stdout=PIPE, stderr=PIPE)
                 stdout, stderr = process.communicate(timeout=5)
+                encoding = 'cp1251' if sys.getdefaultencoding() != 'utf-8' else 'utf-8'
                 if process.returncode == 0:
-                    self.logger.info("Все процессы adb.exe успешно завершены.")
+                    self.logger.info(f"Все процессы adb.exe успешно завершены: {stdout.decode(encoding, errors='ignore').strip()}")
                 else:
-                    self.logger.error(f"Ошибка завершения процессов adb.exe: {stderr.decode().strip()}")
+                    self.logger.error(f"Ошибка завершения процессов adb.exe: {stderr.decode(encoding, errors='ignore').strip()}")
             else:
                 # Используем pkill для завершения процессов adb
                 self.logger.info("Используем pkill для завершения процессов adb.")
@@ -195,9 +196,9 @@ class AndroidTVTimeFixer:
                 process = Popen(pkill_command, stdout=PIPE, stderr=PIPE)
                 stdout, stderr = process.communicate(timeout=5)
                 if process.returncode == 0:
-                    self.logger.info("Все процессы adb успешно завершены.")
+                    self.logger.info(f"Все процессы adb успешно завершены: {stdout.decode(errors='ignore').strip()}")
                 else:
-                    self.logger.error(f"Ошибка завершения процессов adb: {stderr.decode().strip()}")
+                    self.logger.error(f"Ошибка завершения процессов adb: {stderr.decode(errors='ignore').strip()}")
         except FileNotFoundError as e:
             self.logger.warning(f"Команда taskkill/pkill не найдена: {e}")
         except TimeoutError:
