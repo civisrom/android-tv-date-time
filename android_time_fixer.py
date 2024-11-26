@@ -23,7 +23,6 @@ from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language
 init(autoreset=True)
-atexit.register(self.kill_adb_processes)
 
 # Настройка логирования
 #logging.basicConfig(
@@ -65,6 +64,7 @@ class AndroidTVTimeFixer:
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
+        atexit.register(self.kill_adb_processes)
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
