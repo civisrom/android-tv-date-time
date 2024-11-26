@@ -58,7 +58,7 @@ class AndroidTVTimeFixer:
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
-        self._adb_path: Optional[str] = None
+        self.adb_path = self.get_adb_path()
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -163,7 +163,7 @@ class AndroidTVTimeFixer:
         Завершает сервер ADB и связанные процессы.
         """
         self.logger.info("Остановка сервера ADB и завершение процессов adb.")
-
+    
         # Попытка остановить сервер ADB через adb kill-server
         try:
             process = Popen([self.adb_path, 'kill-server'], stdout=PIPE, stderr=PIPE)
@@ -174,7 +174,7 @@ class AndroidTVTimeFixer:
                 self.logger.error(f"Ошибка остановки ADB сервера: {stderr.decode(errors='ignore').strip()}")
         except Exception as e:
             self.logger.warning(f"Не удалось остановить сервер ADB: {e}")
-
+    
         # Завершение процессов adb.exe через psutil
         try:
             for proc in psutil.process_iter(['pid', 'name']):
@@ -188,7 +188,7 @@ class AndroidTVTimeFixer:
             self.logger.error("Нет доступа для завершения процесса ADB.")
         except Exception as e:
             self.logger.error(f"Ошибка завершения процесса ADB через psutil: {e}", exc_info=True)
-
+    
         # Резервное завершение через системные команды
         if sys.platform == 'win32':
             try:
@@ -196,9 +196,9 @@ class AndroidTVTimeFixer:
                 process = Popen(['taskkill', '/F', '/IM', 'adb.exe'], stdout=PIPE, stderr=PIPE)
                 stdout, stderr = process.communicate(timeout=5)
                 if process.returncode == 0:
-                    self.logger.info(f"Taskkill завершил процессы adb.exe: {stdout.decode('cp1251', errors='ignore').strip()}")
+                    self.logger.info(f"Taskkill завершил процессы adb.exe: {stdout.decode('cp866', errors='ignore').strip()}")
                 else:
-                    self.logger.error(f"Ошибка taskkill: {stderr.decode('cp1251', errors='ignore').strip()}")
+                    self.logger.error(f"Ошибка taskkill: {stderr.decode('cp866', errors='ignore').strip()}")
             except Exception as e:
                 self.logger.error(f"Ошибка выполнения taskkill: {e}", exc_info=True)
         else:
