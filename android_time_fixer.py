@@ -9,6 +9,7 @@ import platform
 import json
 import psutil
 import atexit
+import signal
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -65,6 +66,8 @@ class AndroidTVTimeFixer:
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
         atexit.register(self.kill_adb_processes)
+        signal.signal(signal.SIGTERM, self._handle_signal)
+        signal.signal(signal.SIGINT, self._handle_signal)
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
@@ -149,12 +152,18 @@ class AndroidTVTimeFixer:
         )
         self.logger = logging.getLogger(__name__)
 
+    def _handle_signal(self, signum, frame) -> None:
+        """Обработчик сигналов для завершения программы"""
+        self.logger.info(f"Программа завершена с сигналом: {signum}")
+        self.kill_adb_processes()
+        sys.exit(0)
+
     def kill_adb_processes(self) -> None:
         """
         Завершает сервер ADB и связанные процессы.
         """
-        self.logger.info("Остановка сервера ADB и завершение процессов adb.exe.")
-        
+        self.logger.info("Остановка сервера ADB и завершение процессов adb.")
+    
         # Остановка сервера ADB через adb kill-server
         try:
             adb_path = self.get_adb_path()
@@ -166,20 +175,35 @@ class AndroidTVTimeFixer:
                 self.logger.error(f"Ошибка остановки ADB сервера: {stderr.decode().strip()}")
         except Exception as e:
             self.logger.warning(f"Не удалось остановить сервер ADB: {e}")
-        
-        # Завершение процессов adb.exe в Windows
+    
+        # Завершение процессов adb.exe в Windows или Unix
         try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
-                    self.logger.info(f"Завершаем процесс ADB: PID={proc.info['pid']} NAME={proc.info['name']}")
-                    proc.terminate()
-                    proc.wait(timeout=5)
-        except psutil.NoSuchProcess:
-            self.logger.info("Процесс ADB уже завершен.")
-        except psutil.AccessDenied:
-            self.logger.error("Нет доступа для завершения процесса ADB.")
+            if sys.platform == 'win32':
+                # Используем taskkill для завершения процессов adb.exe
+                self.logger.info("Используем taskkill для завершения процессов adb.exe.")
+                taskkill_command = ['taskkill', '/F', '/IM', 'adb.exe']
+                process = Popen(taskkill_command, stdout=PIPE, stderr=PIPE)
+                stdout, stderr = process.communicate(timeout=5)
+                if process.returncode == 0:
+                    self.logger.info("Все процессы adb.exe успешно завершены.")
+                else:
+                    self.logger.error(f"Ошибка завершения процессов adb.exe: {stderr.decode().strip()}")
+            else:
+                # Используем pkill для завершения процессов adb
+                self.logger.info("Используем pkill для завершения процессов adb.")
+                pkill_command = ['pkill', '-f', 'adb']
+                process = Popen(pkill_command, stdout=PIPE, stderr=PIPE)
+                stdout, stderr = process.communicate(timeout=5)
+                if process.returncode == 0:
+                    self.logger.info("Все процессы adb успешно завершены.")
+                else:
+                    self.logger.error(f"Ошибка завершения процессов adb: {stderr.decode().strip()}")
+        except FileNotFoundError as e:
+            self.logger.warning(f"Команда taskkill/pkill не найдена: {e}")
+        except TimeoutError:
+            self.logger.error("Команда завершения процессов adb превысила допустимое время ожидания.")
         except Exception as e:
-            self.logger.error(f"Ошибка завершения процесса ADB: {e}", exc_info=True)
+            self.logger.error(f"Ошибка завершения процессов adb: {e}", exc_info=True)
 
     def get_adb_path(self) -> str:
         """
