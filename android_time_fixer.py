@@ -7,13 +7,8 @@ import time
 import logging
 import platform
 import json
-import atexit
-import psutil
-import threading
-from threading import Lock
 import subprocess
-from subprocess import Popen, PIPE, TimeoutExpired
-from contextlib import contextmanager
+from subprocess import Popen, PIPE
 from pathlib import Path
 from typing import Optional, Tuple
 import ntplib
@@ -56,14 +51,11 @@ class AndroidTVTimeFixerError(Exception):
     pass
 
 class AndroidTVTimeFixer:
-    def __init__(self, adb_path=None):
+    def __init__(self):
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
-        self.adb_processes_lock = Lock() 
-        self.adb_processes = []
-        atexit.register(self.cleanup_adb)
-        self._adb_path: Optional[str] = adb_path
+        self._adb_path: Optional[str] = None
         self.device = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -143,242 +135,32 @@ class AndroidTVTimeFixer:
         ]
 
     def _setup_logging(self) -> None:
-        """Настраивает логирование для класса с защитой от повторной инициализации"""
-        if not logging.getLogger().handlers:  # Проверяем, не настроено ли уже логирование
-            logging.basicConfig(
-                level=logging.INFO,
-                format='%(asctime)s - %(levelname)s - %(message)s',
-                handlers=[
-                    logging.FileHandler('android_tv_fixer.log', encoding='utf-8'),
-                    logging.StreamHandler(sys.stdout)
-                ]
-            )
-            
-            # Установка кодировки для обработчика
-            for handler in logging.getLogger().handlers:
-                if isinstance(handler, logging.StreamHandler):
-                    handler.setStream(sys.stdout)
-                    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        
+        """Настраивает логирование для класса"""
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('android_tv_fixer.log', encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
         self.logger = logging.getLogger(__name__)
-
-    @contextmanager
-    def managed_process(self, command: str, timeout: int = 30):
-        """Контекстный менеджер для безопасной работы с процессами"""
-        process = None
-        try:
-            process = self.execute_adb_command(command)
-            yield process
-        finally:
-            if process:
-                try:
-                    process.terminate()
-                    process.wait(timeout=5)
-                except Exception:
-                    if process.poll() is None:
-                        process.kill()
-
-    def execute_adb_command(self, command: str, save_process: bool = False, timeout: int = 30):
-        """
-        Выполняет команду ADB с таймаутом и обработкой ошибок
-        
-        Args:
-            command (str): Команда ADB для выполнения
-            save_process (bool): Сохранять ли процесс в список
-            timeout (int): Таймаут выполнения в секундах
-            
-        Returns:
-            Popen: Процесс, выполняющий команду
-            
-        Raises:
-            TimeoutExpired: Если превышен таймаут выполнения
-            AndroidTVTimeFixerError: При ошибках выполнения команды
-        """
-        args = shlex.split(command)
-        args[0] = self.get_adb_path()
-        
-        try:
-            process = Popen(
-                args,
-                stdout=PIPE,
-                stderr=PIPE,
-                universal_newlines=True,
-                encoding='utf-8' if sys.platform != 'win32' else 'cp866',
-                bufsize=1
-            )
-            
-            if save_process:
-                with self.adb_processes_lock:
-                    self.adb_processes.append(process)
-            
-            return_code = process.wait(timeout=timeout)
-            
-            if return_code != 0:
-                _, stderr = process.communicate()
-                raise AndroidTVTimeFixerError(f"Command failed with code {return_code}: {stderr}")
-                
-            return process
-            
-        except TimeoutExpired:
-            if process:
-                process.kill()
-            raise AndroidTVTimeFixerError(f"Command timed out after {timeout} seconds")
-        except Exception as e:
-            raise AndroidTVTimeFixerError(f"Error executing command: {str(e)}")
-
-    def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
-        """
-        Обрабатывает вывод команды с корректной обработкой кодировок
-        """
-        stdout_lines = []
-        try:
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    clean_output = output.strip()
-                    if sys.platform == 'win32':
-                        try:
-                            clean_output = clean_output.encode('cp866', errors='replace').decode('cp866')
-                        except UnicodeEncodeError:
-                            clean_output = clean_output.encode('utf-8', errors='replace').decode('utf-8')
-                    stdout_lines.append(clean_output)
-                    print(clean_output)  # Используем системную кодировку по умолчанию
-
-            return_code = process.poll()
-            _, stderr = process.communicate(timeout=5)
-            
-            # Обработка stderr с учётом кодировки
-            if stderr and sys.platform == 'win32':
-                try:
-                    stderr = stderr.encode('cp866', errors='replace').decode('cp866')
-                except UnicodeEncodeError:
-                    stderr = stderr.encode('utf-8', errors='replace').decode('utf-8')
-            
-            return return_code, '\n'.join(stdout_lines), stderr
-
-        except TimeoutExpired:
-            process.kill()
-            raise TimeoutExpired(process.args, 5)
-
-    def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
-        """
-        Пытается переподключиться к устройству с обработкой специфических ошибок
-        """
-        import time
-        
-        connection_errors = {
-            "error: no devices/emulators found": "Устройства не найдены",
-            "error: device not found": "Устройство не найдено",
-            "error: device offline": "Устройство не в сети",
-            "error: device unauthorized": "Устройство не авторизовано"
-        }
-        
-        for attempt in range(max_retries):
-            try:
-                with self.managed_process(command) as process:
-                    return_code, stdout, stderr = self._process_command_output(process)
-                    
-                    if return_code == 0:
-                        return True
-                    
-                    error_found = False
-                    for error_text, error_message in connection_errors.items():
-                        if error_text in stderr.lower():
-                            error_found = True
-                            self.logger.warning(
-                                f"Попытка {attempt + 1}/{max_retries}: {error_message}. "
-                                f"Повторная попытка через {delay} сек..."
-                            )
-                            time.sleep(delay)
-                            break
-                    
-                    if not error_found:
-                        self.logger.error(f"Неизвестная ошибка: {stderr}")
-                        return False
-                        
-            except TimeoutExpired:
-                self.logger.error(f"Таймаут подключения на попытке {attempt + 1}")
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    continue
-                return False
-            except Exception as e:
-                self.logger.error(f"Ошибка подключения: {str(e)}", exc_info=True)
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    continue
-                return False
-                
-        return False
-
-    def kill_all_adb_processes(self) -> None:
-        """Безопасное завершение всех процессов ADB с обработкой ошибок"""
-        self.logger.info("Завершение всех процессов ADB")
-        
-        # Завершение сервера ADB
-        try:
-            with self.managed_process("adb kill-server", timeout=10):
-                self.logger.info("ADB сервер успешно остановлен")
-        except Exception as e:
-            self.logger.warning(f"Не удалось остановить сервер ADB: {e}")
-        
-        # Завершение процессов через psutil
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    if proc.info['name'] and 'adb.exe' in proc.info['name'].lower():
-                        self.logger.info(f"Завершение процесса: PID={proc.info['pid']}")
-                        proc.kill()
-                        proc.wait(timeout=5)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
-                    self.logger.warning(f"Ошибка при завершении процесса {proc.info['pid']}: {e}")
-        except Exception as e:
-            self.logger.error(f"Ошибка при завершении процессов: {e}", exc_info=True)
-        
-        # Завершение сохранённых процессов
-        with self.adb_processes_lock:
-            for process in self.adb_processes[:]:  # Создаём копию списка
-                try:
-                    if process.poll() is None:  # Проверяем, что процесс ещё запущен
-                        process.terminate()
-                        try:
-                            process.wait(timeout=5)
-                        except TimeoutExpired:
-                            process.kill()
-                            process.wait()
-                except Exception as e:
-                    self.logger.error(f"Ошибка при завершении процесса: {e}")
-                finally:
-                    self.adb_processes.remove(process)
-
-    def cleanup_adb(self) -> None:
-        """Безопасная очистка ресурсов при завершении работы"""
-        try:
-            self.logger.info("Начало очистки ресурсов ADB")
-            self.kill_all_adb_processes()
-            self.logger.info("Очистка ресурсов ADB завершена успешно")
-        except Exception as e:
-            self.logger.error(f"Ошибка при очистке ресурсов ADB: {e}", exc_info=True)
-            # Принудительное завершение процессов в случае ошибки
-            try:
-                os.system('taskkill /F /IM adb.exe' if sys.platform == 'win32' else 'killall adb')
-            except Exception as kill_error:
-                self.logger.error(f"Не удалось принудительно завершить процессы: {kill_error}")
 
     def get_adb_path(self) -> str:
         """
-        Получает путь к ADB из настроек или ресурсов.
+        Получает путь к ADB из runtime hook или ресурсов
         
         Returns:
-            str: Полный путь к исполняемому файлу ADB.
+            str: Полный путь к исполняемому файлу ADB
+            
+        Raises:
+            FileNotFoundError: Если файл ADB не найден
         """
         if self._adb_path:
             return self._adb_path
-    
+
         try:
-            # Проверяем наличие hook'ов
+            # Пытаемся импортировать из hook'ов
             try:
                 from hooks.win_hook import ADB_PATH
                 self._adb_path = ADB_PATH
@@ -397,12 +179,119 @@ class AndroidTVTimeFixer:
                 'resources', 
                 'adb.exe' if sys.platform == 'win32' else 'adb'
             )
-        
+
         if not os.path.exists(self._adb_path):
             raise FileNotFoundError(f"ADB не найден по пути: {self._adb_path}")
-        
+
         self.logger.info(f"Используется ADB по пути: {self._adb_path}")
         return self._adb_path
+
+    def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
+        """
+        Обрабатывает вывод команды и возвращает результат
+        
+        Args:
+            process (Popen): Процесс для обработки
+            
+        Returns:
+            Tuple[int, str, str]: (код возврата, stdout, stderr)
+        """
+        stdout_lines = []
+        try:
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    clean_output = output.strip()
+                    if sys.platform == 'win32':
+                        try:
+                            # Пробуем декодировать как cp866 (кодировка командной строки Windows)
+                            clean_output = clean_output.encode('cp866').decode('cp866')
+                        except UnicodeEncodeError:
+                            # Если не получилось, оставляем как есть
+                            pass
+                    stdout_lines.append(clean_output)
+                    print(Fore.GREEN + clean_output)
+
+            return_code = process.poll()
+            _, stderr = process.communicate(timeout=5)
+            return return_code, '\n'.join(stdout_lines), stderr
+
+        except TimeoutError:
+            process.kill()
+            raise TimeoutError("Превышено время ожидания выполнения команды")
+
+    def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
+        """
+        Пытается переподключиться к устройству несколько раз
+        
+        Args:
+            command (str): Выполняемая команда
+            max_retries (int): Максимальное количество попыток
+            delay (int): Задержка между попытками в секундах
+            
+        Returns:
+            bool: True если подключение успешно, False в противном случае
+        """
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                args = shlex.split(command)
+                if not args:
+                    return False
+    
+                if args[0] == 'adb':
+                    args[0] = self.get_adb_path()
+    
+                process = Popen(
+                    args,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True,
+                    encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+                    bufsize=1
+                )
+                
+                return_code, stdout, stderr = self._process_command_output(process)
+                
+                # Проверяем наличие ошибок подключения
+                connection_errors = [
+                    "error: no devices/emulators found",
+                    "error: device not found",
+                    "error: device offline",
+                    "error: device unauthorized"
+                ]
+                
+                if return_code == 0:
+                    return True
+                    
+                if any(error in stderr.lower() for error in connection_errors):
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
+                        print(Fore.YELLOW + f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        self.logger.error("Все попытки подключения не удались")
+                        print(Fore.RED + "Все попытки подключения не удались")
+                        return False
+                else:
+                    # Если ошибка не связана с подключением, прекращаем попытки
+                    if stderr:
+                        self.logger.error(f"STDERR: {stderr}")
+                        print(Fore.RED + stderr)
+                    return False
+                    
+            except Exception as e:
+                self.logger.error(f"Ошибка при попытке подключения: {str(e)}", exc_info=True)
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                    continue
+                return False
+                
+        return False
     
     def execute_terminal_command(self, command: str) -> None:
         """
@@ -460,41 +349,42 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
     def terminal_mode(self) -> None:
-        """Режим терминала для выполнения команд."""
+        """Режим терминала для выполнения команд"""
+        # Установка кодировки для Windows
         if sys.platform == 'win32':
-            os.system('chcp 866')  # Установка кодировки для Windows
-        
+            os.system('chcp 866')
+
         self.logger.info("Запущен режим терминала")
-        print(Fore.GREEN + "Добро пожаловать в режим терминала! Для выхода введите 'exit'.")
+        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
+        print(Fore.YELLOW + locales.get("terminal_mode_help"))
         
-        try:
-            while True:
+        while True:
+            try:
                 command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
                 
                 # Проверяем специальные команды
                 if command.lower() in ['exit', 'quit', 'q']:
-                    self.logger.info("Выход из режима терминала.")
+                    self.logger.info("Выход из режима терминала")
                     break
+                elif command.lower() in ['help', '?']:
+                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                    continue
                 elif command.lower() == 'clear':
-                    os.system('cls' if sys.platform == 'win32' else 'clear')
+                    os.system('cls' if platform.system() == 'Windows' else 'clear')
                     continue
                 elif not command:
                     continue
                 
-                # Защита от выполнения `adb kill-server`
-                if "adb kill-server" in command.lower():
-                    print(Fore.RED + "Команда 'adb kill-server' запрещена в режиме терминала.")
-                    continue
+                # Выполняем команду
+                self.execute_terminal_command(command)
                 
-                # Выполнение команды
-                self.execute_adb_command(command)
-        except KeyboardInterrupt:
-            self.logger.info("Прерывание работы терминала (Ctrl+C).")
-        except Exception as e:
-            self.logger.error(f"Ошибка в режиме терминала: {e}", exc_info=True)
-            print(Fore.RED + f"Ошибка выполнения команды: {e}")
-        finally:
-            print(Fore.YELLOW + "Режим терминала завершён.")
+            except KeyboardInterrupt:
+                self.logger.info("Прерывание работы терминала (Ctrl+C)")
+                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+                break
+            except Exception as e:
+                self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
+                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
