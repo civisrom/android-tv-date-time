@@ -396,6 +396,9 @@ class AndroidTVTimeFixer:
                 if command.lower() in ['exit', 'quit', 'q']:
                     self.logger.info("Выход из режима терминала")
                     break
+                elif command.lower() in ['help', '?']:
+                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                    continue
                 elif command.lower() == 'clear':
                     os.system('cls' if sys.platform == 'win32' else 'clear')
                     continue
@@ -406,10 +409,11 @@ class AndroidTVTimeFixer:
                 self.execute_terminal_command(command)
         except KeyboardInterrupt:
             self.logger.info("Прерывание работы терминала (Ctrl+C)")
-            print("\nВыход из терминала.")
+            print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+            return
         except Exception as e:
             self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
-            print(Fore.RED + f"Ошибка: {str(e)}")
+            print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
         finally:
             # Завершаем ADB процессы при выходе
             self.kill_adb_processes()
