@@ -63,6 +63,12 @@ class AndroidTVTimeFixer:
         self._adb_path: Optional[str] = None
         self.device = None
         self.kill_adb_processes()
+        self.wmi_interface = None
+        if sys.platform == 'win32':
+            try:
+                self.wmi_interface = wmi.WMI()
+            except Exception as e:
+                self.logger.error(f"Ошибка инициализации WMI: {e}")
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -152,44 +158,75 @@ class AndroidTVTimeFixer:
         )
         self.logger = logging.getLogger(__name__)
 
-    def kill_adb_processes(adb_path):
+    def kill_adb_processes(self):
         """
-        Надежно завершает все процессы ADB.
+        Надежно завершает все процессы ADB с использованием WMI и псевдонимов.
         
-        Args:
-            adb_path (str): Путь к исполняемому файлу ADB
+        Стратегия:
+        1. Использование WMI для быстрого поиска процессов ADB
+        2. Мягкое завершение через команду kill-server
+        3. Принудительное завершение через WMI
+        4. Резервное завершение через psutil
         """
         try:
-            # Явный вызов kill-server
+            # Получаем путь к ADB
+            adb_path = self.get_adb_path()
+
+            # Мягкое завершение через ADB
             try:
-                subprocess.run([adb_path, 'kill-server'], 
-                               stdout=subprocess.PIPE, 
-                               stderr=subprocess.PIPE, 
-                               timeout=5)
+                subprocess.run(
+                    [adb_path, 'kill-server'], 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE, 
+                    timeout=3
+                )
             except Exception as e:
-                logging.warning(f"Ошибка при выполнении adb kill-server: {e}")
-    
-            # Завершение процессов через psutil
-            for proc in psutil.process_iter(['name', 'exe']):
+                self.logger.warning(f"Ошибка при выполнении adb kill-server: {e}")
+
+            # Завершение через WMI (Windows)
+            if sys.platform == 'win32' and self.wmi_interface:
                 try:
-                    # Проверяем, что это точно процесс ADB
-                    if (proc.info['name'] in ['adb.exe', 'adb'] and 
-                        (adb_path.lower() in str(proc.info.get('exe', '')).lower())):
-                        
-                        logging.info(f"Завершение процесса ADB: {proc.pid}")
-                        proc.terminate()
-                        time.sleep(0.5)
-                        
-                        # Принудительное завершение, если процесс не закрылся
-                        if proc.is_running():
-                            proc.kill()
+                    adb_processes = self.wmi_interface.Win32_Process(name='adb.exe')
+                    
+                    # Завершение всех найденных процессов
+                    for process in adb_processes:
+                        try:
+                            process.Terminate()
+                            self.logger.info(f"Процесс ADB {process.ProcessId} завершен через WMI")
+                        except Exception as e:
+                            self.logger.warning(f"Не удалось завершить процесс ADB {process.ProcessId}: {e}")
+                
+                except Exception as e:
+                    self.logger.error(f"Ошибка при завершении ADB через WMI: {e}")
+
+            # Резервный метод через psutil для кроссплатформенности
+            try:
+                import psutil
+                
+                for proc in psutil.process_iter(['name', 'exe']):
+                    try:
+                        # Проверяем, что это точно процесс ADB
+                        if (proc.info['name'] in ['adb.exe', 'adb'] and 
+                            (adb_path.lower() in str(proc.info.get('exe', '')).lower())):
                             
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    pass
-    
-            logging.info("Все процессы ADB успешно завершены")
+                            self.logger.info(f"Завершение процесса ADB: {proc.pid}")
+                            proc.terminate()
+                            time.sleep(0.5)
+                            
+                            # Принудительное завершение, если процесс не закрылся
+                            if proc.is_running():
+                                proc.kill()
+                                
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                        pass
+
+            except ImportError:
+                self.logger.warning("Библиотека psutil не установлена")
+
+            self.logger.info("Все процессы ADB успешно завершены")
+
         except Exception as e:
-            logging.error(f"Ошибка при завершении процессов ADB: {e}")
+            self.logger.error(f"Критическая ошибка при завершении процессов ADB: {e}")
     
     def setup_adb_process_killer():
         """
