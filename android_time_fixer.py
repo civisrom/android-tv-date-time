@@ -330,6 +330,14 @@ class AndroidTVTimeFixer:
             '1.africa.pool.ntp.org',
             '2.africa.pool.ntp.org',
             '3.africa.pool.ntp.org',
+            '0.oceania.pool.ntp.org',
+            '1.oceania.pool.ntp.org',
+            '2.oceania.pool.ntp.org',
+            '3.oceania.pool.ntp.org',
+            '0.south-america.pool.ntp.org',
+            '1.south-america.pool.ntp.org',
+            '2.south-america.pool.ntp.org',
+            '3.south-america.pool.ntp.org',
             'time.cloudflare.com',
             'clock.isc.org',
             'ntp2.vniiftri.ru',
@@ -426,14 +434,14 @@ class AndroidTVTimeFixer:
             process.kill()
             raise TimeoutError("Превышено время ожидания выполнения команды")
 
-    def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
+    def _retry_adb_connection(self, command: str, max_retries: int = 5, delay: int = 2) -> bool:
         """
-        Пытается переподключиться к устройству несколько раз, перед каждой попыткой выполняя 'adb kill-server'.
+        Пытается переподключиться к устройству несколько раз, выполняя 'adb kill-server' только на 3-й, 4-й и 5-й попытке.
     
         Args:
             command (str): Выполняемая команда.
-            max_retries (int): Максимальное количество попыток.
-            delay (int): Задержка между попытками в секундах.
+            max_retries (int): Максимальное количество попыток (по умолчанию 5).
+            delay (int): Задержка между попытками в секундах (по умолчанию 2).
     
         Returns:
             bool: True, если подключение успешно, False в противном случае.
@@ -445,23 +453,24 @@ class AndroidTVTimeFixer:
     
         for attempt in range(max_retries):
             try:
-                # Выполнение команды adb kill-server перед каждой попыткой подключения
-                self.logger.info(f"Попытка {attempt + 1}: Выполняется 'adb kill-server' для перезапуска сервера ADB.")
-                kill_server_command = [self.get_adb_path(), 'kill-server']
-                kill_server_process = Popen(
-                    kill_server_command,
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    universal_newlines=True,
-                    encoding='utf-8' if sys.platform != 'win32' else 'cp866',
-                    bufsize=1
-                )
-                _, kill_server_stderr = kill_server_process.communicate()
+                # Выполнение команды adb kill-server только на 3-й, 4-й и 5-й попытке
+                if attempt >= 2:  # Это означает 3-я, 4-я и 5-я попытки (индексация с 0)
+                    self.logger.info(f"Попытка {attempt + 1}: Выполняется 'adb kill-server' для перезапуска сервера ADB.")
+                    kill_server_command = [self.get_adb_path(), 'kill-server']
+                    kill_server_process = Popen(
+                        kill_server_command,
+                        stdout=PIPE,
+                        stderr=PIPE,
+                        universal_newlines=True,
+                        encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+                        bufsize=1
+                    )
+                    _, kill_server_stderr = kill_server_process.communicate()
     
-                if kill_server_process.returncode != 0:
-                    self.logger.warning(f"Ошибка при выполнении 'adb kill-server': {kill_server_stderr.strip()}")
-                else:
-                    self.logger.info("'adb kill-server' выполнен успешно.")
+                    if kill_server_process.returncode != 0:
+                        self.logger.warning(f"Ошибка при выполнении 'adb kill-server': {kill_server_stderr.strip()}")
+                    else:
+                        self.logger.info("'adb kill-server' выполнен успешно.")
     
                 # Выполнение основной команды подключения
                 args = shlex.split(command)
