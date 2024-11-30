@@ -551,7 +551,6 @@ class AndroidTVTimeFixer:
                 except KeyboardInterrupt:
                     # Обработка Ctrl+C без завершения ADB процессов
                     self.logger.info("Прерывание текущей команды (Ctrl+C)")
-                    self.process_manager.terminate_adb_processes()
                     print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                     continue
                 except Exception as e:
