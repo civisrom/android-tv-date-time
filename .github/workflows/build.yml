@@ -88,22 +88,6 @@ jobs:
           python -m poetry config virtualenvs.in-project true
           python -m poetry env info
         shell: pwsh
-          
-      - name: Debug Python and Poetry
-        run: |
-          echo "Python executable path:"
-          which python
-     
-          echo "Python version:"
-          python --version
-     
-          echo "Actual Python executable:"
-          python -c "import sys; print(sys.executable)"
-     
-          echo "Poetry version:"
-          python -m poetry --version
-        
-          shell: bash
         
       - name: Verify Python version
         run: python --version
