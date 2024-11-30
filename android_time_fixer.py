@@ -568,7 +568,7 @@ class AndroidTVTimeFixer:
         finally:
             # Дополнительная страховка - очистка процессов при любом выходе
             # Хотя основное завершение происходит при командах exit/quit/q
-            self.process_manager.cleanup()
+            fixer.process_manager.cleanup()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
@@ -1164,7 +1164,7 @@ def main():
 
     finally:
         # Явная очистка при завершении программы
-        self.process_manager.cleanup()
+        fixer.process_manager.cleanup()
 
 if __name__ == '__main__':
     main()
