@@ -114,10 +114,14 @@ jobs:
       
       - name: Configure Poetry
         run: |
-          # Set consistent Poetry configuration
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-          poetry config experimental.new-installer false
+          # Cross-platform Poetry configuration
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            python -m poetry config virtualenvs.create true
+            python -m poetry config virtualenvs.in-project true
+          else
+            poetry config virtualenvs.create true
+            poetry config virtualenvs.in-project true
+          fi
         shell: bash
 
       - name: Cache Poetry dependencies
