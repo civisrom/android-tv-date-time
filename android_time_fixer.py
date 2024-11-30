@@ -25,6 +25,11 @@ sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language
 init(autoreset=True)
 
+try:
+    import wmi
+except ImportError:
+    wmi = None
+
 # Настройка логирования
 #logging.basicConfig(
 #    level=logging.INFO,
@@ -52,6 +57,7 @@ logger = logging.getLogger(__name__)
 class ADBProcessManager:
     def __init__(self, adb_path):
         self.adb_path = adb_path
+        self.logger = logging.getLogger(__name__)
         self.setup_process_termination()
 
     def setup_process_termination(self):
@@ -85,25 +91,12 @@ class ADBProcessManager:
                            stdout=subprocess.DEVNULL, 
                            stderr=subprocess.DEVNULL, 
                            timeout=5)
+            self.logger.info("ADB kill-server executed successfully")
         except subprocess.TimeoutExpired:
-            pass
+            self.logger.warning("ADB kill-server timed out")
 
         # 2. Завершение через psutil
-        for proc in psutil.process_iter(['name', 'exe']):
-            try:
-                if (proc.info['name'] == 'adb.exe' or 
-                    (proc.info['exe'] and self.adb_path in proc.info['exe'])):
-                    
-                    # Мягкое завершение
-                    proc.terminate()
-                    
-                    # Если не завершился - принудительно
-                    try:
-                        proc.wait(timeout=3)
-                    except psutil.TimeoutExpired:
-                        proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
+        psutil_terminated = self._terminate_via_psutil()
 
         # 3. Завершение через platform-специфичные методы
         if sys.platform == 'win32':
@@ -111,15 +104,94 @@ class ADBProcessManager:
         else:
             self._terminate_unix_processes()
 
-    def _terminate_windows_processes(self):
-        """Завершение процессов ADB в Windows"""
+    def _terminate_via_psutil(self):
+        """
+        Завершение процессов через psutil
+        
+        Returns:
+            bool: Успешность завершения
+        """
+        terminated = False
         try:
+            for proc in psutil.process_iter(['name', 'exe']):
+                try:
+                    if (proc.info['name'] == 'adb.exe' or 
+                        (proc.info['exe'] and self.adb_path in proc.info['exe'])):
+                        
+                        # Мягкое завершение
+                        proc.terminate()
+                        
+                        # Если не завершился - принудительно
+                        try:
+                            proc.wait(timeout=3)
+                            terminated = True
+                        except psutil.TimeoutExpired:
+                            proc.kill()
+                            terminated = True
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+            
+            if terminated:
+                self.logger.info("Processes terminated via psutil")
+        except Exception as e:
+            self.logger.error(f"Error terminating via psutil: {e}")
+        
+        return terminated
+
+    def _terminate_windows_processes(self):
+        """Расширенное завершение процессов ADB в Windows"""
+        try:
+            # 1. Завершение через taskkill
             subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
                            stdout=subprocess.DEVNULL, 
                            stderr=subprocess.DEVNULL, 
                            timeout=5)
+            
+            # 2. Завершение через WMI (если доступно)
+            if wmi is not None:
+                self._terminate_via_wmi()
+            
+            self.logger.info("Windows ADB processes terminated")
         except subprocess.TimeoutExpired:
-            pass
+            self.logger.warning("taskkill timed out")
+        except Exception as e:
+            self.logger.error(f"Error terminating Windows processes: {e}")
+
+    def _terminate_via_wmi(self):
+        """
+        Завершение процессов ADB с использованием WMI
+        Работает только в Windows
+        """
+        if wmi is None:
+            self.logger.warning("WMI module not available")
+            return
+
+        try:
+            # Создаем WMI объект
+            c = wmi.WMI()
+            
+            # Находим процессы ADB по имени
+            processes = c.Win32_Process(name='adb.exe')
+            
+            for process in processes:
+                try:
+                    # Немедленное завершение процесса
+                    process.Terminate()
+                    self.logger.info(f"Terminated ADB process with PID {process.ProcessId}")
+                except Exception as e:
+                    self.logger.error(f"Error terminating process via WMI: {e}")
+            
+            # Дополнительный поиск по пути
+            processes_by_path = c.Win32_Process(ExecutablePath=self.adb_path)
+            for process in processes_by_path:
+                try:
+                    process.Terminate()
+                    self.logger.info(f"Terminated ADB process with PID {process.ProcessId}")
+                except Exception as e:
+                    self.logger.error(f"Error terminating process by path via WMI: {e}")
+        
+        except Exception as e:
+            self.logger.error(f"WMI termination error: {e}")
 
     def _terminate_unix_processes(self):
         """Завершение процессов ADB в Unix-системах"""
@@ -128,8 +200,9 @@ class ADBProcessManager:
                            stdout=subprocess.DEVNULL, 
                            stderr=subprocess.DEVNULL, 
                            timeout=5)
+            self.logger.info("Unix ADB processes terminated")
         except subprocess.TimeoutExpired:
-            pass
+            self.logger.warning("pkill timed out")
 
     def cleanup(self):
         """
@@ -442,57 +515,57 @@ class AndroidTVTimeFixer:
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
-def terminal_mode(self) -> None:
-    """Режим терминала для выполнения команд"""
-    # Установка кодировки для Windows
-    if sys.platform == 'win32':
-        os.system('chcp 866')
-
-    self.logger.info("Запущен режим терминала")
-    print(Fore.GREEN + locales.get("terminal_mode_welcome"))
-    print(Fore.YELLOW + locales.get("terminal_mode_help"))
+    def terminal_mode(self) -> None:
+        """Режим терминала для выполнения команд"""
+        # Установка кодировки для Windows
+        if sys.platform == 'win32':
+            os.system('chcp 866')
     
-    try:
-        while True:
-            try:
-                command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
-                
-                # Проверяем специальные команды
-                if command.lower() in ['exit', 'quit', 'q']:
-                    self.logger.info("Выход из режима терминала")
-                    # Завершаем процессы ADB только при выходе
+        self.logger.info("Запущен режим терминала")
+        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
+        print(Fore.YELLOW + locales.get("terminal_mode_help"))
+        
+        try:
+            while True:
+                try:
+                    command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
+                    
+                    # Проверяем специальные команды
+                    if command.lower() in ['exit', 'quit', 'q']:
+                        self.logger.info("Выход из режима терминала")
+                        # Завершаем процессы ADB только при выходе
+                        self.process_manager.terminate_adb_processes()
+                        break
+                    elif command.lower() in ['help', '?']:
+                        print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                        continue
+                    elif command.lower() == 'clear':
+                        os.system('cls' if platform.system() == 'Windows' else 'clear')
+                        continue
+                    elif not command:
+                        continue
+                    
+                    # Выполняем команду без завершения процессов ADB
+                    self.execute_terminal_command(command)
+                    
+                except KeyboardInterrupt:
+                    # Обработка Ctrl+C без завершения ADB процессов
+                    self.logger.info("Прерывание текущей команды (Ctrl+C)")
                     self.process_manager.terminate_adb_processes()
-                    break
-                elif command.lower() in ['help', '?']:
-                    print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                    print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                     continue
-                elif command.lower() == 'clear':
-                    os.system('cls' if platform.system() == 'Windows' else 'clear')
-                    continue
-                elif not command:
-                    continue
-                
-                # Выполняем команду без завершения процессов ADB
-                self.execute_terminal_command(command)
-                
-            except KeyboardInterrupt:
-                # Обработка Ctrl+C без завершения ADB процессов
-                self.logger.info("Прерывание текущей команды (Ctrl+C)")
-                self.process_manager.terminate_adb_processes()
-                print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-                continue
-            except Exception as e:
-                self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
-                self.process_manager.terminate_adb_processes()
-                print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
-    
-    except Exception as e:
-        self.logger.error(f"Критическая ошибка в режиме терминала: {str(e)}", exc_info=True)
-        print(Fore.RED + locales.get("terminal_mode_critical_error", error=str(e)))
-    finally:
-        # Дополнительная страховка - очистка процессов при любом выходе
-        # Хотя основное завершение происходит при командах exit/quit/q
-        self.process_manager.cleanup()
+                except Exception as e:
+                    self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
+                    self.process_manager.terminate_adb_processes()
+                    print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
+        
+        except Exception as e:
+            self.logger.error(f"Критическая ошибка в режиме терминала: {str(e)}", exc_info=True)
+            print(Fore.RED + locales.get("terminal_mode_critical_error", error=str(e)))
+        finally:
+            # Дополнительная страховка - очистка процессов при любом выходе
+            # Хотя основное завершение происходит при командах exit/quit/q
+            self.process_manager.cleanup()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
