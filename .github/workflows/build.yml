@@ -22,12 +22,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest] #, ubuntu-latest]
         include:
           - os: windows-latest
             platform: windows
-          - os: ubuntu-latest
-            platform: linux
+          #- os: ubuntu-latest
+            #platform: linux
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45

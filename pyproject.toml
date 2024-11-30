@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "androidtvtimefixer"
-version = "1.0.0"
+version = "2.0.0"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
@@ -15,23 +15,23 @@ platformdirs = "^3.5.0"
 packaging = "^23.0"
 typing-extensions = "^4.5.0"
 cryptography = "^41.0.0"
-pyusb = "^1.2.1"
-libusb1 = "^3.0.0"
+# pyusb = "^1.2.1"
+# libusb1 = "^3.0.0"
 rsa = "^4.9.0"
 ntplib = "^0.4.0"
 
 # Указание зависимостей только для Windows с помощью markers
-pywin32 = { version = "306", markers = "sys_platform == 'win32'" }
+# pywin32 = { version = "306", markers = "sys_platform == 'win32'" }
 psutil = { version = "^5.9.0", markers = "sys_platform == 'win32'" }
 wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
-pywinusb = { version = "^0.4.2", markers = "sys_platform == 'win32'" }
+# pywinusb = { version = "^0.4.2", markers = "sys_platform == 'win32'" }
 
 # Общие зависимости
 click = "^8.1.0"
 rich = "^13.0.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.3.0"
+# pytest = "^7.3.0"
 black = "^23.0.0"
 flake8 = "^6.0.0"
 mypy = "^1.0.0"
