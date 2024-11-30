@@ -76,6 +76,9 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
           
+      - name: Set Python version for Poetry
+        run: poetry env use python3.12
+
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
@@ -87,9 +90,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-
             ${{ runner.os }}-poetry-
-
-      - name: Remove old virtualenv
-        run: poetry env remove python || true
 
       - name: Install project dependencies
         run: |
