@@ -43,32 +43,34 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          cache: 'pip'
         
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip
           python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
-      
+        
       - name: Configure Poetry Environment
         run: |
-          # Explicitly use the Python executable from the runner
-          PYTHON_PATH=$(which python)
-          echo "Using Python executable: $PYTHON_PATH"
+          # Determine Python executable
+          PYTHON_EXE=$(which python)
             
-          # Use the full path to set up Poetry environment
-          $PYTHON_PATH -m poetry env use "$PYTHON_PATH"
+          # Verify Python version
+          $PYTHON_EXE --version
+            
+          # Set up Poetry environment with specific Python version
+          $PYTHON_EXE -m poetry env use $PYTHON_EXE
             
           # Configure Poetry settings
-          $PYTHON_PATH -m poetry config virtualenvs.create true
-          $PYTHON_PATH -m poetry config virtualenvs.in-project true
+          $PYTHON_EXE -m poetry config virtualenvs.create true
+          $PYTHON_EXE -m poetry config virtualenvs.in-project true
             
           # Verify Poetry environment
-          $PYTHON_PATH -m poetry env info
+          $PYTHON_EXE -m poetry env info
         shell: bash
         
-      - name: Install Dependencies
+      - name: Install Project Dependencies
         run: |
           python -m poetry config virtualenvs.in-project true
           python -m poetry lock
@@ -76,6 +78,32 @@ jobs:
           python -m poetry install --no-interaction --with dev --all-extras
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
+          
+          
+      - name: Configure Poetry Environment (Windows)
+        run: |
+          # Windows-specific Poetry environment setup
+          python -m poetry env use "$env:pythonLocation\python.exe"
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
+          python -m poetry env info
+        shell: pwsh
+          
+      - name: Debug Python and Poetry
+        run: |
+          echo "Python executable path:"
+          which python
+     
+          echo "Python version:"
+          python --version
+     
+          echo "Actual Python executable:"
+          python -c "import sys; print(sys.executable)"
+     
+          echo "Poetry version:"
+          python -m poetry --version
+        
+          shell: bash
         
       - name: Verify Python version
         run: python --version
