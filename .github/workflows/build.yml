@@ -9,7 +9,7 @@ permissions:
   actions: write
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.12'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
@@ -62,7 +62,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          # sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
           sudo apt-get install -y zip unzip
         shell: bash
 
@@ -164,6 +164,9 @@ jobs:
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
               --hidden-import=cryptography \
+              --hidden-import=usb \
+              --hidden-import=usb.core \
+              --hidden-import=usb.util \
               --hidden-import=rsa \
               --hidden-import=aiofiles \
               --hidden-import=async_timeout \
@@ -178,6 +181,7 @@ jobs:
               --hidden-import=wmi \
               --collect-all ntplib \
               --collect-all adb_shell \
+              --collect-all libusb1 \
               --collect-all async_timeout \
               --collect-data colorama \
               --collect-data aiofiles \
@@ -197,6 +201,9 @@ jobs:
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
               --hidden-import=cryptography \
+              --hidden-import=usb \
+              --hidden-import=usb.core \
+              --hidden-import=usb.util \
               --hidden-import=rsa \
               --hidden-import=aiofiles \
               --hidden-import=async_timeout \
@@ -210,6 +217,7 @@ jobs:
               --hidden-import=psutil \
               --collect-all ntplib \
               --collect-all adb_shell \
+              --collect-all libusb1 \
               --collect-all async_timeout \
               --collect-data colorama \
               --collect-data aiofiles \
