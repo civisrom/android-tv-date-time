@@ -181,7 +181,6 @@ jobs:
               --hidden-import=wmi \
               --collect-all ntplib \
               --collect-all adb_shell \
-              --collect-all libusb1 \
               --collect-all async_timeout \
               --collect-data colorama \
               --collect-data aiofiles \
@@ -217,7 +216,6 @@ jobs:
               --hidden-import=psutil \
               --collect-all ntplib \
               --collect-all adb_shell \
-              --collect-all libusb1 \
               --collect-all async_timeout \
               --collect-data colorama \
               --collect-data aiofiles \
