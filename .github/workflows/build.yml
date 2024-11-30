@@ -9,7 +9,7 @@ permissions:
   actions: write
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.12'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
@@ -164,9 +164,9 @@ jobs:
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
               --hidden-import=cryptography \
-              --hidden-import=usb \
-              --hidden-import=usb.core \
-              --hidden-import=usb.util \
+             # --hidden-import=usb \
+             # --hidden-import=usb.core \
+             # --hidden-import=usb.util \
               --hidden-import=rsa \
               --hidden-import=aiofiles \
               --hidden-import=async_timeout \
@@ -200,9 +200,9 @@ jobs:
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
               --hidden-import=cryptography \
-              --hidden-import=usb \
-              --hidden-import=usb.core \
-              --hidden-import=usb.util \
+             # --hidden-import=usb \
+             # --hidden-import=usb.core \
+             # --hidden-import=usb.util \
               --hidden-import=rsa \
               --hidden-import=aiofiles \
               --hidden-import=async_timeout \
