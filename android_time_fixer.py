@@ -326,6 +326,10 @@ class AndroidTVTimeFixer:
             '1.asia.pool.ntp.org',
             '2.asia.pool.ntp.org',
             '3.asia.pool.ntp.org',
+            '0.africa.pool.ntp.org',
+            '1.africa.pool.ntp.org',
+            '2.africa.pool.ntp.org',
+            '3.africa.pool.ntp.org',
             'time.cloudflare.com',
             'clock.isc.org',
             'ntp2.vniiftri.ru',
@@ -424,20 +428,42 @@ class AndroidTVTimeFixer:
 
     def _retry_adb_connection(self, command: str, max_retries: int = 3, delay: int = 2) -> bool:
         """
-        Пытается переподключиться к устройству несколько раз
-        
+        Пытается переподключиться к устройству несколько раз, перед каждой попыткой выполняя 'adb kill-server'.
+    
         Args:
-            command (str): Выполняемая команда
-            max_retries (int): Максимальное количество попыток
-            delay (int): Задержка между попытками в секундах
-            
+            command (str): Выполняемая команда.
+            max_retries (int): Максимальное количество попыток.
+            delay (int): Задержка между попытками в секундах.
+    
         Returns:
-            bool: True если подключение успешно, False в противном случае
+            bool: True, если подключение успешно, False в противном случае.
         """
         import time
-        
+        import shlex
+        from subprocess import Popen, PIPE
+        import sys
+    
         for attempt in range(max_retries):
             try:
+                # Выполнение команды adb kill-server перед каждой попыткой подключения
+                self.logger.info(f"Попытка {attempt + 1}: Выполняется 'adb kill-server' для перезапуска сервера ADB.")
+                kill_server_command = [self.get_adb_path(), 'kill-server']
+                kill_server_process = Popen(
+                    kill_server_command,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    universal_newlines=True,
+                    encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+                    bufsize=1
+                )
+                _, kill_server_stderr = kill_server_process.communicate()
+    
+                if kill_server_process.returncode != 0:
+                    self.logger.warning(f"Ошибка при выполнении 'adb kill-server': {kill_server_stderr.strip()}")
+                else:
+                    self.logger.info("'adb kill-server' выполнен успешно.")
+    
+                # Выполнение основной команды подключения
                 args = shlex.split(command)
                 if not args:
                     return False
@@ -453,9 +479,9 @@ class AndroidTVTimeFixer:
                     encoding='utf-8' if sys.platform != 'win32' else 'cp866',
                     bufsize=1
                 )
-                
+    
                 return_code, stdout, stderr = self._process_command_output(process)
-                
+    
                 # Проверяем наличие ошибок подключения
                 connection_errors = [
                     "error: no devices/emulators found",
@@ -463,10 +489,10 @@ class AndroidTVTimeFixer:
                     "error: device offline",
                     "error: device unauthorized"
                 ]
-                
+    
                 if return_code == 0:
                     return True
-                    
+    
                 if any(error in stderr.lower() for error in connection_errors):
                     if attempt < max_retries - 1:
                         self.logger.warning(f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
@@ -474,8 +500,8 @@ class AndroidTVTimeFixer:
                         time.sleep(delay)
                         continue
                     else:
-                        self.logger.error("Все попытки подключения не удались")
-                        print(Fore.RED + "Все попытки подключения не удались")
+                        self.logger.error("Все попытки подключения не удались.")
+                        print(Fore.RED + "Все попытки подключения не удались.")
                         return False
                 else:
                     # Если ошибка не связана с подключением, прекращаем попытки
@@ -483,14 +509,14 @@ class AndroidTVTimeFixer:
                         self.logger.error(f"STDERR: {stderr}")
                         print(Fore.RED + stderr)
                     return False
-                    
+    
             except Exception as e:
                 self.logger.error(f"Ошибка при попытке подключения: {str(e)}", exc_info=True)
                 if attempt < max_retries - 1:
                     time.sleep(delay)
                     continue
                 return False
-                
+    
         return False
     
     def execute_terminal_command(self, command: str) -> None:
