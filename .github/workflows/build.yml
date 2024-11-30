@@ -9,7 +9,7 @@ permissions:
   actions: write
 
 env:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: '3.12.7'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
@@ -62,7 +62,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+          sudo apt-get install -y libudev-dev #libusb-1.0-0-dev
           sudo apt-get install -y zip unzip
         shell: bash
 
