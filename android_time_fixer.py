@@ -928,19 +928,5 @@ def main():
         print(Fore.RED + locales.get('unexpected_error').format(str(e)))
         sys.exit(1)
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    fixer = AndroidTVTimeFixer()
-
-    while True:
-        try:
-            command = input("Введите команду для выполнения (или 'exit' для выхода): ")
-            if command.lower() in ['exit', 'quit']:
-                fixer.logger.info("Выход из программы.")
-                break
-
-            fixer.execute_terminal_command(command)
-
-        except (KeyboardInterrupt, EOFError):
-            fixer.logger.info("Завершение программы через прерывание.")
-            break
+if __name__ == '__main__':
+    main()
