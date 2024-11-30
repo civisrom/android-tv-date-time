@@ -164,9 +164,6 @@ jobs:
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
               --hidden-import=cryptography \
-             # --hidden-import=usb \
-             # --hidden-import=usb.core \
-             # --hidden-import=usb.util \
               --hidden-import=rsa \
               --hidden-import=aiofiles \
               --hidden-import=async_timeout \
@@ -200,9 +197,6 @@ jobs:
               --hidden-import=packaging \
               --hidden-import=typing_extensions \
               --hidden-import=cryptography \
-             # --hidden-import=usb \
-             # --hidden-import=usb.core \
-             # --hidden-import=usb.util \
               --hidden-import=rsa \
               --hidden-import=aiofiles \
               --hidden-import=async_timeout \
