@@ -40,12 +40,38 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          check-latest: true
           cache: pip
+        
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry==${{ env.POETRY_VERSION }}
+        shell: bash
+        
+      - name: Configure Poetry and Python Environment
+        run: |
+          # Set up the correct Python version for Poetry
+          python -m poetry env use ${{ env.PYTHON_VERSION }}
+            
+          # Configure Poetry settings
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
+            
+          # Verify Python version in Poetry environment
+          python -m poetry env info
+        shell: bash
+        
+      - name: Install Dependencies
+        run: |
+          python -m poetry config virtualenvs.in-project true
+          python -m poetry lock  # Regenerate poetry.lock
+          python -m poetry install --no-interaction --no-root
+          python -m poetry install --no-interaction --with dev --all-extras
+          python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
+        shell: bash
         
       - name: Verify Python version
         run: python --version
@@ -67,61 +93,6 @@ jobs:
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
           sudo apt-get install -y libudev-dev libusb-1.0-0-dev
           sudo apt-get install -y zip unzip
-        shell: bash
-
-      - name: Install Poetry
-        env:
-          PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
-          POETRY_VERSION: ${{ env.POETRY_VERSION }}
-        run: |
-          # Cross-platform Poetry installation script
-          
-          # Determine Python executable
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            PYTHON_EXEC="python"
-          else
-            PYTHON_EXEC="python3"
-          fi
-      
-          # Install Poetry with specific version
-          $PYTHON_EXEC -m pip install --upgrade pip
-          $PYTHON_EXEC -m pip install poetry==$POETRY_VERSION
-      
-          # Configure Poetry paths and settings
-          $PYTHON_EXEC -m poetry config virtualenvs.create true
-          $PYTHON_EXEC -m poetry config virtualenvs.in-project true
-      
-          # Add Poetry to PATH for Windows
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            POETRY_HOME="$APPDATA\Python\Scripts"
-            echo "$POETRY_HOME" >> $GITHUB_PATH
-          else
-            # Linux PATH configuration
-            echo "$HOME/.local/bin" >> $GITHUB_PATH
-          fi
-      
-        shell: bash
-      
-      - name: Verify Poetry Installation
-        run: |
-          # Cross-platform Poetry verification
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            python -m poetry --version
-          else
-            poetry --version
-          fi
-        shell: bash
-      
-      - name: Configure Poetry
-        run: |
-          # Cross-platform Poetry configuration
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            python -m poetry config virtualenvs.create true
-            python -m poetry config virtualenvs.in-project true
-          else
-            poetry config virtualenvs.create true
-            poetry config virtualenvs.in-project true
-          fi
         shell: bash
 
       - name: Cache Poetry dependencies
