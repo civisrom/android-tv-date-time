@@ -68,10 +68,10 @@ class ADBProcessManager:
         # Регистрация обработчиков завершения
         atexit.register(self.terminate_adb_processes)
         
-        # Настройка обработчиков сигналов для Unix-подобных систем
-        if sys.platform != 'win32':
-            signal.signal(signal.SIGINT, self.signal_handler)
-            signal.signal(signal.SIGTERM, self.signal_handler)
+        # Настройка обработчиков сигналов
+
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
 
     def signal_handler(self, signum, frame):
         """
@@ -525,6 +525,9 @@ class AndroidTVTimeFixer:
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
         
+        # Выполняем завершение процессов ADB при входе в терминальный режим
+        self.process_manager.terminate_adb_processes()
+
         try:
             while True:
                 try:
