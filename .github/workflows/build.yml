@@ -22,12 +22,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest] #, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest]
         include:
           - os: windows-latest
             platform: windows
-          #- os: ubuntu-latest
-            #platform: linux
+          - os: ubuntu-latest
+            platform: linux
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -69,22 +69,56 @@ jobs:
           sudo apt-get install -y zip unzip
         shell: bash
 
-      - name: Setup Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Add Poetry to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в PATH
+      - name: Install Poetry
+        env:
+          PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
+          POETRY_VERSION: ${{ env.POETRY_VERSION }}
+        run: |
+          # Cross-platform Poetry installation script
+          
+          # Determine Python executable
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            PYTHON_EXEC="python"
+          else
+            PYTHON_EXEC="python3"
+          fi
+      
+          # Install Poetry with specific version
+          $PYTHON_EXEC -m pip install --upgrade pip
+          $PYTHON_EXEC -m pip install poetry==$POETRY_VERSION
+      
+          # Configure Poetry paths and settings
+          $PYTHON_EXEC -m poetry config virtualenvs.create true
+          $PYTHON_EXEC -m poetry config virtualenvs.in-project true
+      
+          # Add Poetry to PATH for Windows
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            POETRY_HOME="$APPDATA\Python\Scripts"
+            echo "$POETRY_HOME" >> $GITHUB_PATH
+          else
+            # Linux PATH configuration
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+          fi
+      
         shell: bash
-
-      - name: Verify Poetry installation
-        run: poetry --version  # Проверяем установку Poetry
-  
-      - name: Set Python version for Poetry
-        run: poetry env use python3.12  # Указываем версию Python для Poetry
+      
+      - name: Verify Poetry Installation
+        run: |
+          # Cross-platform Poetry verification
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            python -m poetry --version
+          else
+            poetry --version
+          fi
+        shell: bash
+      
+      - name: Configure Poetry
+        run: |
+          # Set consistent Poetry configuration
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
+          poetry config experimental.new-installer false
+        shell: bash
 
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
