@@ -64,11 +64,14 @@ class AndroidTVTimeFixer:
         self.device = None
         self.kill_adb_processes()
         self.wmi_interface = None
-        if sys.platform == 'win32':
+        if platform.system() == 'Windows':
             try:
+                import wmi
                 self.wmi_interface = wmi.WMI()
+            except ImportError:
+                self.logger.warning("Библиотека WMI не установлена. Будет использован альтернативный метод.")
             except Exception as e:
-                self.logger.error(f"Ошибка инициализации WMI: {e}")
+                self.logger.warning(f"Ошибка инициализации WMI: {e}")
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -160,19 +163,13 @@ class AndroidTVTimeFixer:
 
     def kill_adb_processes(self):
         """
-        Надежно завершает все процессы ADB с использованием WMI и псевдонимов.
-        
-        Стратегия:
-        1. Использование WMI для быстрого поиска процессов ADB
-        2. Мягкое завершение через команду kill-server
-        3. Принудительное завершение через WMI
-        4. Резервное завершение через psutil
+        Надежно завершает все процессы ADB с минимальными побочными эффектами
         """
         try:
             # Получаем путь к ADB
             adb_path = self.get_adb_path()
 
-            # Мягкое завершение через ADB
+            # Мягкое завершение через ADB kill-server
             try:
                 subprocess.run(
                     [adb_path, 'kill-server'], 
@@ -183,12 +180,15 @@ class AndroidTVTimeFixer:
             except Exception as e:
                 self.logger.warning(f"Ошибка при выполнении adb kill-server: {e}")
 
-            # Завершение через WMI (Windows)
-            if sys.platform == 'win32' and self.wmi_interface:
+            # Завершение через WMI (для Windows)
+            if platform.system() == 'Windows':
                 try:
-                    adb_processes = self.wmi_interface.Win32_Process(name='adb.exe')
+                    import wmi
                     
-                    # Завершение всех найденных процессов
+                    # Создаем интерфейс WMI локально для этого вызова
+                    wmi_interface = wmi.WMI()
+                    adb_processes = wmi_interface.Win32_Process(name='adb.exe')
+                    
                     for process in adb_processes:
                         try:
                             process.Terminate()
@@ -196,10 +196,12 @@ class AndroidTVTimeFixer:
                         except Exception as e:
                             self.logger.warning(f"Не удалось завершить процесс ADB {process.ProcessId}: {e}")
                 
+                except ImportError:
+                    self.logger.warning("Библиотека WMI не установлена для завершения процессов")
                 except Exception as e:
                     self.logger.error(f"Ошибка при завершении ADB через WMI: {e}")
 
-            # Резервный метод через psutil для кроссплатформенности
+            # Резервный кроссплатформенный метод
             try:
                 import psutil
                 
@@ -223,10 +225,10 @@ class AndroidTVTimeFixer:
             except ImportError:
                 self.logger.warning("Библиотека psutil не установлена")
 
-            self.logger.info("Все процессы ADB успешно завершены")
+            self.logger.info("Попытка завершения процессов ADB выполнена")
 
         except Exception as e:
-            self.logger.error(f"Критическая ошибка при завершении процессов ADB: {e}")
+            self.logger.error(f"Ошибка при завершении процессов ADB: {e}")
     
     def setup_adb_process_killer():
         """
@@ -239,13 +241,48 @@ class AndroidTVTimeFixer:
         # Регистрация функции завершения при штатном выходе
         atexit.register(kill_adb_processes)
 
-    def signal_handler(signum, frame):
-        logger.info(f"Получен сигнал {signum}. Завершение ADB процессов.")
-        kill_adb_processes()
-        sys.exit(0)
+    def global_adb_killer():
+        """
+        Глобальный обработчик завершения ADB-процессов
+        """
+        try:
+            import subprocess
+            import platform
+            
+            # Явное завершение ADB
+            adb_command = 'adb.exe kill-server' if platform.system() == 'Windows' else 'adb kill-server'
+            subprocess.run(adb_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Дополнительные методы завершения
+            if platform.system() == 'Windows':
+                try:
+                    import wmi
+                    w = wmi.WMI()
+                    for process in w.Win32_Process(name='adb.exe'):
+                        process.Terminate()
+                except:
+                    pass
+        except Exception as e:
+            logging.error(f"Ошибка при глобальном завершении ADB: {e}")
     
-    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
-    signal.signal(signal.SIGTERM, signal_handler)  # Системный сигнал завершения
+    # Регистрация глобальных обработчиков
+    import atexit
+    import signal
+    
+    def setup_exit_handlers():
+        # Завершение через atexit
+        atexit.register(global_adb_killer)
+        
+        # Обработка сигналов завершения
+        def signal_handler(signum, frame):
+            global_adb_killer()
+            sys.exit(0)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Вызывайте эту функцию в начале вашей программы
+    setup_exit_handlers()
 
     def get_adb_path(self) -> str:
         """
@@ -496,8 +533,8 @@ class AndroidTVTimeFixer:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
         
-        # Финальное завершение ADB после выхода из цикла
-        self.kill_adb_processes()
+            finally:
+                self.kill_adb_processes()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
