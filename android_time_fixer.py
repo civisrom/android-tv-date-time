@@ -11,7 +11,6 @@ import psutil
 import signal
 import atexit
 import threading
-import wmi
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -26,6 +25,13 @@ from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language
 init(autoreset=True)
+
+if platform.system() == 'Windows':
+    try:
+        import wmi
+        wmi_available = True
+    except ImportError:
+        wmi_available = False
 
 # Настройка логирования
 #logging.basicConfig(
@@ -60,18 +66,10 @@ class AndroidTVTimeFixer:
         self.current_path = Path.cwd()
         self.keys_folder = self.current_path / 'keys'
         self._setup_logging()
-        self._adb_path: Optional[str] = None
+        self._adb_path = None
+        self.setup_exit_handlers()
         self.device = None
         self.kill_adb_processes()
-        self.wmi_interface = None
-        if platform.system() == 'Windows':
-            try:
-                import wmi
-                self.wmi_interface = wmi.WMI()
-            except ImportError:
-                self.logger.warning("Библиотека WMI не установлена. Будет использован альтернативный метод.")
-            except Exception as e:
-                self.logger.warning(f"Ошибка инициализации WMI: {e}")
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -163,165 +161,67 @@ class AndroidTVTimeFixer:
 
     def kill_adb_processes(self):
         """
-        Надежно завершает все процессы ADB с минимальными побочными эффектами
+        Завершает все процессы ADB, используя adb kill-server, WMI и psutil.
         """
+        adb_path = self.get_adb_path()
+
+        # Мягкое завершение через `adb kill-server`
         try:
-            # Получаем путь к ADB
-            adb_path = self.get_adb_path()
+            subprocess.run([adb_path, 'kill-server'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+            self.logger.info("adb kill-server выполнен успешно.")
+        except Exception as e:
+            self.logger.warning(f"Ошибка при выполнении adb kill-server: {e}")
 
-            # Мягкое завершение через ADB kill-server
+        # Завершение процессов через WMI (только для Windows)
+        if platform.system() == 'Windows' and wmi_available:
             try:
-                subprocess.run(
-                    [adb_path, 'kill-server'], 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE, 
-                    timeout=3
-                )
-            except Exception as e:
-                self.logger.warning(f"Ошибка при выполнении adb kill-server: {e}")
+                wmi_interface = wmi.WMI()
+                adb_processes = wmi_interface.Win32_Process(name='adb.exe')
 
-            # Завершение через WMI (для Windows)
-            if platform.system() == 'Windows':
-                try:
-                    import wmi
-                    
-                    # Создаем интерфейс WMI локально для этого вызова
-                    wmi_interface = wmi.WMI()
-                    adb_processes = wmi_interface.Win32_Process(name='adb.exe')
-                    
-                    for process in adb_processes:
-                        try:
-                            process.Terminate()
-                            self.logger.info(f"Процесс ADB {process.ProcessId} завершен через WMI")
-                        except Exception as e:
-                            self.logger.warning(f"Не удалось завершить процесс ADB {process.ProcessId}: {e}")
-                
-                except ImportError:
-                    self.logger.warning("Библиотека WMI не установлена для завершения процессов")
-                except Exception as e:
-                    self.logger.error(f"Ошибка при завершении ADB через WMI: {e}")
-
-            # Резервный кроссплатформенный метод
-            try:
-                import psutil
-                
-                for proc in psutil.process_iter(['name', 'exe']):
+                for process in adb_processes:
                     try:
-                        # Проверяем, что это точно процесс ADB
-                        if (proc.info['name'] in ['adb.exe', 'adb'] and 
-                            (adb_path.lower() in str(proc.info.get('exe', '')).lower())):
-                            
-                            self.logger.info(f"Завершение процесса ADB: {proc.pid}")
-                            proc.terminate()
-                            time.sleep(0.5)
-                            
-                            # Принудительное завершение, если процесс не закрылся
-                            if proc.is_running():
-                                proc.kill()
-                                
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                        pass
-
-            except ImportError:
-                self.logger.warning("Библиотека psutil не установлена")
-
-            self.logger.info("Попытка завершения процессов ADB выполнена")
-
-        except Exception as e:
-            self.logger.error(f"Ошибка при завершении процессов ADB: {e}")
-    
-    def setup_adb_process_killer():
-        """
-        Настраивает механизмы автоматического завершения ADB процессов.
-        
-        - Регистрирует обработчик для штатного завершения программы
-        - Настраивает обработку сигналов операционной системы
-        - Создаёт фоновый поток для мониторинга родительского процесса
-        """
-        # Регистрация функции завершения при штатном выходе
-        atexit.register(kill_adb_processes)
-
-    def global_adb_killer():
-        """
-        Глобальный обработчик завершения ADB-процессов
-        """
-        try:
-            import subprocess
-            import platform
-            
-            # Явное завершение ADB
-            adb_command = 'adb.exe kill-server' if platform.system() == 'Windows' else 'adb kill-server'
-            subprocess.run(adb_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-            # Дополнительные методы завершения
-            if platform.system() == 'Windows':
-                try:
-                    import wmi
-                    w = wmi.WMI()
-                    for process in w.Win32_Process(name='adb.exe'):
                         process.Terminate()
-                except:
-                    pass
-        except Exception as e:
-            logging.error(f"Ошибка при глобальном завершении ADB: {e}")
-    
-    # Регистрация глобальных обработчиков
-    import atexit
-    import signal
-    
-    def setup_exit_handlers():
-        # Завершение через atexit
-        atexit.register(global_adb_killer)
-        
-        # Обработка сигналов завершения
-        def signal_handler(signum, frame):
-            global_adb_killer()
-            sys.exit(0)
-        
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-    
-    # Вызывайте эту функцию в начале вашей программы
-    setup_exit_handlers()
+                        self.logger.info(f"Процесс ADB (PID: {process.ProcessId}) завершен через WMI.")
+                    except Exception as e:
+                        self.logger.warning(f"Ошибка при завершении процесса ADB через WMI (PID: {process.ProcessId}): {e}")
+
+            except Exception as e:
+                self.logger.error(f"Ошибка при использовании WMI для завершения ADB: {e}")
+
+        # Жесткое завершение через psutil (кроссплатформенный метод)
+        for proc in psutil.process_iter(['pid', 'name', 'exe']):
+            try:
+                if proc.info['name'] in ['adb.exe', 'adb']:
+                    self.logger.info(f"Попытка завершить процесс ADB через psutil (PID: {proc.info['pid']}).")
+                    proc.terminate()
+                    time.sleep(0.5)
+
+                    # Если процесс все еще жив, убиваем принудительно
+                    if proc.is_running():
+                        self.logger.warning(f"Процесс ADB (PID: {proc.info['pid']}) не завершился, принудительное завершение.")
+                        proc.kill()
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as e:
+                self.logger.error(f"Ошибка при завершении процесса ADB через psutil: {e}")
+
+    def setup_exit_handlers(self):
+        """ Устанавливает обработчики завершения программы. """
+        atexit.register(self.kill_adb_processes)
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
+
+    def signal_handler(self, signum, frame):
+        """ Обработчик сигналов для корректного завершения программы. """
+        self.logger.info(f"Получен сигнал {signum}, завершение работы.")
+        self.kill_adb_processes()
+        sys.exit(0)
 
     def get_adb_path(self) -> str:
-        """
-        Получает путь к ADB из runtime hook или ресурсов
-        
-        Returns:
-            str: Полный путь к исполняемому файлу ADB
-            
-        Raises:
-            FileNotFoundError: Если файл ADB не найден
-        """
+        """ Получает путь к ADB """
         if self._adb_path:
             return self._adb_path
 
-        try:
-            # Пытаемся импортировать из hook'ов
-            try:
-                from hooks.win_hook import ADB_PATH
-                self._adb_path = ADB_PATH
-            except ImportError:
-                from hooks.linux_hook import ADB_PATH
-                self._adb_path = ADB_PATH
-        except ImportError:
-            # Fallback для разработки
-            if getattr(sys, 'frozen', False):
-                base_path = sys._MEIPASS
-            else:
-                base_path = os.path.abspath(os.path.dirname(__file__))
-            
-            self._adb_path = os.path.join(
-                base_path, 
-                'resources', 
-                'adb.exe' if sys.platform == 'win32' else 'adb'
-            )
-
-        if not os.path.exists(self._adb_path):
-            raise FileNotFoundError(f"ADB не найден по пути: {self._adb_path}")
-
-        self.logger.info(f"Используется ADB по пути: {self._adb_path}")
+        self._adb_path = "adb.exe" if sys.platform == 'win32' else "adb"
         return self._adb_path
 
     def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
