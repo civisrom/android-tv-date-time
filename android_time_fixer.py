@@ -61,8 +61,6 @@ class AndroidTVTimeFixer:
         self._setup_logging()
         self._adb_path: Optional[str] = None
         self.device = None
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
         atexit.register(kill_adb_processes)
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
