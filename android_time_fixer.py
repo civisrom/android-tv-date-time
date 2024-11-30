@@ -555,7 +555,6 @@ class AndroidTVTimeFixer:
                     continue
                 except Exception as e:
                     self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
-                    self.process_manager.terminate_adb_processes()
                     print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
         
         except Exception as e:
