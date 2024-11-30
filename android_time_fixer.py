@@ -432,7 +432,7 @@ class AndroidTVTimeFixer:
 
         except TimeoutError:
             process.kill()
-            raise TimeoutError("Превышено время ожидания выполнения команды")
+            raise TimeoutError("Command execution timeout exceeded")
 
     def _retry_adb_connection(self, command: str, max_retries: int = 5, delay: int = 2) -> bool:
         """
@@ -453,13 +453,13 @@ class AndroidTVTimeFixer:
         import locale
     
         # Определяем кодировку текущей системы
-        encoding = locale.getpreferredencoding() if sys.platform != 'win32' else 'cp866'
+        encoding = 'utf-8' if sys.platform != 'win32' else 'cp866'
     
         for attempt in range(max_retries):
             try:
                 # Выполнение команды adb kill-server только на 3-й, 4-й и 5-й попытке
                 if attempt >= 2:
-                    self.logger.info(f"Попытка {attempt + 1}: Выполняется 'adb kill-server' для перезапуска сервера ADB.")
+                    self.logger.info(f"Попытка {attempt + 1}: Execute 'adb kill-server' to restart the ADB server.")
                     kill_server_command = [self.get_adb_path(), 'kill-server']
                     kill_server_process = Popen(
                         kill_server_command,
@@ -472,9 +472,9 @@ class AndroidTVTimeFixer:
                     _, kill_server_stderr = kill_server_process.communicate()
     
                     if kill_server_process.returncode != 0:
-                        self.logger.warning(f"Ошибка при выполнении 'adb kill-server': {kill_server_stderr.strip()}")
+                        self.logger.warning(f"Error while executing 'adb kill-server': {kill_server_stderr.strip()}")
                     else:
-                        self.logger.info("'adb kill-server' выполнен успешно.")
+                        self.logger.info("'adb kill-server' completed successfully.")
     
                 # Выполнение основной команды подключения
                 args = shlex.split(command)
@@ -509,13 +509,13 @@ class AndroidTVTimeFixer:
     
                 if any(error in stderr.lower() for error in connection_errors):
                     if attempt < max_retries - 1:
-                        self.logger.warning(f"Попытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...")
-                        print(f"\033[33mПопытка подключения {attempt + 1} не удалась. Повторная попытка через {delay} сек...\033[0m")
+                        self.logger.warning(f"Connection attempt {attempt + 1} failed. Retrying in {delay} sec...")
+                        print(f"\033[33mConnection attempt {attempt + 1} failed. Retrying in {delay} sec...\033[0m")
                         time.sleep(delay)
                         continue
                     else:
-                        self.logger.error("Все попытки подключения не удались.")
-                        print(f"\033[31mВсе попытки подключения не удались.\033[0m")
+                        self.logger.error("All connection attempts failed.")
+                        print(f"\033[31mAll connection attempts failed.\033[0m")
                         return False
                 else:
                     # Если ошибка не связана с подключением, прекращаем попытки
@@ -525,7 +525,7 @@ class AndroidTVTimeFixer:
                     return False
     
             except Exception as e:
-                self.logger.error(f"Ошибка при попытке подключения: {str(e)}", exc_info=True)
+                self.logger.error(f"Error while trying to connect: {str(e)}", exc_info=True)
                 if attempt < max_retries - 1:
                     time.sleep(delay)
                     continue
@@ -555,7 +555,7 @@ class AndroidTVTimeFixer:
                 if not args:
                     return
     
-                self.logger.debug(f"Выполняется команда: {' '.join(args)}")
+                self.logger.debug(f"The command is being executed: {' '.join(args)}")
                 
                 process = Popen(
                     args,
@@ -569,22 +569,22 @@ class AndroidTVTimeFixer:
                 return_code, stdout, stderr = self._process_command_output(process)
                 
                 if return_code != 0:
-                    self.logger.error(f"Ошибка выполнения команды. Код: {return_code}")
+                    self.logger.error(f"Command execution error. Code: {return_code}")
                     print(Fore.RED + locales.get("command_error"))
                     if stderr:
                         self.logger.error(f"STDERR: {stderr}")
                         print(Fore.RED + stderr)
     
         except FileNotFoundError as e:
-            error_msg = f"Команда не найдена: {e}"
+            error_msg = f"Command not found: {e}"
             self.logger.error(error_msg)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
         except TimeoutError as e:
-            error_msg = f"Таймаут выполнения команды: {e}"
+            error_msg = f"Command execution timeout: {e}"
             self.logger.error(error_msg)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
         except Exception as e:
-            error_msg = f"Ошибка выполнения команды: {str(e)}"
+            error_msg = f"Command execution error: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
@@ -594,7 +594,7 @@ class AndroidTVTimeFixer:
         if sys.platform == 'win32':
             os.system('chcp 866')
     
-        self.logger.info("Запущен режим терминала")
+        self.logger.info("Terminal mode started")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
         
@@ -608,7 +608,7 @@ class AndroidTVTimeFixer:
                     
                     # Проверяем специальные команды
                     if command.lower() in ['exit', 'quit', 'q']:
-                        self.logger.info("Выход из режима терминала")
+                        self.logger.info("Exit terminal mode")
                         # Завершаем процессы ADB только при выходе
                         self.process_manager.terminate_adb_processes()
                         break
@@ -630,11 +630,11 @@ class AndroidTVTimeFixer:
                     print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                     continue
                 except Exception as e:
-                    self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
+                    self.logger.error(f"Error in terminal mode: {str(e)}", exc_info=True)
                     print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
         
         except Exception as e:
-            self.logger.error(f"Критическая ошибка в режиме терминала: {str(e)}", exc_info=True)
+            self.logger.error(f"Critical error in terminal mode: {str(e)}", exc_info=True)
             print(Fore.RED + locales.get("terminal_mode_critical_error", error=str(e)))
         finally:
             # Дополнительная страховка - очистка процессов при любом выходе
