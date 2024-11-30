@@ -442,16 +442,17 @@ class AndroidTVTimeFixer:
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
-    def terminal_mode(self) -> None:
-        """Режим терминала для выполнения команд"""
-        # Установка кодировки для Windows
-        if sys.platform == 'win32':
-            os.system('chcp 866')
+def terminal_mode(self) -> None:
+    """Режим терминала для выполнения команд"""
+    # Установка кодировки для Windows
+    if sys.platform == 'win32':
+        os.system('chcp 866')
 
-        self.logger.info("Запущен режим терминала")
-        print(Fore.GREEN + locales.get("terminal_mode_welcome"))
-        print(Fore.YELLOW + locales.get("terminal_mode_help"))
-        
+    self.logger.info("Запущен режим терминала")
+    print(Fore.GREEN + locales.get("terminal_mode_welcome"))
+    print(Fore.YELLOW + locales.get("terminal_mode_help"))
+    
+    try:
         while True:
             try:
                 command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
@@ -459,6 +460,8 @@ class AndroidTVTimeFixer:
                 # Проверяем специальные команды
                 if command.lower() in ['exit', 'quit', 'q']:
                     self.logger.info("Выход из режима терминала")
+                    # Завершаем процессы ADB только при выходе
+                    self.process_manager.terminate_adb_processes()
                     break
                 elif command.lower() in ['help', '?']:
                     print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -469,20 +472,26 @@ class AndroidTVTimeFixer:
                 elif not command:
                     continue
                 
-                # Выполняем команду
+                # Выполняем команду без завершения процессов ADB
                 self.execute_terminal_command(command)
                 
             except KeyboardInterrupt:
-                self.logger.info("Прерывание работы терминала (Ctrl+C)")
+                # Обработка Ctrl+C без завершения ADB процессов
+                self.logger.info("Прерывание текущей команды (Ctrl+C)")
+                self.process_manager.terminate_adb_processes()
                 print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-                break
+                continue
             except Exception as e:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
-
-            finally:
-                # Явная очистка после выхода из режима терминала
-                self.process_manager.cleanup()
+    
+    except Exception as e:
+        self.logger.error(f"Критическая ошибка в режиме терминала: {str(e)}", exc_info=True)
+        print(Fore.RED + locales.get("terminal_mode_critical_error", error=str(e)))
+    finally:
+        # Дополнительная страховка - очистка процессов при любом выходе
+        # Хотя основное завершение происходит при командах exit/quit/q
+        self.process_manager.cleanup()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
