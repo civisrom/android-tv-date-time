@@ -80,10 +80,6 @@ jobs:
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH  # Добавляем Poetry в PATH
         shell: bash
 
-      - name: Add Poetry to PATH (Windows)
-        run: echo "$env:USERPROFILE\\.local\\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-        shell: pwsh
-
       - name: Verify Poetry installation
         run: poetry --version  # Проверяем установку Poetry
   
