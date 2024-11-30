@@ -1038,7 +1038,6 @@ class AndroidTVTimeFixer:
 
 def main():
     fixer = AndroidTVTimeFixer()
-    fixer.terminal_mode()
     print(locales.get("select_language"))  # Выводим сообщение для выбора языка
     print("1. " + locales.get("english"))  # Выбор для английского
     print("2. " + locales.get("russian"))  # Выбор для русского
