@@ -62,6 +62,7 @@ class AndroidTVTimeFixer:
         self._adb_path: Optional[str] = None
         self.device = None
         atexit.register(kill_adb_processes)
+        self.kill_adb_processes()
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
