@@ -20,6 +20,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Шаг 2.1: Очищаем кэш Poetry
+      - name: Clear Poetry cache
+        run: |
+          rm -rf ~/.cache/pypoetry
+
       # Шаг 3: Кэшируем зависимости Poetry
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
