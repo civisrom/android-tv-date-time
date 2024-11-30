@@ -802,7 +802,6 @@ se: Sweden
 si: Slovenia
 sk: Slovakia
 tr: Turkey
-ua: Ukraine
 uk: United Kingdom
 us: United States
 ca: Canada
@@ -812,6 +811,38 @@ cn: China
 jp: Japan
 kz: Kazakhstan
 uk: United Kingdom
+ae: United Arab Emirates
+am: Armenia
+az: Azerbaijan
+bd: Bangladesh
+bh: Bahrain
+ge: Georgia
+hk: Hong Kong
+id: Indonesia
+il: Israel
+in: India
+ir: Iran
+jp: Japan
+kg: Kyrgyzstan
+kh: Cambodia
+kr: Korea
+kz: Kazakhstan
+lk: Sri Lanka
+mn: Mongolia
+mv: Maldives
+my: Malaysia
+np: Nepal
+ph: Philippines
+pk: Pakistan
+ps: Palestinian Territory
+qa: Qatar
+sa: Saudi Arabia
+sg: Singapore
+th: Thailand
+tj: Tajikistan
+tw: Taiwan
+uz: Uzbekistan
+vn: Vietnam
 """,
                 ru="""
 at: Австрия
@@ -852,7 +883,6 @@ se: Швеция
 si: Словения
 sk: Словакия
 tr: Турция
-ua: Украина
 uk: Великобритания
 us: США
 ca: Канада
@@ -862,6 +892,39 @@ cn: Китай
 jp: Япония
 kz: Казахстан
 uk: Великобритания
+ae: Объединённые Арабские Эмираты
+am: Армения
+az: Азербайджан
+bd: Бангладеш
+bh: Бахрейн
+ge: Грузия
+hk: Гонконг
+id: Индонезия
+il: Израиль
+in: Индия
+ir: Иран
+jp: Япония
+kg: Кыргызстан
+kh: Камбоджа
+kr: Корея
+kz: Казахстан
+lk: Шри-Ланка
+mn: Монголия
+mv: Мальдивы
+my: Малайзия
+np: Непал
+ph: Филиппины
+pk: Пакистан
+ps: Палестинская территория
+qa: Катар
+sa: Саудовская Аравия
+sg: Сингапур
+th: Таиланд
+tj: Таджикистан
+tw: Тайвань
+uz: Узбекистан
+vn: Вьетнам
+
 """
             ),
             "exit_message": Translation(
