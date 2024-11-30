@@ -39,9 +39,6 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Remove old virtualenv
-        run: poetry env remove python || true
-
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         id: setup-python
         uses: actions/setup-python@v5
@@ -90,6 +87,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-
             ${{ runner.os }}-poetry-
+
+      - name: Remove old virtualenv
+        run: poetry env remove python || true
 
       - name: Install project dependencies
         run: |
