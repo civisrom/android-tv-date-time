@@ -453,7 +453,7 @@ class AndroidTVTimeFixer:
                 if command.lower() in ['exit', 'quit', 'q']:
                     self.logger.info("Выход из режима терминала")
                     # Явное завершение ADB перед выходом
-                    kill_adb_processes(adb_path)
+                    self.kill_adb_processes()
                     break
                 elif command.lower() in ['help', '?']:
                     print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -470,7 +470,7 @@ class AndroidTVTimeFixer:
             except KeyboardInterrupt:
                 self.logger.info("Прерывание работы терминала (Ctrl+C)")
                 # Завершаем ADB при прерывании
-                kill_adb_processes(adb_path)
+                self.kill_adb_processes()
                 print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                 break
             except Exception as e:
@@ -478,7 +478,7 @@ class AndroidTVTimeFixer:
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
         
         # Финальное завершение ADB после выхода из цикла
-        kill_adb_processes(adb_path)
+        self.kill_adb_processes()
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
