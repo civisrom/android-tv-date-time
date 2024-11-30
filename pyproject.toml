@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "androidtvtimefixer"
-version = "2.0.0"
+version = "1.0.0"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
