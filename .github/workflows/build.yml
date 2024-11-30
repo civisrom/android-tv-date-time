@@ -39,6 +39,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Remove old virtualenv
+        run: poetry env remove python || true
+
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         id: setup-python
         uses: actions/setup-python@v5
@@ -46,6 +49,9 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           check-latest: true
           cache: pip
+        
+      - name: Verify Python version
+        run: python --version
 
       - name: Install psutil
         run: |
