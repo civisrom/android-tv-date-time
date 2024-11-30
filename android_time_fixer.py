@@ -61,6 +61,9 @@ class AndroidTVTimeFixer:
         self._setup_logging()
         self._adb_path: Optional[str] = None
         self.device = None
+        signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+        signal.signal(signal.SIGTERM, signal_handler)  # Системный сигнал завершения
+        atexit.register(kill_adb_processes)
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -150,26 +153,44 @@ class AndroidTVTimeFixer:
         )
         self.logger = logging.getLogger(__name__)
 
-    def kill_adb_processes():
+    def kill_adb_processes(adb_path):
         """
-        Завершает все процессы ADB.
+        Надежно завершает все процессы ADB.
         
-        Надёжный метод завершения всех процессов ADB независимо от способа их запуска.
+        Args:
+            adb_path (str): Путь к исполняемому файлу ADB
         """
         try:
-            for proc in psutil.process_iter(['name']):
-                if proc.info['name'] in ['adb.exe', 'adb']:
-                    try:
+            # Явный вызов kill-server
+            try:
+                subprocess.run([adb_path, 'kill-server'], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE, 
+                               timeout=5)
+            except Exception as e:
+                logging.warning(f"Ошибка при выполнении adb kill-server: {e}")
+    
+            # Завершение процессов через psutil
+            for proc in psutil.process_iter(['name', 'exe']):
+                try:
+                    # Проверяем, что это точно процесс ADB
+                    if (proc.info['name'] in ['adb.exe', 'adb'] and 
+                        (adb_path.lower() in str(proc.info.get('exe', '')).lower())):
+                        
+                        logging.info(f"Завершение процесса ADB: {proc.pid}")
                         proc.terminate()
-                        time.sleep(0.5)  # Небольшая задержка для мягкого завершения
+                        time.sleep(0.5)
+                        
+                        # Принудительное завершение, если процесс не закрылся
                         if proc.is_running():
-                            proc.kill()  # Принудительное завершение, если не закрылся
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                        pass
-            
-            logger.info("Все процессы ADB успешно завершены")
+                            proc.kill()
+                            
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+    
+            logging.info("Все процессы ADB успешно завершены")
         except Exception as e:
-            logger.error(f"Ошибка при завершении процессов ADB: {e}")
+            logging.error(f"Ошибка при завершении процессов ADB: {e}")
     
     def setup_adb_process_killer():
         """
@@ -179,17 +200,12 @@ class AndroidTVTimeFixer:
         - Настраивает обработку сигналов операционной системы
         - Создаёт фоновый поток для мониторинга родительского процесса
         """
-        # Регистрация функции завершения при штатном выходе
-        atexit.register(kill_adb_processes)
     
         # Обработка сигналов завершения
         def signal_handler(signum, frame):
             logger.info(f"Получен сигнал {signum}. Завершение ADB процессов.")
             kill_adb_processes()
             sys.exit(0)
-    
-        signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
-        signal.signal(signal.SIGTERM, signal_handler)  # Системный сигнал завершения
     
         # Мониторинг родительского процесса (защита от закрытия Powershell)
         def monitor_parent_process():
@@ -412,22 +428,29 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
     def terminal_mode(self) -> None:
-        """Режим терминала для выполнения команд"""
+        """
+        Обновленный метод терминала с улучшенным завершением ADB
+        """
         # Установка кодировки для Windows
         if sys.platform == 'win32':
             os.system('chcp 866')
-
+    
         self.logger.info("Запущен режим терминала")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
+        
+        # Сохраняем путь к ADB для последующего использования
+        adb_path = self.get_adb_path()
         
         while True:
             try:
                 command = input(Fore.CYAN + "terminal> " + Fore.WHITE).strip()
                 
-                # Проверяем специальные команды
+                # Проверяем специальные команды завершения
                 if command.lower() in ['exit', 'quit', 'q']:
                     self.logger.info("Выход из режима терминала")
+                    # Явное завершение ADB перед выходом
+                    kill_adb_processes(adb_path)
                     break
                 elif command.lower() in ['help', '?']:
                     print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -443,11 +466,16 @@ class AndroidTVTimeFixer:
                 
             except KeyboardInterrupt:
                 self.logger.info("Прерывание работы терминала (Ctrl+C)")
+                # Завершаем ADB при прерывании
+                kill_adb_processes(adb_path)
                 print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                 break
             except Exception as e:
                 self.logger.error(f"Ошибка в режиме терминала: {str(e)}", exc_info=True)
                 print(Fore.RED + locales.get("terminal_mode_error", error=str(e)))
+        
+        # Финальное завершение ADB после выхода из цикла
+        kill_adb_processes(adb_path)
 	
     def ping_ntp_servers(self, timeout=2, count=3):
         """
