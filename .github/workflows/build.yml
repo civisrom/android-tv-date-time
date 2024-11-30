@@ -50,24 +50,28 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
-        
-      - name: Configure Poetry and Python Environment
+      
+      - name: Configure Poetry Environment
         run: |
-          # Set up the correct Python version for Poetry
-          python -m poetry env use ${{ env.PYTHON_VERSION }}
+          # Explicitly use the Python executable from the runner
+          PYTHON_PATH=$(which python)
+          echo "Using Python executable: $PYTHON_PATH"
+            
+          # Use the full path to set up Poetry environment
+          $PYTHON_PATH -m poetry env use "$PYTHON_PATH"
             
           # Configure Poetry settings
-          python -m poetry config virtualenvs.create true
-          python -m poetry config virtualenvs.in-project true
+          $PYTHON_PATH -m poetry config virtualenvs.create true
+          $PYTHON_PATH -m poetry config virtualenvs.in-project true
             
-          # Verify Python version in Poetry environment
-          python -m poetry env info
+          # Verify Poetry environment
+          $PYTHON_PATH -m poetry env info
         shell: bash
         
       - name: Install Dependencies
         run: |
           python -m poetry config virtualenvs.in-project true
-          python -m poetry lock  # Regenerate poetry.lock
+          python -m poetry lock
           python -m poetry install --no-interaction --no-root
           python -m poetry install --no-interaction --with dev --all-extras
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
