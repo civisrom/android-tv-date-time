@@ -309,7 +309,7 @@ class AndroidTVTimeFixer:
             'tj': 'tj.pool.ntp.org',
             'tw': 'tw.pool.ntp.org',
             'uz': 'uz.pool.ntp.org',
-            'vn': 'vn.pool.ntp.org',
+            'vn': 'vn.pool.ntp.org'
         }
         self.custom_ntp_servers = [
             'time.windows.com',
