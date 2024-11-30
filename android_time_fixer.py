@@ -8,6 +8,7 @@ import logging
 import platform
 import json
 import psutil
+import atexit
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -58,6 +59,7 @@ class AndroidTVTimeFixer:
         self._setup_logging()
         self._adb_path: Optional[str] = None
         self.device = None
+        atexit.register(self.kill_adb_processes)
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -146,6 +148,14 @@ class AndroidTVTimeFixer:
             ]
         )
         self.logger = logging.getLogger(__name__)
+
+    def _handle_signal(self, signum, frame) -> None:
+        """Обработчик сигналов для завершения программы"""
+        try:
+            self.logger.info(f"Получен сигнал завершения: {signum}")
+            self.kill_adb_processes()
+        finally:
+            sys.exit(0)
 
     def kill_adb_processes(self) -> None:
         """
