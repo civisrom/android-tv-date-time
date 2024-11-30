@@ -77,6 +77,7 @@ class ADBProcessManager:
         """
         Обработчик системных сигналов для завершения процессов
         """
+        self.logger.info("Прерывание текущей команды (Ctrl+C)")
         self.terminate_adb_processes()
         sys.exit(0)
 
@@ -1037,6 +1038,7 @@ class AndroidTVTimeFixer:
 
 def main():
     fixer = AndroidTVTimeFixer()
+    fixer.terminal_mode()
     print(locales.get("select_language"))  # Выводим сообщение для выбора языка
     print("1. " + locales.get("english"))  # Выбор для английского
     print("2. " + locales.get("russian"))  # Выбор для русского
