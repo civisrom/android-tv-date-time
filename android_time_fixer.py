@@ -11,6 +11,7 @@ import psutil
 import signal
 import atexit
 import threading
+import wmi
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -61,7 +62,6 @@ class AndroidTVTimeFixer:
         self._setup_logging()
         self._adb_path: Optional[str] = None
         self.device = None
-        atexit.register(kill_adb_processes)
         self.kill_adb_processes()
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
@@ -209,24 +209,6 @@ class AndroidTVTimeFixer:
     
     signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
     signal.signal(signal.SIGTERM, signal_handler)  # Системный сигнал завершения
-
-    # Мониторинг родительского процесса (защита от закрытия Powershell)
-    def monitor_parent_process():
-        parent_pid = os.getppid()
-        try:
-            parent = psutil.Process(parent_pid)
-            while parent.is_running():
-                time.sleep(1)
-            kill_adb_processes()
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            kill_adb_processes()
-    
-    # Запуск фонового потока мониторинга
-    parent_monitor_thread = threading.Thread(
-        target=monitor_parent_process, 
-        daemon=True
-    )
-    parent_monitor_thread.start()
 
     def get_adb_path(self) -> str:
         """
