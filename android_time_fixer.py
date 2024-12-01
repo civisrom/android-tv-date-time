@@ -931,12 +931,12 @@ class AndroidTVTimeFixer:
     def show_country_codes(self) -> None:
         print(Fore.YELLOW + locales.get("available_country_codes"))
         for code, server in self.ntp_servers.items():
-            print(Fore.BLUE + locales.get("country_code_server", code=code.upper(), server=server))
+            print(Fore.WHITE + locales.get("country_code_server", code=code.upper(), server=server))
 
     def show_custom_ntp_servers(self) -> None:
         print(Fore.YELLOW + locales.get("available_alternative_ntp_servers"))
         for server in self.custom_ntp_servers:
-            print(Fore.BLUE + locales.get("custom_ntp_server", server=server))
+            print(Fore.WHITE + locales.get("custom_ntp_server", server=server))
 
     def set_custom_ntp(self) -> None:
         while True:
