@@ -7,8 +7,6 @@ on:
 
 env:
   PYTHON_VERSION: '3.12'
-  APP_NAME: AndroidTVTimeFixer
-  SOURCE_FILE: android_time_fixer.py
   CI_DEBUG: true
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
@@ -71,6 +69,9 @@ jobs:
           python -m poetry config virtualenvs.in-project true
           python -m poetry env info
         shell: pwsh
+        
+      - name: Verify Python version
+        run: python --version
 
       # Шаг 2.1: Очищаем кэш Poetry
       - name: Clear Poetry cache
