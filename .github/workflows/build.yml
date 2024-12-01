@@ -79,7 +79,6 @@ jobs:
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
           
-          
       - name: Configure Poetry Environment (Windows)
         run: |
           # Windows-specific Poetry environment setup
