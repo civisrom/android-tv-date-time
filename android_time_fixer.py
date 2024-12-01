@@ -1149,7 +1149,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
 
-            choice = input(Fore.WHITE + locales.get("menu_prompt")).strip()
+            choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
 
             if choice == '1':
                 print(Fore.GREEN + locales.get('enter_device_ip'), end="")
