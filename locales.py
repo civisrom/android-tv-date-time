@@ -354,8 +354,8 @@ arising from the use of this program.
                  ru="8. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
-                 en="Terminal mode activated. Type 'help' for available commands or 'exit' to quit.",
-                 ru="Режим терминала активирован. Введите 'help' для списка команд или 'exit' для выхода."
+                 en="Terminal mode activated. Type 'help', 'adb --help' for available commands or 'exit' to quit.",
+                 ru="Режим терминала активирован. Введите 'help', 'adb --help' для списка команд или 'exit' для выхода."
             ),
             "terminal_mode_help": Translation(
                  en="\nYou can execute any ADB or system commands."
