@@ -901,6 +901,7 @@ th: Thailand
 tj: Tajikistan
 tw: Taiwan
 uz: Uzbekistan
+ua: Ukraine
 vn: Vietnam
 """,
                 ru="""
@@ -982,6 +983,7 @@ th: Таиланд
 tj: Таджикистан
 tw: Тайвань
 uz: Узбекистан
+ua: Украина
 vn: Вьетнам
 
 """
