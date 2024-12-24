@@ -40,10 +40,23 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
         shell: bash
 
-      - name: Set Poetry config
+      - name: Ensure Poetry config is clean
         run: |
-          poetry config --unset virtualenvs.in-project || echo "Config not set yet"
+          poetry config --unset virtualenvs.in-project --local || echo "Local config not set"
+          poetry config --unset virtualenvs.in-project || echo "Global config not set"
           poetry config virtualenvs.in-project true --local
+        shell: bash
+
+      - name: Set Poetry config only if needed
+        run: |
+          if ! poetry config virtualenvs.in-project --local | grep -q "true"; then
+          poetry config virtualenvs.in-project true --local
+          fi
+        shell: bash
+
+      - name: Debug Poetry config
+        run: |
+          poetry config --list
         shell: bash
 
       - name: Install dependencies
