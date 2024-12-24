@@ -22,12 +22,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
             platform: windows
           - os: ubuntu-latest
             platform: linux
+          - os: macos-latest
+            platform: macos
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -107,10 +109,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
+          sudo apt-get install -y libudev-dev
           sudo apt-get install -y zip unzip
         shell: bash
-
+        
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl
+        shell: bash
+        
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
