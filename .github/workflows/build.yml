@@ -227,6 +227,10 @@ jobs:
         run: |
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             poetry run pyinstaller --clean --onefile --console --name="${{ env.APP_NAME }}" \
+              --version-file="version_info.txt" \
+              --manifest="application.manifest" \
+              --uac-admin \
+              --icon="resources/app_icon.ico" \
               --hidden-import=pyperclip \
               --hidden-import=colorama \
               --add-data="resources/adb.exe;resources/" \
