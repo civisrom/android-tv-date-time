@@ -23,7 +23,7 @@ ntplib = "^0.4.0"
 # Указание зависимостей только для Windows с помощью markers
 #pywin32 = { version = "306", markers = "sys_platform == 'win32'" }
 psutil = { version = "^5.9.0", markers = "sys_platform == 'win32'" }
-#wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
+wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
 #pywinusb = { version = "^0.4.2", markers = "sys_platform == 'win32'" }
 
 # Общие зависимости
