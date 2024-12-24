@@ -42,6 +42,7 @@ jobs:
 
       - name: Set Poetry config
         run: |
+          poetry config --unset virtualenvs.in-project || echo "Config not set yet"
           poetry config virtualenvs.in-project true --local
         shell: bash
 
