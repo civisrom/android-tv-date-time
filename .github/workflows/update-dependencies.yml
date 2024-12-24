@@ -14,31 +14,71 @@ env:
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
+      # Шаг 1: Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-
+        
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "poetry==${{ env.POETRY_VERSION }}"
+          python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
-
-      - name: Configure Poetry
+        
+      - name: Configure Poetry Environment
         run: |
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
+          # Determine Python executable
+          PYTHON_EXE=$(which python)
+            
+          # Verify Python version
+          $PYTHON_EXE --version
+            
+          # Set up Poetry environment with specific Python version
+          $PYTHON_EXE -m poetry env use $PYTHON_EXE
+            
+          # Configure Poetry settings
+          $PYTHON_EXE -m poetry config virtualenvs.create true
+          $PYTHON_EXE -m poetry config virtualenvs.in-project true
+            
+          # Verify Poetry environment
+          $PYTHON_EXE -m poetry env info
         shell: bash
+        
+      - name: Install Project Dependencies
+        run: |
+          python -m poetry config virtualenvs.in-project true
+          python -m poetry lock
+          python -m poetry install --no-interaction --no-root
+          python -m poetry install --no-interaction --with dev --all-extras
+          python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
+        shell: bash
+          
+          
+      - name: Configure Poetry Environment (Windows)
+        run: |
+          # Windows-specific Poetry environment setup
+          python -m poetry env use "$env:pythonLocation\python.exe"
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
+          python -m poetry env info
+        shell: pwsh
+        
+      - name: Verify Python version
+        run: python --version
 
+      # Шаг 2.1: Очищаем кэш Poetry
+      - name: Clear Poetry cache
+        run: |
+          rm -rf ~/.cache/pypoetry
+
+      # Шаг 3: Кэшируем зависимости Poetry
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
@@ -47,41 +87,29 @@ jobs:
           restore-keys: |
             poetry-${{ runner.os }}-
 
+      # Шаг 5: Принудительное обновление зависимостей
       - name: Update dependencies
         run: |
-          # Обновляем зависимости
+          poetry self update
+          poetry lock
+          poetry install
           poetry update
-          # Проверяем, есть ли изменения в poetry.lock
-          if [[ -n "$(git status --porcelain poetry.lock)" ]]; then
-            echo "Changes detected in poetry.lock"
-            # Устанавливаем обновленные зависимости
-            poetry install --no-interaction --with dev --all-extras
-            poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
-          else
-            echo "No changes in poetry.lock"
-          fi
-        shell: bash
+        env:
+          POETRY_CACHE_DIR: ~/.cache/pypoetry  # Используем кэш Poetry
 
-      - name: Verify environment
-        run: |
-          python --version
-          poetry --version
-          poetry env info
-        shell: bash
-
-      - name: Configure Git
+      # Шаг 6: Настраиваем пользователя Git
+      - name: Configure Git user
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        shell: bash
 
-      - name: Commit and push changes
+      # Шаг 7: Проверяем изменения и пушим их
+      - name: Commit and push changes to main
         run: |
-          if [[ -n "$(git status --porcelain poetry.lock)" ]]; then
-            git add poetry.lock
-            git commit -m "chore: update dependencies [skip ci]"
-            git push origin ${{ github.ref_name }}
+          git add poetry.lock
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
           else
-            echo "No changes to commit"
+            git commit -m "Update dependencies"
+            git push origin main
           fi
-        shell: bash
