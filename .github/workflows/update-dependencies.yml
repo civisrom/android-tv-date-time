@@ -27,26 +27,33 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
+      - name: Clean Poetry installation
+        run: |
+          rm -rf ~/.config/pypoetry
+          rm -rf ~/.local/share/pypoetry
+          rm -rf ~/.cache/pypoetry
+        shell: bash
 
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Install and configure Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | POETRY_HOME=$HOME/.local python3 - --version ${{ env.POETRY_VERSION }}
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Set Poetry config
+        run: |
+          poetry config virtualenvs.in-project true --local
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-root
+        shell: bash
 
       - name: Update dependencies
         run: |
-          poetry install --no-interaction --with dev
-          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
           poetry update
+          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
         shell: bash
 
       - name: Configure Git
