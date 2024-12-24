@@ -10,6 +10,8 @@ env:
   CI_DEBUG: true
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
+  POETRY_VIRTUALENVS_CREATE: true
+  POETRY_VIRTUALENVS_IN_PROJECT: true
 
 jobs:
   update-dependencies:
@@ -33,24 +35,25 @@ jobs:
           python -m pip install "poetry==${{ env.POETRY_VERSION }}"
         shell: bash
 
-      - name: Configure Poetry
-        run: |
-          poetry config virtualenvs.create true
-          poetry config virtualenvs.in-project true
-        shell: bash
-
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pypoetry
+          path: |
+            ~/.cache/pypoetry
+            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
 
       - name: Update dependencies
         run: |
+          # Проверяем конфигурацию Poetry
+          poetry --version
+          poetry env info
+          
           # Обновляем зависимости
           poetry update
+          
           # Проверяем, есть ли изменения в poetry.lock
           if [[ -n "$(git status --porcelain poetry.lock)" ]]; then
             echo "Changes detected in poetry.lock"
@@ -61,13 +64,9 @@ jobs:
             echo "No changes in poetry.lock"
           fi
         shell: bash
-
-      - name: Verify environment
-        run: |
-          python --version
-          poetry --version
-          poetry env info
-        shell: bash
+        env:
+          POETRY_VIRTUALENVS_CREATE: true
+          POETRY_VIRTUALENVS_IN_PROJECT: true
 
       - name: Configure Git
         run: |
