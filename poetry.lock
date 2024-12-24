@@ -12,7 +12,6 @@ files = [
 
 [package.dependencies]
 cryptography = "*"
-libusb1 = {version = ">=1.0.16", optional = true, markers = "extra == \"usb\""}
 pyasn1 = "*"
 rsa = "*"
 
@@ -228,19 +227,6 @@ files = [
 mccabe = ">=0.7.0,<0.8.0"
 pycodestyle = ">=2.11.0,<2.12.0"
 pyflakes = ">=3.1.0,<3.2.0"
-
-[[package]]
-name = "libusb1"
-version = "3.1.0"
-description = "Pure-python wrapper for libusb-1.0"
-optional = false
-python-versions = "*"
-files = [
-    {file = "libusb1-3.1.0-py3-none-any.whl", hash = "sha256:9d9f16e2c199cab91f48ead585d3f5ec7e8e4be428a25ddfed22abf786fa9b3a"},
-    {file = "libusb1-3.1.0-py3-none-win32.whl", hash = "sha256:bc7874302565721f443a27d8182fcc7152e5b560523f12f1377b130f473e4a0c"},
-    {file = "libusb1-3.1.0-py3-none-win_amd64.whl", hash = "sha256:77a06ecfb3d002d7c2ce369e28d0138b292fe8db8a3d102b73fda231a716dd35"},
-    {file = "libusb1-3.1.0.tar.gz", hash = "sha256:4ee9b0a55f8bd0b3ea7017ae919a6c1f439af742c4a4b04543c5fd7af89b828c"},
-]
 
 [[package]]
 name = "markdown-it-py"
@@ -513,4 +499,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "2ed087dbb51c167f9503d7d3e1364ae7988dc73bc511b4ba7fb184233907e365"
+content-hash = "b5a0e29e3137f50a8ba2a52e36048d6a9025664d6e2a79f7e993678ede257b6f"
