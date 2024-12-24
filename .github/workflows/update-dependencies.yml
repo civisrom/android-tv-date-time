@@ -27,47 +27,46 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Clean Poetry installation
+      - name: Install Poetry
         run: |
-          rm -rf ~/.config/pypoetry
-          rm -rf ~/.local/share/pypoetry
-          rm -rf ~/.cache/pypoetry
+          python -m pip install --upgrade pip
+          python -m pip install "poetry==${{ env.POETRY_VERSION }}"
         shell: bash
 
-      - name: Install and configure Poetry
+      - name: Configure Poetry
         run: |
-          curl -sSL https://install.python-poetry.org | POETRY_HOME=$HOME/.local python3 - --version ${{ env.POETRY_VERSION }}
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
         shell: bash
 
-      - name: Ensure Poetry config is clean
-        run: |
-          poetry config --unset virtualenvs.in-project --local || echo "Local config not set"
-          poetry config --unset virtualenvs.in-project || echo "Global config not set"
-          poetry config virtualenvs.in-project true --local
-        shell: bash
-
-      - name: Set Poetry config only if needed
-        run: |
-          if ! poetry config virtualenvs.in-project --local | grep -q "true"; then
-          poetry config virtualenvs.in-project true --local
-          fi
-        shell: bash
-
-      - name: Debug Poetry config
-        run: |
-          poetry config --list
-        shell: bash
-
-      - name: Install dependencies
-        run: |
-          poetry install --no-interaction --no-root
-        shell: bash
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
 
       - name: Update dependencies
         run: |
+          # Обновляем зависимости
           poetry update
-          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
+          # Проверяем, есть ли изменения в poetry.lock
+          if [[ -n "$(git status --porcelain poetry.lock)" ]]; then
+            echo "Changes detected in poetry.lock"
+            # Устанавливаем обновленные зависимости
+            poetry install --no-interaction --with dev --all-extras
+            poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
+          else
+            echo "No changes in poetry.lock"
+          fi
+        shell: bash
+
+      - name: Verify environment
+        run: |
+          python --version
+          poetry --version
+          poetry env info
         shell: bash
 
       - name: Configure Git
