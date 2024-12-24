@@ -10,8 +10,6 @@ env:
   CI_DEBUG: true
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
-  POETRY_VIRTUALENVS_CREATE: true
-  POETRY_VIRTUALENVS_IN_PROJECT: true
 
 jobs:
   update-dependencies:
@@ -29,6 +27,17 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
+      - name: Create Poetry config directory
+        run: |
+          mkdir -p ~/.config/pypoetry
+          echo '{
+            "virtualenvs": {
+              "create": true,
+              "in-project": true
+            }
+          }' > ~/.config/pypoetry/config.toml
+        shell: bash
+
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip
@@ -45,28 +54,17 @@ jobs:
           restore-keys: |
             poetry-${{ runner.os }}-
 
+      - name: Show Poetry version
+        run: poetry --version
+        shell: bash
+
       - name: Update dependencies
         run: |
-          # Проверяем конфигурацию Poetry
-          poetry --version
-          poetry env info
-          
           # Обновляем зависимости
+          poetry install --no-interaction --with dev --all-extras
           poetry update
-          
-          # Проверяем, есть ли изменения в poetry.lock
-          if [[ -n "$(git status --porcelain poetry.lock)" ]]; then
-            echo "Changes detected in poetry.lock"
-            # Устанавливаем обновленные зависимости
-            poetry install --no-interaction --with dev --all-extras
-            poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
-          else
-            echo "No changes in poetry.lock"
-          fi
+          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
         shell: bash
-        env:
-          POETRY_VIRTUALENVS_CREATE: true
-          POETRY_VIRTUALENVS_IN_PROJECT: true
 
       - name: Configure Git
         run: |
