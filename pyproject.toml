@@ -23,14 +23,16 @@ cryptography = "^41.0.0"
 rsa = "^4.9.0"
 ntplib = "^0.4.0"
 
+# Windows-специфичные зависимости
+psutil = { version = "^5.9.0", markers = "sys_platform == 'win32' or sys_platform == 'darwin'" }
+wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
+
+# macOS-специфичные зависимости
+pyobjc-framework-Cocoa = { version = "^9.2", markers = "sys_platform == 'darwin'" }
+
 # Общие зависимости
 click = "^8.1.0"
 rich = "^13.0.0"
-
-# Специфичные зависимости для платформ
-psutil = { version = "^5.9.0", markers = "sys_platform == 'win32' or sys_platform == 'darwin'" }
-wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
-pyobjc-framework-Cocoa = { version = "^9.2", markers = "sys_platform == 'darwin'" }
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.0.0"
@@ -48,7 +50,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 100
-target-version = ['py311']
+target-version = ['py310', 'py311']
 
 [tool.isort]
 profile = "black"
