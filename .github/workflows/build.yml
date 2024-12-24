@@ -91,10 +91,16 @@ jobs:
       - name: Verify Python version
         run: python --version
 
-      - name: Install psutil wmi
+      - name: Install psutil
         run: |
           python -m pip install --upgrade pip
-          pip install psutil wmi
+          pip install psutil
+
+      - name: Install wmi (Windows only)
+        if: runner.os == 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install wmi
           
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
