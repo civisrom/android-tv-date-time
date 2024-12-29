@@ -80,6 +80,30 @@ jobs:
           python -m poetry install --no-interaction --with dev --all-extras
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
+        
+      - name: Show dependency tree
+        run: |
+          poetry show --tree
+        shell: bash
+
+      - name: Show details for specific packages
+        run: |
+          poetry show cryptography pyasn1 rsa -v
+        shell: bash
+
+      - name: Generate dependency report
+        run: |
+          poetry show --tree > dependency-tree.txt
+          poetry show cryptography pyasn1 rsa -v > package-details.txt
+        shell: bash
+
+      - name: Upload dependency reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dependency Reports
+          path: |
+            dependency-tree.txt
+            package-details.txt
           
       - name: Configure Poetry Environment (Windows)
         run: |
