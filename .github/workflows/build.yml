@@ -247,6 +247,7 @@ jobs:
               argv_emulation=False,
               target_arch=None,
               codesign_identity=None,
+              collect_all=True,
               entitlements_file=None,
           )
           EOF
