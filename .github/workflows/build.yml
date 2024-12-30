@@ -208,7 +208,7 @@ jobs:
               a.datas,
               [],
               name='AndroidTVTimeFixer',
-              debug=True,
+              debug=False,
               bootloader_ignore_signals=False,
               strip=True,
               upx=False,
