@@ -2,6 +2,16 @@ name: Build AndroidTVTimeFixer
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -22,10 +32,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
             platform: windows
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -42,71 +56,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-        
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry==${{ env.POETRY_VERSION }}
-        shell: bash
-        
-      - name: Configure Poetry Environment
-        run: |
-          # Determine Python executable
-          PYTHON_EXE=$(which python)
-            
-          # Verify Python version
-          $PYTHON_EXE --version
-            
-          # Set up Poetry environment with specific Python version
-          $PYTHON_EXE -m poetry env use $PYTHON_EXE
-            
-          # Configure Poetry settings
-          $PYTHON_EXE -m poetry config virtualenvs.create true
-          $PYTHON_EXE -m poetry config virtualenvs.in-project true
-            
-          # Verify Poetry environment
-          $PYTHON_EXE -m poetry env info
-        shell: bash
-        
-      - name: Install Project Dependencies
-        run: |
-          python -m poetry config virtualenvs.in-project true
-          python -m poetry lock
-          python -m poetry install --no-interaction --no-root
-          python -m poetry install --no-interaction --with dev --all-extras
-          python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
-        shell: bash
-          
-      - name: Configure Poetry Environment (Windows)
-        run: |
-          # Windows-specific Poetry environment setup
-          python -m poetry env use "$env:pythonLocation\python.exe"
-          python -m poetry config virtualenvs.create true
-          python -m poetry config virtualenvs.in-project true
-          python -m poetry env info
-        shell: pwsh
-        
-      - name: Verify Python version
-        run: python --version
-
-      - name: Install psutil
-        run: |
-          python -m pip install --upgrade pip
-          pip install psutil
-
-      - name: Install wmi
-        run: |
-          python -m pip install --upgrade pip
-          pip install wmi
-
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y libudev-dev libusb-1.0-0-dev
-          sudo apt-get install -y zip unzip
-        shell: bash
 
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
@@ -115,148 +64,216 @@ jobs:
             .venv
             ~/AppData/Local/pypoetry/Cache
             ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-${{ hashFiles('**/pyproject.toml') }}
+          key: ${{ runner.os }}-poetry-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
-            ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-
+            ${{ runner.os }}-poetry-${{ env.PYTHON_VERSION }}-
             ${{ runner.os }}-poetry-
 
-      - name: Install project dependencies
+      - name: Install Poetry
         run: |
-          poetry config virtualenvs.in-project true
-          poetry lock  # Перегенерировать poetry.lock
-          poetry install --no-interaction --no-root  # Установить зависимости из нового poetry.lock
-          poetry install --no-interaction --with dev --all-extras  # Установить дополнительные зависимости
-          poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}  # Установить pyinstaller
+          python -m pip install --upgrade pip
+          python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
 
-      - name: Commit poetry.lock changes (if any)
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git diff --exit-code poetry.lock || (git add poetry.lock && git commit -m "Update poetry.lock" && git push)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Этот токен автоматически доступен для использования в GitHub Actions
-        
-      - name: Create resources directory
-        run: |
-          mkdir -p resources
-        shell: bash
-
-      - name: Download and Setup ADB (Windows)
+      - name: Configure Poetry Environment (Windows)
         if: runner.os == 'Windows'
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          
-          # Создаем временную директорию для ADB
-          New-Item -ItemType Directory -Force -Path ".\temp_adb"
-          
-          # Загружаем platform-tools
-          $platformToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
-          Invoke-WebRequest -Uri $platformToolsUrl -OutFile ".\temp_adb\platform-tools.zip"
-          
-          # Распаковываем
-          Expand-Archive -Path ".\temp_adb\platform-tools.zip" -DestinationPath ".\temp_adb" -Force
-          
-          # Копируем adb.exe и необходимые DLL в resources
-          Copy-Item ".\temp_adb\platform-tools\adb.exe" -Destination ".\resources\"
-          Copy-Item ".\temp_adb\platform-tools\AdbWinApi.dll" -Destination ".\resources\"
-          Copy-Item ".\temp_adb\platform-tools\AdbWinUsbApi.dll" -Destination ".\resources\"
-          
-          # Устанавливаем переменную среды для сборки
-          echo "ADB_RESOURCES_PATH=$pwd\resources" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         shell: pwsh
+        run: |
+          python -m poetry env use "$env:pythonLocation\python.exe"
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
 
-      - name: Download and Setup ADB (Linux)
+      - name: Configure Poetry Environment (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python -m poetry env use $(which python)
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
+
+      - name: Install Dependencies
+        run: |
+          python -m poetry install --no-interaction --no-root
+          python -m poetry install --no-interaction --with dev --all-extras
+          python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
+          python -m poetry run pip install psutil
+        shell: bash
+
+      - name: Install Windows Dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m poetry run pip install wmi
+
+      - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          # Создаем временную директорию для ADB
-          mkdir -p temp_adb
-          
-          # Загружаем platform-tools
-          wget https://dl.google.com/android/repository/platform-tools-latest-linux.zip -O temp_adb/platform-tools.zip
-          
-          # Распаковываем
-          unzip temp_adb/platform-tools.zip -d temp_adb/
-          
-          # Копируем adb в resources
-          cp temp_adb/platform-tools/adb ./resources/
-          
-          # Устанавливаем права на выполнение
-          chmod +x ./resources/adb
-          
-          echo "ADB_RESOURCES_PATH=$PWD/resources" >> $GITHUB_ENV
-        shell: bash
-      - name: Build executable (Windows and Linux)
-        run: |
-          if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            poetry run pyinstaller --clean --onefile --console --name="${{ env.APP_NAME }}" \
-              --hidden-import=pyperclip \
-              --hidden-import=colorama \
-              --add-data="resources/adb.exe;resources/" \
-              --add-data="resources/AdbWinApi.dll;resources/" \
-              --add-data="resources/AdbWinUsbApi.dll;resources/" \
-              --hidden-import=platformdirs \
-              --hidden-import=packaging \
-              --hidden-import=typing_extensions \
-              --hidden-import=cryptography \
-              --hidden-import=rsa \
-              --hidden-import=aiofiles \
-              --hidden-import=async_timeout \
-              --hidden-import=asyncio \
-              --hidden-import=socket \
-              --hidden-import=subprocess \
-              --hidden-import=threading \
-              --hidden-import=adb_shell.adb_device \
-              --hidden-import=adb_shell.auth.sign_pythonrsa \
-              --hidden-import=ntplib \
-              --hidden-import=psutil \
-              --hidden-import=wmi \
-              --log-level=DEBUG \
-              --runtime-hook="hooks/win_hook.py" \
-              "${{ env.SOURCE_FILE }}"
-          else
-            poetry run pyinstaller --clean --onefile --console --name="${{ env.APP_NAME }}" \
-              --hidden-import=pyperclip \
-              --hidden-import=colorama \
-              --add-data="resources/adb:resources/" \
-              --hidden-import=platformdirs \
-              --hidden-import=packaging \
-              --hidden-import=typing_extensions \
-              --hidden-import=cryptography \
-              --hidden-import=usb \
-              --hidden-import=usb.core \
-              --hidden-import=usb.util \
-              --hidden-import=rsa \
-              --hidden-import=aiofiles \
-              --hidden-import=async_timeout \
-              --hidden-import=asyncio \
-              --hidden-import=socket \
-              --hidden-import=subprocess \
-              --hidden-import=threading \
-              --hidden-import=adb_shell.adb_device \
-              --hidden-import=adb_shell.auth.sign_pythonrsa \
-              --hidden-import=ntplib \
-              --hidden-import=psutil \
-              --collect-all ntplib \
-              --collect-all adb_shell \
-              --collect-all libusb1 \
-              --collect-all async_timeout \
-              --collect-data colorama \
-              --collect-data aiofiles \
-              --collect-data platformdirs \
-              --collect-data packaging \
-              --collect-data typing_extensions \
-              --collect-data cryptography \
-              --log-level=DEBUG \
-              --runtime-hook="hooks/linux_hook.py" \
-              "${{ env.SOURCE_FILE }}"
-          fi
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev libudev-dev zip unzip
         shell: bash
 
-      - name: Package build
+      - name: Install System Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl
+        shell: bash
+
+      - name: Create Resources Directory and Setup ADB
+        shell: bash
+        run: |
+          # Создаем директории
+          mkdir -p resources
+          mkdir -p temp_adb
+          
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            curl -L https://dl.google.com/android/repository/platform-tools-latest-windows.zip -o temp_adb/platform-tools.zip
+            unzip -o temp_adb/platform-tools.zip -d temp_adb/
+            cp "temp_adb/platform-tools/adb.exe" "resources/adb.exe"
+            cp "temp_adb/platform-tools/AdbWinApi.dll" "resources/AdbWinApi.dll"
+            cp "temp_adb/platform-tools/AdbWinUsbApi.dll" "resources/AdbWinUsbApi.dll"
+          elif [ "${{ runner.os }}" == "Darwin" ]; then
+            curl -L https://dl.google.com/android/repository/platform-tools-latest-darwin.zip -o temp_adb/platform-tools.zip
+            unzip -o temp_adb/platform-tools.zip -d temp_adb/
+            cp "temp_adb/platform-tools/adb" "resources/adb"
+            chmod +x "resources/adb"
+          else
+            curl -L https://dl.google.com/android/repository/platform-tools-latest-linux.zip -o temp_adb/platform-tools.zip
+            unzip -o temp_adb/platform-tools.zip -d temp_adb/
+            cp "temp_adb/platform-tools/adb" "resources/adb"
+            chmod +x "resources/adb"
+          fi
+          
+          echo "Contents of resources directory:"
+          ls -la resources/
+
+      - name: Create PyInstaller Spec
+        shell: bash
+        run: |
+          cat > pyinstaller.spec << 'EOF'
+          # -*- mode: python ; coding: utf-8 -*-
+          import sys
+
+          a = Analysis(
+              ['android_time_fixer.py'],
+              pathex=[],
+              binaries=[],
+              datas=[],
+              hiddenimports=[
+                  'pyperclip',
+                  'colorama',
+                  'platformdirs',
+                  'packaging',
+                  'typing_extensions',
+                  'cryptography',
+                  'rsa',
+                  'aiofiles',
+                  'async_timeout',
+                  'asyncio',
+                  'socket',
+                  'subprocess',
+                  'threading',
+                  'adb_shell.adb_device',
+                  'adb_shell.auth.sign_pythonrsa',
+                  'ntplib',
+                  'psutil'
+              ],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=['hooks/win_hook.py'] if sys.platform == 'win32' else 
+                          ['hooks/macos_hook.py'] if sys.platform == 'darwin' else 
+                          ['hooks/linux_hook.py'],
+              excludes=[
+                  'tkinter',
+                  'unittest',
+                  'pdb',
+                  'difflib',
+                  'doctest',
+                  'xml',
+                  'pydoc',
+                  'inspect',
+                  'test',
+                  '_pytest',
+                  'pytest',
+                  'pip',
+                  'setuptools',
+                  'pkg_resources',
+                  'distutils',
+                  'email',
+                  'html',
+                  'http',
+                  'logging',
+                  'multiprocessing',
+                  'unittest',
+                  'urllib',
+                  'xml',
+                  'xmlrpc',
+                  'win32com',
+                  'win32api',
+                  'win32gui'
+              ],
+              win_no_prefer_redirects=False,
+              win_private_assemblies=False,
+              cipher=None,
+              noarchive=False
+          )
+
+          # Add platform-specific data files
+          if sys.platform == 'win32':
+              a.datas += [
+                  ('resources/adb.exe', 'resources/adb.exe', 'DATA'),
+                  ('resources/AdbWinApi.dll', 'resources/AdbWinApi.dll', 'DATA'),
+                  ('resources/AdbWinUsbApi.dll', 'resources/AdbWinUsbApi.dll', 'DATA')
+              ]
+          else:
+              a.datas += [
+                  ('resources/adb', 'resources/adb', 'DATA')
+              ]
+
+          # Bundle external shared libraries
+          a.binaries = [b for b in a.binaries if not b[0].startswith('api-ms-win')]
+
+          pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+
+          exe = EXE(
+              pyz,
+              a.scripts,
+              a.binaries,
+              a.zipfiles,
+              a.datas,
+              [],
+              name='AndroidTVTimeFixer',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=True,
+              upx=False,
+              upx_exclude=['vcruntime140.dll', 'python*.dll'],
+              runtime_tmpdir=None,
+              console=True,
+              disable_windowed_traceback=False,
+              argv_emulation=False,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+          )
+          EOF
+
+      - name: Build Executable
+        shell: bash
+        run: |
+          # Сборка с использованием spec файла
+          poetry run pyinstaller --clean pyinstaller.spec
+          
+          # Очистка временных файлов после сборки
+          rm -rf build/
+          rm -rf __pycache__/
+          find . -type d -name "__pycache__" -exec rm -r {} +
+          find . -type d -name "*.egg-info" -exec rm -r {} +
+          find . -type f -name "*.pyc" -delete
+
+      - name: Package Build
         run: |
           cd dist
-          if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          if [ "${{ runner.os }}" == "Windows" ]; then
             7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}.exe"
           else
             chmod +x ${{ env.APP_NAME }}
@@ -264,7 +281,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Upload build artifact
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
@@ -275,10 +292,10 @@ jobs:
   create-release:
     needs: setup-and-build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
     
     steps:
-      - name: Download all artifacts
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
