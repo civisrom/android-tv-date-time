@@ -150,7 +150,17 @@ jobs:
           
           datas = []
           binaries = []
-          hiddenimports = ['logging']  # Add logging to hidden imports
+          hiddenimports = [
+              'logging',
+              'urllib',
+              'urllib.parse',
+              'urllib.error',
+              'urllib.request',
+              'urllib.response',
+              'pathlib',
+              '_collections_abc',
+              'encodings.idna'
+          ]
           
           # Collect all necessary packages
           packages = ['pyperclip', 'colorama', 'platformdirs', 'packaging', 'typing_extensions', 
@@ -191,9 +201,9 @@ jobs:
                   'tkinter', 'unittest', 'pdb', 'difflib', 'doctest', 'xml',
                   'pydoc', 'inspect', 'test', '_pytest', 'pytest', 'pip',
                   'setuptools', 'pkg_resources', 'distutils', 'email',
-                  'html', 'http', 'multiprocessing', 'unittest',
-                  'urllib', 'xmlrpc', 'win32com', 'win32api', 'win32gui'
-              ],  # Removed 'logging' from excludes
+                  'html', 'http', 'multiprocessing',
+                  'xmlrpc', 'win32com', 'win32api', 'win32gui'
+              ],  # Removed 'urllib' from excludes
               win_no_prefer_redirects=False,
               win_private_assemblies=False,
               cipher=None,
@@ -207,29 +217,40 @@ jobs:
                   ('resources/AdbWinApi.dll', 'resources/AdbWinApi.dll', 'DATA'),
                   ('resources/AdbWinUsbApi.dll', 'resources/AdbWinUsbApi.dll', 'DATA')
               ]
+              
+              # Add base Python DLLs
+              import os
+              python_dlls = [
+                  f'python{sys.version_info.major}{sys.version_info.minor}.dll',
+                  'vcruntime140.dll',
+                  'msvcp140.dll',
+              ]
+              for dll in python_dlls:
+                  dll_path = os.path.join(sys.prefix, dll)
+                  if os.path.exists(dll_path):
+                      a.binaries.append((dll, dll_path, 'BINARY'))
           else:
               a.datas += [
                   ('resources/adb', 'resources/adb', 'DATA')
               ]
           
-          # Add system DLLs for Windows
+          # Bundle all required Windows DLLs
           if sys.platform == 'win32':
               import os
               import glob
               
-              # Add Python DLL
-              python_dll = f'python{sys.version_info.major}{sys.version_info.minor}.dll'
-              python_dll_path = os.path.join(sys.prefix, python_dll)
-              if os.path.exists(python_dll_path):
-                  a.binaries.append((python_dll, python_dll_path, 'BINARY'))
-              
-              # Add Windows API DLLs
               system32_path = os.path.join(os.environ['SystemRoot'], 'System32')
-              api_dlls = glob.glob(os.path.join(system32_path, 'api-ms-win-*.dll'))
-              for dll in api_dlls:
-                  if os.path.exists(dll):
-                      dll_name = os.path.basename(dll)
-                      a.binaries.append((dll_name, dll, 'BINARY'))
+              required_dlls = [
+                  'api-ms-win-core-path-l1-1-0.dll',
+                  'api-ms-win-core-file-l1-1-0.dll',
+                  'api-ms-win-core-file-l1-2-0.dll',
+                  'api-ms-win-core-file-l2-1-0.dll',
+              ]
+              
+              for dll in required_dlls:
+                  dll_path = os.path.join(system32_path, dll)
+                  if os.path.exists(dll_path):
+                      a.binaries.append((dll, dll_path, 'BINARY'))
           
           pyz = PYZ(a.pure, a.zipped_data, cipher=None)
           
