@@ -4,17 +4,15 @@ import os
 from PyInstaller.utils.hooks import collect_all
 
 # Определяем базовый путь проекта
-BASEPATH = os.path.abspath(os.path.dirname(__file__))
+BASEPATH = os.path.dirname(os.path.abspath('__file__'))
 
 # Определяем пути к ресурсам
 HOOKS_PATH = os.path.join(BASEPATH, 'scripts', 'hooks')
 SRC_PATH = os.path.join(BASEPATH, 'src')
 
 # Добавляем src в PYTHONPATH
-if SRC_PATH not in sys.path:
-    sys.path.insert(0, SRC_PATH)
+sys.path.insert(0, SRC_PATH)
 
-# Списки для хранения данных, бинарников и скрытых импортов
 datas = []
 binaries = []
 hiddenimports = [
@@ -26,54 +24,54 @@ hiddenimports = [
     'urllib.response',
     'pathlib',
     '_collections_abc',
-    'encodings.idna',
+    'encodings.idna'
 ]
 
-# Список необходимых пакетов
+# Collect all necessary packages
 packages = [
-    'pyperclip',
-    'colorama',
-    'platformdirs',
-    'packaging',
+    'pyperclip', 
+    'colorama', 
+    'platformdirs', 
+    'packaging', 
     'typing_extensions',
-    'cryptography',
-    'rsa',
-    'aiofiles',
-    'async_timeout',
-    'asyncio',
+    'cryptography', 
+    'rsa', 
+    'aiofiles', 
+    'async_timeout', 
+    'asyncio', 
     'socket',
-    'subprocess',
-    'threading',
-    'adb_shell.adb_device',
+    'subprocess', 
+    'threading', 
+    'adb_shell.adb_device', 
     'adb_shell.auth.sign_pythonrsa',
-    'ntplib',
-    'psutil',
+    'ntplib', 
+    'psutil'
 ]
 
-# Собираем данные из пакетов
+# Only collect from actual packages to avoid warnings
 for package in packages:
     try:
         __import__(package)
         tmp_ret = collect_all(package)
-        datas.extend(tmp_ret[0])
-        binaries.extend(tmp_ret[1])
-        hiddenimports.extend(tmp_ret[2])
+        if tmp_ret[0]:
+            datas.extend(tmp_ret[0])
+        if tmp_ret[1]:
+            binaries.extend(tmp_ret[1])
+        if tmp_ret[2]:
+            hiddenimports.extend(tmp_ret[2])
     except ImportError:
-        print(f"Warning: Unable to import package '{package}', skipping...")
+        continue
 
-# Платформо-зависимые настройки
-runtime_hooks = []
-platform_data = []
-
+# Определяем платформо-зависимые настройки
 if sys.platform == 'win32':
-    # Windows специфические настройки
-    runtime_hooks.append(os.path.join(HOOKS_PATH, 'win_hook.py'))
+    runtime_hooks = [os.path.join(HOOKS_PATH, 'win_hook.py')]
+    # Platform data теперь содержит только source и destination
     platform_data = [
         ('resources/adb.exe', 'resources'),
         ('resources/AdbWinApi.dll', 'resources'),
-        ('resources/AdbWinUsbApi.dll', 'resources'),
+        ('resources/AdbWinUsbApi.dll', 'resources')
     ]
-    # Добавляем системные DLL
+    # Добавляем системные DLL для Windows
     python_dlls = [
         f'python{sys.version_info.major}{sys.version_info.minor}.dll',
         'vcruntime140.dll',
@@ -83,8 +81,8 @@ if sys.platform == 'win32':
         dll_path = os.path.join(sys.prefix, dll)
         if os.path.exists(dll_path):
             binaries.append((dll_path, '.'))
-    
-    # Дополнительные Windows API DLL
+            
+    # Добавляем необходимые Windows API DLL
     system32_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32')
     required_dlls = [
         'api-ms-win-core-path-l1-1-0.dll',
@@ -96,21 +94,16 @@ if sys.platform == 'win32':
         dll_path = os.path.join(system32_path, dll)
         if os.path.exists(dll_path):
             binaries.append((dll_path, '.'))
-
 elif sys.platform == 'darwin':
-    # macOS специфические настройки
-    runtime_hooks.append(os.path.join(HOOKS_PATH, 'macos_hook.py'))
+    runtime_hooks = [os.path.join(HOOKS_PATH, 'macos_hook.py')]
     platform_data = [('resources/adb', 'resources')]
-
-elif sys.platform.startswith('linux'):
-    # Linux специфические настройки
-    runtime_hooks.append(os.path.join(HOOKS_PATH, 'linux_hook.py'))
+else:  # linux
+    runtime_hooks = [os.path.join(HOOKS_PATH, 'linux_hook.py')]
     platform_data = [('resources/adb', 'resources')]
 
 # Добавляем платформо-зависимые данные
 datas.extend(platform_data)
 
-# Создаем объект Analysis
 a = Analysis(
     [os.path.join(SRC_PATH, 'android_time_fixer.py')],
     pathex=[BASEPATH],
@@ -136,18 +129,16 @@ a = Analysis(
         'email',
         'html',
         'http',
-        'xmlrpc',
+        'xmlrpc'
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
-    noarchive=False,
+    noarchive=False
 )
 
-# Создаем объект PYZ
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
-# Создаем объект EXE
 exe = EXE(
     pyz,
     a.scripts,
@@ -168,5 +159,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon=['icon.png'],  # Раскомментируйте, если у вас есть иконка
+#    icon=['icon.png'],
 )
