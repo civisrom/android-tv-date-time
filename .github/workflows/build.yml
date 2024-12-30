@@ -224,7 +224,7 @@ jobs:
               ]
 
           # Bundle external shared libraries
-          a.binaries = [b for b in a.binaries if not b[0].startswith('api-ms-win')]
+          #a.binaries = [b for b in a.binaries if not b[0].startswith('api-ms-win')]
 
           pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
@@ -236,11 +236,10 @@ jobs:
               a.datas,
               [],
               name='AndroidTVTimeFixer',
-              debug=False,
+              debug=True,
               bootloader_ignore_signals=False,
               strip=True,
               upx=False,
-              upx_exclude=['vcruntime140.dll', 'python*.dll'],
               runtime_tmpdir=None,
               console=True,
               disable_windowed_traceback=False,
