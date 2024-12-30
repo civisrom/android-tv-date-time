@@ -80,15 +80,6 @@ jobs:
           python -m poetry install --no-interaction --with dev --all-extras
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
-
-      - name: Show details for dependencies
-        run: |
-          $packages = @("cryptography", "pyasn1", "rsa")
-          foreach ($package in $packages) {
-            Write-Host "Details for $package:"
-            poetry show $package -v | Out-File "$package-details.txt"
-          }
-        shell: pwsh
           
       - name: Configure Poetry Environment (Windows)
         run: |
