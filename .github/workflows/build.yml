@@ -2,12 +2,6 @@ name: Build AndroidTVTimeFixer
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
-    branches:
-      - main
-      - master
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -32,14 +26,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest] #, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
             platform: windows
-          - os: ubuntu-latest
-            platform: linux
-          - os: macos-latest
-            platform: macos
+#          - os: ubuntu-latest
+#            platform: linux
+#          - os: macos-latest
+#            platform: macos
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
