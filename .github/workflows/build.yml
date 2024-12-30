@@ -209,13 +209,10 @@ jobs:
                   '_pytest',
                   'pytest',
                   'pip',
-                  'setuptools',
                   'pkg_resources',
-                  'distutils',
                   'email',
                   'html',
                   'http',
-                  'multiprocessing',
                   'xmlrpc'
               ],  # Removed 'urllib' from excludes
               win_no_prefer_redirects=False,
