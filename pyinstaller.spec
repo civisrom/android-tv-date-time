@@ -65,10 +65,11 @@ for package in packages:
 # Определяем платформо-зависимые настройки
 if sys.platform == 'win32':
     runtime_hooks = [os.path.join(HOOKS_PATH, 'win_hook.py')]
+    # Platform data теперь содержит только source и destination
     platform_data = [
-        ('resources/adb.exe', 'resources/adb.exe', 'DATA'),
-        ('resources/AdbWinApi.dll', 'resources/AdbWinApi.dll', 'DATA'),
-        ('resources/AdbWinUsbApi.dll', 'resources/AdbWinUsbApi.dll', 'DATA')
+        ('resources/adb.exe', 'resources'),
+        ('resources/AdbWinApi.dll', 'resources'),
+        ('resources/AdbWinUsbApi.dll', 'resources')
     ]
     # Добавляем системные DLL для Windows
     python_dlls = [
@@ -79,7 +80,7 @@ if sys.platform == 'win32':
     for dll in python_dlls:
         dll_path = os.path.join(sys.prefix, dll)
         if os.path.exists(dll_path):
-            binaries.append((dll, dll_path, 'BINARY'))
+            binaries.append((dll_path, '.'))
             
     # Добавляем необходимые Windows API DLL
     system32_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32')
@@ -92,13 +93,13 @@ if sys.platform == 'win32':
     for dll in required_dlls:
         dll_path = os.path.join(system32_path, dll)
         if os.path.exists(dll_path):
-            binaries.append((dll, dll_path, 'BINARY'))
+            binaries.append((dll_path, '.'))
 elif sys.platform == 'darwin':
     runtime_hooks = [os.path.join(HOOKS_PATH, 'macos_hook.py')]
-    platform_data = [('resources/adb', 'resources/adb', 'DATA')]
+    platform_data = [('resources/adb', 'resources')]
 else:  # linux
     runtime_hooks = [os.path.join(HOOKS_PATH, 'linux_hook.py')]
-    platform_data = [('resources/adb', 'resources/adb', 'DATA')]
+    platform_data = [('resources/adb', 'resources')]
 
 # Добавляем платформо-зависимые данные
 datas.extend(platform_data)
