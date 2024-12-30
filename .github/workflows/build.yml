@@ -87,7 +87,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          python -m poetry install --no-interaction --no-root --no-cache-dir
+          python -m poetry install --no-interaction --no-root
           python -m poetry install --no-interaction --with dev --all-extras
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
           python -m poetry run pip install psutil
