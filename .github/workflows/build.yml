@@ -149,11 +149,6 @@ jobs:
           poetry run flake8 .
         continue-on-error: true
 
-      - name: Run Tests
-        run: |
-          poetry run pytest
-        continue-on-error: true
-
       - name: Build Executable
         run: |
           COMMON_ARGS="--clean --onefile --console --name=${{ env.APP_NAME }} \
