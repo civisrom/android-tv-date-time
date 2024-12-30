@@ -198,11 +198,25 @@ jobs:
                             ['hooks/macos_hook.py'] if sys.platform == 'darwin' else 
                             ['hooks/linux_hook.py'],
               excludes=[
-                  'tkinter', 'unittest', 'pdb', 'difflib', 'doctest', 'xml',
-                  'pydoc', 'inspect', 'test', '_pytest', 'pytest', 'pip',
-                  'setuptools', 'pkg_resources', 'distutils', 'email',
-                  'html', 'http', 'multiprocessing',
-                  'xmlrpc', 'win32com', 'win32api', 'win32gui'
+                  'tkinter',
+                  'unittest',
+                  'pdb',
+                  'difflib',
+                  'doctest',
+                  'xml',
+                  'pydoc',
+                  'test',
+                  '_pytest',
+                  'pytest',
+                  'pip',
+                  'setuptools',
+                  'pkg_resources',
+                  'distutils',
+                  'email',
+                  'html',
+                  'http',
+                  'multiprocessing',
+                  'xmlrpc'
               ],  # Removed 'urllib' from excludes
               win_no_prefer_redirects=False,
               win_private_assemblies=False,
