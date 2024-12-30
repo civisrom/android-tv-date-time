@@ -146,7 +146,17 @@ jobs:
           cat > pyinstaller.spec << 'EOF'
           # -*- mode: python ; coding: utf-8 -*-
           import sys
-
+          import os
+          from PyInstaller.utils.hooks import collect_dynamic_libs
+          
+          # Указать путь к системным библиотекам
+          extra_paths = [
+              r"C:\Windows\System32"
+          ]
+          binaries = collect_dynamic_libs('android-tv-date-time') + [
+              (os.path.join(path, dll), dll) for path in extra_paths for dll in os.listdir(path)
+          ]
+          
           a = Analysis(
               ['android_time_fixer.py'],
               pathex=[],
