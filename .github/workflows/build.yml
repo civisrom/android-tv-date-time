@@ -39,15 +39,15 @@ jobs:
           - os: windows-latest
             platform: windows
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
-            adb_files: ['adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll']
+            adb_base: "adb.exe AdbWinApi.dll AdbWinUsbApi.dll"
           - os: ubuntu-latest
             platform: linux
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-linux.zip
-            adb_files: ['adb']
+            adb_base: "adb"
           - os: macos-latest
             platform: macos
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-darwin.zip
-            adb_files: ['adb']
+            adb_base: "adb"
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Changed to full history for better versioning
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -117,9 +117,9 @@ jobs:
           curl -L ${{ matrix.adb_url }} -o temp_adb/platform-tools.zip
           unzip -o temp_adb/platform-tools.zip -d temp_adb/
           
-          for file in ${{ toJSON(matrix.adb_files) }}; do
+          for file in ${{ matrix.adb_base }}; do
             cp "temp_adb/platform-tools/$file" "resources/$file"
-            if [[ "$file" != *.dll ]]; then
+            if [[ "$file" != *".dll" ]]; then
               chmod +x "resources/$file"
             fi
           done
