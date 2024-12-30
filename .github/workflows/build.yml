@@ -25,7 +25,7 @@ permissions:
 env:
   PYTHON_VERSION: '3.12'
   APP_NAME: AndroidTVTimeFixer
-  SOURCE_FILE: android_time_fixer.py
+  SOURCE_FILE: src/android_time_fixer.py
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
   ADB_VERSION: '35.0.2'
