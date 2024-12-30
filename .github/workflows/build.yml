@@ -81,59 +81,14 @@ jobs:
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
 
-      - name: Show dependency tree
+      - name: Show details for dependencies
         run: |
-          poetry show --tree
-        shell: bash
-
-      - name: Show details for cryptography
-        run: |
-          poetry show cryptography -v
-        shell: bash
-
-      - name: Show details for pyasn1
-        run: |
-          poetry show pyasn1 -v
-        shell: bash
-
-      - name: Show details for rsa
-        run: |
-          poetry show rsa -v
-        shell: bash
-
-      - name: Show dependency tree
-        run: |
-          poetry show --tree
+          $packages = @("cryptography", "pyasn1", "rsa")
+          foreach ($package in $packages) {
+            Write-Host "Details for $package:"
+            poetry show $package -v | Out-File "$package-details.txt"
+          }
         shell: pwsh
-
-      - name: Show details for cryptography
-        run: |
-          poetry show cryptography -v
-        shell: pwsh
-
-      - name: Show details for pyasn1
-        run: |
-          poetry show pyasn1 -v
-        shell: pwsh
-
-      - name: Show details for rsa
-        run: |
-          poetry show rsa -v
-        shell: pwsh
-
-      - name: Generate dependency report
-        run: |
-          poetry show --tree > dependency-tree.txt
-          poetry show cryptography pyasn1 rsa -v > package-details.txt
-        shell: pwsh
-
-      - name: Upload dependency reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: Dependency Reports
-          path: |
-            dependency-tree.txt
-            package-details.txt
           
       - name: Configure Poetry Environment (Windows)
         run: |
