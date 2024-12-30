@@ -144,13 +144,13 @@ jobs:
         shell: bash
         run: |
           cat > pyinstaller.spec << 'EOF'
-                    # -*- mode: python ; coding: utf-8 -*-
+          # -*- mode: python ; coding: utf-8 -*-
           import sys
           from PyInstaller.utils.hooks import collect_all
           
           datas = []
           binaries = []
-          hiddenimports = []
+          hiddenimports = ['logging']  # Add logging to hidden imports
           
           # Collect all necessary packages
           packages = ['pyperclip', 'colorama', 'platformdirs', 'packaging', 'typing_extensions', 
@@ -158,16 +158,23 @@ jobs:
                      'subprocess', 'threading', 'adb_shell.adb_device', 'adb_shell.auth.sign_pythonrsa', 
                      'ntplib', 'psutil']
           
+          # Only collect from actual packages to avoid warnings
+          package_imports = []
           for package in packages:
-              tmp_ret = collect_all(package)
-              datas.append(tmp_ret[0])
-              binaries.append(tmp_ret[1])
-              hiddenimports.append(tmp_ret[2])
+              try:
+                  __import__(package)
+                  package_imports.append(package)
+              except ImportError:
+                  continue
           
-          # Flatten the lists
-          datas = [item for sublist in datas for item in sublist]
-          binaries = [item for sublist in binaries for item in sublist]
-          hiddenimports = [item for sublist in hiddenimports for item in sublist]
+          for package in package_imports:
+              tmp_ret = collect_all(package)
+              if tmp_ret[0]:  # datas
+                  datas.extend(tmp_ret[0])
+              if tmp_ret[1]:  # binaries
+                  binaries.extend(tmp_ret[1])
+              if tmp_ret[2]:  # hiddenimports
+                  hiddenimports.extend(tmp_ret[2])
           
           a = Analysis(
               ['android_time_fixer.py'],
@@ -184,9 +191,9 @@ jobs:
                   'tkinter', 'unittest', 'pdb', 'difflib', 'doctest', 'xml',
                   'pydoc', 'inspect', 'test', '_pytest', 'pytest', 'pip',
                   'setuptools', 'pkg_resources', 'distutils', 'email',
-                  'html', 'http', 'logging', 'multiprocessing', 'unittest',
-                  'urllib', 'xml', 'xmlrpc', 'win32com', 'win32api', 'win32gui'
-              ],
+                  'html', 'http', 'multiprocessing', 'unittest',
+                  'urllib', 'xmlrpc', 'win32com', 'win32api', 'win32gui'
+              ],  # Removed 'logging' from excludes
               win_no_prefer_redirects=False,
               win_private_assemblies=False,
               cipher=None,
@@ -205,16 +212,24 @@ jobs:
                   ('resources/adb', 'resources/adb', 'DATA')
               ]
           
-          # Bundle external shared libraries
-          a.binaries = [b for b in a.binaries if not b[0].startswith('api-ms-win')]
-          
-          # Ensure Python DLL is included
+          # Add system DLLs for Windows
           if sys.platform == 'win32':
               import os
+              import glob
+              
+              # Add Python DLL
               python_dll = f'python{sys.version_info.major}{sys.version_info.minor}.dll'
               python_dll_path = os.path.join(sys.prefix, python_dll)
               if os.path.exists(python_dll_path):
                   a.binaries.append((python_dll, python_dll_path, 'BINARY'))
+              
+              # Add Windows API DLLs
+              system32_path = os.path.join(os.environ['SystemRoot'], 'System32')
+              api_dlls = glob.glob(os.path.join(system32_path, 'api-ms-win-*.dll'))
+              for dll in api_dlls:
+                  if os.path.exists(dll):
+                      dll_name = os.path.basename(dll)
+                      a.binaries.append((dll_name, dll, 'BINARY'))
           
           pyz = PYZ(a.pure, a.zipped_data, cipher=None)
           
@@ -228,9 +243,9 @@ jobs:
               name='AndroidTVTimeFixer',
               debug=False,
               bootloader_ignore_signals=False,
-              strip=False,  # Changed to False to prevent stripping of important DLLs
+              strip=False,
               upx=True,
-              upx_exclude=['vcruntime140.dll', 'python*.dll'],
+              upx_exclude=['vcruntime140.dll', 'python*.dll', 'api-ms-*.dll'],
               runtime_tmpdir=None,
               console=True,
               disable_windowed_traceback=False,
