@@ -255,7 +255,7 @@ jobs:
         shell: bash
         run: |
           # Сборка с использованием spec файла
-          poetry run pyinstaller --clean pyinstaller.spec
+          poetry run pyinstaller --clean --collect-all pyinstaller.spec
           
           # Очистка временных файлов после сборки
           rm -rf build/
