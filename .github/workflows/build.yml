@@ -69,16 +69,21 @@ jobs:
           python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
 
-      - name: Configure Poetry Environment
+      - name: Configure Poetry Environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            python -m poetry env use "$env:pythonLocation\python.exe"
-          else
-            python -m poetry env use $(which python)
-          fi
+          python -m poetry env use "$env:pythonLocation\python.exe"
           python -m poetry config virtualenvs.create true
           python -m poetry config virtualenvs.in-project true
+
+      - name: Configure Poetry Environment (Unix)
+        if: runner.os != 'Windows'
         shell: bash
+        run: |
+          python -m poetry env use $(which python)
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
 
       - name: Install Dependencies
         run: |
