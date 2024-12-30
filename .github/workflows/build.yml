@@ -118,83 +118,108 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Resources Directory and Setup ADB
-        run: |
-          mkdir -p resources
-          mkdir -p temp_adb
-          
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            curl -L https://dl.google.com/android/repository/platform-tools-latest-windows.zip -o temp_adb/platform-tools.zip
-            unzip temp_adb/platform-tools.zip -d temp_adb/
-            cp temp_adb/platform-tools/adb.exe ./resources/
-            cp temp_adb/platform-tools/AdbWinApi.dll ./resources/
-            cp temp_adb/platform-tools/AdbWinUsbApi.dll ./resources/
-          elif [ "${{ runner.os }}" == "Darwin" ]; then
-            curl -L https://dl.google.com/android/repository/platform-tools-latest-darwin.zip -o temp_adb/platform-tools.zip
-            unzip temp_adb/platform-tools.zip -d temp_adb/
-            cp temp_adb/platform-tools/adb ./resources/
-            chmod +x ./resources/adb
-          else
-            curl -L https://dl.google.com/android/repository/platform-tools-latest-linux.zip -o temp_adb/platform-tools.zip
-            unzip temp_adb/platform-tools.zip -d temp_adb/
-            cp temp_adb/platform-tools/adb ./resources/
-            chmod +x ./resources/adb
-          fi
-          
-          echo "ADB_RESOURCES_PATH=$PWD/resources" >> $GITHUB_ENV
-        shell: bash
-
       - name: Run Linter
         run: |
           poetry run flake8 .
         continue-on-error: true
 
-      - name: Build Executable
-        run: |
-          COMMON_ARGS="--clean --onefile --console --name=${{ env.APP_NAME }} \
-            --hidden-import=pyperclip \
-            --hidden-import=colorama \
-            --hidden-import=platformdirs \
-            --hidden-import=packaging \
-            --hidden-import=typing_extensions \
-            --hidden-import=cryptography \
-            --hidden-import=rsa \
-            --hidden-import=aiofiles \
-            --hidden-import=async_timeout \
-            --hidden-import=asyncio \
-            --hidden-import=socket \
-            --hidden-import=subprocess \
-            --hidden-import=threading \
-            --hidden-import=adb_shell.adb_device \
-            --hidden-import=adb_shell.auth.sign_pythonrsa \
-            --hidden-import=ntplib \
-            --hidden-import=psutil \
-            --collect-all ntplib \
-            --collect-all adb_shell \
-            --collect-all async_timeout \
-            --collect-data colorama \
-            --collect-data aiofiles \
-            --collect-data platformdirs \
-            --collect-data packaging \
-            --collect-data typing_extensions \
-            --collect-data cryptography \
-            --log-level=DEBUG"
+- name: Build Executable
+  shell: bash
+  run: |
+    # Определяем базовые аргументы для PyInstaller
+    COMMON_ARGS="--clean --onefile --console --name=${{ env.APP_NAME }} \
+      --hidden-import=pyperclip \
+      --hidden-import=colorama \
+      --hidden-import=platformdirs \
+      --hidden-import=packaging \
+      --hidden-import=typing_extensions \
+      --hidden-import=cryptography \
+      --hidden-import=rsa \
+      --hidden-import=aiofiles \
+      --hidden-import=async_timeout \
+      --hidden-import=asyncio \
+      --hidden-import=socket \
+      --hidden-import=subprocess \
+      --hidden-import=threading \
+      --hidden-import=adb_shell.adb_device \
+      --hidden-import=adb_shell.auth.sign_pythonrsa \
+      --hidden-import=ntplib \
+      --hidden-import=psutil \
+      --collect-all ntplib \
+      --collect-all adb_shell \
+      --collect-all async_timeout \
+      --collect-data colorama \
+      --collect-data aiofiles \
+      --collect-data platformdirs \
+      --collect-data packaging \
+      --collect-data typing_extensions \
+      --collect-data cryptography \
+      --log-level=DEBUG"
 
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            ADD_DATA="--add-data=\"resources/adb.exe;resources/\" \
-              --add-data=\"resources/AdbWinApi.dll;resources/\" \
-              --add-data=\"resources/AdbWinUsbApi.dll;resources/\""
-            HOOK="--runtime-hook=\"hooks/win_hook.py\""
-          elif [ "${{ runner.os }}" == "Darwin" ]; then
-            ADD_DATA="--add-data=\"resources/adb:resources/\""
-            HOOK="--runtime-hook=\"hooks/macos_hook.py\""
-          else
-            ADD_DATA="--add-data=\"resources/adb:resources/\""
-            HOOK="--runtime-hook=\"hooks/linux_hook.py\""
-          fi
+    if [ "${{ runner.os }}" == "Windows" ]; then
+      # Windows специфичная конфигурация
+      RESOURCES_PATH=$(pwd)/resources
+      RESOURCES_PATH_WIN=$(echo "$RESOURCES_PATH" | sed 's/\//\\/g')
+      
+      poetry run pyinstaller $COMMON_ARGS \
+        --add-data "${RESOURCES_PATH_WIN}\\adb.exe;resources" \
+        --add-data "${RESOURCES_PATH_WIN}\\AdbWinApi.dll;resources" \
+        --add-data "${RESOURCES_PATH_WIN}\\AdbWinUsbApi.dll;resources" \
+        --runtime-hook "hooks/win_hook.py" \
+        "${{ env.SOURCE_FILE }}"
+    elif [ "${{ runner.os }}" == "Darwin" ]; then
+      # macOS специфичная конфигурация
+      poetry run pyinstaller $COMMON_ARGS \
+        --add-data "resources/adb:resources" \
+        --runtime-hook "hooks/macos_hook.py" \
+        "${{ env.SOURCE_FILE }}"
+    else
+      # Linux специфичная конфигурация
+      poetry run pyinstaller $COMMON_ARGS \
+        --add-data "resources/adb:resources" \
+        --runtime-hook "hooks/linux_hook.py" \
+        "${{ env.SOURCE_FILE }}"
+    fi
 
-          poetry run pyinstaller $COMMON_ARGS $ADD_DATA $HOOK "${{ env.SOURCE_FILE }}"
-        shell: bash
+# И обновленная секция для создания ресурсов:
+- name: Create Resources Directory and Setup ADB
+  shell: bash
+  run: |
+    # Создаем директории
+    mkdir -p resources
+    mkdir -p temp_adb
+    
+    if [ "${{ runner.os }}" == "Windows" ]; then
+      # Windows setup
+      curl -L https://dl.google.com/android/repository/platform-tools-latest-windows.zip -o temp_adb/platform-tools.zip
+      unzip -o temp_adb/platform-tools.zip -d temp_adb/
+      # Используем относительные пути и cp вместо copy
+      cp "temp_adb/platform-tools/adb.exe" "resources/adb.exe"
+      cp "temp_adb/platform-tools/AdbWinApi.dll" "resources/AdbWinApi.dll"
+      cp "temp_adb/platform-tools/AdbWinUsbApi.dll" "resources/AdbWinUsbApi.dll"
+      
+      # Проверяем наличие файлов
+      ls -la resources/
+    elif [ "${{ runner.os }}" == "Darwin" ]; then
+      # macOS setup
+      curl -L https://dl.google.com/android/repository/platform-tools-latest-darwin.zip -o temp_adb/platform-tools.zip
+      unzip -o temp_adb/platform-tools.zip -d temp_adb/
+      cp "temp_adb/platform-tools/adb" "resources/adb"
+      chmod +x "resources/adb"
+    else
+      # Linux setup
+      curl -L https://dl.google.com/android/repository/platform-tools-latest-linux.zip -o temp_adb/platform-tools.zip
+      unzip -o temp_adb/platform-tools.zip -d temp_adb/
+      cp "temp_adb/platform-tools/adb" "resources/adb"
+      chmod +x "resources/adb"
+    fi
+    
+    # Проверяем содержимое директории resources
+    echo "Contents of resources directory:"
+    ls -la resources/
+    
+    # Устанавливаем переменную окружения
+    echo "ADB_RESOURCES_PATH=$(pwd)/resources" >> $GITHUB_ENV
 
       - name: Package Build
         run: |
@@ -238,14 +263,3 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          body: |
-            ## Release Notes
-            
-            ### Changes
-            - Automated release from GitHub Actions
-            - Built for Windows, Linux, and macOS
-            
-            ### Artifacts
-            - AndroidTVTimeFixer-windows.zip
-            - AndroidTVTimeFixer-linux.zip
-            - AndroidTVTimeFixer-macos.zip
