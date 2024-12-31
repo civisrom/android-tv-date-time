@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
-packages = [{include = "android_time_fixer.py"}]
+packages = [{include = "src/android_time_fixer.py"}]
 classifiers = [
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: Microsoft :: Windows",
