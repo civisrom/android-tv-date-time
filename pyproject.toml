@@ -12,7 +12,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
+python = ">=3.8,<3.12"
 adb-shell = {extras = ["network"], version = "^0.4.4"}
 pyperclip = "^1.9.0"
 colorama = "^0.4.6"
@@ -50,7 +50,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 100
-target-version = ['py310', 'py311']
+target-version = ['py38', 'py310', 'py311']
 
 [tool.isort]
 profile = "black"
