@@ -129,7 +129,15 @@ a = Analysis(
         'email',
         'html',
         'http',
-        'xmlrpc'
+        'xmlrpc',
+        'PyQt5',
+        'PyQt6',
+        'PySide6',
+        'wx',
+        'PIL',
+        'numpy',
+        'pandas',
+        'scipy'
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
