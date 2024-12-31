@@ -140,7 +140,6 @@ a = Analysis(
         'scipy',
         'matplotlib',
         'doctest',
-        'urllib',
         'pywin',
         'win32com'
     ],
