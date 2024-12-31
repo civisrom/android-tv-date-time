@@ -62,16 +62,33 @@ def _update_path(paths: list, logger: logging.Logger) -> None:
     
     logger.info("PATH environment updated")
 
-def _load_windows_dlls(resources_path: str, logger: logging.Logger) -> None:
-    dll_path = os.path.join(resources_path, 'AdbWinApi.dll')
-    if not ctypes.windll.kernel32.LoadLibraryW(dll_path):
-        raise OSError(f"Failed to load {dll_path}")
+def load_windows_dlls(resources_path: str, logger: logging.Logger) -> None:
+    # Get full paths for DLLs
+    adb_dll = os.path.join(resources_path, 'AdbWinApi.dll')
+    usb_dll = os.path.join(resources_path, 'AdbWinUsbApi.dll')
     
-    dll_path = os.path.join(resources_path, 'AdbWinUsbApi.dll')
-    if not ctypes.windll.kernel32.LoadLibraryW(dll_path):
-        raise OSError(f"Failed to load {dll_path}")
+    # Ensure files exist
+    if not os.path.exists(adb_dll):
+        raise FileNotFoundError(f"Required DLL not found: {adb_dll}")
+    if not os.path.exists(usb_dll):
+        raise FileNotFoundError(f"Required DLL not found: {usb_dll}")
+    
+    # Copy DLLs to a stable location
+    stable_dir = os.path.join(os.path.expanduser('~'), '.android')
+    os.makedirs(stable_dir, exist_ok=True)
+    
+    stable_adb_dll = os.path.join(stable_dir, 'AdbWinApi.dll')
+    stable_usb_dll = os.path.join(stable_dir, 'AdbWinUsbApi.dll')
+    
+    # Copy files if they don't exist or are different
+    import shutil
+    shutil.copy2(adb_dll, stable_adb_dll)
+    shutil.copy2(usb_dll, stable_usb_dll)
+    
+    # Load DLLs from stable location
+    if not ctypes.windll.kernel32.LoadLibraryW(stable_adb_dll):
+        raise OSError(f"Failed to load {stable_adb_dll}")
+    if not ctypes.windll.kernel32.LoadLibraryW(stable_usb_dll):
+        raise OSError(f"Failed to load {stable_usb_dll}")
     
     logger.info("Windows DLLs loaded successfully")
-
-if __name__ == '__main__':
-    setup_windows_environment()
