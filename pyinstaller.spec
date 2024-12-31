@@ -137,7 +137,12 @@ a = Analysis(
         'PIL',
         'numpy',
         'pandas',
-        'scipy'
+        'scipy',
+        'matplotlib',
+        'doctest',
+        'urllib',
+        'pywin',
+        'win32com'
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
