@@ -23,7 +23,7 @@ permissions:
   actions: write
 
 env:
-  PYTHON_VERSION: '3.8'
+  PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: src/android_time_fixer.py
   POETRY_VERSION: '1.8.4'
