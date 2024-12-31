@@ -6,7 +6,7 @@ on:
   workflow_dispatch:  # Возможность запуска вручную
 
 env:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: '3.10'
   CI_DEBUG: true
   POETRY_VERSION: '1.8.4'
   PYINSTALLER_VERSION: '6.11.1'
