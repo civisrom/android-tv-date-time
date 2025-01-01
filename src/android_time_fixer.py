@@ -581,25 +581,6 @@ class AndroidTVTimeFixer:
                         else:
                             self.logger.info("'adb disconnect' completed successfully.")
     
-                # Выполняем adb connect перед основной командой, если есть IP
-                if device_ip:
-                    self.logger.info(f"Executing 'adb connect {device_ip}'")
-                    connect_command = [self.get_adb_path(), 'connect', device_ip]
-                    connect_process = Popen(
-                        connect_command,
-                        stdout=PIPE,
-                        stderr=PIPE,
-                        universal_newlines=True,
-                        encoding=encoding,
-                        bufsize=1
-                    )
-                    _, connect_stderr = connect_process.communicate()
-    
-                    if connect_process.returncode != 0:
-                        self.logger.warning(f"Error while executing 'adb connect': {connect_stderr.strip()}")
-                    else:
-                        self.logger.info("'adb connect' completed successfully.")
-    
                 # Выполнение основной команды подключения
                 args = shlex.split(command)
                 if not args:
