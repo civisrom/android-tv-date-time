@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 class ADBProcessManager:
     def __init__(self, adb_path, device_ip=None):
         self.adb_path = adb_path
-        self.device_ip = device_ip  # Сохраняем IP-адрес устройства
+        self.device_ip = device_ip
         self.logger = logging.getLogger(__name__)
         self.setup_process_termination()
 
@@ -66,21 +66,37 @@ class ADBProcessManager:
         Настройка механизмов завершения процессов ADB
         при выходе из программы или закрытии терминала
         """
-        # Регистрация обработчиков завершения
-        atexit.register(self.terminate_adb_processes)
-        
-        # Настройка обработчиков сигналов
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
+        try:
+            # Сначала отключаем устройство
+            self.disconnect_device()
+            
+            # Регистрация обработчиков завершения
+            atexit.register(self.terminate_adb_processes)
+            
+            # Настройка обработчиков сигналов
+            signal.signal(signal.SIGINT, self.signal_handler)
+            signal.signal(signal.SIGTERM, self.signal_handler)
+        except Exception as e:
+            self.logger.error(f"Error in setup_process_termination: {e}")
 
     def signal_handler(self, signum, frame):
         """
         Обработчик системных сигналов для завершения процессов
         """
-        self.logger.info(locales.get("terminal_mode_exit_ctrl_c"))
-        print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-        self.terminate_adb_processes()
-        sys.exit(0)
+        try:
+            self.logger.info(locales.get("terminal_mode_exit_ctrl_c"))
+            print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
+            
+            # Сначала отключаем устройство
+            self.disconnect_device()
+            
+            # Затем завершаем процессы
+            self.terminate_adb_processes()
+            
+            sys.exit(0)
+        except Exception as e:
+            self.logger.error(f"Error in signal handler: {e}")
+            sys.exit(1)
 
     def disconnect_device(self):
         """
@@ -96,12 +112,19 @@ class ADBProcessManager:
             else:
                 device_address = self.device_ip
 
-            self.logger.info(f"Disconnecting device: {device_address}")
-            subprocess.run([self.adb_path, 'disconnect', device_address],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         timeout=5)
-            self.logger.info(f"Successfully disconnected from {device_address}")
+            self.logger.info(f"Executing 'adb disconnect {device_address}'")
+            disconnect_process = subprocess.run(
+                [self.adb_path, 'disconnect', device_address],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5
+            )
+            
+            if disconnect_process.returncode == 0:
+                self.logger.info(f"Successfully disconnected from {device_address}")
+            else:
+                self.logger.warning(f"Failed to disconnect from {device_address}")
+                
         except subprocess.TimeoutExpired:
             self.logger.warning("ADB disconnect timed out")
         except Exception as e:
@@ -141,6 +164,9 @@ class ADBProcessManager:
         Returns:
             bool: Успешность завершения
         """
+        # Сначала отключаем устройство
+        self.disconnect_device()
+
         terminated = False
         try:
             for proc in psutil.process_iter(['name', 'exe']):
@@ -170,6 +196,9 @@ class ADBProcessManager:
 
     def _terminate_windows_processes(self):
         """Расширенное завершение процессов ADB в Windows"""
+        # Сначала отключаем устройство
+        self.disconnect_device()
+
         try:
             # 1. Завершение через taskkill
             subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
@@ -192,6 +221,9 @@ class ADBProcessManager:
         Завершение процессов ADB с использованием WMI
         Работает только в Windows
         """
+        # Сначала отключаем устройство
+        self.disconnect_device()
+
         if wmi is None:
             self.logger.warning("WMI module not available")
             return
@@ -225,6 +257,9 @@ class ADBProcessManager:
 
     def _terminate_unix_processes(self):
         """Завершение процессов ADB в Unix-системах"""
+        # Сначала отключаем устройство
+        self.disconnect_device()
+
         try:
             subprocess.run(['pkill', '-9', 'adb'], 
                            stdout=subprocess.DEVNULL, 
@@ -233,13 +268,21 @@ class ADBProcessManager:
             self.logger.info("Unix ADB processes terminated")
         except subprocess.TimeoutExpired:
             self.logger.warning("pkill timed out")
+        except Exception as e:
+            self.logger.error(f"Error terminating Unix processes: {e}")
 
     def cleanup(self):
         """
         Метод для явного вызова очистки,
         который можно использовать при завершении программы
         """
-        self.terminate_adb_processes()
+        try:
+            # Сначала отключаем устройство
+            self.disconnect_device()
+            # Затем завершаем процессы
+            self.terminate_adb_processes()
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {e}")
 
 class AndroidTVTimeFixerError(Exception):
     """Базовый класс исключений для AndroidTVTimeFixer"""
