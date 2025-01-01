@@ -55,8 +55,9 @@ for handler in logging.getLogger().handlers:
 logger = logging.getLogger(__name__)
 
 class ADBProcessManager:
-    def __init__(self, adb_path):
+    def __init__(self, adb_path, device_ip=None):
         self.adb_path = adb_path
+        self.device_ip = device_ip  # Сохраняем IP-адрес устройства
         self.logger = logging.getLogger(__name__)
         self.setup_process_termination()
 
@@ -69,7 +70,6 @@ class ADBProcessManager:
         atexit.register(self.terminate_adb_processes)
         
         # Настройка обработчиков сигналов
-
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
 
@@ -82,12 +82,40 @@ class ADBProcessManager:
         self.terminate_adb_processes()
         sys.exit(0)
 
+    def disconnect_device(self):
+        """
+        Отключение устройства через ADB перед завершением процессов
+        """
+        if not self.device_ip:
+            return
+
+        try:
+            # Добавляем порт 5555 по умолчанию, если он не указан
+            if ':' not in self.device_ip:
+                device_address = f"{self.device_ip}:5555"
+            else:
+                device_address = self.device_ip
+
+            self.logger.info(f"Disconnecting device: {device_address}")
+            subprocess.run([self.adb_path, 'disconnect', device_address],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         timeout=5)
+            self.logger.info(f"Successfully disconnected from {device_address}")
+        except subprocess.TimeoutExpired:
+            self.logger.warning("ADB disconnect timed out")
+        except Exception as e:
+            self.logger.error(f"Error during device disconnect: {e}")
+
     def terminate_adb_processes(self):
         """
         Комплексный метод завершения всех процессов ADB
         с использованием нескольких подходов
         """
         try:
+            # Сначала отключаем устройство
+            self.disconnect_device()
+
             # 1. Штатное завершение через ADB
             subprocess.run([self.adb_path, 'kill-server'], 
                            stdout=subprocess.DEVNULL, 
@@ -437,7 +465,8 @@ class AndroidTVTimeFixer:
 
     def _retry_adb_connection(self, command: str, max_retries: int = 5, delay: int = 2) -> bool:
         """
-        Пытается переподключиться к устройству несколько раз, выполняя 'adb kill-server' только на 3-й, 4-й и 5-й попытке.
+        Пытается переподключиться к устройству несколько раз, выполняя 'adb kill-server' и 'adb disconnect'
+        только на 3-й, 4-й и 5-й попытке. Использует порт 5555 по умолчанию.
     
         Args:
             command (str): Выполняемая команда.
@@ -452,15 +481,28 @@ class AndroidTVTimeFixer:
         from subprocess import Popen, PIPE
         import sys
         import locale
+        import re
     
         # Определяем кодировку текущей системы
         encoding = 'utf-8' if sys.platform != 'win32' else 'cp866'
     
+        # Извлекаем IP-адрес из команды
+        ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?', command)
+        if ip_match:
+            ip = ip_match.group(1)
+            # Используем порт 5555 по умолчанию, если порт не указан
+            port = ip_match.group(2) if ip_match.group(2) else '5555'
+            device_ip = f"{ip}:{port}"
+        else:
+            device_ip = None
+    
         for attempt in range(max_retries):
             try:
-                # Выполнение команды adb kill-server только на 3-й, 4-й и 5-й попытке
+                # Выполнение команд adb kill-server и adb disconnect только на 3-й, 4-й и 5-й попытке
                 if attempt >= 2:
                     self.logger.info(f"Попытка {attempt + 1}: Execute 'adb kill-server' to restart the ADB server.")
+                    
+                    # Выполняем adb kill-server
                     kill_server_command = [self.get_adb_path(), 'kill-server']
                     kill_server_process = Popen(
                         kill_server_command,
@@ -476,6 +518,44 @@ class AndroidTVTimeFixer:
                         self.logger.warning(f"Error while executing 'adb kill-server': {kill_server_stderr.strip()}")
                     else:
                         self.logger.info("'adb kill-server' completed successfully.")
+    
+                    # Выполняем adb disconnect для конкретного IP, если он есть
+                    if device_ip:
+                        self.logger.info(f"Попытка {attempt + 1}: Execute 'adb disconnect {device_ip}'")
+                        disconnect_command = [self.get_adb_path(), 'disconnect', device_ip]
+                        disconnect_process = Popen(
+                            disconnect_command,
+                            stdout=PIPE,
+                            stderr=PIPE,
+                            universal_newlines=True,
+                            encoding=encoding,
+                            bufsize=1
+                        )
+                        _, disconnect_stderr = disconnect_process.communicate()
+    
+                        if disconnect_process.returncode != 0:
+                            self.logger.warning(f"Error while executing 'adb disconnect': {disconnect_stderr.strip()}")
+                        else:
+                            self.logger.info("'adb disconnect' completed successfully.")
+    
+                # Выполняем adb connect перед основной командой, если есть IP
+                if device_ip:
+                    self.logger.info(f"Executing 'adb connect {device_ip}'")
+                    connect_command = [self.get_adb_path(), 'connect', device_ip]
+                    connect_process = Popen(
+                        connect_command,
+                        stdout=PIPE,
+                        stderr=PIPE,
+                        universal_newlines=True,
+                        encoding=encoding,
+                        bufsize=1
+                    )
+                    _, connect_stderr = connect_process.communicate()
+    
+                    if connect_process.returncode != 0:
+                        self.logger.warning(f"Error while executing 'adb connect': {connect_stderr.strip()}")
+                    else:
+                        self.logger.info("'adb connect' completed successfully.")
     
                 # Выполнение основной команды подключения
                 args = shlex.split(command)
@@ -502,7 +582,7 @@ class AndroidTVTimeFixer:
                     "error: device not found",
                     "error: device offline",
                     "error: device unauthorized",
-                    "cannot connect"  # Включаем ошибку подключения
+                    "cannot connect"
                 ]
     
                 if return_code == 0:
