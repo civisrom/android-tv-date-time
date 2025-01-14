@@ -125,7 +125,10 @@ jobs:
           done
           
           rm -rf temp_adb
-
+          
+      - name: Check Poetry source
+        run: poetry config --list
+        
       - name: Build executable
         run: poetry run pyinstaller --clean pyinstaller.spec
         shell: bash
