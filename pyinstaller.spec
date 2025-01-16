@@ -23,7 +23,7 @@ hiddenimports = [
     'urllib.request',
     'urllib.response',
     'pathlib',
-    '_collections_abc',
+#    '_collections_abc',
     'encodings.idna'
 ]
 
