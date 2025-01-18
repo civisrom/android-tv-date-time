@@ -22,9 +22,10 @@ hiddenimports = [
     'urllib.error',
     'urllib.request',
     'urllib.response',
-    'pathlib'
+    'pathlib',
 #    '_collections_abc',
-#    'encodings.idna'
+#    'encodings.idna',
+    'concurrent.futures'
 ]
 
 # Collect all necessary packages
