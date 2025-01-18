@@ -4,11 +4,19 @@ import os
 from PyInstaller.utils.hooks import collect_all
 
 # Определяем базовый путь проекта
-BASEPATH = os.path.dirname(os.path.abspath('pyinstaller.spec'))
+BASEPATH = os.path.dirname(os.path.abspath(SPECPATH))
+SRC_PATH = os.path.join(BASEPATH, 'src')
+
+# Проверяем существование основного скрипта
+MAIN_SCRIPT = os.path.join(SRC_PATH, 'android_time_fixer.py')
+if not os.path.exists(MAIN_SCRIPT):
+    raise FileNotFoundError(f"Main script not found at: {MAIN_SCRIPT}")
+
+# Добавляем src в PYTHONPATH
+sys.path.insert(0, SRC_PATH)
 
 # Определяем пути к ресурсам
 HOOKS_PATH = os.path.join(BASEPATH, 'scripts', 'hooks')
-SRC_PATH = os.path.join(BASEPATH, 'src')
 
 # Добавляем src в PYTHONPATH
 sys.path.insert(0, SRC_PATH)
@@ -106,7 +114,7 @@ else:  # linux
 datas.extend(platform_data)
 
 a = Analysis(
-    [os.path.join(SRC_PATH, 'android_time_fixer.py')],
+    [MAIN_SCRIPT],
     pathex=[BASEPATH],
     binaries=binaries,
     datas=datas,
