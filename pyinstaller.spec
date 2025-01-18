@@ -22,9 +22,9 @@ hiddenimports = [
     'urllib.error',
     'urllib.request',
     'urllib.response',
-    'pathlib',
+    'pathlib'
 #    '_collections_abc',
-    'encodings.idna'
+#    'encodings.idna'
 ]
 
 # Collect all necessary packages
@@ -38,10 +38,10 @@ packages = [
     'rsa', 
     'aiofiles', 
     'async_timeout', 
-    'asyncio', 
-    'socket',
-    'subprocess', 
-    'threading', 
+#    'asyncio', 
+#    'socket',
+#    'subprocess', 
+#    'threading', 
     'adb_shell.adb_device', 
     'adb_shell.auth.sign_pythonrsa',
     'ntplib', 
