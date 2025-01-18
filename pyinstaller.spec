@@ -4,7 +4,7 @@ import os
 from PyInstaller.utils.hooks import collect_all
 
 # Определяем базовый путь проекта
-BASEPATH = os.path.dirname(os.path.abspath('__file__'))
+BASEPATH = os.path.dirname(os.path.abspath(__file__))
 
 # Определяем пути к ресурсам
 HOOKS_PATH = os.path.join(BASEPATH, 'scripts', 'hooks')
