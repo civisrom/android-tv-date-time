@@ -3,20 +3,40 @@ import sys
 import os
 from PyInstaller.utils.hooks import collect_all
 
-# Определяем базовый путь проекта
+# Определяем корректные пути
 BASEPATH = os.path.dirname(os.path.abspath(SPECPATH))
-SRC_PATH = os.path.join(BASEPATH, 'src')
+REPO_ROOT = BASEPATH  # или os.path.dirname(BASEPATH) если spec файл в подпапке
+SRC_PATH = os.path.join(REPO_ROOT, 'android-tv-date-time', 'src')
+
+# Проверяем и выводим пути для отладки
+print(f"BASEPATH: {BASEPATH}")
+print(f"SRC_PATH: {SRC_PATH}")
+
+# Проверяем существование директории src
+if not os.path.exists(SRC_PATH):
+    raise FileNotFoundError(f"Source directory not found at: {SRC_PATH}")
+
+# Определяем путь к основному скрипту
+MAIN_SCRIPT = os.path.join(SRC_PATH, 'android_time_fixer.py')
 
 # Проверяем существование основного скрипта
-MAIN_SCRIPT = os.path.join(SRC_PATH, 'android_time_fixer.py')
 if not os.path.exists(MAIN_SCRIPT):
-    raise FileNotFoundError(f"Main script not found at: {MAIN_SCRIPT}")
+    # Пробуем альтернативный путь
+    ALT_SRC_PATH = os.path.join(REPO_ROOT, 'src')
+    ALT_MAIN_SCRIPT = os.path.join(ALT_SRC_PATH, 'android_time_fixer.py')
+    
+    if os.path.exists(ALT_MAIN_SCRIPT):
+        MAIN_SCRIPT = ALT_MAIN_SCRIPT
+        SRC_PATH = ALT_SRC_PATH
+    else:
+        raise FileNotFoundError(
+            f"Main script not found at either:\n"
+            f"1. {MAIN_SCRIPT}\n"
+            f"2. {ALT_MAIN_SCRIPT}"
+        )
 
-# Добавляем src в PYTHONPATH
-sys.path.insert(0, SRC_PATH)
-
-# Определяем пути к ресурсам
-HOOKS_PATH = os.path.join(BASEPATH, 'scripts', 'hooks')
+# Определяем остальные пути
+HOOKS_PATH = os.path.join(REPO_ROOT, 'scripts', 'hooks')
 
 # Добавляем src в PYTHONPATH
 sys.path.insert(0, SRC_PATH)
@@ -115,7 +135,7 @@ datas.extend(platform_data)
 
 a = Analysis(
     [MAIN_SCRIPT],
-    pathex=[BASEPATH],
+    pathex=[BASEPATH, SRC_PATH],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
