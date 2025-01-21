@@ -843,6 +843,47 @@ class AndroidTVTimeFixer:
                 result['color'] + 
                 f"{result['server']:<25} {result['status']:<15} {rtt_display:<15} {success_rate_display:<15}"
             )
+	
+    def load_saved_servers(self) -> dict:
+        """Загружает сохраненные серверы из файла"""
+        if self.servers_file.exists():
+            try:
+                with open(self.servers_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(locales.get('logger_warning', error=str(e)))
+        return {'favorite_servers': [], 'custom_servers': []}
+
+    def save_servers(self):
+        """Сохраняет серверы в файл"""
+        try:
+            with open(self.servers_file, 'w') as f:
+                json.dump(self.saved_servers, f, indent=2)
+        except Exception as e:
+            logger.warning(locales.get('logger_warning_2', error=str(e)))
+
+    def copy_server_to_clipboard(self, server: str) -> bool:
+        """Копирует адрес сервера в буфер обмена"""
+        try:
+            pyperclip.copy(server)
+            return True
+        except Exception as e:
+            logger.warning(locales.get('copy_to_clipboard', error=str(e)))
+            return False
+
+    def paste_server_from_clipboard(self) -> str:
+        """Получает адрес сервера из буфера обмена"""
+        try:
+            return pyperclip.paste()
+        except Exception as e:
+            logger.warning(locales.get('copy_to_clipboard_2', error=str(e)))
+            return ""
+
+    def add_to_favorites(self, server: str):
+        """Добавляет сервер в избранное"""
+        if server not in self.saved_servers['favorite_servers']:
+            self.saved_servers['favorite_servers'].append(server)
+            self.save_servers()
 
     @staticmethod
     def validate_ip(ip: str) -> bool:
@@ -1090,87 +1131,6 @@ class AndroidTVTimeFixer:
                 print(f"  {key.capitalize()}: {value}")
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
-            
-    def manage_servers(self):
-        """Управление сохраненными серверами"""
-        while True:
-            print(locales.get("server_management"))
-            print("1. " + locales.get("show_favorite_servers"))
-            print("2. " + locales.get("add_current_server_to_favorites"))
-            print("3. " + locales.get("copy_server_to_clipboard"))
-            print("4. " + locales.get("paste_server_from_clipboard"))
-            print("5. " + locales.get("remove_server_from_favorites"))
-            print("6. " + locales.get("ping_servers"))
-            print("7. " + locales.get("return_to_main_menu"))
-
-            choice = input(locales.get("select_action")).strip()
-
-            if choice == '1':
-                if self.saved_servers['favorite_servers']:
-                    print(locales.get("favorite_servers_list"))
-                    for i, server in enumerate(self.saved_servers['favorite_servers'], 1):
-                        print(f"{i}. {server}")
-                else:
-                    print(locales.get("no_favorite_servers"))
-
-            elif choice == '2':
-                if self.device:
-                    current_ntp = self.get_current_ntp()
-                    self.add_to_favorites(current_ntp)
-                    print(locales.get("server_added_to_favorites", server=current_ntp))
-                else:
-                    print(locales.get("connect_device_first"))
-
-            elif choice == '3':
-                if self.device:
-                    current_ntp = self.get_current_ntp()
-                    if self.copy_server_to_clipboard(current_ntp):
-                        print(locales.get("server_copied_to_clipboard", server=current_ntp))
-                    else:
-                        print(locales.get("failed_to_copy_server"))
-                else:
-                    print(locales.get("connect_device_first"))
-
-            elif choice == '4':
-                server = self.paste_server_from_clipboard()
-                if server:
-                    try:
-                        if self.device:
-                            self.fix_time(server)
-                            print(locales.get("server_set_from_clipboard", server=server))
-                        else:
-                            print(locales.get("connect_device_first"))
-                    except AndroidTVTimeFixerError as e:
-                        print(locales.get("error_occurred", error=str(e)))
-                else:
-                    print(locales.get("clipboard_empty_or_unavailable"))
-
-            elif choice == '5':
-                if self.saved_servers['favorite_servers']:
-                    print(locales.get("choose_server_to_remove"))
-                    for i, server in enumerate(self.saved_servers['favorite_servers'], 1):
-                        print(f"{i}. {server}")
-                    try:
-                        idx = int(input(locales.get("enter_server_number"))) - 1
-                        if 0 <= idx < len(self.saved_servers['favorite_servers']):
-                            removed = self.saved_servers['favorite_servers'].pop(idx)
-                            self.save_servers()
-                            print(locales.get("server_removed_from_favorites", server=removed))
-                        else:
-                            print(locales.get("invalid_number"))
-                    except ValueError:
-                        print(locales.get("enter_valid_number"))
-                else:
-                    print(locales.get("no_favorite_servers"))
-
-            elif choice == '6':
-                self.ping_ntp_servers()
-            
-            elif choice == '7':
-                break
-
-            else:
-                print(locales.get("invalid_choice"))
 
 def main():
     fixer = AndroidTVTimeFixer()
@@ -1269,7 +1229,7 @@ def main():
                     print(Fore.RED + locales.get('invalid_ip_format'))
             
             elif choice == '6':
-                self.ping_ntp_servers()
+                fixer.ping_ntp_servers()
                     
             elif choice == '7':
                 print(Fore.GREEN + locales.get('country_codes_description'))
