@@ -794,13 +794,13 @@ arising from the use of this program.
             ),
 
             "ping_servers": Translation(
-                en="Ping NTP Servers",
-                ru="Пинговать NTP-серверы"
+                en="6. Ping NTP Servers",
+                ru="6. Пинговать NTP-серверы"
             ),
 
             "ping_ntp_servers_start": Translation(
-                en="Checking NTP server connectivity...",
-                ru="Проверка доступности NTP-серверов..."
+                en="Checking NTP server connectivity (may take time)...",
+                ru="Проверка доступности NTP-серверов (может занять время)..."
             ),
             
             # Setup instructions
