@@ -843,47 +843,6 @@ class AndroidTVTimeFixer:
                 result['color'] + 
                 f"{result['server']:<25} {result['status']:<15} {rtt_display:<15} {success_rate_display:<15}"
             )
-	
-    def load_saved_servers(self) -> dict:
-        """Загружает сохраненные серверы из файла"""
-        if self.servers_file.exists():
-            try:
-                with open(self.servers_file, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning(locales.get('logger_warning', error=str(e)))
-        return {'favorite_servers': [], 'custom_servers': []}
-
-    def save_servers(self):
-        """Сохраняет серверы в файл"""
-        try:
-            with open(self.servers_file, 'w') as f:
-                json.dump(self.saved_servers, f, indent=2)
-        except Exception as e:
-            logger.warning(locales.get('logger_warning_2', error=str(e)))
-
-    def copy_server_to_clipboard(self, server: str) -> bool:
-        """Копирует адрес сервера в буфер обмена"""
-        try:
-            pyperclip.copy(server)
-            return True
-        except Exception as e:
-            logger.warning(locales.get('copy_to_clipboard', error=str(e)))
-            return False
-
-    def paste_server_from_clipboard(self) -> str:
-        """Получает адрес сервера из буфера обмена"""
-        try:
-            return pyperclip.paste()
-        except Exception as e:
-            logger.warning(locales.get('copy_to_clipboard_2', error=str(e)))
-            return ""
-
-    def add_to_favorites(self, server: str):
-        """Добавляет сервер в избранное"""
-        if server not in self.saved_servers['favorite_servers']:
-            self.saved_servers['favorite_servers'].append(server)
-            self.save_servers()
 
     @staticmethod
     def validate_ip(ip: str) -> bool:
@@ -1249,7 +1208,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_3"))
             print(Fore.YELLOW + locales.get("menu_item_4"))
             print(Fore.YELLOW + locales.get("menu_item_5"))
-            print(Fore.YELLOW + locales.get("menu_item_6"))
+            print(Fore.YELLOW + locales.get("ping_servers"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
@@ -1310,7 +1269,7 @@ def main():
                     print(Fore.RED + locales.get('invalid_ip_format'))
             
             elif choice == '6':
-                fixer.manage_servers()
+                self.ping_ntp_servers()
                     
             elif choice == '7':
                 print(Fore.GREEN + locales.get('country_codes_description'))
