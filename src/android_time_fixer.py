@@ -415,6 +415,7 @@ class AndroidTVTimeFixer:
             'ntp2.vniiftri.ru',
             'ntps1-1.cs.tu-berlin.de',
             'ntp.ix.ru',
+            'time.google.com',
             'time.android.com'
         ]
 
