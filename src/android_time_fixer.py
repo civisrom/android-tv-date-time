@@ -1133,131 +1133,173 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
 
+# Добавляем новый класс для меню
+class MenuDisplay:
+    """Класс для создания красивого меню"""
+    def __init__(self):
+        self.line_width = 60
+        self.border_char = "═"
+        self.corner_char = "╣"
+
+    def print_header(self, title):
+        """Выводит заголовок меню"""
+        print(f"{Fore.CYAN}{self.border_char * self.line_width}")
+        centered_title = title.center(self.line_width - 2)
+        print(f"{Fore.CYAN}{self.corner_char} {Fore.GREEN}{centered_title} {Fore.CYAN}{self.corner_char}")
+        print(f"{Fore.CYAN}{self.border_char * self.line_width}")
+
+    def print_option(self, number, text, color=Fore.YELLOW):
+        """Выводит пункт меню"""
+        formatted_text = f"[{number}] {text}"
+        print(f"{color}{formatted_text:<50}")
+
+    def print_footer(self):
+        """Выводит нижнюю часть меню"""
+        print(f"{Fore.CYAN}{self.border_char * self.line_width}")
+        print(f"{Fore.GREEN}{locales.get('menu_prompt')}", end=" ")
+        
+    def print_separator(self):
+        """Выводит разделитель"""
+        print(f"{Fore.CYAN}─{'─' * (self.line_width-2)}─")
+
+# Добавляем функцию отображения меню
+def display_main_menu():
+    """Отображает главное меню"""
+    menu = MenuDisplay()
+    menu.print_header(locales.get("program_title"))
+    
+    # Основные опции
+    menu.print_option("1", locales.get("menu_item_1"))
+    menu.print_option("2", locales.get("menu_item_2"))
+    menu.print_option("3", locales.get("menu_item_3"))
+    menu.print_option("4", locales.get("menu_item_4"))
+    menu.print_option("5", locales.get("menu_item_5"))
+    
+    menu.print_separator()
+    
+    # Дополнительные опции
+    menu.print_option("6", locales.get("ping_servers"))
+    menu.print_option("7", locales.get("menu_item_8"))
+    menu.print_option("8", locales.get("menu_item_9"))
+    
+    menu.print_separator()
+    
+    # Выход
+    menu.print_option("9", locales.get("menu_item_10"), Fore.RED)
+    
+    menu.print_footer()
+
+# Добавляем функцию обработки выбора
+def handle_menu_choice(fixer: AndroidTVTimeFixer, choice: str):
+    """Обрабатывает выбор пользователя"""
+    try:
+        if choice == '1':
+            ip = input(f"{Fore.GREEN}{locales.get('enter_device_ip')}{Fore.WHITE}").strip()
+            if fixer.validate_ip(ip):
+                fixer.connect(ip)
+                fixer.show_current_settings()
+                code = input(f"{Fore.GREEN}{locales.get('enter_country_code')}{Fore.WHITE}").strip()
+                if fixer.validate_country_code(code):
+                    try:
+                        ntp_server = fixer.ntp_servers[code.lower()]
+                        fixer.fix_time(ntp_server)
+                        print(f"{Fore.GREEN}{locales.get('ntp_server_set', ntp_server=ntp_server)}")
+                    except KeyError:
+                        print(f"{Fore.RED}{locales.get('invalid_country_code')}")
+                else:
+                    print(f"{Fore.RED}{locales.get('invalid_country_code')}")
+            else:
+                print(f"{Fore.RED}{locales.get('invalid_ip_format')}")
+
+        elif choice == '2':
+            ip = input(f"{Fore.GREEN}{locales.get('enter_device_ip')}{Fore.WHITE}").strip()
+            if fixer.validate_ip(ip):
+                fixer.connect(ip)
+                fixer.show_current_settings()
+                fixer.set_custom_ntp()
+            else:
+                print(f"{Fore.RED}{locales.get('invalid_ip_format')}")
+
+        elif choice == '3':
+            fixer.show_country_codes()
+
+        elif choice == '4':
+            fixer.show_custom_ntp_servers()
+
+        elif choice == '5':
+            ip = input(f"{Fore.GREEN}{locales.get('enter_device_ip')}{Fore.WHITE}").strip()
+            if fixer.validate_ip(ip):
+                fixer.connect(ip)
+                fixer.show_device_info()
+            else:
+                print(f"{Fore.RED}{locales.get('invalid_ip_format')}")
+
+        elif choice == '6':
+            fixer.ping_ntp_servers()
+
+        elif choice == '7':
+            fixer.terminal_mode()
+
+        elif choice == '8':
+            print(f"{Fore.GREEN}{locales.get('country_codes_description')}")
+            print(locales.get('country_codes'))
+
+        elif choice == '9':
+            print(f"{Fore.GREEN}{locales.get('exit_message')}")
+            fixer.process_manager.cleanup()
+            sys.exit(0)
+
+        else:
+            print(f"{Fore.RED}{locales.get('invalid_choice')}")
+            
+    except AndroidTVTimeFixerError as e:
+        print(f"{Fore.RED}{locales.get('error_message', error=str(e))}")
+    except Exception as e:
+        print(f"{Fore.RED}{locales.get('unexpected_error', error=str(e))}")
+
+# Обновляем функцию main()
 def main():
     fixer = AndroidTVTimeFixer()
-    print(locales.get("select_language"))  # Выводим сообщение для выбора языка
-    print("1. " + locales.get("english"))  # Выбор для английского
-    print("2. " + locales.get("russian"))  # Выбор для русского
-    # Ввод пользователя
-    lang_choice = input(locales.get("enter_number")).strip()
-    # Назначение языка на основе выбора
-    if lang_choice == "2":
-        set_language("ru")
-        print(locales.get("language_set_ru"))  # Подтверждение выбора
-    else:
-        set_language("en")
-        print(locales.get("language_set_en"))  # Подтверждение выбора
-        
+    
     try:
-        # Показываем начальные инструкции
-        print(Fore.GREEN + locales.get("program_title"))
-        print(Fore.WHITE + locales.get("please_ensure"))
-        print(Fore.YELLOW + locales.get("adb_setup"))
-        print(Fore.YELLOW + locales.get("adb_steps"))
-        print(Fore.YELLOW + locales.get("adb_network"))
-        print(Fore.YELLOW + locales.get("auto_time_date"))
-        print(Fore.YELLOW + locales.get("network_requirement"))
-        input(Fore.WHITE + locales.get("press_enter_to_continue"))
+        # Выбор языка
+        menu = MenuDisplay()
+        menu.print_header("Language Selection / Выбор языка")
+        menu.print_option("1", locales.get("english"))
+        menu.print_option("2", locales.get("russian"))
+        menu.print_footer()
+        
+        lang_choice = input().strip()
+        set_language("ru" if lang_choice == "2" else "en")
+        print(f"{Fore.GREEN}{locales.get('language_set_' + ('ru' if lang_choice == '2' else 'en'))}")
 
-        # Генерируем ключи ADB
+        # Начальные инструкции
+        print(f"{Fore.WHITE}{locales.get('please_ensure')}")
+        print(f"{Fore.YELLOW}{locales.get('adb_setup')}")
+        print(f"{Fore.YELLOW}{locales.get('adb_steps')}")
+        print(f"{Fore.YELLOW}{locales.get('adb_network')}")
+        print(f"{Fore.YELLOW}{locales.get('auto_time_date')}")
+        print(f"{Fore.YELLOW}{locales.get('network_requirement')}")
+        input(f"{Fore.WHITE}{locales.get('press_enter_to_continue')}")
+
         fixer.gen_keys()
 
         while True:
-            print(Fore.GREEN + locales.get("main_menu"))
-            print(Fore.YELLOW + locales.get("menu_item_1"))
-            print(Fore.YELLOW + locales.get("menu_item_2"))
-            print(Fore.YELLOW + locales.get("menu_item_3"))
-            print(Fore.YELLOW + locales.get("menu_item_4"))
-            print(Fore.YELLOW + locales.get("menu_item_5"))
-            print(Fore.YELLOW + locales.get("ping_servers"))
-            print(Fore.YELLOW + locales.get("menu_item_8"))
-            print(Fore.YELLOW + locales.get("menu_item_9"))
-            print(Fore.YELLOW + locales.get("menu_item_10"))
+            os.system('cls' if os.name == 'nt' else 'clear')
+            display_main_menu()
+            choice = input().strip()
+            handle_menu_choice(fixer, choice)
+            input(f"{Fore.YELLOW}{locales.get('press_enter_to_continue')}")
 
-            choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
-
-            if choice == '1':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
-                if fixer.validate_ip(ip):
-                    try:
-                        fixer.connect(ip)
-                        fixer.show_current_settings()
-                        print(Fore.GREEN + locales.get('enter_country_code'), end="")
-                        code = input(Fore.WHITE).strip()
-                        if fixer.validate_country_code(code):
-                            try:
-                                ntp_server = fixer.ntp_servers[code.lower()]
-                                fixer.fix_time(ntp_server)
-                                print(Fore.GREEN + locales.get('ntp_server_set', ntp_server=ntp_server))
-                            except KeyError:
-                                print(Fore.RED + locales.get('invalid_country_code'))
-                            except AndroidTVTimeFixerError as e:
-                                print(Fore.RED + locales.get('error_message', error=str(e)))
-                        else:
-                            print(Fore.RED + locales.get('invalid_country_code'))
-                    except AndroidTVTimeFixerError as e:
-                        print(Fore.RED + locales.get('error_message', error=str(e)))
-                else:
-                    print(Fore.RED + locales.get('invalid_ip_format'))
-
-            elif choice == '2':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
-                if fixer.validate_ip(ip):
-                    try:
-                        fixer.connect(ip)
-                        fixer.show_current_settings()
-                        fixer.set_custom_ntp()
-                    except AndroidTVTimeFixerError as e:
-                        print(Fore.RED + locales.get('error_message', error=str(e)))
-                else:
-                    print(Fore.RED + locales.get('invalid_ip_format'))
-
-            elif choice == '3':
-                fixer.show_country_codes()
-
-            elif choice == '4':
-                fixer.show_custom_ntp_servers()
-
-            elif choice == '5':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
-                if fixer.validate_ip(ip):
-                    fixer.connect(ip)
-                    fixer.show_device_info()
-                else:
-                    print(Fore.RED + locales.get('invalid_ip_format'))
-            
-            elif choice == '6':
-                fixer.ping_ntp_servers()
-                    
-            elif choice == '7':
-                print(Fore.GREEN + locales.get('country_codes_description'))
-                print(locales.get('country_codes'))
-		    
-            elif choice == '8':
-                fixer.terminal_mode()
-		    
-            elif choice == '9':
-                print(Fore.GREEN + locales.get('exit_message'))
-                sys.exit(0)
-            
-            elif choice.lower() == 'b':
-                continue
-            else:
-                print(Fore.RED + locales.get('invalid_choice'))
-        
     except AndroidTVTimeFixerError as e:
-        print(Fore.RED + locales.get('error_message').format(str(e)))
+        print(f"{Fore.RED}{locales.get('error_message').format(str(e))}")
         sys.exit(1)
     except KeyboardInterrupt:
-        print(Fore.RED + locales.get('operation_aborted'))
+        print(f"{Fore.RED}{locales.get('operation_aborted')}")
         sys.exit(0)
     except Exception as e:
-        print(Fore.RED + locales.get('unexpected_error').format(str(e)))
+        print(f"{Fore.RED}{locales.get('unexpected_error').format(str(e))}")
         sys.exit(1)
-
     finally:
         # Явная очистка при завершении программы
         fixer.process_manager.cleanup()
