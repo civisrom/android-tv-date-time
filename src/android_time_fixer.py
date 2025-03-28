@@ -1135,47 +1135,82 @@ class AndroidTVTimeFixer:
 
 def main():
     fixer = AndroidTVTimeFixer()
-    print(locales.get("select_language"))  # Выводим сообщение для выбора языка
-    print("1. " + locales.get("english"))  # Выбор для английского
-    print("2. " + locales.get("russian"))  # Выбор для русского
+    
+    # Красивое приветствие с выбором языка
+    print(Fore.CYAN + "=" * 50)
+    print(Fore.CYAN + f"{'Android TV Time Fixer':^50}")
+    print(Fore.CYAN + "=" * 50)
+    print("\n" + locales.get("select_language"))
+    
+    # Улучшенное меню выбора языка
+    language_options = [
+        f"1. {locales.get('english')} 🇬🇧",
+        f"2. {locales.get('russian')} 🇷🇺"
+    ]
+    for option in language_options:
+        print(Fore.YELLOW + option)
+    
     # Ввод пользователя
-    lang_choice = input(locales.get("enter_number")).strip()
+    lang_choice = input(Fore.GREEN + locales.get("enter_number") + ": ").strip()
+    
     # Назначение языка на основе выбора
     if lang_choice == "2":
         set_language("ru")
-        print(locales.get("language_set_ru"))  # Подтверждение выбора
+        print(Fore.GREEN + locales.get("language_set_ru"))
     else:
         set_language("en")
-        print(locales.get("language_set_en"))  # Подтверждение выбора
+        print(Fore.GREEN + locales.get("language_set_en"))
         
     try:
-        # Показываем начальные инструкции
-        print(Fore.GREEN + locales.get("program_title"))
-        print(Fore.WHITE + locales.get("please_ensure"))
-        print(Fore.YELLOW + locales.get("adb_setup"))
-        print(Fore.YELLOW + locales.get("adb_steps"))
-        print(Fore.YELLOW + locales.get("adb_network"))
-        print(Fore.YELLOW + locales.get("auto_time_date"))
-        print(Fore.YELLOW + locales.get("network_requirement"))
-        input(Fore.WHITE + locales.get("press_enter_to_continue"))
+        # Показываем начальные инструкции с улучшенным форматированием
+        print("\n" + Fore.CYAN + "=" * 50)
+        print(Fore.GREEN + locales.get("program_title").center(50))
+        print(Fore.CYAN + "=" * 50)
+        
+        print(Fore.WHITE + "\n" + locales.get("please_ensure"))
+        
+        # Инструкции с иконками для акцента
+        instructions = [
+            "🔌 " + locales.get("adb_setup"),
+            "📡 " + locales.get("adb_network"),
+            "⏰ " + locales.get("auto_time_date"),
+            "🌐 " + locales.get("network_requirement")
+        ]
+        
+        for instruction in instructions:
+            print(Fore.YELLOW + instruction)
+        
+        input(Fore.GREEN + "\n" + locales.get("press_enter_to_continue"))
 
         # Генерируем ключи ADB
         fixer.gen_keys()
 
         while True:
-            print(Fore.GREEN + locales.get("main_menu"))
-            print(Fore.YELLOW + locales.get("menu_item_1"))
-            print(Fore.YELLOW + locales.get("menu_item_2"))
-            print(Fore.YELLOW + locales.get("menu_item_3"))
-            print(Fore.YELLOW + locales.get("menu_item_4"))
-            print(Fore.YELLOW + locales.get("menu_item_5"))
-            print(Fore.YELLOW + locales.get("ping_servers"))
-            print(Fore.YELLOW + locales.get("menu_item_8"))
-            print(Fore.YELLOW + locales.get("menu_item_9"))
-            print(Fore.YELLOW + locales.get("menu_item_10"))
+            # Улучшенное главное меню с разделителями и иконками
+            print("\n" + Fore.CYAN + "=" * 50)
+            print(Fore.GREEN + locales.get("main_menu").center(50))
+            print(Fore.CYAN + "=" * 50)
+            
+            # Список опций с иконками и номерами
+            menu_items = [
+                f"1️⃣  {locales.get('menu_item_1')}",  # Установка времени по NTP
+                f"2️⃣  {locales.get('menu_item_2')}",  # Пользовательский NTP-сервер
+                f"3️⃣  {locales.get('menu_item_3')}",  # Показать коды стран
+                f"4️⃣  {locales.get('menu_item_4')}",  # Показать пользовательские NTP-серверы
+                f"5️⃣  {locales.get('menu_item_5')}",  # Информация об устройстве
+                f"6️⃣  {locales.get('ping_servers')}",  # Пинг NTP-серверов
+                f"7️⃣  {locales.get('menu_item_8')}",  # Описание кодов стран
+                f"8️⃣  {locales.get('menu_item_9')}",  # Терминальный режим
+                f"9️⃣  {locales.get('menu_item_10')}"  # Выход
+            ]
+            
+            for item in menu_items:
+                print(Fore.YELLOW + item)
+            
+            # Приглашение к вводу с цветовым акцентом
+            choice = input(Fore.GREEN + "\n" + locales.get("menu_prompt") + ": ").strip()
 
-            choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
-
+            # Остальная логика меню остается прежней (блоки if/elif)
             if choice == '1':
                 print(Fore.GREEN + locales.get('enter_device_ip'), end="")
                 ip = input(Fore.WHITE).strip()
@@ -1201,6 +1236,7 @@ def main():
                 else:
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
+            # Остальные блоки (choice == '2', '3' и т.д.) остаются без изменений
             elif choice == '2':
                 print(Fore.GREEN + locales.get('enter_device_ip'), end="")
                 ip = input(Fore.WHITE).strip()
