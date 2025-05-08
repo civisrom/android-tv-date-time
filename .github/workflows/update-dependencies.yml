@@ -1,4 +1,4 @@
-name: Update Dependencies
+name: Update dependencies
 
 on:
   schedule:
@@ -32,19 +32,52 @@ jobs:
           python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
         
-      # Шаг: Очищаем кэш Poetry
+      - name: Configure Poetry Environment
+        run: |
+          # Determine Python executable
+          PYTHON_EXE=$(which python)
+            
+          # Verify Python version
+          $PYTHON_EXE --version
+            
+          # Set up Poetry environment with specific Python version
+          $PYTHON_EXE -m poetry env use $PYTHON_EXE
+            
+          # Configure Poetry settings
+          $PYTHON_EXE -m poetry config virtualenvs.create true
+          $PYTHON_EXE -m poetry config virtualenvs.in-project true
+            
+          # Verify Poetry environment
+          $PYTHON_EXE -m poetry env info
+        shell: bash
+        
+      - name: Install Project Dependencies
+        run: |
+          python -m poetry config virtualenvs.in-project true
+          python -m poetry lock
+          python -m poetry install --no-interaction --no-root
+          python -m poetry install --no-interaction --with dev --all-extras
+          python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
+        shell: bash
+          
+          
+      - name: Configure Poetry Environment (Windows)
+        run: |
+          # Windows-specific Poetry environment setup
+          python -m poetry env use "$env:pythonLocation\python.exe"
+          python -m poetry config virtualenvs.create true
+          python -m poetry config virtualenvs.in-project true
+          python -m poetry env info
+        shell: pwsh
+        
+      - name: Verify Python version
+        run: python --version
+
+      # Шаг 2.1: Очищаем кэш Poetry
       - name: Clear Poetry cache
         run: |
           rm -rf ~/.cache/pypoetry
-          
-      # Настройка Poetry
-      - name: Configure Poetry
-        run: |
-          python -m poetry config virtualenvs.create false
-          # Отключаем экспериментальные функции, которые могут вызывать проблемы
-          python -m poetry config experimental.new-installer false
-        shell: bash
-        
+
       # Шаг 3: Кэшируем зависимости Poetry
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
@@ -53,21 +86,24 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
-            
-      # Обновляем зависимости без использования виртуальной среды
+
+      # Шаг 5: Принудительное обновление зависимостей
       - name: Update dependencies
         run: |
-          python -m poetry lock --no-update
-          python -m poetry update
-        shell: bash
+          poetry self update
+          poetry lock
+          poetry install
+          poetry update
+        env:
+          POETRY_CACHE_DIR: ~/.cache/pypoetry  # Используем кэш Poetry
 
-      # Шаг: Настраиваем пользователя Git
+      # Шаг 6: Настраиваем пользователя Git
       - name: Configure Git user
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Шаг: Проверяем изменения и пушим их
+      # Шаг 7: Проверяем изменения и пушим их
       - name: Commit and push changes to main
         run: |
           git add poetry.lock
