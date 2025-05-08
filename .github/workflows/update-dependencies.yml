@@ -31,14 +31,13 @@ jobs:
           python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
 
-      - name: Configure Poetry to use venv
+      - name: Configure Poetry
         run: |
-          poetry config virtualenvs.prefer-active-python true
           poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
         shell: bash
 
-      - name: Create virtual environment with venv
+      - name: Create virtual environment
         run: |
           poetry env use python
         shell: bash
