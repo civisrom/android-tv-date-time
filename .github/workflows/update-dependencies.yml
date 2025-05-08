@@ -1,4 +1,4 @@
-name: Update dependencies
+name: Update Dependencies
 
 on:
   schedule:
@@ -60,8 +60,8 @@ jobs:
           python -m poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
         shell: bash
           
-          
       - name: Configure Poetry Environment (Windows)
+        if: runner.os == 'Windows'
         run: |
           # Windows-specific Poetry environment setup
           python -m poetry env use "$env:pythonLocation\python.exe"
@@ -90,12 +90,8 @@ jobs:
       # Шаг 5: Принудительное обновление зависимостей
       - name: Update dependencies
         run: |
-          poetry self update
-          poetry lock
-          poetry install
-          poetry update
-        env:
-          POETRY_CACHE_DIR: ~/.cache/pypoetry  # Используем кэш Poetry
+          python -m poetry update
+        shell: bash
 
       # Шаг 6: Настраиваем пользователя Git
       - name: Configure Git user
