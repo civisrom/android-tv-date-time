@@ -5,6 +5,9 @@ on:
     - cron: "0 0 1 * *"  # Обновление зависимостей раз в месяц
   workflow_dispatch:  # Возможность запуска вручную
 
+permissions:
+  contents: write
+
 env:
   PYTHON_VERSION: '3.11'
   CI_DEBUG: true
@@ -18,6 +21,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
