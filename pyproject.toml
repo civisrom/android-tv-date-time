@@ -16,11 +16,11 @@ python = ">=3.11,<3.13"
 adb-shell = {extras = ["network"], version = "^0.4.4"}
 pyperclip = "^1.9.0"
 colorama = "^0.4.6"
-platformdirs = "^4.3.7"
-packaging = "^24.2"
-typing-extensions = "^4.13.2"
-cryptography = "^44.0.2"
-rsa = "^4.9.0"
+platformdirs = "^4.4.0"
+packaging = "^25.0"
+typing-extensions = "^4.15.0"
+cryptography = "^45.0.7"
+rsa = "^4.9.1"
 ntplib = "^0.4.0"
 
 # Windows-специфичные зависимости
@@ -28,11 +28,11 @@ psutil = { version = "^7.0.0", markers = "sys_platform == 'win32' or sys_platfor
 wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
 
 # macOS-специфичные зависимости
-pyobjc-framework-Cocoa = { version = "^9.2", markers = "sys_platform == 'darwin'" }
+pyobjc-framework-Cocoa = { version = "^11.1", markers = "sys_platform == 'darwin'" }
 
 # Общие зависимости
-click = "^8.1.8"
-rich = "^14.0.0"
+click = "^8.2.1"
+rich = "^14.1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
@@ -40,7 +40,7 @@ flake8 = "^6.0.0"
 mypy = "^1.15.0"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 strict = true
 ignore_missing_imports = true
 
