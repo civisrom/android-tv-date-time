@@ -20,18 +20,16 @@ concurrency:
 permissions:
   contents: write
   packages: write
-  actions: write
 
 env:
   PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
-  SOURCE_FILE: src/android_time_fixer.py
   POETRY_VERSION: '2.1.4'
   PYINSTALLER_VERSION: '6.15'
-  ADB_VERSION: '36.0.0'
 
 jobs:
-  setup-and-build:
+  build:
+    name: Build ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,18 +37,23 @@ jobs:
           - os: windows-latest
             platform: windows
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
-            adb_base: "adb.exe AdbWinApi.dll AdbWinUsbApi.dll"
+            adb_files: "adb.exe AdbWinApi.dll AdbWinUsbApi.dll"
+            artifact_ext: ".exe"
+            
           - os: ubuntu-latest
             platform: linux
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-linux.zip
-            adb_base: "adb"
+            adb_files: "adb"
+            artifact_ext: ""
+            
           - os: macos-latest
             platform: macos
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-darwin.zip
-            adb_base: "adb"
+            adb_files: "adb"
+            artifact_ext: ""
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -58,91 +61,117 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Set up Poetry cache
+      - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
           path: |
             .venv
-            ~/AppData/Local/pypoetry/Cache
             ~/.cache/pypoetry
+            ~/AppData/Local/pypoetry/Cache
           key: poetry-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
-            poetry-${{ runner.os }}-
 
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install "poetry==${{ env.POETRY_VERSION }}"
-        shell: bash
 
       - name: Configure Poetry
         run: |
           poetry config virtualenvs.create true
           poetry config virtualenvs.in-project true
-          poetry env use python
-        shell: bash
 
       - name: Install dependencies
         run: |
-          poetry install --no-interaction --no-root --with dev --all-extras
-          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}" psutil
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            poetry run pip install wmi
-          fi
-        shell: bash
+          poetry install --no-interaction --with dev --all-extras
+          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}"
 
-      - name: Install system dependencies
-        if: runner.os == 'Linux'
+      - name: Install platform-specific dependencies
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev libudev-dev
-        shell: bash
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            brew install --quiet openssl || true
+          fi
 
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        run: brew install openssl
-        shell: bash
-
-      - name: Setup ADB
+      - name: Download and setup ADB
         shell: bash
         run: |
           mkdir -p resources temp_adb
-          curl -L ${{ matrix.adb_url }} -o temp_adb/platform-tools.zip
-          unzip -o temp_adb/platform-tools.zip -d temp_adb/
           
-          for file in ${{ matrix.adb_base }}; do
-            cp "temp_adb/platform-tools/$file" "resources/$file"
-            if [[ "$file" != *".dll" ]]; then
-              chmod +x "resources/$file"
+          # Скачиваем platform-tools
+          curl -fsSL "${{ matrix.adb_url }}" -o temp_adb/platform-tools.zip
+          
+          # Распаковываем
+          unzip -q temp_adb/platform-tools.zip -d temp_adb/
+          
+          # Копируем нужные файлы
+          for file in ${{ matrix.adb_files }}; do
+            if [ -f "temp_adb/platform-tools/$file" ]; then
+              cp "temp_adb/platform-tools/$file" "resources/$file"
+              
+              # Устанавливаем права на выполнение для не-DLL файлов
+              if [[ "$file" != *.dll ]]; then
+                chmod +x "resources/$file"
+              fi
+              
+              echo "✓ Copied: $file"
+            else
+              echo "✗ Not found: $file"
+              exit 1
             fi
           done
           
+          # Очистка
           rm -rf temp_adb
           
-      - name: Check Poetry source
-        run: poetry config --list
-        
+          # Проверка
+          ls -lh resources/
+
       - name: Build executable
         run: poetry run pyinstaller --clean pyinstaller.spec
+
+      - name: Verify build
         shell: bash
+        run: |
+          if [ ! -f "dist/${{ env.APP_NAME }}${{ matrix.artifact_ext }}" ]; then
+            echo "Build failed: executable not found"
+            exit 1
+          fi
+          
+          # Показываем информацию о файле
+          ls -lh "dist/${{ env.APP_NAME }}${{ matrix.artifact_ext }}"
+          
+          # Для Unix-систем проверяем права
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            if [ ! -x "dist/${{ env.APP_NAME }}" ]; then
+              echo "Making executable..."
+              chmod +x "dist/${{ env.APP_NAME }}"
+            fi
+          fi
 
       - name: Package build
+        shell: bash
         run: |
           cd dist
+          
           if [ "${{ runner.os }}" == "Windows" ]; then
             7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}.exe"
           else
-            chmod +x "${{ env.APP_NAME }}"
             zip -j "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
-        shell: bash
+          
+          # Проверяем размер архива
+          ls -lh "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -151,36 +180,66 @@ jobs:
           path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
           retention-days: 90
           if-no-files-found: error
+          compression-level: 0  # Уже сжато в zip
 
-  create-release:
-    needs: setup-and-build
+  release:
+    name: Create Release
+    needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+    if: |
+      (github.event_name == 'push' && 
+       (startsWith(github.ref, 'refs/tags/v') || 
+        github.ref == 'refs/heads/main' || 
+        github.ref == 'refs/heads/master')) || 
+      github.event_name == 'workflow_dispatch'
     
     steps:
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist
-          merge-multiple: true
+          path: artifacts
+          merge-multiple: false
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -name "*.zip" -exec cp {} release/ \;
+          ls -lh release/
 
       - name: Generate release tag
         id: tag
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
           else
-            echo "tag=v${{ github.run_number }}" >> $GITHUB_OUTPUT
+            echo "tag=build-${{ github.run_number }}" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/*.zip
+          files: release/*.zip
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: Release ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag == format('build-{0}', github.run_number) && format('Build {0}', github.run_number) || format('Release {0}', steps.tag.outputs.tag) }}
           draft: false
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          prerelease: ${{ steps.tag.outputs.prerelease == 'true' }}
           generate_release_notes: true
+          body: |
+            ## ${{ env.APP_NAME }} - ${{ steps.tag.outputs.tag }}
+            
+            **Built from:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}`
+            
+            ### Downloads
+            - Windows: `${{ env.APP_NAME }}-windows.zip`
+            - Linux: `${{ env.APP_NAME }}-linux.zip`
+            - macOS: `${{ env.APP_NAME }}-macos.zip`
+            
+            ### Installation
+            1. Download the appropriate file for your platform
+            2. Extract the archive
+            3. Run the executable
+            
+            For detailed instructions, see the [README](https://github.com/${{ github.repository }}/blob/main/README.md)
