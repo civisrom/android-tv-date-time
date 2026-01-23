@@ -1,38 +1,40 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec file for AndroidTVTimeFixer
-Оптимизированная конфигурация для кросс-платформенной сборки
+Optimized configuration for cross-platform builds
 """
 import sys
 import os
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
-# Определяем пути проекта
+# Determine project paths using SPECPATH (PyInstaller built-in variable)
+# SPECPATH is always available and points to the directory containing this spec file
+SPEC_DIR = Path(SPECPATH)
 SRC_PATH = SPEC_DIR / 'src'
 HOOKS_PATH = SPEC_DIR / 'scripts' / 'hooks'
 
-# Добавляем src в PYTHONPATH
+# Add src to PYTHONPATH
 sys.path.insert(0, str(SRC_PATH))
 
-# Инициализация коллекций
+# Initialize collections
 datas = []
 binaries = []
 hiddenimports = [
-    # Стандартная библиотека
+    # Standard library
     'logging',
     'urllib.parse',
     'urllib.error', 
     'urllib.request',
     'pathlib',
     'concurrent.futures',
-    # ADB специфичные
+    # ADB specific
     'adb_shell.adb_device',
     'adb_shell.auth.sign_pythonrsa',
     'adb_shell.auth.keygen',
 ]
 
-# Пакеты для автоматического сбора зависимостей
+# Packages to collect automatically
 PACKAGES_TO_COLLECT = [
     'pyperclip',
     'colorama', 
@@ -42,146 +44,171 @@ PACKAGES_TO_COLLECT = [
     'cryptography',
     'rsa',
     'ntplib',
+    'psutil',
 ]
 
-# Собираем зависимости пакетов
+# Collect all data files and hidden imports from packages
+print("Collecting package dependencies...")
 for package_name in PACKAGES_TO_COLLECT:
     try:
         pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(package_name)
-        datas.extend(pkg_datas)
-        binaries.extend(pkg_binaries)
-        hiddenimports.extend(pkg_hiddenimports)
-    except ImportError:
-        print(f"Warning: Package {package_name} not found, skipping")
+        datas += pkg_datas
+        binaries += pkg_binaries
+        hiddenimports += pkg_hiddenimports
+        print(f"  ✓ {package_name}")
     except Exception as e:
-        print(f"Warning: Error collecting {package_name}: {e}")
+        print(f"  ⚠ Warning: Could not collect {package_name}: {e}")
 
-# Платформо-зависимые настройки
-if sys.platform == 'win32':
-    # Windows
-    runtime_hooks = [str(HOOKS_PATH / 'win_hook.py')]
-    
-    # ADB ресурсы для Windows
-    platform_datas = [
-        (str(SPEC_DIR / 'resources' / 'adb.exe'), 'resources'),
-        (str(SPEC_DIR / 'resources' / 'AdbWinApi.dll'), 'resources'),
-        (str(SPEC_DIR / 'resources' / 'AdbWinUsbApi.dll'), 'resources'),
-    ]
-    
-    # Python DLL для Windows
-    python_version = f"{sys.version_info.major}{sys.version_info.minor}"
-    system_dlls = [
-        f"python{python_version}.dll",
-        "vcruntime140.dll",
-        "vcruntime140_1.dll",  # Для новых версий Python
-        "msvcp140.dll",
-    ]
-    
-    for dll_name in system_dlls:
-        dll_path = Path(sys.prefix) / dll_name
-        if dll_path.exists():
-            binaries.append((str(dll_path), '.'))
-    
-    # psutil для Windows
-    try:
-        psutil_data, psutil_bin, psutil_hidden = collect_all('psutil')
-        datas.extend(psutil_data)
-        binaries.extend(psutil_bin)
-        hiddenimports.extend(psutil_hidden)
-        
-        # WMI для Windows
-        wmi_data, wmi_bin, wmi_hidden = collect_all('wmi')
-        datas.extend(wmi_data)
-        binaries.extend(wmi_bin)
-        hiddenimports.extend(wmi_hidden)
-    except ImportError:
-        pass
-
-elif sys.platform == 'darwin':
-    # macOS
-    runtime_hooks = [str(HOOKS_PATH / 'macos_hook.py')]
-    platform_datas = [(str(SPEC_DIR / 'resources' / 'adb'), 'resources')]
-    
-    # psutil для macOS
-    try:
-        psutil_data, psutil_bin, psutil_hidden = collect_all('psutil')
-        datas.extend(psutil_data)
-        binaries.extend(psutil_bin)
-        hiddenimports.extend(psutil_hidden)
-    except ImportError:
-        pass
-
+# Add locales file
+locales_file = SRC_PATH / 'locales.py'
+if locales_file.exists():
+    datas.append((str(locales_file), 'src'))
+    print(f"  ✓ Added locales.py")
 else:
-    # Linux
-    runtime_hooks = [str(HOOKS_PATH / 'linux_hook.py')]
-    platform_datas = [(str(SPEC_DIR / 'resources' / 'adb'), 'resources')]
+    print(f"  ⚠ Warning: locales.py not found at {locales_file}")
 
-# Добавляем базовый хук для всех платформ
-runtime_hooks.insert(0, str(HOOKS_PATH / 'base_hook.py'))
+# Add constants and logging config if they exist
+for module_name in ['constants.py', 'logging_config.py']:
+    module_file = SRC_PATH / module_name
+    if module_file.exists():
+        datas.append((str(module_file), 'src'))
+        print(f"  ✓ Added {module_name}")
 
-# Добавляем платформо-зависимые данные
-datas.extend(platform_datas)
+# Platform-specific runtime hooks
+runtime_hooks = []
+if sys.platform == 'win32':
+    hook_file = HOOKS_PATH / 'win_hook.py'
+    if hook_file.exists():
+        runtime_hooks.append(str(hook_file))
+        print(f"  ✓ Using Windows runtime hook")
+elif sys.platform == 'darwin':
+    hook_file = HOOKS_PATH / 'macos_hook.py'
+    if hook_file.exists():
+        runtime_hooks.append(str(hook_file))
+        print(f"  ✓ Using macOS runtime hook")
+else:  # Linux
+    hook_file = HOOKS_PATH / 'linux_hook.py'
+    if hook_file.exists():
+        runtime_hooks.append(str(hook_file))
+        print(f"  ✓ Using Linux runtime hook")
 
-# Модули для исключения (оптимизация размера)
-excludes = [
-    # GUI фреймворки
-    'tkinter', 'PyQt5', 'PyQt6', 'PySide6', 'wx',
-    # Тестирование
-    'unittest', 'pytest', '_pytest', 'test',
-    # Документация
-    'pdb', 'pydoc', 'doctest',
-    # Веб
-    'http', 'html', 'xmlrpc', 'email',
-    # Научные библиотеки
-    'numpy', 'pandas', 'scipy', 'matplotlib',
-    # Разработка
-    'pip', 'setuptools', 'wheel', 'pkg_resources',
+# Optimized excludes list
+EXCLUDES = [
+    # Development tools
+    'setuptools',
+    'pip',
+    'wheel',
+    'poetry',
+    # Testing frameworks
+    'pytest',
+    'unittest',
+    'nose',
+    'hypothesis',
+    # Documentation
+    'sphinx',
+    'docutils',
+    # GUI frameworks (not needed)
+    'tkinter',
+    'PyQt5',
+    'PyQt6',
+    'PySide2',
+    'PySide6',
+    'wx',
+    # Scientific libraries (not needed)
+    'numpy',
+    'pandas',
+    'scipy',
+    'matplotlib',
+    # Web frameworks (not needed)
+    'flask',
+    'django',
+    'tornado',
+    'aiohttp',
 ]
 
-# PyInstaller Analysis
+print(f"\nConfiguration summary:")
+print(f"  Source path: {SRC_PATH}")
+print(f"  Hooks path: {HOOKS_PATH}")
+print(f"  Runtime hooks: {len(runtime_hooks)}")
+print(f"  Hidden imports: {len(hiddenimports)}")
+print(f"  Data files: {len(datas)}")
+print(f"  Binaries: {len(binaries)}")
+
+# Analysis configuration
 a = Analysis(
     [str(SRC_PATH / 'android_time_fixer.py')],
-    pathex=[str(SPEC_DIR)],
+    pathex=[str(SRC_PATH)],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=runtime_hooks,
-    excludes=excludes,
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=None,
+    excludes=EXCLUDES,
     noarchive=False,
+    optimize=2,
 )
 
-# PYZ Archive
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+# Remove duplicate entries
+pyz = PYZ(a.pure)
 
-# EXE Build
+# Platform-specific executable configuration
+if sys.platform == 'win32':
+    exe_name = 'AndroidTVTimeFixer.exe'
+    console = True
+    icon = None  # Add icon path if available
+elif sys.platform == 'darwin':
+    exe_name = 'AndroidTVTimeFixer'
+    console = False
+    icon = None  # Add icon path if available
+else:  # Linux
+    exe_name = 'AndroidTVTimeFixer'
+    console = True
+    icon = None
+
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
-    name='AndroidTVTimeFixer',
+    exclude_binaries=True,
+    name=exe_name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,  # Сжатие исполняемого файла
-    upx_exclude=[
-        # Исключаем из UPX компрессии критичные библиотеки
-        'vcruntime*.dll',
-        'python*.dll',
-        'api-ms-*.dll',
-    ],
-    runtime_tmpdir=None,
-    console=True,  # Консольное приложение
+    upx=True,
+    console=console,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=icon,
 )
+
+# Collect into directory
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='AndroidTVTimeFixer',
+)
+
+# macOS specific: Create application bundle
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='AndroidTVTimeFixer.app',
+        icon=icon,
+        bundle_identifier='com.orientalium.androidtvtimefixer',
+        info_plist={
+            'CFBundleShortVersionString': '1.1.0',
+            'CFBundleVersion': '1.1.0',
+            'NSHighResolutionCapable': 'True',
+            'LSMinimumSystemVersion': '10.13.0',
+        },
+    )
+
+print("\n✓ PyInstaller spec file loaded successfully")
