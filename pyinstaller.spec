@@ -9,7 +9,6 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
 # Определяем пути проекта
-SPEC_DIR = Path(__file__).parent.absolute()
 SRC_PATH = SPEC_DIR / 'src'
 HOOKS_PATH = SPEC_DIR / 'scripts' / 'hooks'
 
