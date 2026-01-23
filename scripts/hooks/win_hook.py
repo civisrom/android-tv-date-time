@@ -5,7 +5,8 @@ import ctypes
 from pathlib import Path
 
 # Добавляем путь к базовому модулю
-from .base_hook import BaseRuntimeHook
+sys.path.insert(0, os.path.dirname(__file__))
+from base_hook import BaseRuntimeHook
 
 
 class WindowsRuntimeHook(BaseRuntimeHook):
