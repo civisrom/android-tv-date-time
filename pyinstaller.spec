@@ -47,12 +47,11 @@ PACKAGES_TO_COLLECT = [
     'psutil',
 ]
 
-datas = [
+datas = []
 base_hook_path = HOOKS_PATH / 'base_hook.py'
 if base_hook_path.exists():
     datas.append((str(base_hook_path), 'scripts/hooks'))
     print(f" ✓ Added base_hook.py as data")
-]
 binaries = []
 
 print("Собираем зависимости пакетов...")
