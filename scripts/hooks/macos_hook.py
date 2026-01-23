@@ -1,85 +1,117 @@
+"""Runtime hook для macOS"""
 import os
 import sys
-import logging
-import stat
 import subprocess
-from pathlib import Path
-from typing import Optional
+
+# Добавляем путь к базовому модулю
+sys.path.insert(0, os.path.dirname(__file__))
+from base_hook import BaseRuntimeHook
+
+
+class MacOSRuntimeHook(BaseRuntimeHook):
+    """Настройка окружения для macOS"""
+    
+    def __init__(self):
+        super().__init__('MacOS')
+        
+    def setup(self) -> None:
+        """Настройка macOS окружения"""
+        try:
+            self._verify_adb()
+            self._configure_environment()
+            self._configure_security()
+            self.logger.info("MacOS environment setup completed")
+        except Exception as e:
+            self.logger.error(f"Failed to setup MacOS environment: {e}")
+            raise SystemExit(1)
+    
+    def _verify_adb(self) -> None:
+        """Проверка и настройка ADB"""
+        adb_path = os.path.join(self.resources_path, 'adb')
+        self._verify_file_exists(adb_path, "ADB")
+        self._make_executable(adb_path)
+        self.logger.info("ADB verified and configured")
+    
+    def _configure_environment(self) -> None:
+        """Настройка переменных окружения"""
+        # Настраиваем PATH
+        self._configure_path([self.base_path, self.resources_path])
+        
+        # Настраиваем DYLD_LIBRARY_PATH для динамических библиотек
+        lib_path = os.path.join(self.base_path, 'lib')
+        if os.path.exists(lib_path):
+            current_dyld = os.environ.get('DYLD_LIBRARY_PATH', '')
+            new_dyld = f"{lib_path}{os.pathsep}{current_dyld}" if current_dyld else lib_path
+            os.environ['DYLD_LIBRARY_PATH'] = new_dyld
+            self.logger.debug("DYLD_LIBRARY_PATH configured")
+        
+        # Устанавливаем ANDROID_HOME
+        os.environ['ANDROID_HOME'] = self.resources_path
+        self.logger.info("Environment variables configured")
+    
+    def _configure_security(self) -> None:
+        """Настройка безопасности macOS (карантин, подпись)"""
+        adb_path = os.path.join(self.resources_path, 'adb')
+        
+        try:
+            # Удаляем атрибут карантина, если он есть
+            result = subprocess.run(
+                ['xattr', '-l', adb_path],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0 and 'com.apple.quarantine' in result.stdout:
+                subprocess.run(
+                    ['xattr', '-d', 'com.apple.quarantine', adb_path],
+                    check=True,
+                    capture_output=True,
+                    timeout=5
+                )
+                self.logger.info("Quarantine attribute removed from ADB")
+            
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Quarantine check timed out")
+        except subprocess.CalledProcessError as e:
+            self.logger.debug(f"Could not remove quarantine attribute: {e}")
+        except FileNotFoundError:
+            self.logger.debug("xattr command not found")
+        except Exception as e:
+            self.logger.warning(f"Unexpected error removing quarantine: {e}")
+        
+        # Подписываем бинарник (ad-hoc подпись)
+        try:
+            result = subprocess.run(
+                ['codesign', '-v', adb_path],
+                capture_output=True,
+                timeout=5
+            )
+            
+            if result.returncode != 0:
+                subprocess.run(
+                    ['codesign', '-s', '-', '--force', '--deep', adb_path],
+                    check=True,
+                    capture_output=True,
+                    timeout=10
+                )
+                self.logger.info("ADB binary signed (ad-hoc)")
+                
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Code signing timed out")
+        except subprocess.CalledProcessError as e:
+            self.logger.debug(f"Could not sign binary: {e}")
+        except FileNotFoundError:
+            self.logger.debug("codesign command not found")
+        except Exception as e:
+            self.logger.warning(f"Unexpected error during code signing: {e}")
+
 
 def setup_macos_environment() -> None:
-    logger = _setup_logger()
-    try:
-        base_path = _get_base_path()
-        resources_path = os.path.join(base_path, 'resources')
-        
-        # Проверяем ADB
-        adb_path = os.path.join(resources_path, 'adb')
-        _verify_adb(adb_path, logger)
-        
-        # Настраиваем окружение
-        _configure_environment(base_path, resources_path, logger)
-        
-        # Проверяем и настраиваем безопасность
-        _configure_security(adb_path, logger)
-        
-        logger.info("MacOS environment setup completed")
-        
-    except Exception as e:
-        logger.error(f"Failed to setup MacOS environment: {e}")
-        raise SystemExit(1)
+    """Точка входа для runtime hook"""
+    hook = MacOSRuntimeHook()
+    hook.setup()
 
-def _setup_logger() -> logging.Logger:
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    return logging.getLogger('MacOSHook')
-
-def _get_base_path() -> str:
-    return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-
-def _verify_adb(adb_path: str, logger: logging.Logger) -> None:
-    if not os.path.exists(adb_path):
-        raise FileNotFoundError(f"ADB not found at {adb_path}")
-    
-    # Устанавливаем права на выполнение
-    current_mode = os.stat(adb_path).st_mode
-    os.chmod(adb_path, current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    logger.info("ADB permissions set")
-
-def _configure_environment(base_path: str, resources_path: str, logger: logging.Logger) -> None:
-    # Настраиваем PATH
-    paths = [base_path, resources_path]
-    current_path = os.environ.get('PATH', '')
-    new_path = os.pathsep.join(paths + [current_path] if current_path else paths)
-    os.environ['PATH'] = new_path
-    
-    # Настраиваем DYLD_LIBRARY_PATH
-    lib_path = os.path.join(base_path, 'lib')
-    if os.path.exists(lib_path):
-        current_dyld_path = os.environ.get('DYLD_LIBRARY_PATH', '')
-        new_dyld_path = os.pathsep.join([lib_path, current_dyld_path]) if current_dyld_path else lib_path
-        os.environ['DYLD_LIBRARY_PATH'] = new_dyld_path
-    
-    os.environ['ANDROID_HOME'] = resources_path
-    logger.info("Environment variables configured")
-
-def _configure_security(adb_path: str, logger: logging.Logger) -> None:
-    try:
-        # Проверяем карантин
-        result = subprocess.run(['xattr', adb_path], capture_output=True, text=True)
-        if 'com.apple.quarantine' in result.stdout:
-            subprocess.run(['xattr', '-d', 'com.apple.quarantine', adb_path])
-            logger.info("Quarantine attribute removed from ADB")
-            
-        # Проверяем подпись
-        result = subprocess.run(['codesign', '-v', adb_path], capture_output=True)
-        if result.returncode != 0:
-            subprocess.run(['codesign', '-s', '-', '--force', adb_path])
-            logger.info("ADB binary signed")
-            
-    except Exception as e:
-        logger.warning(f"Could not configure security settings: {e}")
 
 if __name__ == '__main__':
     setup_macos_environment()
