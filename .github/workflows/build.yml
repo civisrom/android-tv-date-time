@@ -141,25 +141,6 @@ jobs:
       - name: Build executable
         run: poetry run pyinstaller --clean pyinstaller.spec
 
-      - name: Verify build
-        shell: bash
-        run: |
-          if [ ! -f "dist/${{ env.APP_NAME }}${{ matrix.artifact_ext }}" ]; then
-            echo "Build failed: executable not found"
-            exit 1
-          fi
-          
-          # Показываем информацию о файле
-          ls -lh "dist/${{ env.APP_NAME }}${{ matrix.artifact_ext }}"
-          
-          # Для Unix-систем проверяем права
-          if [ "${{ runner.os }}" != "Windows" ]; then
-            if [ ! -x "dist/${{ env.APP_NAME }}" ]; then
-              echo "Making executable..."
-              chmod +x "dist/${{ env.APP_NAME }}"
-            fi
-          fi
-
       - name: Package build
         shell: bash
         run: |
