@@ -1,157 +1,165 @@
 # -*- mode: python ; coding: utf-8 -*-
+"""
+PyInstaller spec file for AndroidTVTimeFixer
+Оптимизированная конфигурация для кросс-платформенной сборки
+"""
 import sys
 import os
+from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
-# Определяем базовый путь проекта
-BASEPATH = os.path.dirname(os.path.abspath('pyinstaller.spec'))
-
-# Определяем пути к ресурсам
-HOOKS_PATH = os.path.join(BASEPATH, 'scripts', 'hooks')
-SRC_PATH = os.path.join(BASEPATH, 'src')
+# Определяем пути проекта
+SPEC_DIR = Path(__file__).parent.absolute()
+SRC_PATH = SPEC_DIR / 'src'
+HOOKS_PATH = SPEC_DIR / 'scripts' / 'hooks'
 
 # Добавляем src в PYTHONPATH
-sys.path.insert(0, SRC_PATH)
+sys.path.insert(0, str(SRC_PATH))
 
+# Инициализация коллекций
 datas = []
 binaries = []
 hiddenimports = [
+    # Стандартная библиотека
     'logging',
-    'urllib',
     'urllib.parse',
-    'urllib.error',
+    'urllib.error', 
     'urllib.request',
-    'urllib.response',
     'pathlib',
-#    '_collections_abc',
-#    'encodings.idna',
-    'concurrent.futures'
-]
-
-# Collect all necessary packages
-packages = [
-    'pyperclip', 
-    'colorama', 
-    'platformdirs', 
-    'packaging', 
-    'typing_extensions',
-    'cryptography', 
-    'rsa', 
-    'aiofiles', 
-    'async_timeout', 
-    'asyncio', 
-    'socket',
-    'subprocess', 
-    'threading', 
-    'adb_shell.adb_device', 
+    'concurrent.futures',
+    # ADB специфичные
+    'adb_shell.adb_device',
     'adb_shell.auth.sign_pythonrsa',
-    'ntplib', 
-    'psutil'
+    'adb_shell.auth.keygen',
 ]
 
-# Only collect from actual packages to avoid warnings
-for package in packages:
-    try:
-        __import__(package)
-        tmp_ret = collect_all(package)
-        if tmp_ret[0]:
-            datas.extend(tmp_ret[0])
-        if tmp_ret[1]:
-            binaries.extend(tmp_ret[1])
-        if tmp_ret[2]:
-            hiddenimports.extend(tmp_ret[2])
-    except ImportError:
-        continue
+# Пакеты для автоматического сбора зависимостей
+PACKAGES_TO_COLLECT = [
+    'pyperclip',
+    'colorama', 
+    'platformdirs',
+    'packaging',
+    'typing_extensions',
+    'cryptography',
+    'rsa',
+    'ntplib',
+]
 
-# Определяем платформо-зависимые настройки
+# Собираем зависимости пакетов
+for package_name in PACKAGES_TO_COLLECT:
+    try:
+        pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(package_name)
+        datas.extend(pkg_datas)
+        binaries.extend(pkg_binaries)
+        hiddenimports.extend(pkg_hiddenimports)
+    except ImportError:
+        print(f"Warning: Package {package_name} not found, skipping")
+    except Exception as e:
+        print(f"Warning: Error collecting {package_name}: {e}")
+
+# Платформо-зависимые настройки
 if sys.platform == 'win32':
-    runtime_hooks = [os.path.join(HOOKS_PATH, 'win_hook.py')]
-    # Platform data теперь содержит только source и destination
-    platform_data = [
-        ('resources/adb.exe', 'resources'),
-        ('resources/AdbWinApi.dll', 'resources'),
-        ('resources/AdbWinUsbApi.dll', 'resources')
+    # Windows
+    runtime_hooks = [str(HOOKS_PATH / 'win_hook.py')]
+    
+    # ADB ресурсы для Windows
+    platform_datas = [
+        (str(SPEC_DIR / 'resources' / 'adb.exe'), 'resources'),
+        (str(SPEC_DIR / 'resources' / 'AdbWinApi.dll'), 'resources'),
+        (str(SPEC_DIR / 'resources' / 'AdbWinUsbApi.dll'), 'resources'),
     ]
-    # Добавляем системные DLL для Windows
-    python_dlls = [
-        f'python{sys.version_info.major}{sys.version_info.minor}.dll',
-        'vcruntime140.dll',
-        'msvcp140.dll',
+    
+    # Python DLL для Windows
+    python_version = f"{sys.version_info.major}{sys.version_info.minor}"
+    system_dlls = [
+        f"python{python_version}.dll",
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",  # Для новых версий Python
+        "msvcp140.dll",
     ]
-    for dll in python_dlls:
-        dll_path = os.path.join(sys.prefix, dll)
-        if os.path.exists(dll_path):
-            binaries.append((dll_path, '.'))
-            
-    # Добавляем необходимые Windows API DLL
-    system32_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32')
-    required_dlls = [
-        'api-ms-win-core-path-l1-1-0.dll',
-        'api-ms-win-core-file-l1-1-0.dll',
-        'api-ms-win-core-file-l1-2-0.dll',
-        'api-ms-win-core-file-l2-1-0.dll',
-    ]
-    for dll in required_dlls:
-        dll_path = os.path.join(system32_path, dll)
-        if os.path.exists(dll_path):
-            binaries.append((dll_path, '.'))
+    
+    for dll_name in system_dlls:
+        dll_path = Path(sys.prefix) / dll_name
+        if dll_path.exists():
+            binaries.append((str(dll_path), '.'))
+    
+    # psutil для Windows
+    try:
+        psutil_data, psutil_bin, psutil_hidden = collect_all('psutil')
+        datas.extend(psutil_data)
+        binaries.extend(psutil_bin)
+        hiddenimports.extend(psutil_hidden)
+        
+        # WMI для Windows
+        wmi_data, wmi_bin, wmi_hidden = collect_all('wmi')
+        datas.extend(wmi_data)
+        binaries.extend(wmi_bin)
+        hiddenimports.extend(wmi_hidden)
+    except ImportError:
+        pass
+
 elif sys.platform == 'darwin':
-    runtime_hooks = [os.path.join(HOOKS_PATH, 'macos_hook.py')]
-    platform_data = [('resources/adb', 'resources')]
-else:  # linux
-    runtime_hooks = [os.path.join(HOOKS_PATH, 'linux_hook.py')]
-    platform_data = [('resources/adb', 'resources')]
+    # macOS
+    runtime_hooks = [str(HOOKS_PATH / 'macos_hook.py')]
+    platform_datas = [(str(SPEC_DIR / 'resources' / 'adb'), 'resources')]
+    
+    # psutil для macOS
+    try:
+        psutil_data, psutil_bin, psutil_hidden = collect_all('psutil')
+        datas.extend(psutil_data)
+        binaries.extend(psutil_bin)
+        hiddenimports.extend(psutil_hidden)
+    except ImportError:
+        pass
+
+else:
+    # Linux
+    runtime_hooks = [str(HOOKS_PATH / 'linux_hook.py')]
+    platform_datas = [(str(SPEC_DIR / 'resources' / 'adb'), 'resources')]
+
+# Добавляем базовый хук для всех платформ
+runtime_hooks.insert(0, str(HOOKS_PATH / 'base_hook.py'))
 
 # Добавляем платформо-зависимые данные
-datas.extend(platform_data)
+datas.extend(platform_datas)
 
+# Модули для исключения (оптимизация размера)
+excludes = [
+    # GUI фреймворки
+    'tkinter', 'PyQt5', 'PyQt6', 'PySide6', 'wx',
+    # Тестирование
+    'unittest', 'pytest', '_pytest', 'test',
+    # Документация
+    'pdb', 'pydoc', 'doctest',
+    # Веб
+    'http', 'html', 'xmlrpc', 'email',
+    # Научные библиотеки
+    'numpy', 'pandas', 'scipy', 'matplotlib',
+    # Разработка
+    'pip', 'setuptools', 'wheel', 'pkg_resources',
+]
+
+# PyInstaller Analysis
 a = Analysis(
-    [os.path.join(SRC_PATH, 'android_time_fixer.py')],
-    pathex=[BASEPATH],
+    [str(SRC_PATH / 'android_time_fixer.py')],
+    pathex=[str(SPEC_DIR)],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=runtime_hooks,
-    excludes=[
-        'tkinter',
-        'unittest',
-        'pdb',
-        'difflib',
-        'doctest',
-        'xml',
-        'pydoc',
-        'test',
-        '_pytest',
-        'pytest',
-        'pip',
-        'pkg_resources',
-        'email',
-        'html',
-        'http',
-        'xmlrpc',
-        'PyQt5',
-        'PyQt6',
-        'PySide6',
-        'wx',
-        'PIL',
-        'numpy',
-        'pandas',
-        'scipy',
-        'matplotlib',
-        'doctest',
-        'pywin',
-        'win32com'
-    ],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
-    noarchive=False
+    noarchive=False,
 )
 
+# PYZ Archive
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
+# EXE Build
 exe = EXE(
     pyz,
     a.scripts,
@@ -163,14 +171,18 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=['vcruntime140.dll', 'python*.dll', 'api-ms-*.dll'],
+    upx=True,  # Сжатие исполняемого файла
+    upx_exclude=[
+        # Исключаем из UPX компрессии критичные библиотеки
+        'vcruntime*.dll',
+        'python*.dll',
+        'api-ms-*.dll',
+    ],
     runtime_tmpdir=None,
-    console=True,
+    console=True,  # Консольное приложение
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-##    icon=['icon.png'],
 )
