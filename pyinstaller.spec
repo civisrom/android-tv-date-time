@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
+if sys.platform == "win32":
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
 # Determine project paths using SPECPATH (PyInstaller built-in variable)
 # SPECPATH is always available and points to the directory containing this spec file
 SPEC_DIR = Path(SPECPATH)
