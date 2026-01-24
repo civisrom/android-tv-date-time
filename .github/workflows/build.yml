@@ -143,33 +143,24 @@ jobs:
       - name: Verify build
         shell: bash
         run: |
-          # PyInstaller создает директорию dist/AndroidTVTimeFixer
-          if [ ! -d "dist/${{ env.APP_NAME }}" ]; then
-            echo "Build failed: output directory not found"
-            echo "Contents of dist:"
-            ls -la dist/
-            exit 1
-          fi
-          
-          echo "Build output structure:"
-          ls -lh "dist/${{ env.APP_NAME }}/"
-          
-          # Проверяем наличие исполняемого файла внутри директории
+          # PyInstaller onefile mode creates a single executable in dist/
           if [ "${{ runner.os }}" == "Windows" ]; then
-            EXEC_PATH="dist/${{ env.APP_NAME }}/${{ env.APP_NAME }}.exe"
+            EXEC_PATH="dist/${{ env.APP_NAME }}.exe"
           else
-            EXEC_PATH="dist/${{ env.APP_NAME }}/${{ env.APP_NAME }}"
+            EXEC_PATH="dist/${{ env.APP_NAME }}"
           fi
           
           if [ ! -f "$EXEC_PATH" ]; then
-            echo "Executable not found at: $EXEC_PATH"
+            echo "Build failed: executable not found at $EXEC_PATH"
+            echo "Contents of dist:"
+            ls -la dist/
             exit 1
           fi
           
           echo "Executable found:"
           ls -lh "$EXEC_PATH"
           
-          # Для Unix-систем проверяем права
+          # For Unix systems, make executable
           if [ "${{ runner.os }}" != "Windows" ]; then
             if [ ! -x "$EXEC_PATH" ]; then
               echo "Making executable..."
@@ -182,16 +173,14 @@ jobs:
         run: |
           cd dist
           
-          # Архивируем всю директорию AndroidTVTimeFixer
+          # Archive the single executable file (onefile mode)
           if [ "${{ runner.os }}" == "Windows" ]; then
-            # Для Windows используем 7z с рекурсивным добавлением
-            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}/"
+            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}.exe"
           else
-            # Для Linux/macOS используем zip с рекурсивным добавлением
-            zip -r "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}/"
+            zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
           fi
           
-          # Проверяем размер и содержимое архива
+          # Check archive size and contents
           echo "Archive created:"
           ls -lh "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
           
@@ -199,7 +188,7 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             7z l "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
           else
-            unzip -l "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" | head -20
+            unzip -l "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
           fi
 
       - name: Upload artifact
