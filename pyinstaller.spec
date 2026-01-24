@@ -55,24 +55,24 @@ for package_name in PACKAGES_TO_COLLECT:
         datas += pkg_datas
         binaries += pkg_binaries
         hiddenimports += pkg_hiddenimports
-        print(f"  ✓ {package_name}")
+        print(f"  [OK] {package_name}")
     except Exception as e:
-        print(f"  ⚠ Warning: Could not collect {package_name}: {e}")
+        print(f"  [WARN] Could not collect {package_name}: {e}")
 
 # Add locales file
 locales_file = SRC_PATH / 'locales.py'
 if locales_file.exists():
     datas.append((str(locales_file), 'src'))
-    print(f"  ✓ Added locales.py")
+    print(f"  [OK] Added locales.py")
 else:
-    print(f"  ⚠ Warning: locales.py not found at {locales_file}")
+    print(f"  [WARN] locales.py not found at {locales_file}")
 
 # Add constants and logging config if they exist
 for module_name in ['constants.py', 'logging_config.py']:
     module_file = SRC_PATH / module_name
     if module_file.exists():
         datas.append((str(module_file), 'src'))
-        print(f"  ✓ Added {module_name}")
+        print(f"  [OK] Added {module_name}")
 
 # Platform-specific runtime hooks
 runtime_hooks = []
@@ -80,17 +80,17 @@ if sys.platform == 'win32':
     hook_file = HOOKS_PATH / 'win_hook.py'
     if hook_file.exists():
         runtime_hooks.append(str(hook_file))
-        print(f"  ✓ Using Windows runtime hook")
+        print(f"  [OK] Using Windows runtime hook")
 elif sys.platform == 'darwin':
     hook_file = HOOKS_PATH / 'macos_hook.py'
     if hook_file.exists():
         runtime_hooks.append(str(hook_file))
-        print(f"  ✓ Using macOS runtime hook")
+        print(f"  [OK] Using macOS runtime hook")
 else:  # Linux
     hook_file = HOOKS_PATH / 'linux_hook.py'
     if hook_file.exists():
         runtime_hooks.append(str(hook_file))
-        print(f"  ✓ Using Linux runtime hook")
+        print(f"  [OK] Using Linux runtime hook")
 
 # Optimized excludes list
 EXCLUDES = [
@@ -166,16 +166,20 @@ else:  # Linux
     console = True
     icon = None
 
+# ONEFILE MODE: Single executable file
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name=exe_name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=console,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -185,30 +189,10 @@ exe = EXE(
     icon=icon,
 )
 
-# Collect into directory
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='AndroidTVTimeFixer',
-)
+# Note: COLLECT is not used in onefile mode
+# The executable is self-contained in the single file created above
 
-# macOS specific: Create application bundle
-if sys.platform == 'darwin':
-    app = BUNDLE(
-        coll,
-        name='AndroidTVTimeFixer.app',
-        icon=icon,
-        bundle_identifier='com.orientalium.androidtvtimefixer',
-        info_plist={
-            'CFBundleShortVersionString': '1.1.0',
-            'CFBundleVersion': '1.1.0',
-            'NSHighResolutionCapable': 'True',
-            'LSMinimumSystemVersion': '10.13.0',
-        },
-    )
+# Note: macOS app bundles are not created in onefile mode
+# The single executable file can be run directly
 
-print("\n✓ PyInstaller spec file loaded successfully")
+print("\n[OK] PyInstaller spec file loaded successfully")
