@@ -6,6 +6,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
+dist/
 downloads/
 eggs/
 .eggs/
@@ -19,23 +20,22 @@ wheels/
 .installed.cfg
 *.egg
 
-# Poetry - оставляем poetry.lock для воспроизводимости сборок
+# Poetry
+# poetry.lock
 .venv/
 venv/
-env/
 
 # PyInstaller
 *.manifest
-# НЕ игнорируем *.spec - он нужен для сборки!
-dist/
+*.spec
 build/
+dist/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
 
 # Environment
 .env
@@ -45,17 +45,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-*.bak
-
-# Logs
-*.log
-
-# Temporary files
-temp/
-tmp/
-*.tmp
-
-# Downloaded resources (создаются при сборке)
-resources/adb*
-resources/*.dll
-temp_adb/

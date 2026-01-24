@@ -4,14 +4,11 @@ version = "1.0.0"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
-packages = [{include = "android_time_fixer.py", from = "src"}]
+packages = [{include = "src/android_time_fixer.py"}]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12"
+    "Operating System :: POSIX :: Linux"
 ]
 
 [tool.poetry.dependencies]
@@ -25,19 +22,22 @@ typing-extensions = "^4.15.0"
 cryptography = "^45.0.7"
 rsa = "^4.9.1"
 ntplib = "^0.4.0"
-click = "^8.2.1"
-rich = "^14.1.0"
 
-# Платформо-зависимые зависимости
+# Windows-специфичные зависимости
 psutil = { version = "^7.0.0", markers = "sys_platform == 'win32' or sys_platform == 'darwin'" }
 wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
+
+# macOS-специфичные зависимости
 pyobjc-framework-Cocoa = { version = "^11.1", markers = "sys_platform == 'darwin'" }
+
+# Общие зависимости
+click = "^8.2.1"
+rich = "^14.1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 flake8 = "^6.0.0"
 mypy = "^1.15.0"
-pyinstaller = "^6.15"
 
 [tool.mypy]
 python_version = "3.11"
@@ -45,22 +45,14 @@ strict = true
 ignore_missing_imports = true
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 100
-target-version = ['py311', 'py312']
-extend-exclude = '''
-/(
-    \.venv
-  | build
-  | dist
-)/
-'''
+target-version = ['py310', 'py311']
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
 line_length = 100
-skip_gitignore = true

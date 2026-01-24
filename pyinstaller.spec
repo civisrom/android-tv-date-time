@@ -1,198 +1,176 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""
-PyInstaller spec file for AndroidTVTimeFixer
-Optimized configuration for cross-platform builds
-"""
 import sys
 import os
-from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
-# Determine project paths using SPECPATH (PyInstaller built-in variable)
-# SPECPATH is always available and points to the directory containing this spec file
-SPEC_DIR = Path(SPECPATH)
-SRC_PATH = SPEC_DIR / 'src'
-HOOKS_PATH = SPEC_DIR / 'scripts' / 'hooks'
+# Определяем базовый путь проекта
+BASEPATH = os.path.dirname(os.path.abspath('pyinstaller.spec'))
 
-# Add src to PYTHONPATH
-sys.path.insert(0, str(SRC_PATH))
+# Определяем пути к ресурсам
+HOOKS_PATH = os.path.join(BASEPATH, 'scripts', 'hooks')
+SRC_PATH = os.path.join(BASEPATH, 'src')
 
-# Initialize collections
+# Добавляем src в PYTHONPATH
+sys.path.insert(0, SRC_PATH)
+
 datas = []
 binaries = []
 hiddenimports = [
-    # Standard library
     'logging',
+    'urllib',
     'urllib.parse',
-    'urllib.error', 
+    'urllib.error',
     'urllib.request',
+    'urllib.response',
     'pathlib',
-    'concurrent.futures',
-    # ADB specific
-    'adb_shell.adb_device',
-    'adb_shell.auth.sign_pythonrsa',
-    'adb_shell.auth.keygen',
+#    '_collections_abc',
+#    'encodings.idna',
+    'concurrent.futures'
 ]
 
-# Packages to collect automatically
-PACKAGES_TO_COLLECT = [
-    'pyperclip',
+# Collect all necessary packages
+packages = [
+    'pyperclip', 
     'colorama', 
-    'platformdirs',
-    'packaging',
+    'platformdirs', 
+    'packaging', 
     'typing_extensions',
-    'cryptography',
-    'rsa',
-    'ntplib',
-    'psutil',
+    'cryptography', 
+    'rsa', 
+    'aiofiles', 
+    'async_timeout', 
+    'asyncio', 
+    'socket',
+    'subprocess', 
+    'threading', 
+    'adb_shell.adb_device', 
+    'adb_shell.auth.sign_pythonrsa',
+    'ntplib', 
+    'psutil'
 ]
 
-# Collect all data files and hidden imports from packages
-print("Collecting package dependencies...")
-for package_name in PACKAGES_TO_COLLECT:
+# Only collect from actual packages to avoid warnings
+for package in packages:
     try:
-        pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(package_name)
-        datas += pkg_datas
-        binaries += pkg_binaries
-        hiddenimports += pkg_hiddenimports
-        print(f"  [OK] {package_name}")
-    except Exception as e:
-        print(f"  [WARN] Could not collect {package_name}: {e}")
+        __import__(package)
+        tmp_ret = collect_all(package)
+        if tmp_ret[0]:
+            datas.extend(tmp_ret[0])
+        if tmp_ret[1]:
+            binaries.extend(tmp_ret[1])
+        if tmp_ret[2]:
+            hiddenimports.extend(tmp_ret[2])
+    except ImportError:
+        continue
 
-# Add locales file
-locales_file = SRC_PATH / 'locales.py'
-if locales_file.exists():
-    datas.append((str(locales_file), 'src'))
-    print(f"  [OK] Added locales.py")
-else:
-    print(f"  [WARN] locales.py not found at {locales_file}")
-
-# Add constants and logging config if they exist
-for module_name in ['constants.py', 'logging_config.py']:
-    module_file = SRC_PATH / module_name
-    if module_file.exists():
-        datas.append((str(module_file), 'src'))
-        print(f"  [OK] Added {module_name}")
-
-# Platform-specific runtime hooks
-runtime_hooks = []
+# Определяем платформо-зависимые настройки
 if sys.platform == 'win32':
-    hook_file = HOOKS_PATH / 'win_hook.py'
-    if hook_file.exists():
-        runtime_hooks.append(str(hook_file))
-        print(f"  [OK] Using Windows runtime hook")
+    runtime_hooks = [os.path.join(HOOKS_PATH, 'win_hook.py')]
+    # Platform data теперь содержит только source и destination
+    platform_data = [
+        ('resources/adb.exe', 'resources'),
+        ('resources/AdbWinApi.dll', 'resources'),
+        ('resources/AdbWinUsbApi.dll', 'resources')
+    ]
+    # Добавляем системные DLL для Windows
+    python_dlls = [
+        f'python{sys.version_info.major}{sys.version_info.minor}.dll',
+        'vcruntime140.dll',
+        'msvcp140.dll',
+    ]
+    for dll in python_dlls:
+        dll_path = os.path.join(sys.prefix, dll)
+        if os.path.exists(dll_path):
+            binaries.append((dll_path, '.'))
+            
+    # Добавляем необходимые Windows API DLL
+    system32_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32')
+    required_dlls = [
+        'api-ms-win-core-path-l1-1-0.dll',
+        'api-ms-win-core-file-l1-1-0.dll',
+        'api-ms-win-core-file-l1-2-0.dll',
+        'api-ms-win-core-file-l2-1-0.dll',
+    ]
+    for dll in required_dlls:
+        dll_path = os.path.join(system32_path, dll)
+        if os.path.exists(dll_path):
+            binaries.append((dll_path, '.'))
 elif sys.platform == 'darwin':
-    hook_file = HOOKS_PATH / 'macos_hook.py'
-    if hook_file.exists():
-        runtime_hooks.append(str(hook_file))
-        print(f"  [OK] Using macOS runtime hook")
-else:  # Linux
-    hook_file = HOOKS_PATH / 'linux_hook.py'
-    if hook_file.exists():
-        runtime_hooks.append(str(hook_file))
-        print(f"  [OK] Using Linux runtime hook")
+    runtime_hooks = [os.path.join(HOOKS_PATH, 'macos_hook.py')]
+    platform_data = [('resources/adb', 'resources')]
+else:  # linux
+    runtime_hooks = [os.path.join(HOOKS_PATH, 'linux_hook.py')]
+    platform_data = [('resources/adb', 'resources')]
 
-# Optimized excludes list
-EXCLUDES = [
-    # Development tools
-    'setuptools',
-    'pip',
-    'wheel',
-    'poetry',
-    # Testing frameworks
-    'pytest',
-    'unittest',
-    'nose',
-    'hypothesis',
-    # Documentation
-    'sphinx',
-    'docutils',
-    # GUI frameworks (not needed)
-    'tkinter',
-    'PyQt5',
-    'PyQt6',
-    'PySide2',
-    'PySide6',
-    'wx',
-    # Scientific libraries (not needed)
-    'numpy',
-    'pandas',
-    'scipy',
-    'matplotlib',
-    # Web frameworks (not needed)
-    'flask',
-    'django',
-    'tornado',
-    'aiohttp',
-]
+# Добавляем платформо-зависимые данные
+datas.extend(platform_data)
 
-print(f"\nConfiguration summary:")
-print(f"  Source path: {SRC_PATH}")
-print(f"  Hooks path: {HOOKS_PATH}")
-print(f"  Runtime hooks: {len(runtime_hooks)}")
-print(f"  Hidden imports: {len(hiddenimports)}")
-print(f"  Data files: {len(datas)}")
-print(f"  Binaries: {len(binaries)}")
-
-# Analysis configuration
 a = Analysis(
-    [str(SRC_PATH / 'android_time_fixer.py')],
-    pathex=[str(SRC_PATH)],
+    [os.path.join(SRC_PATH, 'android_time_fixer.py')],
+    pathex=[BASEPATH],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=runtime_hooks,
-    excludes=EXCLUDES,
-    noarchive=False,
-    optimize=2,
+    excludes=[
+        'tkinter',
+        'unittest',
+        'pdb',
+        'difflib',
+        'doctest',
+        'xml',
+        'pydoc',
+        'test',
+        '_pytest',
+        'pytest',
+        'pip',
+        'pkg_resources',
+        'email',
+        'html',
+        'http',
+        'xmlrpc',
+        'PyQt5',
+        'PyQt6',
+        'PySide6',
+        'wx',
+        'PIL',
+        'numpy',
+        'pandas',
+        'scipy',
+        'matplotlib',
+        'doctest',
+        'pywin',
+        'win32com'
+    ],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=None,
+    noarchive=False
 )
 
-# Remove duplicate entries
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
-# Platform-specific executable configuration
-if sys.platform == 'win32':
-    exe_name = 'AndroidTVTimeFixer.exe'
-    console = True
-    icon = None  # Add icon path if available
-elif sys.platform == 'darwin':
-    exe_name = 'AndroidTVTimeFixer'
-    console = False
-    icon = None  # Add icon path if available
-else:  # Linux
-    exe_name = 'AndroidTVTimeFixer'
-    console = True
-    icon = None
-
-# ONEFILE MODE: Single executable file
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
+    a.zipfiles,
     a.datas,
     [],
-    name=exe_name,
+    name='AndroidTVTimeFixer',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
+    upx_exclude=['vcruntime140.dll', 'python*.dll', 'api-ms-*.dll'],
     runtime_tmpdir=None,
-    console=console,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=icon,
+##    icon=['icon.png'],
 )
-
-# Note: COLLECT is not used in onefile mode
-# The executable is self-contained in the single file created above
-
-# Note: macOS app bundles are not created in onefile mode
-# The single executable file can be run directly
-
-print("\n[OK] PyInstaller spec file loaded successfully")
