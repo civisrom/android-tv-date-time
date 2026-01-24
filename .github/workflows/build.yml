@@ -26,7 +26,6 @@ env:
   APP_NAME: AndroidTVTimeFixer
   POETRY_VERSION: '2.1.4'
   PYINSTALLER_VERSION: '6.15'
-  PYTHONIOENCODING: utf-8
 
 jobs:
   build:
@@ -141,19 +140,67 @@ jobs:
       - name: Build executable
         run: poetry run pyinstaller --clean pyinstaller.spec
 
+      - name: Verify build
+        shell: bash
+        run: |
+          # PyInstaller создает директорию dist/AndroidTVTimeFixer
+          if [ ! -d "dist/${{ env.APP_NAME }}" ]; then
+            echo "Build failed: output directory not found"
+            echo "Contents of dist:"
+            ls -la dist/
+            exit 1
+          fi
+          
+          echo "Build output structure:"
+          ls -lh "dist/${{ env.APP_NAME }}/"
+          
+          # Проверяем наличие исполняемого файла внутри директории
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            EXEC_PATH="dist/${{ env.APP_NAME }}/${{ env.APP_NAME }}.exe"
+          else
+            EXEC_PATH="dist/${{ env.APP_NAME }}/${{ env.APP_NAME }}"
+          fi
+          
+          if [ ! -f "$EXEC_PATH" ]; then
+            echo "Executable not found at: $EXEC_PATH"
+            exit 1
+          fi
+          
+          echo "Executable found:"
+          ls -lh "$EXEC_PATH"
+          
+          # Для Unix-систем проверяем права
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            if [ ! -x "$EXEC_PATH" ]; then
+              echo "Making executable..."
+              chmod +x "$EXEC_PATH"
+            fi
+          fi
+
       - name: Package build
         shell: bash
         run: |
           cd dist
           
+          # Архивируем всю директорию AndroidTVTimeFixer
           if [ "${{ runner.os }}" == "Windows" ]; then
-            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}.exe"
+            # Для Windows используем 7z с рекурсивным добавлением
+            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}/"
           else
-            zip -j "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
+            # Для Linux/macOS используем zip с рекурсивным добавлением
+            zip -r "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}/"
           fi
           
-          # Проверяем размер архива
+          # Проверяем размер и содержимое архива
+          echo "Archive created:"
           ls -lh "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
+          
+          echo "Archive contents:"
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            7z l "${{ env.APP_NAME }}-${{ matrix.platform }}.zip"
+          else
+            unzip -l "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" | head -20
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
