@@ -1,105 +1,78 @@
-"""Runtime hook для Windows"""
 import os
 import sys
+import logging
 import ctypes
 from pathlib import Path
-
-# Добавляем путь к базовому модулю
-sys.path.insert(0, os.path.dirname(__file__))
-from base_hook import BaseRuntimeHook
-
-
-class WindowsRuntimeHook(BaseRuntimeHook):
-    """Настройка окружения для Windows"""
-    
-    REQUIRED_FILES = {'adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll'}
-    
-    def __init__(self):
-        super().__init__('Windows')
-        
-    def setup(self) -> None:
-        """Настройка Windows окружения"""
-        try:
-            self._verify_resources()
-            self._configure_environment()
-            self._load_adb_dlls()
-            self.logger.info("Windows environment setup completed")
-        except Exception as e:
-            self.logger.error(f"Failed to setup Windows environment: {e}")
-            raise SystemExit(1)
-    
-    def _verify_resources(self) -> None:
-        """Проверка наличия необходимых файлов"""
-        for filename in self.REQUIRED_FILES:
-            filepath = os.path.join(self.resources_path, filename)
-            self._verify_file_exists(filepath, filename)
-            
-            # Проверяем exe файлы на возможность выполнения
-            if filename.endswith('.exe'):
-                if not os.access(filepath, os.X_OK):
-                    self.logger.warning(f"Setting executable permissions for {filename}")
-                    try:
-                        os.chmod(filepath, 0o755)
-                    except Exception as e:
-                        self.logger.error(f"Failed to set permissions: {e}")
-        
-        self.logger.info("All required files verified")
-    
-    def _configure_environment(self) -> None:
-        """Настройка переменных окружения"""
-        # Настраиваем PATH
-        self._configure_path([self.base_path, self.resources_path])
-        
-        # Устанавливаем ANDROID_HOME
-        os.environ['ANDROID_HOME'] = self.resources_path
-        self.logger.info("Environment variables configured")
-    
-    def _load_adb_dlls(self) -> None:
-        """Загрузка ADB DLL библиотек"""
-        # Создаем стабильную директорию для DLL
-        stable_dir = Path.home() / '.android'
-        stable_dir.mkdir(parents=True, exist_ok=True)
-        
-        import shutil
-        
-        for dll_name in ['AdbWinApi.dll', 'AdbWinUsbApi.dll']:
-            source_path = os.path.join(self.resources_path, dll_name)
-            target_path = stable_dir / dll_name
-            
-            # Копируем DLL в стабильную директорию
-            if not target_path.exists() or self._should_update_dll(source_path, target_path):
-                try:
-                    shutil.copy2(source_path, target_path)
-                    self.logger.info(f"Copied {dll_name} to {stable_dir}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to copy {dll_name}: {e}")
-            
-            # Загружаем DLL
-            try:
-                if not ctypes.windll.kernel32.LoadLibraryW(str(target_path)):
-                    raise OSError(f"LoadLibraryW failed for {target_path}")
-                self.logger.debug(f"Loaded {dll_name}")
-            except Exception as e:
-                self.logger.error(f"Failed to load {dll_name}: {e}")
-                raise
-        
-        self.logger.info("Windows DLLs loaded successfully")
-    
-    def _should_update_dll(self, source: str, target: Path) -> bool:
-        """Проверка, нужно ли обновить DLL"""
-        try:
-            source_mtime = os.path.getmtime(source)
-            target_mtime = target.stat().st_mtime
-            return source_mtime > target_mtime
-        except Exception:
-            return True
-
+from typing import Set
 
 def setup_windows_environment() -> None:
-    """Точка входа для runtime hook"""
-    hook = WindowsRuntimeHook()
-    hook.setup()
+    logger = setup_logger()
+    try:
+        base_path = get_base_path()
+        resources_path = os.path.join(base_path, 'resources')
+        
+        required_files = {'adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll'}
+        verify_resources(resources_path, required_files, logger)
+        
+        paths = [base_path, resources_path]
+        update_path(paths, logger)
+        
+        load_windows_dlls(resources_path, logger)
+        
+        os.environ['ANDROID_HOME'] = resources_path
+        
+        logger.info("Windows environment setup completed")
+        
+    except Exception as e:
+        logger.error(f"Failed to setup Windows environment: {e}")
+        raise SystemExit(1)
 
+def setup_logger() -> logging.Logger:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    return logging.getLogger('WindowsHook')
 
-if __name__ == '__main__':
-    setup_windows_environment()
+def get_base_path() -> str:
+    return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+
+def verify_resources(resources_path: str, required_files: Set[str], logger: logging.Logger) -> None:
+    for file in required_files:
+        file_path = os.path.join(resources_path, file)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Required file not found: {file}")
+        if file.endswith('.exe'):
+            if not os.access(file_path, os.X_OK):
+                logger.warning(f"Setting executable permissions for {file}")
+                os.chmod(file_path, 0o755)
+
+def update_path(paths: list, logger: logging.Logger) -> None:
+    current_path = os.environ.get('PATH', '')
+    new_paths = os.pathsep.join(paths)
+    
+    if current_path:
+        os.environ['PATH'] = new_paths + os.pathsep + current_path
+    else:
+        os.environ['PATH'] = new_paths
+    
+    logger.info("PATH environment updated")
+
+def load_windows_dlls(resources_path: str, logger: logging.Logger) -> None:
+    stable_dir = os.path.join(os.path.expanduser('~'), '.android')
+    os.makedirs(stable_dir, exist_ok=True)
+    
+    for dll_name in ['AdbWinApi.dll', 'AdbWinUsbApi.dll']:
+        source_dll = os.path.join(resources_path, dll_name)
+        target_dll = os.path.join(stable_dir, dll_name)
+        
+        if not os.path.exists(source_dll):
+            raise FileNotFoundError(f"Required DLL not found: {source_dll}")
+            
+        import shutil
+        shutil.copy2(source_dll, target_dll)
+        
+        if not ctypes.windll.kernel32.LoadLibraryW(target_dll):
+            raise OSError(f"Failed to load {target_dll}")
+    
+    logger.info("Windows DLLs loaded successfully")

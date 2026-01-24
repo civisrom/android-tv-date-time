@@ -1,99 +1,81 @@
-"""Runtime hook для Linux"""
 import os
 import sys
-import subprocess
-
-# Добавляем путь к базовому модулю
-sys.path.insert(0, os.path.dirname(__file__))
-from base_hook import BaseRuntimeHook
-
-
-class LinuxRuntimeHook(BaseRuntimeHook):
-    """Настройка окружения для Linux"""
-    
-    def __init__(self):
-        super().__init__('Linux')
-        
-    def setup(self) -> None:
-        """Настройка Linux окружения"""
-        try:
-            self._verify_adb()
-            self._configure_environment()
-            self._setup_udev_rules()
-            self.logger.info("Linux environment setup completed")
-        except Exception as e:
-            self.logger.error(f"Failed to setup Linux environment: {e}")
-            raise SystemExit(1)
-    
-    def _verify_adb(self) -> None:
-        """Проверка и настройка ADB"""
-        adb_path = os.path.join(self.resources_path, 'adb')
-        self._verify_file_exists(adb_path, "ADB")
-        self._make_executable(adb_path)
-        self.logger.info("ADB verified and configured")
-    
-    def _configure_environment(self) -> None:
-        """Настройка переменных окружения"""
-        # Настраиваем PATH
-        self._configure_path([self.base_path, self.resources_path])
-        
-        # Настраиваем LD_LIBRARY_PATH
-        lib_path = os.path.join(self.base_path, 'lib')
-        if os.path.exists(lib_path):
-            current_ld = os.environ.get('LD_LIBRARY_PATH', '')
-            new_ld = f"{lib_path}{os.pathsep}{current_ld}" if current_ld else lib_path
-            os.environ['LD_LIBRARY_PATH'] = new_ld
-            self.logger.debug("LD_LIBRARY_PATH configured")
-        
-        # Устанавливаем ANDROID_HOME
-        os.environ['ANDROID_HOME'] = self.resources_path
-        self.logger.info("Environment variables configured")
-    
-    def _setup_udev_rules(self) -> None:
-        """Настройка udev правил для USB устройств"""
-        # Проверяем, запущены ли мы с правами root
-        if os.geteuid() != 0:
-            self.logger.debug("Not running as root, skipping udev rules setup")
-            return
-        
-        try:
-            rules_content = (
-                '# Android TV Time Fixer rules\n'
-                'SUBSYSTEM=="usb", ATTR{idVendor}=="0502", MODE="0666", GROUP="plugdev"\n'
-                'SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", MODE="0666", GROUP="plugdev"\n'
-            )
-            rules_path = '/etc/udev/rules.d/51-android-timefixer.rules'
-            
-            # Проверяем, существуют ли уже правила
-            if os.path.exists(rules_path):
-                with open(rules_path, 'r') as f:
-                    if f.read() == rules_content:
-                        self.logger.debug("Udev rules already up to date")
-                        return
-            
-            # Создаем/обновляем правила
-            with open(rules_path, 'w') as f:
-                f.write(rules_content)
-            
-            # Перезагружаем правила
-            subprocess.run(['udevadm', 'control', '--reload-rules'], 
-                          check=False, capture_output=True)
-            subprocess.run(['udevadm', 'trigger'], 
-                          check=False, capture_output=True)
-            
-            self.logger.info("USB udev rules installed and reloaded")
-            
-        except PermissionError:
-            self.logger.warning("Insufficient permissions to setup udev rules")
-        except Exception as e:
-            self.logger.warning(f"Could not setup udev rules: {e}")
-
+import logging
+import stat
+from pathlib import Path
+from typing import List
 
 def setup_linux_environment() -> None:
-    """Точка входа для runtime hook"""
-    hook = LinuxRuntimeHook()
-    hook.setup()
+    logger = _setup_logger()
+    try:
+        base_path = _get_base_path()
+        resources_path = os.path.join(base_path, 'resources')
+        
+        # Проверяем ADB
+        adb_path = os.path.join(resources_path, 'adb')
+        _verify_adb(adb_path, logger)
+        
+        # Настраиваем окружение
+        _configure_environment(base_path, resources_path, logger)
+        
+        # Проверяем USB правила
+        _setup_udev_rules(logger)
+        
+        logger.info("Linux environment setup completed")
+        
+    except Exception as e:
+        logger.error(f"Failed to setup Linux environment: {e}")
+        raise SystemExit(1)
 
+def _setup_logger() -> logging.Logger:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    return logging.getLogger('LinuxHook')
+
+def _get_base_path() -> str:
+    return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+
+def _verify_adb(adb_path: str, logger: logging.Logger) -> None:
+    if not os.path.exists(adb_path):
+        raise FileNotFoundError(f"ADB not found at {adb_path}")
+    
+    # Устанавливаем права на выполнение
+    current_mode = os.stat(adb_path).st_mode
+    os.chmod(adb_path, current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    logger.info("ADB permissions set")
+
+def _configure_environment(base_path: str, resources_path: str, logger: logging.Logger) -> None:
+    # Настраиваем PATH
+    paths = [base_path, resources_path]
+    current_path = os.environ.get('PATH', '')
+    new_path = os.pathsep.join(paths + [current_path] if current_path else paths)
+    os.environ['PATH'] = new_path
+    
+    # Настраиваем LD_LIBRARY_PATH
+    lib_path = os.path.join(base_path, 'lib')
+    if os.path.exists(lib_path):
+        current_ld_path = os.environ.get('LD_LIBRARY_PATH', '')
+        new_ld_path = os.pathsep.join([lib_path, current_ld_path]) if current_ld_path else lib_path
+        os.environ['LD_LIBRARY_PATH'] = new_ld_path
+    
+    os.environ['ANDROID_HOME'] = resources_path
+    logger.info("Environment variables configured")
+
+def _setup_udev_rules(logger: logging.Logger) -> None:
+    try:
+        if os.geteuid() == 0:  # Проверяем root права
+            rules_content = 'SUBSYSTEM=="usb", ATTR{idVendor}=="0502", MODE="0666", GROUP="plugdev"\n'
+            rules_path = '/etc/udev/rules.d/51-android.rules'
+            
+            if not os.path.exists(rules_path):
+                with open(rules_path, 'w') as f:
+                    f.write(rules_content)
+                os.system('udevadm control --reload-rules')
+                logger.info("USB rules installed")
+    except Exception as e:
+        logger.warning(f"Could not setup udev rules: {e}")
 
 if __name__ == '__main__':
     setup_linux_environment()
