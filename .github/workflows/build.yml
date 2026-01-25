@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description:
+        description: 'Type YES to confirm build'
         required: true
   push:
     tags:
