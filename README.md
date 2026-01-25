@@ -22,7 +22,8 @@
 
 ## Скриншоты
 
-![Главное меню](screenshots/ru2.png)
+![Главное меню](screenshots/ru-en.png)
+![Главное меню](screenshots/ru1.png)
 
 ## Основные возможности
 
