@@ -302,6 +302,8 @@ class AndroidTVTimeFixer:
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
+        self.settings_file = self.current_path / 'settings.json'
+        self.last_device_ip = self.load_last_ip()
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
             'ba': 'ba.pool.ntp.org',
@@ -854,6 +856,69 @@ class AndroidTVTimeFixer:
         except Exception as e:
             self.logger.warning(locales.get('logger_warning_2', error=str(e)))
 
+    def load_last_ip(self) -> str:
+        """Загружает последний использованный IP адрес из файла настроек"""
+        if self.settings_file.exists():
+            try:
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+                    return settings.get('last_device_ip', '')
+            except Exception as e:
+                self.logger.warning(locales.get('settings_load_error', error=str(e)))
+        return ''
+
+    def save_last_ip(self, ip: str) -> None:
+        """Сохраняет последний использованный IP адрес в файл настроек"""
+        try:
+            settings = {}
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+            settings['last_device_ip'] = ip
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+            self.last_device_ip = ip
+        except Exception as e:
+            self.logger.warning(locales.get('settings_save_error', error=str(e)))
+
+    def get_device_ip_input(self) -> str:
+        """Получает IP адрес устройства с возможностью использования сохранённого"""
+        if self.last_device_ip:
+            print(Fore.GREEN + locales.get('enter_device_ip_with_saved', saved_ip=self.last_device_ip), end="")
+            ip = input(Fore.WHITE).strip()
+            if not ip:  # Если пользователь нажал Enter без ввода
+                ip = self.last_device_ip
+        else:
+            print(Fore.GREEN + locales.get('enter_device_ip'), end="")
+            ip = input(Fore.WHITE).strip()
+        return ip
+
+    @staticmethod
+    def validate_ntp_server(server: str) -> bool:
+        """
+        Проверяет валидность NTP сервера (доменное имя или IP адрес)
+
+        Args:
+            server: Строка с адресом NTP сервера
+
+        Returns:
+            bool: True если формат валидный, False в противном случае
+        """
+        if not server:
+            return False
+
+        # Проверка на IP адрес
+        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if re.match(ip_pattern, server):
+            octets = server.split('.')
+            return all(0 <= int(octet) <= 255 for octet in octets)
+
+        # Проверка на валидное доменное имя
+        # Доменное имя может содержать буквы, цифры, дефисы и точки
+        # Каждая часть должна начинаться и заканчиваться буквой или цифрой
+        domain_pattern = r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$'
+        return bool(re.match(domain_pattern, server))
+
     def copy_server_to_clipboard(self, server: str) -> bool:
         """Копирует адрес сервера в буфер обмена"""
         try:
@@ -1040,6 +1105,10 @@ class AndroidTVTimeFixer:
             ntp_server = input(Fore.GREEN + locales.get("enter_ntp_server") + Fore.WHITE).strip()
             if ntp_server.lower() == 'q':
                 return
+            # Проверяем валидность формата NTP сервера
+            if not self.validate_ntp_server(ntp_server):
+                print(Fore.RED + locales.get("invalid_ntp_server_format"))
+                continue
             try:
                 self.fix_time(ntp_server)
                 print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=ntp_server))
@@ -1148,6 +1217,7 @@ def main():
         print(Fore.YELLOW + locales.get("adb_network"))
         print(Fore.YELLOW + locales.get("auto_time_date"))
         print(Fore.YELLOW + locales.get("network_requirement"))
+        print(Fore.YELLOW + locales.get("reboot_device"))
         input(Fore.WHITE + locales.get("press_enter_to_continue"))
 
         # Генерируем ключи ADB
@@ -1168,11 +1238,11 @@ def main():
             choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
 
             if choice == '1':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
+                ip = fixer.get_device_ip_input()
                 if fixer.validate_ip(ip):
                     try:
                         fixer.connect(ip)
+                        fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
                         fixer.show_current_settings()
                         print(Fore.GREEN + locales.get('enter_country_code'), end="")
                         code = input(Fore.WHITE).strip()
@@ -1193,11 +1263,11 @@ def main():
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '2':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
+                ip = fixer.get_device_ip_input()
                 if fixer.validate_ip(ip):
                     try:
                         fixer.connect(ip)
+                        fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
                         fixer.show_current_settings()
                         fixer.set_custom_ntp()
                     except AndroidTVTimeFixerError as e:
@@ -1212,11 +1282,14 @@ def main():
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
-                print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-                ip = input(Fore.WHITE).strip()
+                ip = fixer.get_device_ip_input()
                 if fixer.validate_ip(ip):
-                    fixer.connect(ip)
-                    fixer.show_device_info()
+                    try:
+                        fixer.connect(ip)
+                        fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.show_device_info()
+                    except AndroidTVTimeFixerError as e:
+                        print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
                     print(Fore.RED + locales.get('invalid_ip_format'))
             

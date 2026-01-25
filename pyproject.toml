@@ -4,7 +4,10 @@ version = "1.0.0"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
-packages = [{include = "src/android_time_fixer.py"}]
+packages = [
+    {include = "src/android_time_fixer.py"},
+    {include = "locales.py"}
+]
 classifiers = [
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: Microsoft :: Windows",
@@ -23,8 +26,8 @@ cryptography = "^45.0.7"
 rsa = "^4.9.1"
 ntplib = "^0.4.0"
 
-# Windows-специфичные зависимости
-psutil = { version = "^7.0.0", markers = "sys_platform == 'win32' or sys_platform == 'darwin'" }
+# Общая зависимость для всех платформ
+psutil = "^7.0.0"
 wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
 
 # macOS-специфичные зависимости

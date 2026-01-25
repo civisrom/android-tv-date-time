@@ -5,6 +5,12 @@ import stat
 from pathlib import Path
 from typing import List
 
+# Global ADB path for import by android_time_fixer.py
+ADB_PATH = os.path.join(
+    getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
+    'resources', 'adb'
+)
+
 def setup_linux_environment() -> None:
     logger = _setup_logger()
     try:
