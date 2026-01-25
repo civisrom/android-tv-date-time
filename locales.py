@@ -238,6 +238,10 @@ arising from the use of this program.
                 en="- Current NTP time server set on the device: ",
                 ru="- Текущий сервер времени, установленный на устройстве: "
             ),
+            "device_info": Translation(
+                en="Device information:",
+                ru="Информация об устройстве:"
+            ),
             "ntp_server_info_error": Translation(
                 en="Failed to retrieve NTP server information: {error}",
                 ru="Не удалось получить информацию о сервере NTP: {error}"
@@ -1064,8 +1068,20 @@ vn: Вьетнам
         translation = self.translations.get(key)
         if not translation:
             return f"Missing translation: {key}"
-        
+
         text = getattr(translation, self.current_language.name.lower())
+        return text.format(**kwargs) if kwargs else text
+
+    def get_en(self, key: str, **kwargs: Any) -> str:
+        """
+        Get English translation for the given key (for logging purposes)
+        Always returns English regardless of current language setting
+        """
+        translation = self.translations.get(key)
+        if not translation:
+            return f"Missing translation: {key}"
+
+        text = translation.en
         return text.format(**kwargs) if kwargs else text
 
 # Create global instance
