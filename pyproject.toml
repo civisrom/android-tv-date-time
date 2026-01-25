@@ -17,30 +17,30 @@ classifiers = [
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
 adb-shell = {extras = ["network"], version = "^0.4.4"}
-pyperclip = "^1.9.0"
+pyperclip = "^1.11.0"
 colorama = "^0.4.6"
-platformdirs = "^4.4.0"
-packaging = "^25.0"
+platformdirs = "^4.5.1"
+packaging = "^26.0"
 typing-extensions = "^4.15.0"
-cryptography = "^45.0.7"
+cryptography = "^46.0.3"
 rsa = "^4.9.1"
 ntplib = "^0.4.0"
 
 # Общая зависимость для всех платформ
-psutil = "^7.0.0"
+psutil = "^7.2.1"
 wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
 
 # macOS-специфичные зависимости
 pyobjc-framework-Cocoa = { version = "^11.1", markers = "sys_platform == 'darwin'" }
 
 # Общие зависимости
-click = "^8.2.1"
-rich = "^14.1.0"
+click = "^8.3.1"
+rich = "^14.3.1"
 
 [tool.poetry.group.dev.dependencies]
-black = "^25.1.0"
-flake8 = "^6.0.0"
-mypy = "^1.15.0"
+black = "^26.1.0"
+flake8 = "^7.3.0"
+mypy = "^1.19.1"
 
 [tool.mypy]
 python_version = "3.11"
