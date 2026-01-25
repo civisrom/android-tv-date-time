@@ -22,7 +22,7 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 
 ## Screenshots
 
-![Main Menu](screenshots/en1.png)
+![Main Menu](screenshot/en1.png)
 
 ## Key Features
 
