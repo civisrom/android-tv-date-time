@@ -1,3 +1,5 @@
+[Русский](https://github.com/civisrom/android-tv-date-time/blob/main/README.md)
+
 # Android TV Time Fixer
 
 **Fixing Time Synchronization Issues on Android TV**
@@ -16,37 +18,79 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 
 ## About the Program
 
-**Android TV Time Fixer** is a Windows utility designed to manage NTP server settings on Android TV devices via ADB (Android Debug Bridge). The program performs the following functions:
-
-*   Runs as an executable file (`.exe`) in a Windows environment.
-*   Operates through PowerShell.
-*   Provides the ability to configure NTP servers by country code or manually.
-*   Generates and uses ADB keys for secure TCP connections.
+**Android TV Time Fixer** is a cross-platform utility for Windows, Linux, and macOS, designed to manage NTP server settings on Android TV devices via ADB (Android Debug Bridge).
 
 ## Key Features
 
-*   **NTP Server Modification:**
-    *   Automatic setup by country code.
-    *   Manual setup of a custom NTP server.
-*   **Viewing Current Device Settings:**
-    *   Device model.
-    *   Android version.
-    *   Serial number.
-    *   Currently used NTP server.
+*   **Multilingual Interface:**
+    *   Support for English and Russian languages
+    *   Language selection at program startup
 
-## Installation
+*   **NTP Server Modification:**
+    *   Automatic setup by country code (65+ countries)
+    *   Manual setup of a custom NTP server
+    *   Input validation
+
+*   **Information Display:**
+    *   List of available country codes and NTP servers
+    *   List of alternative NTP servers (regional pools, Cloudflare, Google, etc.)
+    *   Country code descriptions
+
+*   **Detailed Device Information:**
+    *   Model and manufacturer
+    *   Android version and API level
+    *   Serial number
+    *   CPU architecture and core count
+    *   RAM capacity
+    *   Screen resolution
+    *   Network parameters (IP, MAC address)
+    *   Current NTP server
+    *   And much more
+
+*   **NTP Server Testing:**
+    *   Ping all available NTP servers (110+)
+    *   Display response time (RTT)
+    *   Success rate percentage
+    *   Sorting by availability and speed
+
+*   **Terminal Mode:**
+    *   Execute any ADB commands
+    *   Execute system commands
+    *   Built-in ADB command reference
+    *   App management, file operations, device reboot
+
+*   **Additional Features:**
+    *   Save last used IP address
+    *   Copy servers to clipboard
+    *   Automatic ADB key generation
+    *   Detailed file logging
+
+## Installation and Usage
+
+### Windows
 
 1.  Download the `AndroidTVTimeFixer-windows.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
 2.  Extract the archive to a convenient location on your computer, for example, `D:\AndroidTVTimeFixer`.
-3.  Open **PowerShell** as an administrator.
-4.  Navigate to the program's folder:
-    ```powershell
-    cd "D:\AndroidTVTimeFixer"
+3.  Run `AndroidTVTimeFixer.exe`.
+
+### Linux
+
+1.  Download the `AndroidTVTimeFixer-linux.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
+2.  Extract the archive:
+    ```bash
+    unzip AndroidTVTimeFixer-linux.zip
+    cd AndroidTVTimeFixer-linux
     ```
-5.  Run the program:
-    ```powershell
-    .\AndroidTVTimeFixer.exe
+3.  Make the file executable and run:
+    ```bash
+    chmod +x AndroidTVTimeFixer
+    ./AndroidTVTimeFixer
     ```
+
+### macOS
+
+1.  Download the `AndroidTVTimeFixer-macos.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
+2.  Extract the archive and run the application.
 
 ## Android TV Setup
 
@@ -60,12 +104,19 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 6.  Enable: **Auto date & time** > **Use network time**.
 7.  For enhanced security, it is recommended to disable developer mode after completing the NTP server configuration.
 
-## Usage
+## Main Menu
 
-1.  Connect your Android TV (or Nvidia Shield) and your computer to the same local network.
-2.  Find your Android TV's IP address in **"Settings > Network & internet"**.
-3.  Run the `AndroidTVTimeFixer.exe` program on your computer.
-4.  Follow the instructions within the program to connect to your Android TV and configure the NTP server.
+```
+1. Change NTP time server by country code
+2. Change NTP time server to custom
+3. Show available country codes and NTP servers
+4. Show available alternative NTP servers
+5. Show current device information
+6. Ping NTP servers
+7. Country codes explanation
+8. Terminal mode (ADB and system commands)
+9. Exit
+```
 
 ## Compatibility
 
@@ -73,6 +124,11 @@ The program has been tested and should work on Android TV devices (including Nvi
 
 *   Support for ADB connections over the network.
 *   Support for NTP server management via `adb shell` commands.
+
+**Supported Operating Systems:**
+*   Windows 10/11
+*   Linux (Ubuntu, Debian, Fedora, etc.)
+*   macOS
 
 ## Disclaimer
 
@@ -102,3 +158,7 @@ By using the **Android TV Time Fixer** program, you:
 *   **Agree to the terms of this disclaimer.**
 *   **Assume all risks** associated with the use of the program.
 *   **Release the author(s) and developers from any liability** for any losses or damages that may arise from the use of the program.
+
+**Changes:**
+
+The author(s) reserve the right to make changes to this disclaimer at any time without prior notice. Your continued use of the program after any changes are made will signify your acceptance of the modified terms.
