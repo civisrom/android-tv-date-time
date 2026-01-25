@@ -740,39 +740,54 @@ class AndroidTVTimeFixer:
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
-        
+
         Args:
             timeout (int): Timeout for NTP server connection in seconds
             count (int): Number of attempts to connect to each server
         """
+        self.logger.info("Starting NTP servers ping test")
         print(Fore.GREEN + locales.get("ping_ntp_servers_start"))
-        
-        # Combine country NTP servers and custom NTP servers
-        all_servers = list(self.ntp_servers.values()) + self.custom_ntp_servers
-        
+
+        # Combine country NTP servers and custom NTP servers, removing duplicates
+        all_servers = list(dict.fromkeys(
+            list(self.ntp_servers.values()) + self.custom_ntp_servers
+        ))
+
+        total_servers = len(all_servers)
+        self.logger.info(f"Total NTP servers to check: {total_servers}")
+
         server_ping_results = []
-        
-        for server in all_servers:
+        reachable_count = 0
+        unreachable_count = 0
+
+        for idx, server in enumerate(all_servers, 1):
+            # Show progress
+            progress = f"[{idx}/{total_servers}]"
+            print(Fore.CYAN + f"\r{progress} Checking: {server:<40}", end="", flush=True)
+
             server_attempts = []
-            
-            for _ in range(count):
+            rtts = []
+
+            for attempt_num in range(count):
                 try:
                     # Create NTP client
                     ntp_client = ntplib.NTPClient()
-                    
+
                     # Attempt to retrieve NTP time
                     start_time = time.time()
                     ntp_response = ntp_client.request(server, version=3, timeout=timeout)
                     end_time = time.time()
-                    
+
                     # Calculate round trip time
                     rtt = (end_time - start_time) * 1000  # Convert to milliseconds
-                    
+                    rtts.append(rtt)
+
                     server_attempts.append({
                         'status': 'Successful',
-                        'rtt': rtt
+                        'rtt': rtt,
+                        'offset': ntp_response.offset
                     })
-                
+
                 except ntplib.NTPException as e:
                     server_attempts.append({
                         'status': 'NTP Protocol Error',
@@ -793,47 +808,80 @@ class AndroidTVTimeFixer:
                         'status': 'Unexpected Error',
                         'error': str(e)
                     })
-            
+
             # Analyze server performance
             successful_attempts = [attempt for attempt in server_attempts if attempt['status'] == 'Successful']
-            
+
             if successful_attempts:
-                avg_rtt = sum(attempt['rtt'] for attempt in successful_attempts) / len(successful_attempts)
+                avg_rtt = sum(rtts) / len(rtts)
+                min_rtt = min(rtts)
+                max_rtt = max(rtts)
                 success_rate = (len(successful_attempts) / count) * 100
-                
+                reachable_count += 1
+
                 server_ping_results.append({
                     'server': server,
                     'status': 'Reachable',
                     'avg_rtt': avg_rtt,
+                    'min_rtt': min_rtt,
+                    'max_rtt': max_rtt,
                     'success_rate': success_rate,
                     'color': Fore.GREEN if success_rate > 66 else Fore.YELLOW
                 })
+                self.logger.debug(f"Server {server}: Reachable, avg RTT={avg_rtt:.2f}ms, success={success_rate:.0f}%")
             else:
+                unreachable_count += 1
+                # Get the error from the last attempt
+                last_error = server_attempts[-1].get('error', 'Unknown') if server_attempts else 'No attempts'
                 server_ping_results.append({
                     'server': server,
                     'status': 'Unreachable',
                     'avg_rtt': None,
+                    'min_rtt': None,
+                    'max_rtt': None,
                     'success_rate': 0,
+                    'error': last_error,
                     'color': Fore.RED
                 })
-        
+                self.logger.debug(f"Server {server}: Unreachable, error={last_error}")
+
+        # Clear progress line
+        print("\r" + " " * 60 + "\r", end="")
+
         # Sort results: reachable servers first, sorted by success rate and avg RTT
         server_ping_results.sort(
             key=lambda x: (x['status'] != 'Reachable', -x['success_rate'], x['avg_rtt'] or float('inf'))
         )
-        
-        # Display results
-        print(Fore.YELLOW + f"{'Server':<25} {'Status':<15} {'Avg RTT (ms)':<15} {'Success Rate':<15}")
-        print("-" * 70)
-        
+
+        # Display summary
+        print(Fore.GREEN + f"\n{locales.get('ping_results_summary')}")
+        print(Fore.WHITE + f"  {locales.get('total_servers')}: {total_servers}")
+        print(Fore.GREEN + f"  {locales.get('reachable_servers')}: {reachable_count}")
+        print(Fore.RED + f"  {locales.get('unreachable_servers')}: {unreachable_count}")
+        print()
+
+        # Display results table
+        print(Fore.YELLOW + f"{'Server':<35} {'Status':<12} {'Avg RTT':<12} {'Min/Max RTT':<15} {'Success':<10}")
+        print("-" * 85)
+
         for result in server_ping_results:
-            rtt_display = f"{result['avg_rtt']:.2f}" if result['avg_rtt'] is not None else "N/A"
-            success_rate_display = f"{result['success_rate']:.2f}%" if result['success_rate'] is not None else "N/A"
-            
+            server_display = result['server'][:33] + '..' if len(result['server']) > 35 else result['server']
+
+            if result['avg_rtt'] is not None:
+                rtt_display = f"{result['avg_rtt']:.1f}ms"
+                minmax_display = f"{result['min_rtt']:.1f}/{result['max_rtt']:.1f}ms"
+            else:
+                rtt_display = "N/A"
+                minmax_display = "N/A"
+
+            success_display = f"{result['success_rate']:.0f}%"
+
             print(
-                result['color'] + 
-                f"{result['server']:<25} {result['status']:<15} {rtt_display:<15} {success_rate_display:<15}"
+                result['color'] +
+                f"{server_display:<35} {result['status']:<12} {rtt_display:<12} {minmax_display:<15} {success_display:<10}"
             )
+
+        self.logger.info(f"NTP ping test completed: {reachable_count} reachable, {unreachable_count} unreachable")
 	
     def load_saved_servers(self) -> dict:
         """Загружает сохраненные серверы из файла"""
@@ -1100,17 +1148,22 @@ class AndroidTVTimeFixer:
     def set_custom_ntp(self) -> None:
         while True:
             ntp_server = input(Fore.GREEN + locales.get("enter_ntp_server") + Fore.WHITE).strip()
+            self.logger.info(f"User entered custom NTP server: {ntp_server}")
             if ntp_server.lower() == 'q':
+                self.logger.info("User cancelled custom NTP input")
                 return
             # Проверяем валидность формата NTP сервера
             if not self.validate_ntp_server(ntp_server):
+                self.logger.warning(f"Invalid NTP server format: {ntp_server}")
                 print(Fore.RED + locales.get("invalid_ntp_server_format"))
                 continue
             try:
                 self.fix_time(ntp_server)
+                self.logger.info(f"Custom NTP server set successfully: {ntp_server}")
                 print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=ntp_server))
                 return
             except AndroidTVTimeFixerError as e:
+                self.logger.error(f"Failed to set custom NTP server: {e}")
                 print(locales.get("error_message", error=str(e)))
 
     def get_device_info(self) -> dict:
@@ -1177,10 +1230,13 @@ class AndroidTVTimeFixer:
         """Показывает полную информацию об устройстве, включая NTP-сервер"""
         if not self.device:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
-    
+
         try:
+            self.logger.info("Retrieving device information")
             current_ntp = self.get_current_ntp()
             device_info = self.get_device_info()
+            self.logger.info(f"Device model: {device_info.get('model', 'Unknown')}")
+            self.logger.info(f"Current NTP server: {current_ntp}")
             print(Fore.GREEN + locales.get("current_device_info"))
             print(Fore.GREEN + locales.get("current_ntp_server") + " ", end="")
             print(Fore.RED + "{}".format(current_ntp))
@@ -1188,10 +1244,14 @@ class AndroidTVTimeFixer:
             for key, value in device_info.items():
                 print(f"  {key.capitalize()}: {value}")
         except Exception as e:
+            self.logger.error(f"Failed to retrieve device info: {e}")
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
 
 def main():
     fixer = AndroidTVTimeFixer()
+    fixer.logger.info("=" * 50)
+    fixer.logger.info("Application started")
+
     print(locales.get("select_language"))  # Выводим сообщение для выбора языка
     print("1. " + locales.get("english"))  # Выбор для английского
     print("2. " + locales.get("russian"))  # Выбор для русского
@@ -1200,11 +1260,13 @@ def main():
     # Назначение языка на основе выбора
     if lang_choice == "2":
         set_language("ru")
+        fixer.logger.info("User selected language: Russian")
         print(locales.get("language_set_ru"))  # Подтверждение выбора
     else:
         set_language("en")
+        fixer.logger.info("User selected language: English")
         print(locales.get("language_set_en"))  # Подтверждение выбора
-        
+
     try:
         # Показываем начальные инструкции
         print(Fore.GREEN + locales.get("program_title"))
@@ -1233,95 +1295,131 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_10"))
 
             choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
+            fixer.logger.info(f"User selected menu option: {choice}")
 
             if choice == '1':
+                fixer.logger.info("Menu: Change NTP server by country code")
                 ip = fixer.get_device_ip_input()
+                fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
                         fixer.connect(ip)
                         fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_current_settings()
                         print(Fore.GREEN + locales.get('enter_country_code'), end="")
                         code = input(Fore.WHITE).strip()
+                        fixer.logger.info(f"User entered country code: {code}")
                         if fixer.validate_country_code(code):
                             try:
                                 ntp_server = fixer.ntp_servers[code.lower()]
                                 fixer.fix_time(ntp_server)
+                                fixer.logger.info(f"NTP server changed to: {ntp_server} (country: {code.upper()})")
                                 print(Fore.GREEN + locales.get('ntp_server_set', ntp_server=ntp_server))
                             except KeyError:
+                                fixer.logger.warning(f"Invalid country code entered: {code}")
                                 print(Fore.RED + locales.get('invalid_country_code'))
                             except AndroidTVTimeFixerError as e:
+                                fixer.logger.error(f"Error setting NTP server: {e}")
                                 print(Fore.RED + locales.get('error_message', error=str(e)))
                         else:
+                            fixer.logger.warning(f"Invalid country code format: {code}")
                             print(Fore.RED + locales.get('invalid_country_code'))
                     except AndroidTVTimeFixerError as e:
+                        fixer.logger.error(f"Connection error: {e}")
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
+                    fixer.logger.warning(f"Invalid IP format entered: {ip}")
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '2':
+                fixer.logger.info("Menu: Change NTP server to custom")
                 ip = fixer.get_device_ip_input()
+                fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
                         fixer.connect(ip)
                         fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_current_settings()
                         fixer.set_custom_ntp()
                     except AndroidTVTimeFixerError as e:
+                        fixer.logger.error(f"Connection error: {e}")
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
+                    fixer.logger.warning(f"Invalid IP format entered: {ip}")
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '3':
+                fixer.logger.info("Menu: Show country codes")
                 fixer.show_country_codes()
 
             elif choice == '4':
+                fixer.logger.info("Menu: Show custom NTP servers")
                 fixer.show_custom_ntp_servers()
 
             elif choice == '5':
+                fixer.logger.info("Menu: Show device information")
                 ip = fixer.get_device_ip_input()
+                fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
                         fixer.connect(ip)
                         fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_device_info()
                     except AndroidTVTimeFixerError as e:
+                        fixer.logger.error(f"Connection error: {e}")
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
+                    fixer.logger.warning(f"Invalid IP format entered: {ip}")
                     print(Fore.RED + locales.get('invalid_ip_format'))
-            
+
             elif choice == '6':
+                fixer.logger.info("Menu: Ping NTP servers")
                 fixer.ping_ntp_servers()
-                    
+
             elif choice == '7':
+                fixer.logger.info("Menu: Show country codes description")
                 print(Fore.GREEN + locales.get('country_codes_description'))
                 print(locales.get('country_codes'))
-		    
+
             elif choice == '8':
+                fixer.logger.info("Menu: Terminal mode activated")
                 fixer.terminal_mode()
-		    
+                fixer.logger.info("Menu: Terminal mode deactivated")
+
             elif choice == '9':
+                fixer.logger.info("User selected exit")
                 print(Fore.GREEN + locales.get('exit_message'))
+                fixer.logger.info("Application closed normally")
                 sys.exit(0)
-            
+
             elif choice.lower() == 'b':
+                fixer.logger.info("User pressed back")
                 continue
             else:
+                fixer.logger.warning(f"Invalid menu choice: {choice}")
                 print(Fore.RED + locales.get('invalid_choice'))
-        
+
     except AndroidTVTimeFixerError as e:
+        fixer.logger.error(f"Application error: {e}")
         print(Fore.RED + locales.get('error_message', error=str(e)))
         sys.exit(1)
     except KeyboardInterrupt:
+        fixer.logger.info("Application interrupted by user (Ctrl+C)")
         print(Fore.RED + locales.get('operation_aborted'))
         sys.exit(0)
     except Exception as e:
+        fixer.logger.error(f"Unexpected error: {e}", exc_info=True)
         print(Fore.RED + locales.get('unexpected_error', error=str(e)))
         sys.exit(1)
 
     finally:
+        fixer.logger.info("Application cleanup started")
         # Явная очистка при завершении программы
         fixer.process_manager.cleanup()
+        fixer.logger.info("Application cleanup completed")
 
 if __name__ == '__main__':
     main()

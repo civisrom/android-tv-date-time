@@ -823,6 +823,23 @@ arising from the use of this program.
                 ru="6. Пинговать NTP-серверы"
             ),
 
+            "ping_results_summary": Translation(
+                en="Ping Results Summary:",
+                ru="Итоги проверки:"
+            ),
+            "total_servers": Translation(
+                en="Total servers checked",
+                ru="Всего проверено серверов"
+            ),
+            "reachable_servers": Translation(
+                en="Reachable",
+                ru="Доступно"
+            ),
+            "unreachable_servers": Translation(
+                en="Unreachable",
+                ru="Недоступно"
+            ),
+
             "ping_ntp_servers_start": Translation(
                 en="Checking NTP server connectivity (may take time)...",
                 ru="Проверка доступности NTP-серверов (может занять время)..."
