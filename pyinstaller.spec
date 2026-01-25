@@ -152,6 +152,16 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
+# Определяем путь к иконке в зависимости от платформы
+if sys.platform == 'win32':
+    icon_path = os.path.join(BASEPATH, 'icon.ico')
+else:
+    icon_path = os.path.join(BASEPATH, 'icon.png')
+
+# Проверяем существование иконки
+if not os.path.exists(icon_path):
+    icon_path = None
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -172,5 +182,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-##    icon=['icon.png'],
+    icon=icon_path,
 )

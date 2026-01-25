@@ -30,29 +30,10 @@ try:
 except ImportError:
     wmi = None
 
-# Настройка логирования
-#logging.basicConfig(
-#    level=logging.INFO,
-#    format='%(asctime)s - %(levelname)s - %(message)s',
-#    handlers=[logging.StreamHandler(sys.stdout)]
-#)
-#logger = logging.getLogger(__name__)
-
-# Настройка логгера
-logging.basicConfig(
-    level=logging.INFO,  # Уровень логирования
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Формат сообщений
-    handlers=[
-        logging.StreamHandler(sys.stdout)  # Вывод в консоль
-    ]
-)
-
-# Установка кодировки для обработчика
-for handler in logging.getLogger().handlers:
-    if isinstance(handler, logging.StreamHandler):
-        handler.setStream(sys.stdout)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+# Настройка базового логгера (только консольный вывод на уровне модуля)
+# FileHandler добавляется в AndroidTVTimeFixer._setup_logging()
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 class ADBProcessManager:
     def __init__(self, adb_path, device_ip=None):
@@ -420,16 +401,32 @@ class AndroidTVTimeFixer:
         ]
 
     def _setup_logging(self) -> None:
-        """Настраивает логирование для класса"""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('android_tv_fixer.log', encoding='utf-8'),
-                logging.StreamHandler()
-            ]
-        )
+        """Настраивает логирование для класса с выводом в файл и консоль"""
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+
+        # Очищаем существующие обработчики чтобы избежать дублирования
+        if self.logger.handlers:
+            self.logger.handlers.clear()
+
+        # Формат сообщений
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+        # Обработчик для вывода в консоль
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+
+        # Обработчик для записи в файл
+        try:
+            log_file = self.current_path / 'android_tv_fixer.log'
+            file_handler = logging.FileHandler(log_file, encoding='utf-8', mode='a')
+            file_handler.setLevel(logging.INFO)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+        except Exception as e:
+            self.logger.warning(f"Could not create log file: {e}")
 
     def get_adb_path(self) -> str:
         """

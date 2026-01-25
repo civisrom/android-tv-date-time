@@ -32,20 +32,21 @@ env:
 
 jobs:
   setup-and-build:
+    name: Build for ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            platform: windows
+            platform: Windows
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
             adb_base: "adb.exe AdbWinApi.dll AdbWinUsbApi.dll"
           - os: ubuntu-latest
-            platform: linux
+            platform: Linux
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-linux.zip
             adb_base: "adb"
           - os: macos-latest
-            platform: macos
+            platform: macOS
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-darwin.zip
             adb_base: "adb"
 
@@ -107,7 +108,9 @@ jobs:
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
-        run: brew install openssl
+        run: |
+          # Suppress warning if openssl is already installed
+          brew list openssl@3 &>/dev/null || brew install openssl@3
         shell: bash
 
       - name: Setup ADB
@@ -128,7 +131,11 @@ jobs:
           
       - name: Check Poetry source
         run: poetry config --list
-        
+
+      - name: Generate application icon
+        run: poetry run python scripts/generate_icon.py
+        shell: bash
+
       - name: Build executable
         run: poetry run pyinstaller --clean pyinstaller.spec
         shell: bash
@@ -136,11 +143,12 @@ jobs:
       - name: Package build
         run: |
           cd dist
+          PLATFORM_LOWER=$(echo "${{ matrix.platform }}" | tr '[:upper:]' '[:lower:]')
           if [ "${{ runner.os }}" == "Windows" ]; then
-            7z a -tzip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}.exe"
+            7z a -tzip "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}.exe"
           else
             chmod +x "${{ env.APP_NAME }}"
-            zip -j "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}"
+            zip -j "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}"
           fi
         shell: bash
 
@@ -148,7 +156,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
-          path: dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip
+          path: dist/${{ env.APP_NAME }}-*.zip
           retention-days: 90
           if-no-files-found: error
 
