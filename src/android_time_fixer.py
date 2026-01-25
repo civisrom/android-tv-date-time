@@ -65,7 +65,7 @@ class ADBProcessManager:
         Обработчик системных сигналов для завершения процессов
         """
         try:
-            self.logger.info(locales.get("terminal_mode_exit_ctrl_c"))
+            self.logger.info(locales.get_en("terminal_mode_exit_ctrl_c"))
             print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
             
             # Сначала отключаем устройство
@@ -722,7 +722,7 @@ class AndroidTVTimeFixer:
                     
                 except KeyboardInterrupt:
                     # Обработка Ctrl+C без завершения ADB процессов
-                    self.logger.info(locales.get("terminal_mode_exit_ctrl_c"))
+                    self.logger.info(locales.get_en("terminal_mode_exit_ctrl_c"))
                     print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
                     continue
                 except Exception as e:
@@ -890,7 +890,7 @@ class AndroidTVTimeFixer:
                 with open(self.servers_file, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                self.logger.warning(locales.get('logger_warning', error=str(e)))
+                self.logger.warning(locales.get_en('logger_warning', error=str(e)))
         return {'favorite_servers': [], 'custom_servers': []}
 
     def save_servers(self):
@@ -899,7 +899,7 @@ class AndroidTVTimeFixer:
             with open(self.servers_file, 'w') as f:
                 json.dump(self.saved_servers, f, indent=2)
         except Exception as e:
-            self.logger.warning(locales.get('logger_warning_2', error=str(e)))
+            self.logger.warning(locales.get_en('logger_warning_2', error=str(e)))
 
     def load_last_ip(self) -> str:
         """Загружает последний использованный IP адрес из файла настроек"""
@@ -909,7 +909,7 @@ class AndroidTVTimeFixer:
                     settings = json.load(f)
                     return settings.get('last_device_ip', '')
             except Exception as e:
-                self.logger.warning(locales.get('settings_load_error', error=str(e)))
+                self.logger.warning(locales.get_en('settings_load_error', error=str(e)))
         return ''
 
     def save_last_ip(self, ip: str) -> None:
@@ -924,7 +924,7 @@ class AndroidTVTimeFixer:
                 json.dump(settings, f, indent=2)
             self.last_device_ip = ip
         except Exception as e:
-            self.logger.warning(locales.get('settings_save_error', error=str(e)))
+            self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
 
     def get_device_ip_input(self) -> str:
         """Получает IP адрес устройства с возможностью использования сохранённого"""
@@ -970,7 +970,7 @@ class AndroidTVTimeFixer:
             pyperclip.copy(server)
             return True
         except Exception as e:
-            self.logger.warning(locales.get('copy_to_clipboard', error=str(e)))
+            self.logger.warning(locales.get_en('copy_to_clipboard', error=str(e)))
             return False
 
     def paste_server_from_clipboard(self) -> str:
@@ -978,7 +978,7 @@ class AndroidTVTimeFixer:
         try:
             return pyperclip.paste()
         except Exception as e:
-            self.logger.warning(locales.get('copy_to_clipboard_2', error=str(e)))
+            self.logger.warning(locales.get_en('copy_to_clipboard_2', error=str(e)))
             return ""
 
     def add_to_favorites(self, server: str):
@@ -1005,9 +1005,9 @@ class AndroidTVTimeFixer:
                 self.keys_folder.mkdir(parents=True)
                 priv_key = self.keys_folder / 'adbkey'
                 keygen(str(priv_key))
-                self.logger.info(locales.get('gen_keys'))
+                self.logger.info(locales.get_en('gen_keys'))
             else:
-                self.logger.info(locales.get('existing_adb_keys'))
+                self.logger.info(locales.get_en('existing_adb_keys'))
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get('key_generation_error', error=str(e)))
 
@@ -1079,7 +1079,7 @@ class AndroidTVTimeFixer:
         connection_established = False
         last_error = None
         
-        print(locales.get("waiting_for_connection"))
+        print(locales.get("waiting_for_connection", remaining_time=self.connection_timeout))
         print(locales.get("confirm_connection"))
         
         while time.time() - start_time < self.connection_timeout:
@@ -1087,7 +1087,7 @@ class AndroidTVTimeFixer:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 connection_established = True
-                self.logger.info(locales.get('connection_success', ip=ip))
+                self.logger.info(locales.get_en('connection_success', ip=ip))
                 break
             except Exception as e:
                 last_error = str(e)
@@ -1120,7 +1120,7 @@ class AndroidTVTimeFixer:
     
         try:
             self.device.shell(f'settings put global ntp_server {ntp_server}')
-            self.logger.info(locales.get('ntp_server_set', ntp_server=ntp_server))
+            self.logger.info(locales.get_en('ntp_server_set', ntp_server=ntp_server))
     
             # Проверяем изменение
             new_ntp = self.get_current_ntp()
