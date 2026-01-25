@@ -20,6 +20,10 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 
 **Android TV Time Fixer** is a cross-platform utility for Windows, Linux, and macOS, designed to manage NTP server settings on Android TV devices via ADB (Android Debug Bridge).
 
+## Screenshots
+
+![Main Menu](screenshots/en1.png)
+
 ## Key Features
 
 *   **Multilingual Interface:**
