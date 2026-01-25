@@ -702,6 +702,10 @@ arising from the use of this program.
                  en="Error executing command: {error}",
                  ru="Ошибка выполнения команды: {error}"
             ),
+            "terminal_mode_critical_error": Translation(
+                 en="Critical error in terminal mode: {error}",
+                 ru="Критическая ошибка в режиме терминала: {error}"
+            ),
             "command_error": Translation(
                  en="Command execution failed",
                  ru="Ошибка выполнения команды"
@@ -997,12 +1001,12 @@ vn: Вьетнам
                 ru="Неверный выбор. Пожалуйста, попробуйте еще раз."
             ),
             "error_message": Translation(
-                en="Error: {}",
-                ru="Ошибка: {}"
+                en="Error: {error}",
+                ru="Ошибка: {error}"
             ),
             "unexpected_error": Translation(
-                en="\nUnexpected error: {}",
-                ru="\nНепредвиденная ошибка: {}"
+                en="\nUnexpected error: {error}",
+                ru="\nНепредвиденная ошибка: {error}"
             ),
             "operation_aborted": Translation(
                 en="\nOperation aborted by user",

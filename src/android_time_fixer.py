@@ -360,11 +360,9 @@ class AndroidTVTimeFixer:
             'il': 'il.pool.ntp.org',
             'in': 'in.pool.ntp.org',
             'ir': 'ir.pool.ntp.org',
-            'jp': 'jp.pool.ntp.org',
             'kg': 'kg.pool.ntp.org',
             'kh': 'kh.pool.ntp.org',
             'kr': 'kr.pool.ntp.org',
-            'kz': 'kz.pool.ntp.org',
             'lk': 'lk.pool.ntp.org',
             'mn': 'mn.pool.ntp.org',
             'mv': 'mv.pool.ntp.org',
@@ -520,13 +518,6 @@ class AndroidTVTimeFixer:
         Returns:
             bool: True, если подключение успешно, False в противном случае.
         """
-        import time
-        import shlex
-        from subprocess import Popen, PIPE
-        import sys
-        import locale
-        import re
-    
         # Определяем кодировку текущей системы
         encoding = 'utf-8' if sys.platform != 'win32' else 'cp866'
     
@@ -852,7 +843,7 @@ class AndroidTVTimeFixer:
                 with open(self.servers_file, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                logger.warning(locales.get('logger_warning', error=str(e)))
+                self.logger.warning(locales.get('logger_warning', error=str(e)))
         return {'favorite_servers': [], 'custom_servers': []}
 
     def save_servers(self):
@@ -861,7 +852,7 @@ class AndroidTVTimeFixer:
             with open(self.servers_file, 'w') as f:
                 json.dump(self.saved_servers, f, indent=2)
         except Exception as e:
-            logger.warning(locales.get('logger_warning_2', error=str(e)))
+            self.logger.warning(locales.get('logger_warning_2', error=str(e)))
 
     def copy_server_to_clipboard(self, server: str) -> bool:
         """Копирует адрес сервера в буфер обмена"""
@@ -869,7 +860,7 @@ class AndroidTVTimeFixer:
             pyperclip.copy(server)
             return True
         except Exception as e:
-            logger.warning(locales.get('copy_to_clipboard', error=str(e)))
+            self.logger.warning(locales.get('copy_to_clipboard', error=str(e)))
             return False
 
     def paste_server_from_clipboard(self) -> str:
@@ -877,7 +868,7 @@ class AndroidTVTimeFixer:
         try:
             return pyperclip.paste()
         except Exception as e:
-            logger.warning(locales.get('copy_to_clipboard_2', error=str(e)))
+            self.logger.warning(locales.get('copy_to_clipboard_2', error=str(e)))
             return ""
 
     def add_to_favorites(self, server: str):
@@ -904,9 +895,9 @@ class AndroidTVTimeFixer:
                 self.keys_folder.mkdir(parents=True)
                 priv_key = self.keys_folder / 'adbkey'
                 keygen(str(priv_key))
-                logger.info(locales.get('gen_keys'))
+                self.logger.info(locales.get('gen_keys'))
             else:
-                logger.info(locales.get('existing_adb_keys'))
+                self.logger.info(locales.get('existing_adb_keys'))
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get('key_generation_error', error=str(e)))
 
@@ -922,27 +913,27 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("key_loading_error", error=str(e)))
 
-    def list_devices():
+    def list_devices(self):
         """Получить список подключенных устройств через adb."""
-        result = subprocess.run(['adb', 'devices'], capture_output=True, text=True)
+        result = subprocess.run([self.get_adb_path(), 'devices'], capture_output=True, text=True)
         lines = result.stdout.splitlines()
-        
+
         devices = [line.split()[0] for line in lines[1:] if line.strip()]
-        
+
         if len(devices) == 0:
             print(Fore.RED + locales.get("no_connected_devices"))
             return None
-        
+
         return devices
-    
-    def select_device(devices):
+
+    def select_device(self, devices):
         """Выбор устройства из списка для подключения."""
         print(Fore.GREEN + locales.get("choose_device_to_connect"))
         for i, device in enumerate(devices, 1):
             print(Fore.YELLOW + f"{i}. {device}")
-        
+
         choice = input(Fore.WHITE + locales.get("enter_device_number"))
-        
+
         try:
             choice = int(choice)
             if 1 <= choice <= len(devices):
@@ -953,16 +944,16 @@ class AndroidTVTimeFixer:
         except ValueError:
             print(Fore.RED + locales.get("invalid_input"))
             return None
-    
-    def connect_to_device(device):
+
+    def connect_to_device(self, device):
         """Подключение к выбранному устройству через adb."""
         print(Fore.GREEN + locales.get("connecting_to_device", device_id=device))
-        
-        subprocess.run(['adb', '-s', device, 'shell'], check=True)
-    
-    def show_device_info():
-        """Получение информации о текущем подключенном устройстве."""
-        result = subprocess.run(['adb', 'shell', 'getprop'], capture_output=True, text=True)
+
+        subprocess.run([self.get_adb_path(), '-s', device, 'shell'], check=True)
+
+    def show_device_info_adb(self):
+        """Получение информации о текущем подключенном устройстве через adb shell."""
+        result = subprocess.run([self.get_adb_path(), 'shell', 'getprop'], capture_output=True, text=True)
         print(Fore.GREEN + locales.get("current_device_info"))
         print(result.stdout)
     
@@ -986,7 +977,7 @@ class AndroidTVTimeFixer:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 connection_established = True
-                logger.info(locales.get('connection_success', ip=ip))
+                self.logger.info(locales.get('connection_success', ip=ip))
                 break
             except Exception as e:
                 last_error = str(e)
@@ -1019,7 +1010,7 @@ class AndroidTVTimeFixer:
     
         try:
             self.device.shell(f'settings put global ntp_server {ntp_server}')
-            logger.info(locales.get('ntp_server_set', ntp_server=ntp_server))
+            self.logger.info(locales.get('ntp_server_set', ntp_server=ntp_server))
     
             # Проверяем изменение
             new_ntp = self.get_current_ntp()
@@ -1068,7 +1059,7 @@ class AndroidTVTimeFixer:
                 'android_version': self.device.shell('getprop ro.build.version.release').strip(),
                 'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
                 'serial': self.device.shell('getprop ro.serialno').strip(),
-                'serial': self.device.shell('getprop ro.boot.serialno').strip(),
+                'boot_serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
                 #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
@@ -1249,13 +1240,13 @@ def main():
                 print(Fore.RED + locales.get('invalid_choice'))
         
     except AndroidTVTimeFixerError as e:
-        print(Fore.RED + locales.get('error_message').format(str(e)))
+        print(Fore.RED + locales.get('error_message', error=str(e)))
         sys.exit(1)
     except KeyboardInterrupt:
         print(Fore.RED + locales.get('operation_aborted'))
         sys.exit(0)
     except Exception as e:
-        print(Fore.RED + locales.get('unexpected_error').format(str(e)))
+        print(Fore.RED + locales.get('unexpected_error', error=str(e)))
         sys.exit(1)
 
     finally:
