@@ -66,6 +66,10 @@ arising from the use of this program.
                 en="3. Your TV, Nvidia Shield, and PC must be connected to the same network.",
                 ru="3. Ваш ТВ, Nvidia Shield и ПК должны быть подключены к одной сети"
             ),
+            "reboot_device": Translation(
+                en="4. Reboot your TV or Nvidia Shield before using this program.",
+                ru="4. Сделайте перезагрузку вашего ТВ или Nvidia Shield перед использованием программы."
+            ),
             "press_enter_to_continue": Translation(
                 en="\nPress Enter to continue...",
                 ru="\nНажмите Enter, чтобы продолжить..."
@@ -79,6 +83,15 @@ arising from the use of this program.
             "logger_warning_2": Translation(
                 en="Failed to save servers: {error}",
                 ru="Не удалось сохранить серверы: {error}"
+            ),
+            # settings load/save errors
+            "settings_load_error": Translation(
+                en="Failed to load settings: {error}",
+                ru="Не удалось загрузить настройки: {error}"
+            ),
+            "settings_save_error": Translation(
+                en="Failed to save settings: {error}",
+                ru="Не удалось сохранить настройки: {error}"
             ),
             # copy_server_to_clipboard
             "copy_to_clipboard": Translation(
@@ -760,9 +773,17 @@ arising from the use of this program.
                 en="Enter the IP address of your device (TV, Nvidia Shield) (find it in Settings > Network and Internet): ",
                 ru="Введите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): "
             ),
+            "enter_device_ip_with_saved": Translation(
+                en="Enter the IP address of your device (press Enter to use saved: {saved_ip}): ",
+                ru="Введите IP-адрес устройства (нажмите Enter для использования сохранённого: {saved_ip}): "
+            ),
             "invalid_ip_format": Translation(
                 en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx",
                 ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx"
+            ),
+            "invalid_ntp_server_format": Translation(
+                en="Invalid NTP server format. Use a valid domain name (e.g., time.google.com) or IP address.",
+                ru="Неверный формат NTP-сервера. Используйте корректное доменное имя (например, time.google.com) или IP-адрес."
             ),
             "enter_country_code": Translation(
                 en="Enter your country code (e.g. us for USA, uk for United Kingdom, see country codes menu, q to exit): ",

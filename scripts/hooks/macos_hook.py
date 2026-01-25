@@ -6,6 +6,12 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+# Global ADB path for import by android_time_fixer.py
+ADB_PATH = os.path.join(
+    getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
+    'resources', 'adb'
+)
+
 def setup_macos_environment() -> None:
     logger = _setup_logger()
     try:

@@ -5,6 +5,12 @@ import ctypes
 from pathlib import Path
 from typing import Set
 
+# Global ADB path for import by android_time_fixer.py
+ADB_PATH = os.path.join(
+    getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
+    'resources', 'adb.exe'
+)
+
 def setup_windows_environment() -> None:
     logger = setup_logger()
     try:
