@@ -926,6 +926,30 @@ class AndroidTVTimeFixer:
         except Exception as e:
             self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
 
+    def load_language(self) -> str:
+        """Загружает сохранённый язык из файла настроек"""
+        if self.settings_file.exists():
+            try:
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+                    return settings.get('language', '')
+            except Exception as e:
+                self.logger.warning(locales.get_en('settings_load_error', error=str(e)))
+        return ''
+
+    def save_language(self, language: str) -> None:
+        """Сохраняет выбранный язык в файл настроек"""
+        try:
+            settings = {}
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+            settings['language'] = language
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+        except Exception as e:
+            self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
+
     def get_device_ip_input(self) -> str:
         """Получает IP адрес устройства с возможностью использования сохранённого"""
         if self.last_device_ip:
@@ -1252,20 +1276,35 @@ def main():
     fixer.logger.info("=" * 50)
     fixer.logger.info("Application started")
 
-    print(locales.get("select_language"))  # Выводим сообщение для выбора языка
-    print("1. " + locales.get("english"))  # Выбор для английского
-    print("2. " + locales.get("russian"))  # Выбор для русского
-    # Ввод пользователя
-    lang_choice = input(locales.get("enter_number")).strip()
-    # Назначение языка на основе выбора
-    if lang_choice == "2":
-        set_language("ru")
-        fixer.logger.info("User selected language: Russian")
-        print(locales.get("language_set_ru"))  # Подтверждение выбора
+    # Попытка загрузить сохранённый язык
+    saved_language = fixer.load_language()
+
+    if saved_language in ('en', 'ru'):
+        # Автоматически устанавливаем сохранённый язык
+        set_language(saved_language)
+        fixer.logger.info(f"Language loaded from settings: {saved_language.upper()}")
+        if saved_language == 'ru':
+            print(locales.get("language_loaded_ru"))
+        else:
+            print(locales.get("language_loaded_en"))
     else:
-        set_language("en")
-        fixer.logger.info("User selected language: English")
-        print(locales.get("language_set_en"))  # Подтверждение выбора
+        # Запрашиваем выбор языка у пользователя
+        print(locales.get("select_language"))  # Выводим сообщение для выбора языка
+        print("1. " + locales.get("english"))  # Выбор для английского
+        print("2. " + locales.get("russian"))  # Выбор для русского
+        # Ввод пользователя
+        lang_choice = input(locales.get("enter_number")).strip()
+        # Назначение языка на основе выбора
+        if lang_choice == "2":
+            set_language("ru")
+            fixer.save_language("ru")
+            fixer.logger.info("User selected language: Russian")
+            print(locales.get("language_set_ru"))  # Подтверждение выбора
+        else:
+            set_language("en")
+            fixer.save_language("en")
+            fixer.logger.info("User selected language: English")
+            print(locales.get("language_set_en"))  # Подтверждение выбора
 
     try:
         # Показываем начальные инструкции

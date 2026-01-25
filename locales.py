@@ -270,6 +270,14 @@ arising from the use of this program.
                 en="Language set to Russian.",
                 ru="Язык установлен русский."
             ),
+            "language_loaded_en": Translation(
+                en="Language loaded from settings: English",
+                ru="Язык загружен из настроек: Английский"
+            ),
+            "language_loaded_ru": Translation(
+                en="Language loaded from settings: Russian",
+                ru="Язык загружен из настроек: Русский"
+            ),
             "server_management": Translation(
                 en="Server Management:",
                 ru="Управление серверами:"
