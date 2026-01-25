@@ -2,16 +2,13 @@ name: Build AndroidTVTimeFixer
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to confirm build'
+        required: true
   push:
     tags:
       - 'v*'
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,9 +23,9 @@ env:
   PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: src/android_time_fixer.py
-  POETRY_VERSION: '2.1.4'
-  PYINSTALLER_VERSION: '6.15'
-  ADB_VERSION: '36.0.0'
+  POETRY_VERSION: '2.3.1'
+  PYINSTALLER_VERSION: '6.18.0'
+  ADB_VERSION: '36.0.2'
 
 jobs:
   setup-and-build:
@@ -58,7 +55,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+          
+      - name: Require manual confirmation
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm != 'YES'
+        run: exit 1
+        
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
