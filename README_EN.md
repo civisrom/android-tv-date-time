@@ -78,6 +78,18 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 2.  Extract the archive to a convenient location on your computer, for example, `D:\AndroidTVTimeFixer`.
 3.  Run `AndroidTVTimeFixer.exe`.
 
+Run via PowerShell
+
+1.  Open **PowerShell** as an administrator.
+2.  Navigate to the program's folder:
+    ```powershell
+    cd "D:\AndroidTVTimeFixer"
+    ```
+3.  Run the program:
+    ```powershell
+    .\AndroidTVTimeFixer.exe
+    ```
+
 ### Linux
 
 1.  Download the `AndroidTVTimeFixer-linux.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
