@@ -754,8 +754,8 @@ arising from the use of this program.
                 ru="2. Изменить сервер времени NTP на пользовательский"
             ),
             "menu_item_3": Translation(
-                en="3. Show available country codes and NTP servers (can be copied to clipboard)",
-                ru="3. Показать доступные коды стран и серверов NTP (можно копировать в буфер обмена)"
+                en="3. Show country codes with country names and NTP servers",
+                ru="3. Показать коды стран с названиями и NTP-серверами"
             ),
             "menu_item_4": Translation(
                 en="4. Show available alternative NTP servers (can be copied to clipboard)",
@@ -769,9 +769,9 @@ arising from the use of this program.
                 en="6. Server management",
                 ru="6. Управление серверами"
             ),
-            "menu_item_8": Translation(
-                en="7. Country codes explanation (can be copied to clipboard)",
-                ru="7. Расшифровка кодов стран (можно копировать в буфер обмена)"
+            "menu_item_7": Translation(
+                en="7. Network scan & batch NTP update",
+                ru="7. Сканирование сети и групповое обновление NTP"
             ),
             "menu_item_10": Translation(
                 en="9. Exit",
@@ -1022,6 +1022,192 @@ vn: Вьетнам
 
 """
             ),
+            # ─── Merged country codes display ───────────────────────────
+            "available_country_codes_full": Translation(
+                en="\nAvailable country codes (code: country -> NTP server):",
+                ru="\nДоступные коды стран (код: страна -> NTP-сервер):"
+            ),
+
+            # ─── Interactive hints ───────────────────────────────────────
+            "hint_matching": Translation(
+                en="Matching country codes:",
+                ru="Подходящие коды стран:"
+            ),
+            "hint_no_match": Translation(
+                en="No matching country codes found",
+                ru="Совпадений не найдено"
+            ),
+            "hint_type_hint": Translation(
+                en="Tip: enter ? to search by partial name, e.g. ?rus or ?uni",
+                ru="Подсказка: введите ? для поиска по названию, например ?рос или ?сша"
+            ),
+            "enter_country_code_search": Translation(
+                en="Enter country code or ?<text> to search: ",
+                ru="Введите код страны или ?<текст> для поиска: "
+            ),
+
+            # ─── Network scan ────────────────────────────────────────────
+            "submenu_scan_batch": Translation(
+                en="\nNetwork scan & batch operations:",
+                ru="\nСканирование сети и групповые операции:"
+            ),
+            "submenu_scan": Translation(
+                en="1. Scan local network for Android TV devices",
+                ru="1. Сканировать локальную сеть на устройства Android TV"
+            ),
+            "submenu_connect_discovered": Translation(
+                en="2. Connect to discovered device",
+                ru="2. Подключиться к найденному устройству"
+            ),
+            "submenu_batch": Translation(
+                en="3. Batch NTP update (all discovered or entered IPs)",
+                ru="3. Групповое обновление NTP (все найденные или введённые IP)"
+            ),
+            "submenu_time_sync": Translation(
+                en="4. Show device time sync status",
+                ru="4. Статус синхронизации времени устройства"
+            ),
+            "submenu_back": Translation(
+                en="5. Back to main menu",
+                ru="5. Назад в главное меню"
+            ),
+            "scan_start": Translation(
+                en="Scanning network {network} for open ADB port 5555...",
+                ru="Сканирование сети {network} на открытый порт ADB 5555..."
+            ),
+            "scan_progress": Translation(
+                en="  Progress: {checked}/{total} checked, {found} found",
+                ru="  Прогресс: {checked}/{total} проверено, {found} найдено"
+            ),
+            "scan_found": Translation(
+                en="Found {count} device(s) with open ADB port:",
+                ru="Найдено {count} устройств с открытым портом ADB:"
+            ),
+            "scan_none": Translation(
+                en="No Android TV devices found on local network",
+                ru="Устройства Android TV в локальной сети не найдены"
+            ),
+            "scan_local_ip_error": Translation(
+                en="Could not determine local IP address",
+                ru="Не удалось определить локальный IP-адрес"
+            ),
+            "no_discovered_devices": Translation(
+                en="No discovered devices. Run scan first (option 1).",
+                ru="Нет найденных устройств. Сначала запустите сканирование (пункт 1)."
+            ),
+
+            # ─── Batch NTP ───────────────────────────────────────────────
+            "batch_ntp_title": Translation(
+                en="\nBatch NTP server update:",
+                ru="\nГрупповое обновление NTP-сервера:"
+            ),
+            "batch_enter_ntp": Translation(
+                en="Enter NTP server for all devices (or q to cancel): ",
+                ru="Введите NTP-сервер для всех устройств (или q для отмены): "
+            ),
+            "batch_enter_ips": Translation(
+                en="Enter IP addresses separated by comma, or press Enter to use {count} discovered device(s): ",
+                ru="Введите IP-адреса через запятую или Enter для {count} найденных устройств: "
+            ),
+            "batch_no_targets": Translation(
+                en="No target devices. Run network scan first or enter IPs manually.",
+                ru="Нет целевых устройств. Сначала выполните сканирование или введите IP вручную."
+            ),
+            "batch_connecting": Translation(
+                en="  [{idx}/{total}] Connecting to {ip}...",
+                ru="  [{idx}/{total}] Подключение к {ip}..."
+            ),
+            "batch_success": Translation(
+                en="  OK  {ip}: NTP set to {server}",
+                ru="  ОК  {ip}: NTP установлен на {server}"
+            ),
+            "batch_failed": Translation(
+                en="  ERR {ip}: {error}",
+                ru="  ОШ  {ip}: {error}"
+            ),
+            "batch_summary": Translation(
+                en="Batch complete: {success} succeeded, {failed} failed (total {total})",
+                ru="Завершено: {success} успешно, {failed} ошибок (всего {total})"
+            ),
+
+            # ─── Device time sync ────────────────────────────────────────
+            "device_time_title": Translation(
+                en="\nDevice time synchronization status:",
+                ru="\nСтатус синхронизации времени устройства:"
+            ),
+            "device_time": Translation(
+                en="  Device time : {time}",
+                ru="  Время устройства: {time}"
+            ),
+            "pc_time": Translation(
+                en="  PC time     : {time}",
+                ru="  Время ПК        : {time}"
+            ),
+            "time_in_sync": Translation(
+                en="  Status: Synchronized (difference < 60 sec)",
+                ru="  Статус: Синхронизировано (разница < 60 сек)"
+            ),
+            "time_out_of_sync": Translation(
+                en="  Status: OUT OF SYNC — difference: {diff}",
+                ru="  Статус: РАССИНХРОНИЗИРОВАНО — разница: {diff}"
+            ),
+            "device_time_error": Translation(
+                en="Could not read device time: {error}",
+                ru="Не удалось прочитать время устройства: {error}"
+            ),
+
+            # ─── Export / Import settings ────────────────────────────────
+            "export_import_menu": Translation(
+                en="Export / Import settings",
+                ru="Экспорт / Импорт настроек"
+            ),
+            "export_path_prompt": Translation(
+                en="Export file path (Enter = backup.json): ",
+                ru="Путь для экспорта (Enter = backup.json): "
+            ),
+            "import_path_prompt": Translation(
+                en="Import file path: ",
+                ru="Путь к файлу импорта: "
+            ),
+            "export_success": Translation(
+                en="Settings exported to: {path}",
+                ru="Настройки экспортированы в: {path}"
+            ),
+            "export_failed": Translation(
+                en="Export failed: {error}",
+                ru="Ошибка экспорта: {error}"
+            ),
+            "import_success": Translation(
+                en="Settings imported from: {path}",
+                ru="Настройки импортированы из: {path}"
+            ),
+            "import_failed": Translation(
+                en="Import failed: {error}",
+                ru="Ошибка импорта: {error}"
+            ),
+            "import_not_found": Translation(
+                en="File not found: {path}",
+                ru="Файл не найден: {path}"
+            ),
+            "choice_export": Translation(
+                en="1. Export settings to file",
+                ru="1. Экспортировать настройки в файл"
+            ),
+            "choice_import": Translation(
+                en="2. Import settings from file",
+                ru="2. Импортировать настройки из файла"
+            ),
+            "choice_back": Translation(
+                en="3. Back",
+                ru="3. Назад"
+            ),
+
+            # ─── Windows launcher ────────────────────────────────────────
+            "windows_press_enter": Translation(
+                en="\nPress Enter to close this window...",
+                ru="\nНажмите Enter для закрытия окна..."
+            ),
+
             "ntp_verify_before_apply": Translation(
                 en="Verifying NTP server availability before applying...",
                 ru="Проверка доступности NTP-сервера перед применением..."
