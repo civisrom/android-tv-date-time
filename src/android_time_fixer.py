@@ -1018,15 +1018,38 @@ class AndroidTVTimeFixer:
             self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
 
     def get_device_ip_input(self) -> str:
-        """Получает IP адрес устройства с возможностью использования сохранённого"""
+        """Получает IP адрес устройства: сохранённый, ручной ввод или авто-сканирование сети"""
         if self.last_device_ip:
-            print(Fore.GREEN + locales.get('enter_device_ip_with_saved', saved_ip=self.last_device_ip), end="")
-            ip = input(Fore.WHITE).strip()
-            if not ip:  # Если пользователь нажал Enter без ввода
-                ip = self.last_device_ip
+            print(Fore.GREEN + locales.get('enter_device_ip_scan',
+                                           saved_ip=self.last_device_ip), end="")
         else:
-            print(Fore.GREEN + locales.get('enter_device_ip'), end="")
-            ip = input(Fore.WHITE).strip()
+            print(Fore.GREEN + locales.get('enter_device_ip_scan_no_saved'), end="")
+
+        ip = input(Fore.WHITE).strip()
+
+        # Enter без ввода → сохранённый IP
+        if not ip and self.last_device_ip:
+            return self.last_device_ip
+
+        # 's' → авто-сканирование сети
+        if ip.lower() == 's':
+            found = self.scan_network_for_android_devices()
+            if not found:
+                return self.get_device_ip_input()  # повторный запрос
+            raw = input(Fore.GREEN + locales.get("scan_select_device") + Fore.WHITE).strip()
+            if not raw:
+                return self.get_device_ip_input()
+            try:
+                idx = int(raw)
+                if 1 <= idx <= len(found):
+                    selected_ip = found[idx - 1]
+                    self.save_last_ip(selected_ip)
+                    return selected_ip
+            except ValueError:
+                pass
+            print(Fore.RED + locales.get("invalid_input"))
+            return self.get_device_ip_input()
+
         return ip
 
     @staticmethod
@@ -1373,7 +1396,7 @@ class AndroidTVTimeFixer:
         """Проверяет, открыт ли ADB-порт 5555 на указанном IP"""
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(0.35)
+            sock.settimeout(0.2)
             result = sock.connect_ex((ip, 5555))
             sock.close()
             return ip if result == 0 else None
@@ -1381,7 +1404,7 @@ class AndroidTVTimeFixer:
             return None
 
     def scan_network_for_android_devices(self) -> List[str]:
-        """Сканирует локальную сеть в поисках устройств с открытым ADB-портом 5555"""
+        """Сканирует подсеть /16 в поисках устройств с открытым ADB-портом 5555"""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
@@ -1391,7 +1414,8 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("scan_local_ip_error"))
             return []
 
-        network = ipaddress.IPv4Network(f"{local_ip}/24", strict=False)
+        # Расширенный диапазон /16 — покрывает 65 534 хоста
+        network = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
         hosts = [str(h) for h in network.hosts()]
         total = len(hosts)
 
@@ -1400,18 +1424,20 @@ class AndroidTVTimeFixer:
         found: List[str] = []
         checked = 0
 
-        with ThreadPoolExecutor(max_workers=100) as executor:
+        with ThreadPoolExecutor(max_workers=500) as executor:
             futures = {executor.submit(self._check_adb_port, ip): ip for ip in hosts}
             for future in futures:
                 result = future.result()
                 checked += 1
                 if result:
                     found.append(result)
-                print(
-                    Fore.CYAN + f"\r  {checked}/{total} " +
-                    locales.get("scan_progress", checked=checked, total=total, found=len(found)),
-                    end="", flush=True
-                )
+                # Обновляем прогресс каждые 200 хостов, чтобы не замедлять консоль
+                if checked % 200 == 0 or checked == total:
+                    print(
+                        Fore.CYAN + "\r  " +
+                        locales.get("scan_progress", checked=checked, total=total, found=len(found)),
+                        end="", flush=True
+                    )
         print()  # новая строка после прогресса
 
         if found:
@@ -1827,6 +1853,7 @@ def main():
         print(Fore.YELLOW + locales.get("auto_time_date"))
         print(Fore.YELLOW + locales.get("network_requirement"))
         print(Fore.YELLOW + locales.get("reboot_device"))
+        print(Fore.YELLOW + locales.get("firewall_notice"))
         input(Fore.WHITE + locales.get("press_enter_to_continue"))
 
         # Генерируем ключи ADB

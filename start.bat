@@ -1,11 +1,10 @@
 @echo off
 :: ============================================================
 :: Android TV Time Fixer — Windows Launcher
-:: Двойной клик запускает программу через PowerShell
-:: Double-click opens the program in PowerShell
+:: Double-click opens the program in a new PowerShell window
+:: Двойной клик открывает программу в окне PowerShell
 :: ============================================================
 
-:: Переходим в каталог .bat файла
 cd /d "%~dp0"
 
 :: Проверяем существование exe
@@ -20,6 +19,6 @@ if not exist "%~dp0AndroidTVTimeFixer.exe" (
     exit /b 1
 )
 
-:: Запускаем в PowerShell с UTF-8 и в текущем окне
-powershell.exe -NoLogo -ExecutionPolicy Bypass ^
-    -Command "& { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8; [Console]::InputEncoding=[System.Text.Encoding]::UTF8; $env:PYTHONIOENCODING='utf-8'; Set-Location '%~dp0'; & '.\AndroidTVTimeFixer.exe' }"
+:: Открываем НОВОЕ окно PowerShell и закрываем cmd
+start "Android TV Time Fixer" powershell.exe -NoLogo -ExecutionPolicy Bypass -File "%~dp0start.ps1"
+exit

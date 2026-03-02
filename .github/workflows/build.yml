@@ -146,7 +146,10 @@ jobs:
           cd dist
           PLATFORM_LOWER=$(echo "${{ matrix.platform }}" | tr '[:upper:]' '[:lower:]')
           if [ "${{ runner.os }}" == "Windows" ]; then
-            7z a -tzip "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}.exe"
+            # Включаем start.bat и start.ps1 в Windows-архив
+            cp ../start.bat . 2>/dev/null || true
+            cp ../start.ps1 . 2>/dev/null || true
+            7z a -tzip "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}.exe" start.bat start.ps1
           else
             chmod +x "${{ env.APP_NAME }}"
             zip -j "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}"

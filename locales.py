@@ -70,6 +70,10 @@ arising from the use of this program.
                 en="4. Reboot your TV or Nvidia Shield before using this program.",
                 ru="4. Сделайте перезагрузку вашего ТВ или Nvidia Shield перед использованием программы."
             ),
+            "firewall_notice": Translation(
+                en="5. Allow this program through your firewall when prompted (required for network scanning and ADB connections).",
+                ru="5. Разрешите программу в файрволле (брандмауэре) при появлении запроса (необходимо для сканирования сети и ADB-подключений)."
+            ),
             "press_enter_to_continue": Translation(
                 en="\nPress Enter to continue...",
                 ru="\nНажмите Enter, чтобы продолжить..."
@@ -754,8 +758,8 @@ arising from the use of this program.
                 ru="2. Изменить сервер времени NTP на пользовательский"
             ),
             "menu_item_3": Translation(
-                en="3. Show country codes with country names and NTP servers",
-                ru="3. Показать коды стран с названиями и NTP-серверами"
+                en="3. Show country codes with country names and NTP servers (can be copied to clipboard)",
+                ru="3. Показать коды стран с названиями и NTP-серверами (можно копировать в буфер обмена)"
             ),
             "menu_item_4": Translation(
                 en="4. Show available alternative NTP servers (can be copied to clipboard)",
@@ -1070,6 +1074,18 @@ vn: Вьетнам
             "submenu_back": Translation(
                 en="5. Back to main menu",
                 ru="5. Назад в главное меню"
+            ),
+            "enter_device_ip_scan": Translation(
+                en="Enter device IP (press Enter for saved: {saved_ip}, or 's' to scan network): ",
+                ru="Введите IP устройства (Enter для сохранённого: {saved_ip}, или 's' для сканирования): "
+            ),
+            "enter_device_ip_scan_no_saved": Translation(
+                en="Enter device IP (or 's' to scan network): ",
+                ru="Введите IP устройства (или 's' для сканирования сети): "
+            ),
+            "scan_select_device": Translation(
+                en="Select device number (or Enter to cancel): ",
+                ru="Выберите номер устройства (или Enter для отмены): "
             ),
             "scan_start": Translation(
                 en="Scanning network {network} for open ADB port 5555...",
