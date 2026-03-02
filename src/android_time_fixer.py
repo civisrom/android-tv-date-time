@@ -48,9 +48,6 @@ class ADBProcessManager:
         при выходе из программы или закрытии терминала
         """
         try:
-            # Сначала отключаем устройство
-            self.disconnect_device()
-            
             # Регистрация обработчиков завершения
             atexit.register(self.terminate_adb_processes)
             
@@ -141,13 +138,10 @@ class ADBProcessManager:
     def _terminate_via_psutil(self):
         """
         Завершение процессов через psutil
-        
+
         Returns:
             bool: Успешность завершения
         """
-        # Сначала отключаем устройство
-        self.disconnect_device()
-
         terminated = False
         try:
             for proc in psutil.process_iter(['name', 'exe']):
@@ -177,9 +171,6 @@ class ADBProcessManager:
 
     def _terminate_windows_processes(self):
         """Расширенное завершение процессов ADB в Windows"""
-        # Сначала отключаем устройство
-        self.disconnect_device()
-
         try:
             # 1. Завершение через taskkill
             subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
@@ -202,9 +193,6 @@ class ADBProcessManager:
         Завершение процессов ADB с использованием WMI
         Работает только в Windows
         """
-        # Сначала отключаем устройство
-        self.disconnect_device()
-
         if wmi is None:
             self.logger.warning("WMI module not available")
             return
@@ -238,9 +226,6 @@ class ADBProcessManager:
 
     def _terminate_unix_processes(self):
         """Завершение процессов ADB в Unix-системах"""
-        # Сначала отключаем устройство
-        self.disconnect_device()
-
         try:
             subprocess.run(['pkill', '-9', 'adb'], 
                            stdout=subprocess.DEVNULL, 
@@ -278,6 +263,7 @@ class AndroidTVTimeFixer:
         self._adb_path = self.get_adb_path()
         self.process_manager = ADBProcessManager(self._adb_path)
         self.device = None
+        self.connected_ip = None
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
@@ -447,8 +433,12 @@ class AndroidTVTimeFixer:
                 from hooks.win_hook import ADB_PATH
                 self._adb_path = ADB_PATH
             except ImportError:
-                from hooks.linux_hook import ADB_PATH
-                self._adb_path = ADB_PATH
+                try:
+                    from hooks.linux_hook import ADB_PATH
+                    self._adb_path = ADB_PATH
+                except ImportError:
+                    from hooks.macos_hook import ADB_PATH
+                    self._adb_path = ADB_PATH
         except ImportError:
             # Fallback для разработки
             if getattr(sys, 'frozen', False):
@@ -486,13 +476,6 @@ class AndroidTVTimeFixer:
                     break
                 if output:
                     clean_output = output.strip()
-                    if sys.platform == 'win32':
-                        try:
-                            # Пробуем декодировать как cp866 (кодировка командной строки Windows)
-                            clean_output = clean_output.encode('cp866').decode('cp866')
-                        except UnicodeEncodeError:
-                            # Если не получилось, оставляем как есть
-                            pass
                     stdout_lines.append(clean_output)
                     print(Fore.GREEN + clean_output)
 
@@ -693,9 +676,6 @@ class AndroidTVTimeFixer:
         self.logger.info("Terminal mode started")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
-        
-        # Выполняем завершение процессов ADB при входе в терминальный режим
-        self.process_manager.terminate_adb_processes()
 
         try:
             while True:
@@ -1011,6 +991,107 @@ class AndroidTVTimeFixer:
             self.saved_servers['favorite_servers'].append(server)
             self.save_servers()
 
+    def remove_from_favorites(self, server: str):
+        """Удаляет сервер из избранного"""
+        if server in self.saved_servers['favorite_servers']:
+            self.saved_servers['favorite_servers'].remove(server)
+            self.save_servers()
+
+    def server_management_menu(self) -> None:
+        """Подменю управления серверами"""
+        while True:
+            print(Fore.GREEN + "\n" + locales.get("server_management"))
+            print(Fore.YELLOW + "1. " + locales.get("show_favorite_servers"))
+            print(Fore.YELLOW + "2. " + locales.get("add_current_server_to_favorites"))
+            print(Fore.YELLOW + "3. " + locales.get("copy_server_to_clipboard"))
+            print(Fore.YELLOW + "4. " + locales.get("paste_server_from_clipboard"))
+            print(Fore.YELLOW + "5. " + locales.get("remove_server_from_favorites"))
+            print(Fore.YELLOW + "6. " + locales.get("ping_servers").replace("6. ", ""))
+            print(Fore.YELLOW + "7. " + locales.get("return_to_main_menu"))
+
+            choice = input(Fore.GREEN + locales.get("select_action") + " " + Fore.WHITE).strip()
+
+            if choice == '1':
+                favorites = self.saved_servers.get('favorite_servers', [])
+                if favorites:
+                    print(Fore.GREEN + locales.get("favorite_servers_list"))
+                    for i, server in enumerate(favorites, 1):
+                        print(Fore.WHITE + f"  {i}. {server}")
+                else:
+                    print(Fore.YELLOW + locales.get("no_favorite_servers"))
+
+            elif choice == '2':
+                if not self.device:
+                    print(Fore.RED + locales.get("connect_device_first"))
+                    continue
+                try:
+                    current_ntp = self.get_current_ntp()
+                    if current_ntp and current_ntp != 'null':
+                        self.add_to_favorites(current_ntp)
+                        print(Fore.GREEN + locales.get("server_added_to_favorites", server=current_ntp))
+                    else:
+                        print(Fore.RED + locales.get("no_device_connected"))
+                except AndroidTVTimeFixerError as e:
+                    print(Fore.RED + locales.get("error_message", error=str(e)))
+
+            elif choice == '3':
+                if not self.device:
+                    print(Fore.RED + locales.get("connect_device_first"))
+                    continue
+                try:
+                    current_ntp = self.get_current_ntp()
+                    if self.copy_server_to_clipboard(current_ntp):
+                        print(Fore.GREEN + locales.get("server_copied_to_clipboard", server=current_ntp))
+                    else:
+                        print(Fore.RED + locales.get("failed_to_copy_server"))
+                except AndroidTVTimeFixerError as e:
+                    print(Fore.RED + locales.get("error_message", error=str(e)))
+
+            elif choice == '4':
+                try:
+                    server = self.paste_server_from_clipboard()
+                    if server and server.strip():
+                        server = server.strip()
+                        if self.validate_ntp_server(server):
+                            print(Fore.GREEN + locales.get("server_set_from_clipboard", server=server))
+                            if self.device:
+                                self.fix_time(server)
+                                print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=server))
+                        else:
+                            print(Fore.RED + locales.get("invalid_ntp_server_format"))
+                    else:
+                        print(Fore.YELLOW + locales.get("clipboard_empty_or_unavailable"))
+                except Exception as e:
+                    print(Fore.RED + locales.get("error_occurred", error=str(e)))
+
+            elif choice == '5':
+                favorites = self.saved_servers.get('favorite_servers', [])
+                if not favorites:
+                    print(Fore.YELLOW + locales.get("no_favorite_servers"))
+                    continue
+                print(Fore.GREEN + locales.get("choose_server_to_remove"))
+                for i, server in enumerate(favorites, 1):
+                    print(Fore.WHITE + f"  {i}. {server}")
+                try:
+                    num = int(input(Fore.GREEN + locales.get("enter_server_number") + " " + Fore.WHITE).strip())
+                    if 1 <= num <= len(favorites):
+                        removed = favorites[num - 1]
+                        self.remove_from_favorites(removed)
+                        print(Fore.GREEN + locales.get("server_removed_from_favorites", server=removed))
+                    else:
+                        print(Fore.RED + locales.get("invalid_number"))
+                except ValueError:
+                    print(Fore.RED + locales.get("enter_valid_number"))
+
+            elif choice == '6':
+                self.logger.info("Submenu: Ping NTP servers")
+                self.ping_ntp_servers()
+
+            elif choice == '7':
+                break
+            else:
+                print(Fore.RED + locales.get("invalid_choice"))
+
     @staticmethod
     def validate_ip(ip: str) -> bool:
         pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
@@ -1091,6 +1172,35 @@ class AndroidTVTimeFixer:
         print(Fore.GREEN + locales.get("current_device_info"))
         print(result.stdout)
     
+    def connect_or_reuse(self, ip: str) -> None:
+        """Подключается к устройству или переиспользует существующее соединение"""
+        if self.device and self.connected_ip == ip:
+            try:
+                # Проверяем, что соединение ещё активно
+                self.device.shell('echo ok')
+                self.logger.info(f"Reusing existing connection to {ip}")
+                print(Fore.GREEN + locales.get("connection_reused", ip=ip))
+                return
+            except Exception:
+                # Соединение потеряно, переподключаемся
+                self.device = None
+                self.connected_ip = None
+        self.connect(ip)
+
+    def verify_ntp_server(self, server: str) -> bool:
+        """Проверяет доступность NTP-сервера перед применением"""
+        print(Fore.CYAN + locales.get("ntp_verify_before_apply"))
+        try:
+            ntp_client = ntplib.NTPClient()
+            start_time = time.time()
+            ntp_client.request(server, version=3, timeout=3)
+            rtt = (time.time() - start_time) * 1000
+            print(Fore.GREEN + locales.get("ntp_verify_success", server=server, rtt=rtt))
+            return True
+        except Exception:
+            response = input(Fore.YELLOW + locales.get("ntp_verify_failed", server=server) + Fore.WHITE).strip()
+            return response.lower() in ('y', 'yes', 'д', 'да')
+
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
         if not self.validate_ip(ip):
@@ -1111,6 +1221,8 @@ class AndroidTVTimeFixer:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 connection_established = True
+                self.connected_ip = ip
+                self.process_manager.device_ip = ip
                 self.logger.info(locales.get_en('connection_success', ip=ip))
                 break
             except Exception as e:
@@ -1156,7 +1268,10 @@ class AndroidTVTimeFixer:
     def fix_time(self, ntp_server: str) -> None:
         if not self.device:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
-        
+
+        if not self.verify_ntp_server(ntp_server):
+            return
+
         self.set_ntp_server(ntp_server)
 
     def show_country_codes(self) -> None:
@@ -1328,7 +1443,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_3"))
             print(Fore.YELLOW + locales.get("menu_item_4"))
             print(Fore.YELLOW + locales.get("menu_item_5"))
-            print(Fore.YELLOW + locales.get("ping_servers"))
+            print(Fore.YELLOW + locales.get("menu_item_6"))
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
@@ -1342,12 +1457,14 @@ def main():
                 fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
-                        fixer.connect(ip)
-                        fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.connect_or_reuse(ip)
+                        fixer.save_last_ip(ip)
                         fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_current_settings()
                         print(Fore.GREEN + locales.get('enter_country_code'), end="")
                         code = input(Fore.WHITE).strip()
+                        if code.lower() == 'q':
+                            continue
                         fixer.logger.info(f"User entered country code: {code}")
                         if fixer.validate_country_code(code):
                             try:
@@ -1377,8 +1494,8 @@ def main():
                 fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
-                        fixer.connect(ip)
-                        fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.connect_or_reuse(ip)
+                        fixer.save_last_ip(ip)
                         fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_current_settings()
                         fixer.set_custom_ntp()
@@ -1403,8 +1520,8 @@ def main():
                 fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
-                        fixer.connect(ip)
-                        fixer.save_last_ip(ip)  # Сохраняем IP после успешного подключения
+                        fixer.connect_or_reuse(ip)
+                        fixer.save_last_ip(ip)
                         fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_device_info()
                     except AndroidTVTimeFixerError as e:
@@ -1415,8 +1532,8 @@ def main():
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '6':
-                fixer.logger.info("Menu: Ping NTP servers")
-                fixer.ping_ntp_servers()
+                fixer.logger.info("Menu: Server management")
+                fixer.server_management_menu()
 
             elif choice == '7':
                 fixer.logger.info("Menu: Show country codes description")

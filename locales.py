@@ -60,7 +60,7 @@ arising from the use of this program.
             ),
             "auto_time_date": Translation(
                 en="2. Set time and date to automatic mode:",
-                ru="2. Установите время и дату в автоматический режим: Настройки > Настройки устройства > Дата и Время > Автонастройка доты и времени > Использовать время сити"
+                ru="2. Установите время и дату в автоматический режим: Настройки > Настройки устройства > Дата и Время > Автонастройка даты и времени > Использовать время сети"
             ),
             "network_requirement": Translation(
                 en="3. Your TV, Nvidia Shield, and PC must be connected to the same network.",
@@ -856,23 +856,9 @@ arising from the use of this program.
                 en="Checking NTP server connectivity (may take time)...",
                 ru="Проверка доступности NTP-серверов (может занять время)..."
             ),
-            
-            # Setup instructions
-            "adb_setup": Translation(
-                en="1. Enable ADB debugging on your TV or Nvidia Shield:",
-                ru="1. Включите отладку ADB на вашем ТВ или Nvidia Shield:"
-            ),
-            "adb_steps": Translation(
-                en="   Settings > Device Preferences > About > Build (press 7 times or more)",
-                ru="   Настройки > Настройки устройства > Об устройстве > Сборка (нажмите 7 раз или более)"
-            ),
-            "adb_network": Translation(
-                en="   Then: Device Preferences > Developer options > Network debugging (Enable)",
-                ru="   Затем: Настройки устройства > Для разработчиков > Отладка по сети (Включить)"
-            ),
 
             "country_codes_description": Translation(
-                en="\nCountry code decryption (can be copied to clipboard):",
+                en="\nCountry code description (can be copied to clipboard):",
                 ru="\nРасшифровка кодов стран (копируем в буфер обмена наприм. ru и вставляем в пункте 1 глав. меню):"
             ),
             "country_codes": Translation(
@@ -923,7 +909,6 @@ au: Australia
 cn: China
 jp: Japan
 kz: Kazakhstan
-uk: United Kingdom
 ae: United Arab Emirates
 am: Armenia
 az: Azerbaijan
@@ -935,11 +920,9 @@ id: Indonesia
 il: Israel
 in: India
 ir: Iran
-jp: Japan
 kg: Kyrgyzstan
 kh: Cambodia
 kr: Korea
-kz: Kazakhstan
 lk: Sri Lanka
 mn: Mongolia
 mv: Maldives
@@ -1005,7 +988,6 @@ au: Австралия
 cn: Китай
 jp: Япония
 kz: Казахстан
-uk: Великобритания
 ae: Объединённые Арабские Эмираты
 am: Армения
 az: Азербайджан
@@ -1017,11 +999,9 @@ id: Индонезия
 il: Израиль
 in: Индия
 ir: Иран
-jp: Япония
 kg: Кыргызстан
 kh: Камбоджа
 kr: Корея
-kz: Казахстан
 lk: Шри-Ланка
 mn: Монголия
 mv: Мальдивы
@@ -1041,6 +1021,26 @@ ua: Украина
 vn: Вьетнам
 
 """
+            ),
+            "ntp_verify_before_apply": Translation(
+                en="Verifying NTP server availability before applying...",
+                ru="Проверка доступности NTP-сервера перед применением..."
+            ),
+            "ntp_verify_success": Translation(
+                en="NTP server {server} is reachable (RTT: {rtt:.1f}ms)",
+                ru="NTP-сервер {server} доступен (RTT: {rtt:.1f}мс)"
+            ),
+            "ntp_verify_failed": Translation(
+                en="Warning: NTP server {server} is not reachable. Apply anyway? (y/n): ",
+                ru="Внимание: NTP-сервер {server} недоступен. Применить всё равно? (y/n): "
+            ),
+            "connection_reused": Translation(
+                en="Using existing connection to {ip}",
+                ru="Используется существующее подключение к {ip}"
+            ),
+            "reconnect_or_reuse": Translation(
+                en="Already connected to {ip}. Use existing connection? (y/n): ",
+                ru="Уже подключено к {ip}. Использовать текущее подключение? (y/n): "
             ),
             "exit_message": Translation(
                 en="\nExiting the program...",
@@ -1108,9 +1108,5 @@ def set_language(language_code: str) -> None:
     except KeyError:
         print(f"Unsupported language code: {language_code}")
 
-# Example usage
-set_language('RU')  # Set language to Russian
-show_disclaimer()   # Display disclaimer in Russian
-
-set_language('EN')  # Set language to English
-show_disclaimer()   # Display disclaimer in English
+# Note: Do not call set_language/show_disclaimer at module level
+# to avoid printing disclaimers on every import
