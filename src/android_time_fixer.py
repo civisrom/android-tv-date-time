@@ -1313,19 +1313,41 @@ class AndroidTVTimeFixer:
                 self.connected_ip = None
         self.connect(ip)
 
-    def verify_ntp_server(self, server: str) -> bool:
-        """Проверяет доступность NTP-сервера перед применением"""
+    def verify_ntp_server(self, server: str, count: int = 3, timeout: int = 3) -> bool:
+        """Проверяет что NTP-сервер действительно синхронизирует время (не просто доступен)"""
         print(Fore.CYAN + locales.get("ntp_verify_before_apply"))
-        try:
-            ntp_client = ntplib.NTPClient()
-            start_time = time.time()
-            ntp_client.request(server, version=3, timeout=3)
-            rtt = (time.time() - start_time) * 1000
-            print(Fore.GREEN + locales.get("ntp_verify_success", server=server, rtt=rtt))
-            return True
-        except Exception:
+        ntp_client = ntplib.NTPClient()
+        rtts = []
+        offsets = []
+
+        for i in range(count):
+            try:
+                start_time = time.time()
+                response = ntp_client.request(server, version=3, timeout=timeout)
+                rtt = (time.time() - start_time) * 1000
+                rtts.append(rtt)
+                offsets.append(response.offset)
+            except Exception:
+                pass
+
+        if not rtts:
             response = input(Fore.YELLOW + locales.get("ntp_verify_failed", server=server) + Fore.WHITE).strip()
             return response.lower() in ('y', 'yes', 'д', 'да')
+
+        success_rate = (len(rtts) / count) * 100
+        avg_rtt = sum(rtts) / len(rtts)
+        avg_offset = sum(offsets) / len(offsets)
+
+        # Проверяем что offset адекватный (сервер реально синхронизирует время)
+        if abs(avg_offset) > 60:
+            print(Fore.RED + locales.get("ntp_verify_bad_offset", server=server, offset=avg_offset))
+            response = input(Fore.YELLOW + locales.get("ntp_verify_force_apply") + Fore.WHITE).strip()
+            return response.lower() in ('y', 'yes', 'д', 'да')
+
+        print(Fore.GREEN + locales.get("ntp_verify_detailed",
+                                       server=server, rtt=avg_rtt,
+                                       success=success_rate, offset=avg_offset))
+        return True
 
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
@@ -1818,6 +1840,141 @@ class AndroidTVTimeFixer:
             'offset': avg_offset
         }
 
+    # Маппинг timezone-префиксов на коды стран и региональные пулы
+    _tz_to_countries = {
+        'Europe/Moscow': ['ru'], 'Europe/Kaliningrad': ['ru'], 'Europe/Samara': ['ru'],
+        'Europe/Volgograd': ['ru'], 'Asia/Yekaterinburg': ['ru'], 'Asia/Omsk': ['ru'],
+        'Asia/Novosibirsk': ['ru'], 'Asia/Krasnoyarsk': ['ru'], 'Asia/Irkutsk': ['ru'],
+        'Asia/Yakutsk': ['ru'], 'Asia/Vladivostok': ['ru'], 'Asia/Kamchatka': ['ru'],
+        'Europe/Kiev': ['ua'], 'Europe/Kyiv': ['ua'],
+        'Europe/Minsk': ['by'],
+        'Asia/Almaty': ['kz'], 'Asia/Aqtau': ['kz'], 'Asia/Aqtobe': ['kz'],
+        'Asia/Tashkent': ['uz'], 'Asia/Samarkand': ['uz'],
+        'Asia/Tbilisi': ['ge'],
+        'Asia/Baku': ['az'],
+        'Asia/Yerevan': ['am'],
+        'Europe/Berlin': ['de'], 'Europe/Vienna': ['at'], 'Europe/Zurich': ['ch'],
+        'Europe/Paris': ['fr'], 'Europe/London': ['uk'],
+        'Europe/Rome': ['it'], 'Europe/Madrid': ['es'],
+        'Europe/Amsterdam': ['nl'], 'Europe/Brussels': ['be'],
+        'Europe/Warsaw': ['pl'], 'Europe/Prague': ['cz'],
+        'Europe/Budapest': ['hu'], 'Europe/Bucharest': ['ro'],
+        'Europe/Sofia': ['bg'], 'Europe/Helsinki': ['fi'],
+        'Europe/Stockholm': ['se'], 'Europe/Oslo': ['no'],
+        'Europe/Copenhagen': ['dk'], 'Europe/Lisbon': ['pt'],
+        'Europe/Athens': ['gr'], 'Europe/Istanbul': ['tr'],
+        'Europe/Belgrade': ['rs'], 'Europe/Zagreb': ['hr'],
+        'Europe/Ljubljana': ['si'], 'Europe/Bratislava': ['sk'],
+        'Europe/Vilnius': ['lt'], 'Europe/Riga': ['lv'],
+        'Europe/Tallinn': ['ee'], 'Europe/Chisinau': ['md'],
+        'Europe/Dublin': ['ie'], 'Europe/Reykjavik': ['is'],
+        'Europe/Luxembourg': ['lu'],
+        'America/New_York': ['us'], 'America/Chicago': ['us'],
+        'America/Denver': ['us'], 'America/Los_Angeles': ['us'],
+        'America/Toronto': ['ca'], 'America/Vancouver': ['ca'],
+        'America/Sao_Paulo': ['br'], 'America/Argentina/Buenos_Aires': ['br'],
+        'Australia/Sydney': ['au'], 'Australia/Melbourne': ['au'],
+        'Asia/Tokyo': ['jp'], 'Asia/Seoul': ['kr'],
+        'Asia/Shanghai': ['cn'], 'Asia/Hong_Kong': ['hk'],
+        'Asia/Taipei': ['tw'], 'Asia/Singapore': ['sg'],
+        'Asia/Bangkok': ['th'], 'Asia/Jakarta': ['id'],
+        'Asia/Kolkata': ['in'], 'Asia/Karachi': ['pk'],
+        'Asia/Dubai': ['ae'], 'Asia/Riyadh': ['sa'],
+        'Asia/Tehran': ['ir'], 'Asia/Jerusalem': ['il'],
+        'Asia/Dhaka': ['bd'], 'Asia/Colombo': ['lk'],
+        'Asia/Kuala_Lumpur': ['my'], 'Asia/Manila': ['ph'],
+        'Asia/Phnom_Penh': ['kh'], 'Asia/Ulaanbaatar': ['mn'],
+        'Asia/Kathmandu': ['np'], 'Asia/Bishkek': ['kg'],
+        'Asia/Dushanbe': ['tj'], 'Asia/Ho_Chi_Minh': ['vn'],
+        'Asia/Bahrain': ['bh'], 'Asia/Qatar': ['qa'],
+    }
+
+    # Маппинг континентов из timezone на региональные пулы
+    _tz_region_pools = {
+        'Europe': ['0.europe.pool.ntp.org', '1.europe.pool.ntp.org',
+                    '2.europe.pool.ntp.org', '3.europe.pool.ntp.org'],
+        'America': ['0.north-america.pool.ntp.org', '1.north-america.pool.ntp.org',
+                     '2.north-america.pool.ntp.org', '3.north-america.pool.ntp.org',
+                     '0.south-america.pool.ntp.org', '1.south-america.pool.ntp.org',
+                     '2.south-america.pool.ntp.org', '3.south-america.pool.ntp.org'],
+        'Asia': ['0.asia.pool.ntp.org', '1.asia.pool.ntp.org',
+                  '2.asia.pool.ntp.org', '3.asia.pool.ntp.org'],
+        'Australia': ['0.oceania.pool.ntp.org', '1.oceania.pool.ntp.org',
+                       '2.oceania.pool.ntp.org', '3.oceania.pool.ntp.org'],
+        'Pacific': ['0.oceania.pool.ntp.org', '1.oceania.pool.ntp.org',
+                      '2.oceania.pool.ntp.org', '3.oceania.pool.ntp.org'],
+        'Africa': ['0.africa.pool.ntp.org', '1.africa.pool.ntp.org',
+                    '2.africa.pool.ntp.org', '3.africa.pool.ntp.org'],
+    }
+
+    def _detect_user_region(self) -> Tuple[List[str], List[str]]:
+        """
+        Определяет локацию пользователя по системному timezone.
+        Возвращает (priority_servers, region_name_parts) — серверы для приоритетной проверки.
+        """
+        try:
+            tz_name = time.tzname[0] if time.tzname else ''
+            # Пытаемся получить IANA timezone
+            try:
+                import zoneinfo
+                tz_key = str(datetime.datetime.now().astimezone().tzinfo)
+            except Exception:
+                tz_key = ''
+
+            # Пробуем через datetime
+            if not tz_key or tz_key in ('UTC', 'GMT'):
+                try:
+                    tz_key = str(datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo)
+                except Exception:
+                    pass
+
+            # Определяем timezone через /etc/timezone или /etc/localtime
+            if not tz_key or len(tz_key) < 4:
+                try:
+                    with open('/etc/timezone', 'r') as f:
+                        tz_key = f.read().strip()
+                except Exception:
+                    try:
+                        link = os.readlink('/etc/localtime')
+                        # /usr/share/zoneinfo/Europe/Moscow -> Europe/Moscow
+                        if 'zoneinfo/' in link:
+                            tz_key = link.split('zoneinfo/')[-1]
+                    except Exception:
+                        pass
+
+            if not tz_key:
+                return [], []
+
+            priority = []
+
+            # 1. Точное совпадение timezone -> страна
+            for tz, codes in self._tz_to_countries.items():
+                if tz_key == tz or tz_key.endswith(tz):
+                    for code in codes:
+                        if code in self.ntp_servers:
+                            priority.append(self.ntp_servers[code])
+                    break
+
+            # 2. Региональные пулы по континенту из timezone
+            continent = tz_key.split('/')[0] if '/' in tz_key else ''
+            region_pools = self._tz_region_pools.get(continent, [])
+            for pool in region_pools:
+                if pool not in priority:
+                    priority.append(pool)
+
+            # 3. Соседние страны того же континента
+            for tz, codes in self._tz_to_countries.items():
+                if tz.startswith(continent + '/'):
+                    for code in codes:
+                        srv = self.ntp_servers.get(code, '')
+                        if srv and srv not in priority:
+                            priority.append(srv)
+
+            return priority, [tz_key, continent]
+
+        except Exception:
+            return [], []
+
     def auto_setup_ntp(self) -> None:
         """Полная автоматизация: сканирование → подключение → выбор лучшего NTP → установка"""
         # Шаг 1: Сканирование сети
@@ -1857,7 +2014,13 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("error_message", error=str(e)))
             return
 
-        # Шаг 4: Проверка NTP-серверов (3 попытки, валидация offset)
+        # Шаг 4: Определение локации и проверка NTP-серверов
+        priority_servers, region_info = self._detect_user_region()
+        if region_info:
+            print(Fore.GREEN + locales.get("auto_region_detected",
+                                           timezone=region_info[0], region=region_info[1]))
+            print(Fore.CYAN + locales.get("auto_priority_count", count=len(priority_servers)))
+
         print(Fore.CYAN + locales.get("auto_checking_ntp"))
         all_servers = list(dict.fromkeys(
             list(self.ntp_servers.values()) + self.custom_ntp_servers
@@ -1887,8 +2050,13 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("auto_no_reachable_servers"))
             return
 
-        # Сортировка как в пункте 6: сначала по success_rate (убыв.), потом по avg_rtt (возр.)
-        results.sort(key=lambda x: (-x['success_rate'], x['avg_rtt']))
+        # Сортировка: приоритет локальным серверам, затем success_rate (убыв.) и avg_rtt (возр.)
+        priority_set = set(priority_servers)
+        results.sort(key=lambda x: (
+            x['server'] not in priority_set,  # False (0) для приоритетных — они первые
+            -x['success_rate'],
+            x['avg_rtt']
+        ))
 
         # Шаг 5: Показать топ-5
         print(Fore.GREEN + locales.get("auto_top_servers"))

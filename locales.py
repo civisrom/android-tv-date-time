@@ -1224,16 +1224,24 @@ vn: Вьетнам
             ),
 
             "ntp_verify_before_apply": Translation(
-                en="Verifying NTP server availability before applying...",
-                ru="Проверка доступности NTP-сервера перед применением..."
+                en="Verifying NTP server time sync (3 attempts)...",
+                ru="Проверка синхронизации времени NTP-сервера (3 попытки)..."
             ),
-            "ntp_verify_success": Translation(
-                en="NTP server {server} is reachable (RTT: {rtt:.1f}ms)",
-                ru="NTP-сервер {server} доступен (RTT: {rtt:.1f}мс)"
+            "ntp_verify_detailed": Translation(
+                en="NTP server {server} is working correctly:\n  RTT: {rtt:.1f}ms | Success: {success:.0f}% | Offset: {offset:.3f}s",
+                ru="NTP-сервер {server} работает корректно:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
             ),
             "ntp_verify_failed": Translation(
-                en="Warning: NTP server {server} is not reachable. Apply anyway? (y/n): ",
-                ru="Внимание: NTP-сервер {server} недоступен. Применить всё равно? (y/n): "
+                en="Warning: NTP server {server} is not reachable (0/3 attempts). Apply anyway? (y/n): ",
+                ru="Внимание: NTP-сервер {server} недоступен (0/3 попыток). Применить всё равно? (y/n): "
+            ),
+            "ntp_verify_bad_offset": Translation(
+                en="Warning: NTP server {server} responds but time offset is too large ({offset:.1f}s). Server may not sync time correctly.",
+                ru="Внимание: NTP-сервер {server} отвечает, но смещение времени слишком большое ({offset:.1f}с). Сервер может некорректно синхронизировать время."
+            ),
+            "ntp_verify_force_apply": Translation(
+                en="Apply this server anyway? (y/n): ",
+                ru="Всё равно применить этот сервер? (y/n): "
             ),
             "connection_reused": Translation(
                 en="Using existing connection to {ip}",
@@ -1346,6 +1354,14 @@ vn: Вьетнам
             "auto_server_success": Translation(
                 en="Success",
                 ru="Успех"
+            ),
+            "auto_region_detected": Translation(
+                en="[Auto] Your region detected: {timezone} ({region})",
+                ru="[Авто] Ваш регион определён: {timezone} ({region})"
+            ),
+            "auto_priority_count": Translation(
+                en="[Auto] {count} regional servers will be prioritized",
+                ru="[Авто] {count} региональных серверов будут проверены в приоритете"
             ),
         }
 
