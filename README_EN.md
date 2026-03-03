@@ -30,16 +30,19 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 *   **Multilingual Interface:**
     *   Support for English and Russian languages
     *   Language selection at program startup
+    *   Automatic saving and loading of selected language
 
 *   **NTP Server Modification:**
     *   Automatic setup by country code (65+ countries)
     *   Manual setup of a custom NTP server
-    *   Input validation
+    *   Input validation (domain names and IP addresses)
+    *   NTP server availability check before applying
+    *   Interactive hints and country name search
 
 *   **Information Display:**
-    *   List of available country codes and NTP servers
+    *   List of available country codes with names and NTP servers
     *   List of alternative NTP servers (regional pools, Cloudflare, Google, etc.)
-    *   Country code descriptions
+    *   Interactive search by code or country name
 
 *   **Detailed Device Information:**
     *   Model and manufacturer
@@ -47,16 +50,33 @@ Many televisions and Android TV boxes, particularly in regions with network rest
     *   Serial number
     *   CPU architecture and core count
     *   RAM capacity
-    *   Screen resolution
+    *   Screen resolution and density
     *   Network parameters (IP, MAC address)
     *   Current NTP server
-    *   And much more
+    *   Battery status, timezone, locale
+    *   Device uptime
+    *   Comparison of device time vs PC time
 
-*   **NTP Server Testing:**
+*   **Server Management:**
+    *   Favorite servers (add, remove, view)
+    *   Copy/paste servers to/from clipboard
     *   Ping all available NTP servers (110+)
     *   Display response time (RTT)
     *   Success rate percentage
     *   Sorting by availability and speed
+    *   Export/import settings to JSON
+
+*   **Network Scan & Batch Operations:**
+    *   Automatic local network scanning for Android TV devices
+    *   Detection of devices with open ADB port 5555
+    *   Connect to discovered devices
+    *   Batch NTP server update across multiple devices
+    *   Device time vs PC time comparison (sync status)
+
+*   **Auto-setup NTP (Experimental Mode):**
+    *   Full automation: network scan → connect → select best NTP → install
+    *   Quick test of all NTP servers with optimal selection by RTT
+    *   Top-5 fastest servers with choice option
 
 *   **Terminal Mode:**
     *   Execute any ADB commands
@@ -68,7 +88,9 @@ Many televisions and Android TV boxes, particularly in regions with network rest
     *   Save last used IP address
     *   Copy servers to clipboard
     *   Automatic ADB key generation
+    *   Connection reuse for existing connections
     *   Detailed file logging
+    *   Firewall permission notice
 
 ## Installation and Usage
 
@@ -76,7 +98,7 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 
 1.  Download the `AndroidTVTimeFixer-windows.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
 2.  Extract the archive to a convenient location on your computer, for example, `D:\AndroidTVTimeFixer`.
-3.  Run `AndroidTVTimeFixer.exe`.
+3.  Run `AndroidTVTimeFixer.exe` or use `start.bat` / `start.ps1`.
 
 Run via PowerShell
 
@@ -126,13 +148,37 @@ Run via PowerShell
 ```
 1. Change NTP time server by country code
 2. Change NTP time server to custom
-3. Show available country codes and NTP servers
+3. Show country codes with country names and NTP servers
 4. Show available alternative NTP servers
 5. Show current device information
+6. Server management
+7. Network scan & batch NTP update
+8. Auto-setup NTP server (experimental mode)
+9. Terminal mode (ADB and system commands)
+0. Exit
+```
+
+### Server Management Submenu
+
+```
+1. Show favorite servers
+2. Add current server to favorites
+3. Copy server to clipboard
+4. Paste server from clipboard
+5. Remove server from favorites
 6. Ping NTP servers
-7. Country codes explanation
-8. Terminal mode (ADB and system commands)
-9. Exit
+7. Export/import settings
+8. Return to main menu
+```
+
+### Network Scan Submenu
+
+```
+1. Scan local network for Android TV devices
+2. Connect to discovered device
+3. Batch NTP update (all discovered or entered IPs)
+4. Show device time sync status
+5. Back to main menu
 ```
 
 ## Compatibility
