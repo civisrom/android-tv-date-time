@@ -462,7 +462,19 @@ class AndroidTVTimeFixer:
             '3.south-america.pool.ntp.org',
             'time.cloudflare.com',
             'clock.isc.org',
+            'ntp1.vniiftri.ru',
             'ntp2.vniiftri.ru',
+            'ntp3.vniiftri.ru',
+            'ntp4.vniiftri.ru',
+            'ntp21.vniiftri.ru',
+            'ntp1.niiftri.irkutsk.ru',
+            'ntp2.niiftri.irkutsk.ru',
+            'vniiftri.khv.ru',
+            'vniiftri2.khv.ru',
+            'ntp.sniim.ru',
+            'ntp1.ntp-servers.net',
+            'ntp0.ntp-servers.net',
+            'time.nist.gov',
             'ntps1-1.cs.tu-berlin.de',
             'ntp.ix.ru',
             'time.google.com',
@@ -1116,7 +1128,7 @@ class AndroidTVTimeFixer:
             print(Fore.YELLOW + "3. " + locales.get("copy_server_to_clipboard"))
             print(Fore.YELLOW + "4. " + locales.get("paste_server_from_clipboard"))
             print(Fore.YELLOW + "5. " + locales.get("remove_server_from_favorites"))
-            print(Fore.YELLOW + "6. Ping NTP servers")
+            print(Fore.YELLOW + "6. " + locales.get("ping_ntp_menu"))
             print(Fore.YELLOW + "7. " + locales.get("export_import_menu"))
             print(Fore.YELLOW + "8. " + locales.get("return_to_main_menu"))
 
@@ -1630,6 +1642,7 @@ class AndroidTVTimeFixer:
 
             elif choice == '3':
                 print(Fore.GREEN + locales.get("batch_ntp_title"))
+                print(Fore.CYAN + locales.get("ntp_format_hint"))
                 ntp_server = input(Fore.GREEN + locales.get("batch_enter_ntp") + Fore.WHITE).strip()
                 if not ntp_server or ntp_server.lower() == 'q':
                     continue
@@ -1673,6 +1686,128 @@ class AndroidTVTimeFixer:
             else:
                 print(Fore.RED + locales.get("invalid_choice"))
 
+    # ──────────────────────────────────────────────────────────
+    # Auto-setup NTP (experimental)
+    # ──────────────────────────────────────────────────────────
+
+    def _test_ntp_server_quick(self, server: str) -> Optional[Tuple[str, float]]:
+        """Быстрая проверка одного NTP-сервера, возвращает (server, rtt_ms) или None"""
+        try:
+            ntp_client = ntplib.NTPClient()
+            start = time.time()
+            ntp_client.request(server, version=3, timeout=2)
+            rtt = (time.time() - start) * 1000
+            return (server, rtt)
+        except Exception:
+            return None
+
+    def auto_setup_ntp(self) -> None:
+        """Полная автоматизация: сканирование → подключение → выбор лучшего NTP → установка"""
+        # Шаг 1: Сканирование сети
+        print(Fore.CYAN + locales.get("auto_scanning_network"))
+        found = self.scan_network_for_android_devices()
+
+        if not found:
+            print(Fore.RED + locales.get("auto_no_devices"))
+            return
+
+        # Шаг 2: Выбор устройства
+        if len(found) == 1:
+            target_ip = found[0]
+            print(Fore.GREEN + locales.get("auto_found_device", count=1, ip=target_ip))
+        else:
+            print(Fore.GREEN + locales.get("scan_found", count=len(found)))
+            for i, ip in enumerate(found, 1):
+                print(Fore.WHITE + f"  {i}. {ip}")
+            raw = input(Fore.GREEN + locales.get("auto_select_device") + Fore.WHITE).strip()
+            try:
+                idx = int(raw)
+                if 1 <= idx <= len(found):
+                    target_ip = found[idx - 1]
+                else:
+                    print(Fore.RED + locales.get("invalid_input"))
+                    return
+            except ValueError:
+                print(Fore.RED + locales.get("invalid_input"))
+                return
+
+        # Шаг 3: Подключение к устройству
+        print(Fore.CYAN + locales.get("auto_confirm_tv"))
+        try:
+            self.connect_or_reuse(target_ip)
+            self.save_last_ip(target_ip)
+        except AndroidTVTimeFixerError as e:
+            print(Fore.RED + locales.get("error_message", error=str(e)))
+            return
+
+        # Шаг 4: Быстрая проверка NTP-серверов
+        print(Fore.CYAN + locales.get("auto_checking_ntp"))
+        all_servers = list(dict.fromkeys(
+            list(self.ntp_servers.values()) + self.custom_ntp_servers
+        ))
+
+        results: List[Tuple[str, float]] = []
+        total = len(all_servers)
+
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = {executor.submit(self._test_ntp_server_quick, s): s for s in all_servers}
+            checked = 0
+            for future in futures:
+                result = future.result()
+                checked += 1
+                if result is not None:
+                    results.append(result)
+                if checked % 10 == 0 or checked == total:
+                    print(
+                        Fore.CYAN + "\r" +
+                        locales.get("auto_checking_progress",
+                                    checked=checked, total=total, found=len(results)),
+                        end="", flush=True
+                    )
+        print()  # новая строка
+
+        if not results:
+            print(Fore.RED + locales.get("auto_no_reachable_servers"))
+            return
+
+        # Сортировка по RTT
+        results.sort(key=lambda x: x[1])
+
+        # Шаг 5: Показать топ-5
+        print(Fore.GREEN + locales.get("auto_top_servers"))
+        top5 = results[:5]
+        for i, (server, rtt) in enumerate(top5, 1):
+            marker = " <<< " if i == 1 else ""
+            print(Fore.WHITE + f"  {i}. {server:<40} RTT: {rtt:.1f}ms{marker}")
+
+        best_server = top5[0][0]
+        best_rtt = top5[0][1]
+        print(Fore.GREEN + locales.get("auto_best_server", server=best_server, rtt=best_rtt))
+
+        # Шаг 6: Выбор из топа или подтверждение рекомендации
+        raw = input(Fore.GREEN + locales.get("auto_choose_from_top") + Fore.WHITE).strip()
+        if raw:
+            try:
+                idx = int(raw)
+                if 1 <= idx <= len(top5):
+                    best_server = top5[idx - 1][0]
+            except ValueError:
+                pass
+
+        # Шаг 7: Подтверждение и установка
+        confirm = input(
+            Fore.GREEN + locales.get("auto_confirm_install", server=best_server) + Fore.WHITE
+        ).strip()
+        if confirm.lower() in ('y', 'yes', 'д', 'да', ''):
+            try:
+                self.set_ntp_server(best_server)
+                print(Fore.GREEN + locales.get("auto_installed", server=best_server))
+                self.show_device_time()
+            except AndroidTVTimeFixerError as e:
+                print(Fore.RED + locales.get("error_message", error=str(e)))
+        else:
+            print(Fore.YELLOW + locales.get("auto_cancelled"))
+
     def show_country_codes(self) -> None:
         from locales import Language
         is_ru = locales.current_language == Language.RU
@@ -1707,6 +1842,7 @@ class AndroidTVTimeFixer:
             print(Fore.WHITE + locales.get("custom_ntp_server", server=server))
 
     def set_custom_ntp(self) -> None:
+        print(Fore.CYAN + locales.get("ntp_format_hint"))
         while True:
             ntp_server = input(Fore.GREEN + locales.get("enter_ntp_server") + Fore.WHITE).strip()
             self.logger.info(f"User entered custom NTP server: {ntp_server}")
@@ -1868,6 +2004,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_5"))
             print(Fore.YELLOW + locales.get("menu_item_6"))
             print(Fore.YELLOW + locales.get("menu_item_7"))
+            print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
 
@@ -1885,6 +2022,7 @@ def main():
                         fixer.logger.info(f"Successfully connected to device: {ip}")
                         fixer.show_current_settings()
                         # ── Country code input with interactive hints ──
+                        print(Fore.CYAN + locales.get("country_code_format_hint"))
                         print(Fore.CYAN + locales.get("hint_type_hint"))
                         while True:
                             raw = input(Fore.GREEN + locales.get("enter_country_code") + Fore.WHITE).strip()
@@ -1895,6 +2033,10 @@ def main():
                                 fixer.show_country_hints(raw[1:])
                                 continue
                             code = raw.lower()
+                            # Detect if user entered full NTP address instead of code
+                            if '.' in code:
+                                print(Fore.RED + locales.get('country_code_wrong_format'))
+                                continue
                             if not fixer.validate_country_code(code):
                                 fixer.show_country_hints(code)
                                 print(Fore.RED + locales.get('invalid_country_code'))
@@ -1972,11 +2114,15 @@ def main():
                 fixer.scan_batch_menu()
 
             elif choice == '8':
+                fixer.logger.info("Menu: Auto-setup NTP (experimental)")
+                fixer.auto_setup_ntp()
+
+            elif choice == '9':
                 fixer.logger.info("Menu: Terminal mode activated")
                 fixer.terminal_mode()
                 fixer.logger.info("Menu: Terminal mode deactivated")
 
-            elif choice == '9':
+            elif choice == '0':
                 fixer.logger.info("User selected exit")
                 print(Fore.GREEN + locales.get('exit_message'))
                 fixer.logger.info("Application closed normally")

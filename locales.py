@@ -378,9 +378,13 @@ arising from the use of this program.
                 en="Invalid choice",
                 ru="Неверный выбор"
             ),
+            "menu_item_8": Translation(
+                 en="8. Auto-setup NTP server (experimental mode)",
+                 ru="8. Автоматическая установка NTP-сервера (экспериментальный режим)"
+            ),
             "menu_item_9": Translation(
-                 en="8. Terminal mode (ADB and system commands)",
-                 ru="8. Режим терминала (команды ADB и системные)"
+                 en="9. Terminal mode (ADB and system commands)",
+                 ru="9. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
                  en="Terminal mode activated. Type 'help', 'adb --help' for available commands or 'exit' to quit.",
@@ -778,8 +782,8 @@ arising from the use of this program.
                 ru="7. Сканирование сети и групповое обновление NTP"
             ),
             "menu_item_10": Translation(
-                en="9. Exit",
-                ru="9. Выход"
+                en="0. Exit",
+                ru="0. Выход"
             ),
             "menu_prompt": Translation(
                 en="Enter menu option number:",
@@ -1263,6 +1267,86 @@ vn: Вьетнам
             "operation_aborted": Translation(
                 en="\nOperation aborted by user",
                 ru="\nОперация отменена пользователем"
+            ),
+
+            # ─── Ping NTP menu item (no number prefix) ───────────────
+            "ping_ntp_menu": Translation(
+                en="Ping NTP servers",
+                ru="Пинговать NTP-серверы"
+            ),
+
+            # ─── Country code format hints ────────────────────────────
+            "country_code_format_hint": Translation(
+                en="Note: Enter only the 2-letter country code (e.g. ru), NOT the full server address (e.g. ru.pool.ntp.org)",
+                ru="Примечание: Вводите только 2-буквенный код страны (напр. ru), а НЕ полный адрес сервера (напр. ru.pool.ntp.org)"
+            ),
+            "country_code_wrong_format": Translation(
+                en="You entered a full NTP server address. Enter only the 2-letter country code (e.g. cy, not cy.pool.ntp.org)",
+                ru="Вы ввели полный адрес NTP-сервера. Введите только 2-буквенный код страны (напр. cy, а не cy.pool.ntp.org)"
+            ),
+
+            # ─── NTP server format hint ───────────────────────────────
+            "ntp_format_hint": Translation(
+                en="Format: domain name (e.g. time.google.com, ru.pool.ntp.org) or IP address (e.g. 192.168.1.1)",
+                ru="Формат: доменное имя (напр. time.google.com, ru.pool.ntp.org) или IP-адрес (напр. 192.168.1.1)"
+            ),
+
+            # ─── Auto-setup mode ─────────────────────────────────────
+            "auto_scanning_network": Translation(
+                en="\n[Auto] Scanning network for Android TV devices...",
+                ru="\n[Авто] Сканирование сети для поиска Android TV устройств..."
+            ),
+            "auto_found_device": Translation(
+                en="[Auto] Found {count} device(s). Connecting to {ip}...",
+                ru="[Авто] Найдено {count} устройств. Подключение к {ip}..."
+            ),
+            "auto_select_device": Translation(
+                en="[Auto] Multiple devices found. Select device number: ",
+                ru="[Авто] Найдено несколько устройств. Выберите номер устройства: "
+            ),
+            "auto_no_devices": Translation(
+                en="[Auto] No devices found on network. Check that ADB debugging is enabled.",
+                ru="[Авто] Устройства не найдены в сети. Проверьте, что отладка ADB включена."
+            ),
+            "auto_confirm_tv": Translation(
+                en="[Auto] Please confirm the connection on the TV screen if prompted...",
+                ru="[Авто] Подтвердите подключение на экране ТВ, если появится запрос..."
+            ),
+            "auto_checking_ntp": Translation(
+                en="[Auto] Quick-testing NTP servers to find the best one for you...",
+                ru="[Авто] Быстрая проверка NTP-серверов для выбора оптимального..."
+            ),
+            "auto_best_server": Translation(
+                en="[Auto] Recommended server: {server} (RTT: {rtt:.1f}ms)",
+                ru="[Авто] Рекомендуемый сервер: {server} (RTT: {rtt:.1f}мс)"
+            ),
+            "auto_top_servers": Translation(
+                en="[Auto] Top-5 fastest servers:",
+                ru="[Авто] Топ-5 самых быстрых серверов:"
+            ),
+            "auto_confirm_install": Translation(
+                en="[Auto] Install {server} on the device? (y/n): ",
+                ru="[Авто] Установить {server} на устройство? (y/n): "
+            ),
+            "auto_installed": Translation(
+                en="[Auto] NTP server {server} successfully installed on device!",
+                ru="[Авто] NTP-сервер {server} успешно установлен на устройство!"
+            ),
+            "auto_cancelled": Translation(
+                en="[Auto] Installation cancelled by user.",
+                ru="[Авто] Установка отменена пользователем."
+            ),
+            "auto_no_reachable_servers": Translation(
+                en="[Auto] No reachable NTP servers found. Check your internet connection.",
+                ru="[Авто] Не найдено доступных NTP-серверов. Проверьте подключение к интернету."
+            ),
+            "auto_choose_from_top": Translation(
+                en="[Auto] Enter server number from the list (or Enter for recommended #1): ",
+                ru="[Авто] Введите номер сервера из списка (или Enter для рекомендуемого №1): "
+            ),
+            "auto_checking_progress": Translation(
+                en="  [{checked}/{total}] checked, {found} reachable",
+                ru="  [{checked}/{total}] проверено, {found} доступно"
             ),
         }
 
