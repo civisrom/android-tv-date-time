@@ -816,6 +816,60 @@ class AndroidTVTimeFixer:
             # Хотя основное завершение происходит при командах exit/quit/q
             self.process_manager.cleanup()
 	
+    def _test_ntp_server(self, server: str, count: int = 2, timeout: int = 2) -> dict:
+        """Проверка NTP-сервера с несколькими попытками и детальной диагностикой ошибок.
+        Используется и в ping_ntp_servers (пункт 6), и в auto_setup_ntp (пункт 9).
+        Возвращает dict с метриками и статусом."""
+        rtts = []
+        offsets = []
+        last_error = None
+
+        for _ in range(count):
+            try:
+                ntp_client = ntplib.NTPClient()
+                start_time = time.time()
+                ntp_response = ntp_client.request(server, version=3, timeout=timeout)
+                rtt = (time.time() - start_time) * 1000
+                rtts.append(rtt)
+                offsets.append(ntp_response.offset)
+            except ntplib.NTPException as e:
+                last_error = f"NTP Protocol Error: {e}"
+            except socket.gaierror:
+                last_error = "DNS Resolution Error"
+            except socket.timeout:
+                last_error = "Timeout"
+            except Exception as e:
+                last_error = str(e)
+
+        if not rtts:
+            return {
+                'server': server,
+                'status': 'Unreachable',
+                'avg_rtt': None,
+                'min_rtt': None,
+                'max_rtt': None,
+                'success_rate': 0,
+                'offset': None,
+                'error': last_error or 'Unknown',
+                'color': Fore.RED
+            }
+
+        success_rate = (len(rtts) / count) * 100
+        avg_rtt = sum(rtts) / len(rtts)
+        avg_offset = sum(offsets) / len(offsets)
+
+        return {
+            'server': server,
+            'status': 'Reachable',
+            'avg_rtt': avg_rtt,
+            'min_rtt': min(rtts),
+            'max_rtt': max(rtts),
+            'success_rate': success_rate,
+            'offset': avg_offset,
+            'error': None,
+            'color': Fore.GREEN if success_rate > 66 else Fore.YELLOW
+        }
+
     def ping_ntp_servers(self, timeout=2, count=3):
         """
         Check NTP servers reliability using ntplib with enhanced error handling
@@ -840,89 +894,17 @@ class AndroidTVTimeFixer:
         unreachable_count = 0
 
         for idx, server in enumerate(all_servers, 1):
-            # Show progress
             progress = f"[{idx}/{total_servers}]"
             print(Fore.CYAN + f"\r{progress} Checking: {server:<40}", end="", flush=True)
 
-            server_attempts = []
-            rtts = []
-
-            for attempt_num in range(count):
-                try:
-                    # Create NTP client
-                    ntp_client = ntplib.NTPClient()
-
-                    # Attempt to retrieve NTP time
-                    start_time = time.time()
-                    ntp_response = ntp_client.request(server, version=3, timeout=timeout)
-                    end_time = time.time()
-
-                    # Calculate round trip time
-                    rtt = (end_time - start_time) * 1000  # Convert to milliseconds
-                    rtts.append(rtt)
-
-                    server_attempts.append({
-                        'status': 'Successful',
-                        'rtt': rtt,
-                        'offset': ntp_response.offset
-                    })
-
-                except ntplib.NTPException as e:
-                    server_attempts.append({
-                        'status': 'NTP Protocol Error',
-                        'error': str(e)
-                    })
-                except socket.gaierror:
-                    server_attempts.append({
-                        'status': 'DNS Resolution Error',
-                        'error': 'Could not resolve server hostname'
-                    })
-                except socket.timeout:
-                    server_attempts.append({
-                        'status': 'Timeout',
-                        'error': 'Connection timed out'
-                    })
-                except Exception as e:
-                    server_attempts.append({
-                        'status': 'Unexpected Error',
-                        'error': str(e)
-                    })
-
-            # Analyze server performance
-            successful_attempts = [attempt for attempt in server_attempts if attempt['status'] == 'Successful']
-
-            if successful_attempts:
-                avg_rtt = sum(rtts) / len(rtts)
-                min_rtt = min(rtts)
-                max_rtt = max(rtts)
-                success_rate = (len(successful_attempts) / count) * 100
+            result = self._test_ntp_server(server, count=count, timeout=timeout)
+            server_ping_results.append(result)
+            if result['status'] == 'Reachable':
                 reachable_count += 1
-
-                server_ping_results.append({
-                    'server': server,
-                    'status': 'Reachable',
-                    'avg_rtt': avg_rtt,
-                    'min_rtt': min_rtt,
-                    'max_rtt': max_rtt,
-                    'success_rate': success_rate,
-                    'color': Fore.GREEN if success_rate > 66 else Fore.YELLOW
-                })
-                self.logger.debug(f"Server {server}: Reachable, avg RTT={avg_rtt:.2f}ms, success={success_rate:.0f}%")
+                self.logger.debug(f"Server {server}: Reachable, avg RTT={result['avg_rtt']:.2f}ms, success={result['success_rate']:.0f}%")
             else:
                 unreachable_count += 1
-                # Get the error from the last attempt
-                last_error = server_attempts[-1].get('error', 'Unknown') if server_attempts else 'No attempts'
-                server_ping_results.append({
-                    'server': server,
-                    'status': 'Unreachable',
-                    'avg_rtt': None,
-                    'min_rtt': None,
-                    'max_rtt': None,
-                    'success_rate': 0,
-                    'error': last_error,
-                    'color': Fore.RED
-                })
-                self.logger.debug(f"Server {server}: Unreachable, error={last_error}")
+                self.logger.debug(f"Server {server}: Unreachable, error={result.get('error')}")
 
         # Clear progress line
         print("\r" + " " * 60 + "\r", end="")
@@ -1839,44 +1821,6 @@ class AndroidTVTimeFixer:
     # Auto-setup NTP (experimental)
     # ──────────────────────────────────────────────────────────
 
-    def _test_ntp_server_quick(self, server: str, count: int = 3, timeout: int = 2) -> Optional[dict]:
-        """Проверка NTP-сервера с несколькими попытками и валидацией offset.
-        Возвращает dict с метриками или None если сервер недоступен."""
-        ntp_client = ntplib.NTPClient()
-        rtts = []
-        offsets = []
-
-        for _ in range(count):
-            try:
-                start = time.time()
-                response = ntp_client.request(server, version=3, timeout=timeout)
-                rtt = (time.time() - start) * 1000
-                rtts.append(rtt)
-                offsets.append(response.offset)
-            except Exception:
-                pass
-
-        if not rtts:
-            return None
-
-        success_rate = (len(rtts) / count) * 100
-        avg_rtt = sum(rtts) / len(rtts)
-        avg_offset = sum(offsets) / len(offsets)
-
-        # Отбраковываем серверы с аномально большим offset (>60 секунд)
-        # — они "пингуются" но время некорректно
-        if abs(avg_offset) > 60:
-            return None
-
-        return {
-            'server': server,
-            'avg_rtt': avg_rtt,
-            'min_rtt': min(rtts),
-            'max_rtt': max(rtts),
-            'success_rate': success_rate,
-            'offset': avg_offset
-        }
-
     # Маппинг Windows-имён таймзон (time.tzname) → IANA timezone
     _win_tz_to_iana = {
         # Windows RTZ (Russia Time Zones)
@@ -2158,12 +2102,13 @@ class AndroidTVTimeFixer:
         total = len(all_servers)
 
         with ThreadPoolExecutor(max_workers=50) as executor:
-            futures = {executor.submit(self._test_ntp_server_quick, s): s for s in all_servers}
+            futures = {executor.submit(self._test_ntp_server, s, 2, 2): s for s in all_servers}
             checked = 0
             for future in as_completed(futures):
                 result = future.result()
                 checked += 1
-                if result is not None:
+                # Фильтруем: только доступные с адекватным offset (<60 сек)
+                if result['status'] == 'Reachable' and (result['offset'] is None or abs(result['offset']) <= 60):
                     results.append(result)
                 if checked % 10 == 0 or checked == total:
                     print(
