@@ -1316,8 +1316,8 @@ vn: Вьетнам
                 ru="[Авто] Рекомендуемый сервер: {server} (RTT: {rtt:.1f}мс)"
             ),
             "auto_top_servers": Translation(
-                en="[Auto] Top-5 fastest servers:",
-                ru="[Авто] Топ-5 самых быстрых серверов:"
+                en="[Auto] Top-5 best servers (by reliability and speed):",
+                ru="[Авто] Топ-5 лучших серверов (по надёжности и скорости):"
             ),
             "auto_confirm_install": Translation(
                 en="[Auto] Install {server} on the device? (y/n): ",
@@ -1342,6 +1342,10 @@ vn: Вьетнам
             "auto_checking_progress": Translation(
                 en="  [{checked}/{total}] checked, {found} reachable",
                 ru="  [{checked}/{total}] проверено, {found} доступно"
+            ),
+            "auto_server_success": Translation(
+                en="Success",
+                ru="Успех"
             ),
         }
 

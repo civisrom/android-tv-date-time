@@ -1780,16 +1780,43 @@ class AndroidTVTimeFixer:
     # Auto-setup NTP (experimental)
     # ──────────────────────────────────────────────────────────
 
-    def _test_ntp_server_quick(self, server: str) -> Optional[Tuple[str, float]]:
-        """Быстрая проверка одного NTP-сервера, возвращает (server, rtt_ms) или None"""
-        try:
-            ntp_client = ntplib.NTPClient()
-            start = time.time()
-            ntp_client.request(server, version=3, timeout=2)
-            rtt = (time.time() - start) * 1000
-            return (server, rtt)
-        except Exception:
+    def _test_ntp_server_quick(self, server: str, count: int = 3, timeout: int = 2) -> Optional[dict]:
+        """Проверка NTP-сервера с несколькими попытками и валидацией offset.
+        Возвращает dict с метриками или None если сервер недоступен."""
+        ntp_client = ntplib.NTPClient()
+        rtts = []
+        offsets = []
+
+        for _ in range(count):
+            try:
+                start = time.time()
+                response = ntp_client.request(server, version=3, timeout=timeout)
+                rtt = (time.time() - start) * 1000
+                rtts.append(rtt)
+                offsets.append(response.offset)
+            except Exception:
+                pass
+
+        if not rtts:
             return None
+
+        success_rate = (len(rtts) / count) * 100
+        avg_rtt = sum(rtts) / len(rtts)
+        avg_offset = sum(offsets) / len(offsets)
+
+        # Отбраковываем серверы с аномально большим offset (>60 секунд)
+        # — они "пингуются" но время некорректно
+        if abs(avg_offset) > 60:
+            return None
+
+        return {
+            'server': server,
+            'avg_rtt': avg_rtt,
+            'min_rtt': min(rtts),
+            'max_rtt': max(rtts),
+            'success_rate': success_rate,
+            'offset': avg_offset
+        }
 
     def auto_setup_ntp(self) -> None:
         """Полная автоматизация: сканирование → подключение → выбор лучшего NTP → установка"""
@@ -1830,13 +1857,13 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("error_message", error=str(e)))
             return
 
-        # Шаг 4: Быстрая проверка NTP-серверов
+        # Шаг 4: Проверка NTP-серверов (3 попытки, валидация offset)
         print(Fore.CYAN + locales.get("auto_checking_ntp"))
         all_servers = list(dict.fromkeys(
             list(self.ntp_servers.values()) + self.custom_ntp_servers
         ))
 
-        results: List[Tuple[str, float]] = []
+        results: List[dict] = []
         total = len(all_servers)
 
         with ThreadPoolExecutor(max_workers=50) as executor:
@@ -1860,27 +1887,34 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("auto_no_reachable_servers"))
             return
 
-        # Сортировка по RTT
-        results.sort(key=lambda x: x[1])
+        # Сортировка как в пункте 6: сначала по success_rate (убыв.), потом по avg_rtt (возр.)
+        results.sort(key=lambda x: (-x['success_rate'], x['avg_rtt']))
 
         # Шаг 5: Показать топ-5
         print(Fore.GREEN + locales.get("auto_top_servers"))
         top5 = results[:5]
-        for i, (server, rtt) in enumerate(top5, 1):
+        for i, r in enumerate(top5, 1):
             marker = " <<< " if i == 1 else ""
-            print(Fore.WHITE + f"  {i}. {server:<40} RTT: {rtt:.1f}ms{marker}")
+            color = Fore.GREEN if r['success_rate'] > 66 else Fore.YELLOW
+            print(
+                color +
+                f"  {i}. {r['server']:<40} "
+                f"RTT: {r['avg_rtt']:.1f}ms  "
+                f"{locales.get('auto_server_success')}: {r['success_rate']:.0f}%  "
+                f"Offset: {r['offset']:.3f}s{marker}"
+            )
 
-        best_server = top5[0][0]
-        best_rtt = top5[0][1]
-        print(Fore.GREEN + locales.get("auto_best_server", server=best_server, rtt=best_rtt))
+        best = top5[0]
+        print(Fore.GREEN + locales.get("auto_best_server", server=best['server'], rtt=best['avg_rtt']))
 
         # Шаг 6: Выбор из топа или подтверждение рекомендации
         raw = input(Fore.GREEN + locales.get("auto_choose_from_top") + Fore.WHITE).strip()
+        best_server = best['server']
         if raw:
             try:
                 idx = int(raw)
                 if 1 <= idx <= len(top5):
-                    best_server = top5[idx - 1][0]
+                    best_server = top5[idx - 1]['server']
             except ValueError:
                 pass
 
