@@ -1356,18 +1356,21 @@ class AndroidTVTimeFixer:
 
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
-        
+
         start_time = time.time()
         connection_established = False
         last_error = None
-        
+
         print(locales.get("waiting_for_connection", remaining_time=self.connection_timeout))
         print(locales.get("confirm_connection"))
-        
-        while time.time() - start_time < self.connection_timeout:
+
+        while True:
+            remaining_time = int(self.connection_timeout - (time.time() - start_time))
+            if remaining_time <= 0:
+                break
             try:
                 self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
-                self.device.connect(rsa_keys=[signer], auth_timeout_s=15)
+                self.device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
                 connection_established = True
                 self.connected_ip = ip
                 self.process_manager.device_ip = ip
@@ -1375,12 +1378,13 @@ class AndroidTVTimeFixer:
                 break
             except Exception as e:
                 last_error = str(e)
-                remaining_time = int(self.connection_timeout - (time.time() - start_time))
+                remaining_time = max(0, int(self.connection_timeout - (time.time() - start_time)))
                 print(locales.get("waiting_for_connection", remaining_time=remaining_time), end='')
-                time.sleep(1)
+                if remaining_time > 0:
+                    time.sleep(1)
 
         print()  # Новая строка после завершения ожидания
-        
+
         if not connection_established:
             raise AndroidTVTimeFixerError(
                 locales.get("connection_failed", timeout=self.connection_timeout) + "\n" +
@@ -1504,37 +1508,8 @@ class AndroidTVTimeFixer:
 
         return networks
 
-    def scan_network_for_android_devices(self) -> List[str]:
-        """Сканирует локальные подсети в поисках устройств с открытым ADB-портом 5555.
-        Автоматически определяет подсеть через psutil, fallback на /16."""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-            s.close()
-        except Exception:
-            print(Fore.RED + locales.get("scan_local_ip_error"))
-            return []
-
-        if not self._is_private_ip(local_ip):
-            print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
-            return []
-
-        # Определяем реальную подсеть
-        detected = self._detect_interface_network(local_ip)
-        if detected:
-            hosts_count = detected.num_addresses - 2 if detected.prefixlen < 31 else detected.num_addresses
-            print(Fore.GREEN + locales.get("scan_net_detected", network=str(detected), hosts=hosts_count))
-        else:
-            fallback_net = "192.168.0.0/16" if local_ip.startswith('192.168.') else f"{local_ip}/16"
-            print(Fore.YELLOW + locales.get("scan_net_fallback", network=fallback_net))
-
-        networks = self._get_local_scan_networks(local_ip)
-        if not networks:
-            print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
-            return []
-
-        # Собираем все хосты из всех подсетей, без дублей
+    def _scan_networks(self, networks: List[ipaddress.IPv4Network]) -> List[str]:
+        """Сканирует список сетей на наличие устройств с открытым ADB-портом 5555."""
         hosts_set: set = set()
         for net in networks:
             for h in net.hosts():
@@ -1563,13 +1538,75 @@ class AndroidTVTimeFixer:
                         end="", flush=True
                     )
         print()  # новая строка после прогресса
+        return found
+
+    def scan_network_for_android_devices(self) -> List[str]:
+        """Сканирует локальные подсети в поисках устройств с открытым ADB-портом 5555.
+        Автоматически определяет подсеть через psutil, fallback на /16."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            print(Fore.RED + locales.get("scan_local_ip_error"))
+            return []
+
+        if not self._is_private_ip(local_ip):
+            print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
+            return []
+
+        # Определяем реальную подсеть через psutil
+        detected = self._detect_interface_network(local_ip)
+        if detected:
+            hosts_count = detected.num_addresses - 2 if detected.prefixlen < 31 else detected.num_addresses
+            print(Fore.GREEN + locales.get("scan_net_detected", network=str(detected), hosts=hosts_count))
+        else:
+            fallback_net = "192.168.0.0/16" if local_ip.startswith('192.168.') else f"{local_ip}/16"
+            print(Fore.YELLOW + locales.get("scan_net_fallback", network=fallback_net))
+
+        networks = self._get_local_scan_networks(local_ip)
+        if not networks:
+            print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
+            return []
+
+        # Этап 1: сканируем определённую подсеть (обычно /24)
+        found = self._scan_networks(networks)
+
+        # Этап 2: если /24 ничего не нашёл и есть куда расширять — предлагаем /16
+        wide_scan_offered = False
+        if not found and detected and detected.prefixlen > 16:
+            if local_ip.startswith('192.168.'):
+                wide_net = ipaddress.IPv4Network('192.168.0.0/16', strict=False)
+            elif local_ip.startswith('10.'):
+                wide_net = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
+            else:
+                wide_net = None
+
+            if wide_net and wide_net != detected:
+                wide_scan_offered = True
+                print(Fore.YELLOW + locales.get("scan_none"))
+                print(Fore.CYAN + locales.get("scan_wide_offer",
+                                               narrow=str(detected), wide=str(wide_net)))
+                answer = input(Fore.WHITE).strip().lower()
+                if answer in ('y', 'yes', 'д', 'да', ''):
+                    extra_networks = [wide_net]
+                    # Для 10.x.x.x также добавляем 10.1.0.0/16
+                    if local_ip.startswith('10.'):
+                        extra = ipaddress.IPv4Network('10.1.0.0/16', strict=False)
+                        if extra != wide_net:
+                            extra_networks.append(extra)
+                    found = self._scan_networks(extra_networks)
 
         if found:
             print(Fore.GREEN + locales.get("scan_found", count=len(found)))
             for i, ip in enumerate(found, 1):
                 print(Fore.WHITE + f"  {i}. {ip}")
-        else:
+        elif not wide_scan_offered:
             print(Fore.YELLOW + locales.get("scan_none"))
+            print(Fore.YELLOW + locales.get("scan_firewall_hint"))
+        elif not found:
+            print(Fore.YELLOW + locales.get("scan_firewall_hint"))
 
         return found
 
@@ -2438,10 +2475,9 @@ def main():
                                 print(Fore.RED + locales.get('error_message', error=str(e)))
                             break
                     except AndroidTVTimeFixerError as e:
-                        fixer.logger.error(f"Connection error: {e}")
+                        fixer.logger.debug(f"Connection error: {e}")
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
-                    fixer.logger.warning(f"Invalid IP format entered: {ip}")
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '2':
@@ -2456,10 +2492,9 @@ def main():
                         fixer.show_current_settings()
                         fixer.set_custom_ntp()
                     except AndroidTVTimeFixerError as e:
-                        fixer.logger.error(f"Connection error: {e}")
+                        fixer.logger.debug(f"Connection error: {e}")
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
-                    fixer.logger.warning(f"Invalid IP format entered: {ip}")
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '3':
@@ -2482,10 +2517,9 @@ def main():
                         fixer.show_device_info()
                         fixer.show_device_time()
                     except AndroidTVTimeFixerError as e:
-                        fixer.logger.error(f"Connection error: {e}")
+                        fixer.logger.debug(f"Connection error: {e}")
                         print(Fore.RED + locales.get('error_message', error=str(e)))
                 else:
-                    fixer.logger.warning(f"Invalid IP format entered: {ip}")
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '6':
