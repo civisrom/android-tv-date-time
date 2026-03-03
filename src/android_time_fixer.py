@@ -2298,6 +2298,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_8"))
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
+            print(Fore.YELLOW + locales.get("menu_item_11"))
 
             choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
             fixer.logger.info(f"User selected menu option: {choice}")
@@ -2397,18 +2398,22 @@ def main():
                     print(Fore.RED + locales.get('invalid_ip_format'))
 
             elif choice == '6':
+                fixer.logger.info("Menu: Ping NTP servers")
+                fixer.ping_ntp_servers()
+
+            elif choice == '7':
                 fixer.logger.info("Menu: Server management")
                 fixer.server_management_menu()
 
-            elif choice == '7':
+            elif choice == '8':
                 fixer.logger.info("Menu: Network scan & batch operations")
                 fixer.scan_batch_menu()
 
-            elif choice == '8':
+            elif choice == '9':
                 fixer.logger.info("Menu: Auto-setup NTP (experimental)")
                 fixer.auto_setup_ntp()
 
-            elif choice == '9':
+            elif choice == '10':
                 fixer.logger.info("Menu: Terminal mode activated")
                 fixer.terminal_mode()
                 fixer.logger.info("Menu: Terminal mode deactivated")

@@ -366,13 +366,13 @@ arising from the use of this program.
                 en="Please enter a valid number",
                 ru="Введите корректный номер"
             ),
-            "menu_item_8": Translation(
-                 en="8. Auto-setup NTP server (experimental mode)",
-                 ru="8. Автоматическая установка NTP-сервера (экспериментальный режим)"
-            ),
             "menu_item_9": Translation(
-                 en="9. Terminal mode (ADB and system commands)",
-                 ru="9. Режим терминала (команды ADB и системные)"
+                 en="9. Auto-setup NTP server (experimental mode)",
+                 ru="9. Автоматическая установка NTP-сервера (экспериментальный режим)"
+            ),
+            "menu_item_10": Translation(
+                 en="10. Terminal mode (ADB and system commands)",
+                 ru="10. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
                  en="Terminal mode activated. Type 'help', 'adb --help' for available commands or 'exit' to quit.",
@@ -762,14 +762,18 @@ arising from the use of this program.
                 ru="5. Показать текущую информацию об устройстве"
             ),
             "menu_item_6": Translation(
-                en="6. Server management",
-                ru="6. Управление серверами"
+                en="6. Ping NTP servers",
+                ru="6. Пинговать NTP-серверы"
             ),
             "menu_item_7": Translation(
-                en="7. Network scan & batch NTP update",
-                ru="7. Сканирование сети и групповое обновление NTP"
+                en="7. Server management",
+                ru="7. Управление серверами"
             ),
-            "menu_item_10": Translation(
+            "menu_item_8": Translation(
+                en="8. Network scan & batch NTP update",
+                ru="8. Сканирование сети и групповое обновление NTP"
+            ),
+            "menu_item_11": Translation(
                 en="0. Exit",
                 ru="0. Выход"
             ),
