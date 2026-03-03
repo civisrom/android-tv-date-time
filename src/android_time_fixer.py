@@ -1160,8 +1160,8 @@ class AndroidTVTimeFixer:
                         if self.validate_ntp_server(server):
                             print(Fore.GREEN + locales.get("server_set_from_clipboard", server=server))
                             if self.device:
-                                self.fix_time(server)
-                                print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=server))
+                                if self.fix_time(server):
+                                    print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=server))
                         else:
                             print(Fore.RED + locales.get("invalid_ntp_server_format"))
                     else:
@@ -1399,14 +1399,16 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("ntp_server_update_failed", error=str(e)))
 	
-    def fix_time(self, ntp_server: str) -> None:
+    def fix_time(self, ntp_server: str) -> bool:
+        """Проверяет и устанавливает NTP-сервер. Возвращает True если установлен."""
         if not self.device:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
 
         if not self.verify_ntp_server(ntp_server):
-            return
+            return False
 
         self.set_ntp_server(ntp_server)
+        return True
 
     # ──────────────────────────────────────────────────────────
     # Network scan
@@ -2220,9 +2222,11 @@ class AndroidTVTimeFixer:
                 print(Fore.RED + locales.get("invalid_ntp_server_format"))
                 continue
             try:
-                self.fix_time(ntp_server)
-                self.logger.info(f"Custom NTP server set successfully: {ntp_server}")
-                print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=ntp_server))
+                if self.fix_time(ntp_server):
+                    self.logger.info(f"Custom NTP server set successfully: {ntp_server}")
+                    print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=ntp_server))
+                else:
+                    self.logger.info(f"User declined NTP server: {ntp_server}")
                 return
             except AndroidTVTimeFixerError as e:
                 self.logger.error(f"Failed to set custom NTP server: {e}")
@@ -2412,9 +2416,11 @@ def main():
                                 continue
                             try:
                                 ntp_server = fixer.ntp_servers[code]
-                                fixer.fix_time(ntp_server)
-                                fixer.logger.info(f"NTP server changed to: {ntp_server} (country: {code.upper()})")
-                                print(Fore.GREEN + locales.get('ntp_server_set', ntp_server=ntp_server))
+                                if fixer.fix_time(ntp_server):
+                                    fixer.logger.info(f"NTP server changed to: {ntp_server} (country: {code.upper()})")
+                                    print(Fore.GREEN + locales.get('ntp_server_set', ntp_server=ntp_server))
+                                else:
+                                    fixer.logger.info(f"User declined NTP server: {ntp_server}")
                             except AndroidTVTimeFixerError as e:
                                 fixer.logger.error(f"Error setting NTP server: {e}")
                                 print(Fore.RED + locales.get('error_message', error=str(e)))
