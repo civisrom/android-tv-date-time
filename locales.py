@@ -16,7 +16,7 @@ class Translation:
 
 class Locales:
     def __init__(self):
-        # Default language is English
+        # Default language is Russian
         self.current_language: Language = Language.RU
         
         # Dictionary containing all translations
@@ -113,28 +113,24 @@ arising from the use of this program.
                 ru="Ключи ADB сгенерированы успешно"
             ),
             "existing_adb_keys": Translation(
-            en="Existing ADB keys are being used",
-            ru="Используются существующие ключи ADB"
+                en="Existing ADB keys are being used",
+                ru="Используются существующие ключи ADB"
             ),
-
             "key_generation_error": Translation(
-            en="Failed to generate keys: {error}",
-            ru="Не удалось сгенерировать ключи: {error}"
+                en="Failed to generate keys: {error}",
+                ru="Не удалось сгенерировать ключи: {error}"
             ),
-            
             "adb_keys_not_found": Translation(
-            en="ADB keys not found. Please generate them first.",
-            ru="Ключи ADB не найдены. Пожалуйста, сначала сгенерируйте их."
+                en="ADB keys not found. Please generate them first.",
+                ru="Ключи ADB не найдены. Пожалуйста, сначала сгенерируйте их."
             ),
-            
             "key_loading_error": Translation(
-            en="Failed to load keys: {error}",
-            ru="Не удалось загрузить ключи: {error}"
+                en="Failed to load keys: {error}",
+                ru="Не удалось загрузить ключи: {error}"
             ),
-            
             "no_connected_devices": Translation(
-            en="No connected devices.",
-            ru="Нет подключенных устройств."
+                en="No connected devices.",
+                ru="Нет подключенных устройств."
             ),
             
             "choose_device_to_connect": Translation(
@@ -369,14 +365,6 @@ arising from the use of this program.
             "enter_valid_number": Translation(
                 en="Please enter a valid number",
                 ru="Введите корректный номер"
-            ),
-            "no_favorite_servers": Translation(
-                en="No favorite servers in the list",
-                ru="Список избранных серверов пуст"
-            ),
-            "invalid_choice": Translation(
-                en="Invalid choice",
-                ru="Неверный выбор"
             ),
             "menu_item_8": Translation(
                  en="8. Auto-setup NTP server (experimental mode)",
@@ -818,11 +806,6 @@ arising from the use of this program.
                 ru="Недействительный код страны"
             ),
 
-            "ping_ntp_servers_start": Translation(
-                en="Starting NTP server connectivity check...",
-                ru="Начинаю проверку связи с NTP-серверами..."
-            ),
-            
             "ntp_server_reachable": Translation(
                 en="NTP server is reachable",
                 ru="NTP-сервер доступен"

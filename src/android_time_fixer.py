@@ -16,7 +16,7 @@ import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
 from typing import Optional, Tuple, List
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import ntplib
 import pyperclip
 import colorama
@@ -1438,12 +1438,11 @@ class AndroidTVTimeFixer:
 
         with ThreadPoolExecutor(max_workers=500) as executor:
             futures = {executor.submit(self._check_adb_port, ip): ip for ip in hosts}
-            for future in futures:
+            for future in as_completed(futures):
                 result = future.result()
                 checked += 1
                 if result:
                     found.append(result)
-                # Обновляем прогресс каждые 200 хостов, чтобы не замедлять консоль
                 if checked % 200 == 0 or checked == total:
                     print(
                         Fore.CYAN + "\r  " +
@@ -1752,7 +1751,7 @@ class AndroidTVTimeFixer:
         with ThreadPoolExecutor(max_workers=50) as executor:
             futures = {executor.submit(self._test_ntp_server_quick, s): s for s in all_servers}
             checked = 0
-            for future in futures:
+            for future in as_completed(futures):
                 result = future.result()
                 checked += 1
                 if result is not None:
@@ -1878,16 +1877,12 @@ class AndroidTVTimeFixer:
                 'boot_serial': self.device.shell('getprop ro.boot.serialno').strip(),
                 'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
                 'hardware': self.device.shell('getprop ro.hardware').strip(),
-                #'ip_address': self.device.shell('ip addr show wlan0 | grep "inet "').strip(),
-                #'ip_address': self.device.shell("ip -f inet addr show wlan0 | awk '/inet / {print $2}' | cut -d'/' -f1").strip(),
                 'ip_address': self.device.shell('ip addr show wlan0').strip(),
                 'mac_address': self.device.shell('cat /sys/class/net/wlan0/address').strip(),
-                #'wifi_ssid': self.device.shell('dumpsys wifi | grep "mWifiInfo"').strip(),
                 # Дополнительные сетевые параметры
                 'network_type': self.device.shell('getprop gsm.network.type').strip(),
                 'cellular_operator': self.device.shell('getprop gsm.operator.alpha').strip(),
                 # Информация о подключениях
-                #'active_connections': self.device.shell('netstat -tuln').strip(),
                 'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
                 'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
                 'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
