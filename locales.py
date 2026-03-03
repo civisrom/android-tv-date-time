@@ -366,13 +366,13 @@ arising from the use of this program.
                 en="Please enter a valid number",
                 ru="Введите корректный номер"
             ),
-            "menu_item_8": Translation(
-                 en="8. Auto-setup NTP server (experimental mode)",
-                 ru="8. Автоматическая установка NTP-сервера (экспериментальный режим)"
-            ),
             "menu_item_9": Translation(
-                 en="9. Terminal mode (ADB and system commands)",
-                 ru="9. Режим терминала (команды ADB и системные)"
+                 en="9. Auto-setup NTP server (experimental mode)",
+                 ru="9. Автоматическая установка NTP-сервера (экспериментальный режим)"
+            ),
+            "menu_item_10": Translation(
+                 en="10. Terminal mode (ADB and system commands)",
+                 ru="10. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
                  en="Terminal mode activated. Type 'help', 'adb --help' for available commands or 'exit' to quit.",
@@ -762,14 +762,18 @@ arising from the use of this program.
                 ru="5. Показать текущую информацию об устройстве"
             ),
             "menu_item_6": Translation(
-                en="6. Server management",
-                ru="6. Управление серверами"
+                en="6. Ping NTP servers",
+                ru="6. Пинговать NTP-серверы"
             ),
             "menu_item_7": Translation(
-                en="7. Network scan & batch NTP update",
-                ru="7. Сканирование сети и групповое обновление NTP"
+                en="7. Server management",
+                ru="7. Управление серверами"
             ),
-            "menu_item_10": Translation(
+            "menu_item_8": Translation(
+                en="8. Network scan & batch NTP update",
+                ru="8. Сканирование сети и групповое обновление NTP"
+            ),
+            "menu_item_11": Translation(
                 en="0. Exit",
                 ru="0. Выход"
             ),
@@ -1224,16 +1228,24 @@ vn: Вьетнам
             ),
 
             "ntp_verify_before_apply": Translation(
-                en="Verifying NTP server availability before applying...",
-                ru="Проверка доступности NTP-сервера перед применением..."
+                en="Verifying NTP server time sync (3 attempts)...",
+                ru="Проверка синхронизации времени NTP-сервера (3 попытки)..."
             ),
-            "ntp_verify_success": Translation(
-                en="NTP server {server} is reachable (RTT: {rtt:.1f}ms)",
-                ru="NTP-сервер {server} доступен (RTT: {rtt:.1f}мс)"
+            "ntp_verify_detailed": Translation(
+                en="NTP server {server} is working correctly:\n  RTT: {rtt:.1f}ms | Success: {success:.0f}% | Offset: {offset:.3f}s",
+                ru="NTP-сервер {server} работает корректно:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
             ),
             "ntp_verify_failed": Translation(
-                en="Warning: NTP server {server} is not reachable. Apply anyway? (y/n): ",
-                ru="Внимание: NTP-сервер {server} недоступен. Применить всё равно? (y/n): "
+                en="Warning: NTP server {server} is not reachable (0/3 attempts). Apply anyway? (y/n): ",
+                ru="Внимание: NTP-сервер {server} недоступен (0/3 попыток). Применить всё равно? (y/n): "
+            ),
+            "ntp_verify_bad_offset": Translation(
+                en="Warning: NTP server {server} responds but time offset is too large ({offset:.1f}s). Server may not sync time correctly.",
+                ru="Внимание: NTP-сервер {server} отвечает, но смещение времени слишком большое ({offset:.1f}с). Сервер может некорректно синхронизировать время."
+            ),
+            "ntp_verify_force_apply": Translation(
+                en="Apply this server anyway? (y/n): ",
+                ru="Всё равно применить этот сервер? (y/n): "
             ),
             "connection_reused": Translation(
                 en="Using existing connection to {ip}",
@@ -1346,6 +1358,14 @@ vn: Вьетнам
             "auto_server_success": Translation(
                 en="Success",
                 ru="Успех"
+            ),
+            "auto_region_detected": Translation(
+                en="[Auto] Your region detected: {timezone} ({region})",
+                ru="[Авто] Ваш регион определён: {timezone} ({region})"
+            ),
+            "auto_priority_count": Translation(
+                en="[Auto] {count} regional servers will be prioritized",
+                ru="[Авто] {count} региональных серверов будут проверены в приоритете"
             ),
         }
 
