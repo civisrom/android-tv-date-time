@@ -1427,8 +1427,8 @@ class AndroidTVTimeFixer:
     def _get_local_scan_networks(local_ip: str) -> List[ipaddress.IPv4Network]:
         """
         Определяет сети для сканирования на основе локального IP.
-        Для 192.168.x.x — сканируем всю 192.168.0.0/16 (65 534 хоста)
-        Для 10.x.x.x — сканируем всю 10.0.0.0/8 (16 777 214 хостов — ограничиваем /16)
+        Для 192.168.x.x — сканируем 192.168.0.0/16
+        Для 10.x.x.x — сканируем /16 от текущего IP + 10.1.0.0/16
         Остальные (Docker 172.x, VPN и т.д.) — пропускаем
         """
         try:
@@ -1445,8 +1445,13 @@ class AndroidTVTimeFixer:
             # Домашние сети — вся 192.168.0.0/16
             networks.append(ipaddress.IPv4Network('192.168.0.0/16', strict=False))
         elif local_ip.startswith('10.'):
-            # 10.0.0.0/8 слишком большой, сканируем /16 от текущего IP
-            networks.append(ipaddress.IPv4Network(f"{local_ip}/16", strict=False))
+            # /16 от текущего IP
+            current_net = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
+            networks.append(current_net)
+            # Дополнительно 10.1.0.0/16
+            extra_net = ipaddress.IPv4Network('10.1.0.0/16', strict=False)
+            if extra_net != current_net:
+                networks.append(extra_net)
 
         return networks
 
