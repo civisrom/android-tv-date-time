@@ -1975,6 +1975,9 @@ def main():
             print(locales.get("language_set_en"))  # Подтверждение выбора
 
     try:
+        # Показываем дисклеймер
+        print(Fore.RED + locales.get("disclaimer"))
+
         # Показываем начальные инструкции
         print(Fore.GREEN + locales.get("program_title"))
         print(Fore.WHITE + locales.get("please_ensure"))
