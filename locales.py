@@ -1113,8 +1113,8 @@ vn: Вьетнам
                 ru="Не удалось определить маску подсети, используется запасной диапазон: {network}"
             ),
             "scan_wide_offer": Translation(
-                en="No devices found in {narrow}. Scan wider range {wide}? (Y/n): ",
-                ru="В подсети {narrow} устройства не найдены. Сканировать расширенный диапазон {wide}? (Д/n): "
+                en="No devices found in {narrow}. Scan wider range {wide}? (y/n): ",
+                ru="В подсети {narrow} устройства не найдены. Сканировать расширенный диапазон {wide}? (y/n): "
             ),
             "scan_firewall_hint": Translation(
                 en="Hint: Make sure this program is allowed through your firewall (Windows Defender, iptables, etc.).",
