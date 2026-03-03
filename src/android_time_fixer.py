@@ -1444,8 +1444,8 @@ class AndroidTVTimeFixer:
             pass
         return None
 
-    @staticmethod
-    def _get_local_scan_networks(local_ip: str) -> List[ipaddress.IPv4Network]:
+    @classmethod
+    def _get_local_scan_networks(cls, local_ip: str) -> List[ipaddress.IPv4Network]:
         """
         Определяет сети для сканирования на основе локального IP.
         Сначала пытается определить реальную подсеть интерфейса через psutil.
@@ -1464,7 +1464,7 @@ class AndroidTVTimeFixer:
         networks = []
 
         # Пытаемся определить реальную подсеть через интерфейс
-        detected = AndroidTimeFixer._detect_interface_network(local_ip)
+        detected = cls._detect_interface_network(local_ip)
 
         if detected:
             networks.append(detected)
