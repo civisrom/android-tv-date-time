@@ -1840,6 +1840,76 @@ class AndroidTVTimeFixer:
             'offset': avg_offset
         }
 
+    # Маппинг Windows-имён таймзон (time.tzname) → IANA timezone
+    _win_tz_to_iana = {
+        # Windows RTZ (Russia Time Zones)
+        'RTZ 1': 'Europe/Kaliningrad',
+        'RTZ 2': 'Europe/Moscow',
+        'RTZ 3': 'Europe/Samara',
+        'RTZ 4': 'Asia/Yekaterinburg',
+        'RTZ 5': 'Asia/Omsk',
+        'RTZ 6': 'Asia/Novosibirsk',
+        'RTZ 7': 'Asia/Krasnoyarsk',
+        'RTZ 8': 'Asia/Irkutsk',
+        'RTZ 9': 'Asia/Yakutsk',
+        'RTZ 10': 'Asia/Vladivostok',
+        'RTZ 11': 'Asia/Kamchatka',
+        # Windows standard names (English)
+        'Eastern Standard Time': 'America/New_York',
+        'Central Standard Time': 'America/Chicago',
+        'Mountain Standard Time': 'America/Denver',
+        'Pacific Standard Time': 'America/Los_Angeles',
+        'Central European Standard Time': 'Europe/Warsaw',
+        'W. Europe Standard Time': 'Europe/Berlin',
+        'Romance Standard Time': 'Europe/Paris',
+        'GMT Standard Time': 'Europe/London',
+        'FLE Standard Time': 'Europe/Kiev',
+        'GTB Standard Time': 'Europe/Bucharest',
+        'Turkey Standard Time': 'Europe/Istanbul',
+        'China Standard Time': 'Asia/Shanghai',
+        'Tokyo Standard Time': 'Asia/Tokyo',
+        'Korea Standard Time': 'Asia/Seoul',
+        'India Standard Time': 'Asia/Kolkata',
+        'AUS Eastern Standard Time': 'Australia/Sydney',
+        'E. South America Standard Time': 'America/Sao_Paulo',
+        'Arab Standard Time': 'Asia/Riyadh',
+        'Arabian Standard Time': 'Asia/Dubai',
+        'Israel Standard Time': 'Asia/Jerusalem',
+        'Singapore Standard Time': 'Asia/Singapore',
+        'Taipei Standard Time': 'Asia/Taipei',
+        'SE Asia Standard Time': 'Asia/Bangkok',
+        'Belarus Standard Time': 'Europe/Minsk',
+        'Georgian Standard Time': 'Asia/Tbilisi',
+        'Azerbaijan Standard Time': 'Asia/Baku',
+        'Caucasus Standard Time': 'Asia/Yerevan',
+        'Iran Standard Time': 'Asia/Tehran',
+        'Pakistan Standard Time': 'Asia/Karachi',
+        'Central Asia Standard Time': 'Asia/Almaty',
+        'Bangladesh Standard Time': 'Asia/Dhaka',
+        'Nepal Standard Time': 'Asia/Kathmandu',
+        'N. Central Asia Standard Time': 'Asia/Novosibirsk',
+        'North Asia Standard Time': 'Asia/Krasnoyarsk',
+        'North Asia East Standard Time': 'Asia/Irkutsk',
+        'Vladivostok Standard Time': 'Asia/Vladivostok',
+        'Yakutsk Standard Time': 'Asia/Yakutsk',
+        'Ekaterinburg Standard Time': 'Asia/Yekaterinburg',
+        'Russian Standard Time': 'Europe/Moscow',
+        'Kaliningrad Standard Time': 'Europe/Kaliningrad',
+    }
+
+    # Маппинг UTC-офсета (часы) → IANA timezone (фолбэк)
+    _utc_offset_to_iana = {
+        -10: 'Pacific/Honolulu', -9: 'America/Anchorage',
+        -8: 'America/Los_Angeles', -7: 'America/Denver',
+        -6: 'America/Chicago', -5: 'America/New_York',
+        -4: 'America/Sao_Paulo', -3: 'America/Sao_Paulo',
+        0: 'Europe/London', 1: 'Europe/Berlin', 2: 'Europe/Kiev',
+        3: 'Europe/Moscow', 4: 'Asia/Dubai', 5: 'Asia/Yekaterinburg',
+        6: 'Asia/Omsk', 7: 'Asia/Krasnoyarsk', 8: 'Asia/Shanghai',
+        9: 'Asia/Tokyo', 10: 'Australia/Sydney', 11: 'Asia/Vladivostok',
+        12: 'Asia/Kamchatka',
+    }
+
     # Маппинг timezone-префиксов на коды стран и региональные пулы
     _tz_to_countries = {
         'Europe/Moscow': ['ru'], 'Europe/Kaliningrad': ['ru'], 'Europe/Samara': ['ru'],
@@ -1928,8 +1998,8 @@ class AndroidTVTimeFixer:
                 except Exception:
                     pass
 
-            # Определяем timezone через /etc/timezone или /etc/localtime
-            if not tz_key or len(tz_key) < 4:
+            # Определяем timezone через /etc/timezone или /etc/localtime (Linux/macOS)
+            if not tz_key or '/' not in tz_key:
                 try:
                     with open('/etc/timezone', 'r') as f:
                         tz_key = f.read().strip()
@@ -1941,6 +2011,27 @@ class AndroidTVTimeFixer:
                             tz_key = link.split('zoneinfo/')[-1]
                     except Exception:
                         pass
+
+            # Если tz_key — не IANA (нет '/'), пробуем конвертировать Windows-имя → IANA
+            if tz_key and '/' not in tz_key:
+                # Проверяем точное совпадение Windows-имени
+                iana = self._win_tz_to_iana.get(tz_key)
+                if not iana:
+                    # Проверяем tz_name (time.tzname[0]), например "RTZ 2 (зима)" → "RTZ 2"
+                    for win_name, iana_name in self._win_tz_to_iana.items():
+                        if tz_name.startswith(win_name) or tz_key.startswith(win_name):
+                            iana = iana_name
+                            break
+                if not iana:
+                    # Фолбэк: определяем IANA по UTC-офсету
+                    try:
+                        utc_offset_sec = datetime.datetime.now(datetime.timezone.utc).astimezone().utcoffset().total_seconds()
+                        utc_offset_hours = int(utc_offset_sec / 3600)
+                        iana = self._utc_offset_to_iana.get(utc_offset_hours)
+                    except Exception:
+                        pass
+                if iana:
+                    tz_key = iana
 
             if not tz_key:
                 return [], []
