@@ -1998,8 +1998,8 @@ class AndroidTVTimeFixer:
                 except Exception:
                     pass
 
-            # Определяем timezone через /etc/timezone или /etc/localtime
-            if not tz_key or len(tz_key) < 4:
+            # Определяем timezone через /etc/timezone или /etc/localtime (Linux/macOS)
+            if not tz_key or '/' not in tz_key:
                 try:
                     with open('/etc/timezone', 'r') as f:
                         tz_key = f.read().strip()
