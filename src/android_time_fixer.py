@@ -1424,12 +1424,34 @@ class AndroidTVTimeFixer:
             return False
 
     @staticmethod
+    def _detect_interface_network(local_ip: str) -> Optional[ipaddress.IPv4Network]:
+        """
+        Определяет реальную подсеть интерфейса через psutil.
+        Возвращает точную сеть (например /24) или None если не удалось определить.
+        """
+        try:
+            for iface_name, addrs in psutil.net_if_addrs().items():
+                for addr in addrs:
+                    if addr.family != socket.AF_INET:
+                        continue
+                    if addr.address != local_ip:
+                        continue
+                    if addr.netmask:
+                        return ipaddress.IPv4Network(
+                            f"{local_ip}/{addr.netmask}", strict=False
+                        )
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
     def _get_local_scan_networks(local_ip: str) -> List[ipaddress.IPv4Network]:
         """
         Определяет сети для сканирования на основе локального IP.
-        Для 192.168.x.x — сканируем 192.168.0.0/16
-        Для 10.x.x.x — сканируем /16 от текущего IP + 10.1.0.0/16
-        Остальные (Docker 172.x, VPN и т.д.) — пропускаем
+        Сначала пытается определить реальную подсеть интерфейса через psutil.
+        Если не удалось — использует запасной диапазон:
+          192.168.x.x → 192.168.0.0/16
+          10.x.x.x    → текущая /16 + 10.1.0.0/16
         """
         try:
             addr = ipaddress.IPv4Address(local_ip)
@@ -1441,11 +1463,16 @@ class AndroidTVTimeFixer:
 
         networks = []
 
-        if local_ip.startswith('192.168.'):
-            # Домашние сети — вся 192.168.0.0/16
+        # Пытаемся определить реальную подсеть через интерфейс
+        detected = AndroidTimeFixer._detect_interface_network(local_ip)
+
+        if detected:
+            networks.append(detected)
+        elif local_ip.startswith('192.168.'):
+            # Fallback: домашние сети — вся 192.168.0.0/16
             networks.append(ipaddress.IPv4Network('192.168.0.0/16', strict=False))
         elif local_ip.startswith('10.'):
-            # /16 от текущего IP
+            # Fallback: /16 от текущего IP
             current_net = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
             networks.append(current_net)
             # Дополнительно 10.1.0.0/16
@@ -1457,7 +1484,7 @@ class AndroidTVTimeFixer:
 
     def scan_network_for_android_devices(self) -> List[str]:
         """Сканирует локальные подсети в поисках устройств с открытым ADB-портом 5555.
-        192.168.x.x — вся 192.168.0.0/16, 10.x.x.x — текущая /16."""
+        Автоматически определяет подсеть через psutil, fallback на /16."""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
@@ -1470,6 +1497,15 @@ class AndroidTVTimeFixer:
         if not self._is_private_ip(local_ip):
             print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
             return []
+
+        # Определяем реальную подсеть
+        detected = self._detect_interface_network(local_ip)
+        if detected:
+            hosts_count = detected.num_addresses - 2 if detected.prefixlen < 31 else detected.num_addresses
+            print(Fore.GREEN + locales.get("scan_net_detected", network=str(detected), hosts=hosts_count))
+        else:
+            fallback_net = "192.168.0.0/16" if local_ip.startswith('192.168.') else f"{local_ip}/16"
+            print(Fore.YELLOW + locales.get("scan_net_fallback", network=fallback_net))
 
         networks = self._get_local_scan_networks(local_ip)
         if not networks:

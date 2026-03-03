@@ -1098,6 +1098,14 @@ vn: Вьетнам
                 en="Your IP address ({ip}) is not in a supported local network range (192.168.x.x or 10.x.x.x). Network scan is only available on local networks.",
                 ru="Ваш IP-адрес ({ip}) не входит в поддерживаемый диапазон локальных сетей (192.168.x.x или 10.x.x.x). Сканирование доступно только в локальных сетях."
             ),
+            "scan_net_detected": Translation(
+                en="Network auto-detected: {network} ({hosts} hosts)",
+                ru="Сеть определена автоматически: {network} ({hosts} хостов)"
+            ),
+            "scan_net_fallback": Translation(
+                en="Could not detect subnet mask, using fallback range: {network}",
+                ru="Не удалось определить маску подсети, используется запасной диапазон: {network}"
+            ),
             "no_discovered_devices": Translation(
                 en="No discovered devices. Run scan first (option 1).",
                 ru="Нет найденных устройств. Сначала запустите сканирование (пункт 1)."
