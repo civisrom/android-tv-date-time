@@ -179,12 +179,14 @@ arising from the use of this program.
                 "1. ADB debugging is enabled on your TV\n"
                 "2. Your TV and PC are on the same network\n"
                 "3. The IP address is entered correctly\n"
-                "4. You have granted access to the device when prompted on the TV",
+                "4. You have granted access to the device when prompted on the TV\n"
+                "5. This program is allowed through your firewall",
                 ru="Убедитесь, что:\n"
                 "1. На вашем ТВ включен отладчик ADB\n"
                 "2. Ваш ТВ и ПК находятся в одной сети\n"
                 "3. IP-адрес введен правильно\n"
-                "4. Вы предоставили доступ устройству при появлении запроса на ТВ"
+                "4. Вы предоставили доступ устройству при появлении запроса на ТВ\n"
+                "5. Программа добавлена в исключения файрвола (брандмауэра)"
             ),
             "last_error": Translation(
                 en="Last error: {error}",
@@ -1109,6 +1111,14 @@ vn: Вьетнам
             "scan_net_fallback": Translation(
                 en="Could not detect subnet mask, using fallback range: {network}",
                 ru="Не удалось определить маску подсети, используется запасной диапазон: {network}"
+            ),
+            "scan_wide_offer": Translation(
+                en="No devices found in {narrow}. Scan wider range {wide}? (Y/n): ",
+                ru="В подсети {narrow} устройства не найдены. Сканировать расширенный диапазон {wide}? (Д/n): "
+            ),
+            "scan_firewall_hint": Translation(
+                en="Hint: Make sure this program is allowed through your firewall (Windows Defender, iptables, etc.).",
+                ru="Подсказка: Убедитесь, что программа добавлена в исключения файрвола (Брандмауэр Windows, iptables и т.д.)."
             ),
             "no_discovered_devices": Translation(
                 en="No discovered devices. Run scan first (option 1).",
