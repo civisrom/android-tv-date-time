@@ -38,7 +38,7 @@ jobs:
             platform: Windows
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
             adb_base: "adb.exe AdbWinApi.dll AdbWinUsbApi.dll"
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: Linux
             adb_url: https://dl.google.com/android/repository/platform-tools-latest-linux.zip
             adb_base: "adb"
