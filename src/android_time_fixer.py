@@ -1415,8 +1415,49 @@ class AndroidTVTimeFixer:
         except Exception:
             return None
 
+    @staticmethod
+    def _is_private_ip(ip_str: str) -> bool:
+        """Проверяет, является ли IP-адрес локальным (192.168.x.x или 10.x.x.x)"""
+        try:
+            return ip_str.startswith('192.168.') or ip_str.startswith('10.')
+        except Exception:
+            return False
+
+    @staticmethod
+    def _get_local_scan_networks(local_ip: str) -> List[ipaddress.IPv4Network]:
+        """
+        Определяет сети для сканирования на основе локального IP.
+        Для 192.168.x.x — сканируем 192.168.0.0/16
+        Для 10.x.x.x — сканируем /16 от текущего IP + 10.1.0.0/16
+        Остальные (Docker 172.x, VPN и т.д.) — пропускаем
+        """
+        try:
+            addr = ipaddress.IPv4Address(local_ip)
+        except ValueError:
+            return []
+
+        if addr.is_loopback:
+            return []
+
+        networks = []
+
+        if local_ip.startswith('192.168.'):
+            # Домашние сети — вся 192.168.0.0/16
+            networks.append(ipaddress.IPv4Network('192.168.0.0/16', strict=False))
+        elif local_ip.startswith('10.'):
+            # /16 от текущего IP
+            current_net = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
+            networks.append(current_net)
+            # Дополнительно 10.1.0.0/16
+            extra_net = ipaddress.IPv4Network('10.1.0.0/16', strict=False)
+            if extra_net != current_net:
+                networks.append(extra_net)
+
+        return networks
+
     def scan_network_for_android_devices(self) -> List[str]:
-        """Сканирует подсеть /16 в поисках устройств с открытым ADB-портом 5555"""
+        """Сканирует локальные подсети в поисках устройств с открытым ADB-портом 5555.
+        192.168.x.x — вся 192.168.0.0/16, 10.x.x.x — текущая /16."""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
@@ -1426,17 +1467,31 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("scan_local_ip_error"))
             return []
 
-        # Расширенный диапазон /16 — покрывает 65 534 хоста
-        network = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
-        hosts = [str(h) for h in network.hosts()]
+        if not self._is_private_ip(local_ip):
+            print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
+            return []
+
+        networks = self._get_local_scan_networks(local_ip)
+        if not networks:
+            print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
+            return []
+
+        # Собираем все хосты из всех подсетей, без дублей
+        hosts_set: set = set()
+        for net in networks:
+            for h in net.hosts():
+                hosts_set.add(str(h))
+        hosts = sorted(hosts_set, key=lambda ip: tuple(int(o) for o in ip.split('.')))
         total = len(hosts)
 
-        print(Fore.CYAN + locales.get("scan_start", network=str(network)))
+        net_names = ", ".join(str(n) for n in networks)
+        print(Fore.CYAN + locales.get("scan_start", network=net_names))
 
         found: List[str] = []
         checked = 0
 
-        with ThreadPoolExecutor(max_workers=500) as executor:
+        workers = min(500, total)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {executor.submit(self._check_adb_port, ip): ip for ip in hosts}
             for future in as_completed(futures):
                 result = future.result()
@@ -1975,6 +2030,9 @@ def main():
             print(locales.get("language_set_en"))  # Подтверждение выбора
 
     try:
+        # Показываем дисклеймер
+        print(Fore.RED + locales.get("disclaimer"))
+
         # Показываем начальные инструкции
         print(Fore.GREEN + locales.get("program_title"))
         print(Fore.WHITE + locales.get("please_ensure"))

@@ -1094,6 +1094,10 @@ vn: Вьетнам
                 en="Could not determine local IP address",
                 ru="Не удалось определить локальный IP-адрес"
             ),
+            "scan_not_private": Translation(
+                en="Your IP address ({ip}) is not in a supported local network range (192.168.x.x or 10.x.x.x). Network scan is only available on local networks.",
+                ru="Ваш IP-адрес ({ip}) не входит в поддерживаемый диапазон локальных сетей (192.168.x.x или 10.x.x.x). Сканирование доступно только в локальных сетях."
+            ),
             "no_discovered_devices": Translation(
                 en="No discovered devices. Run scan first (option 1).",
                 ru="Нет найденных устройств. Сначала запустите сканирование (пункт 1)."
