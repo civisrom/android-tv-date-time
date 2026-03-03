@@ -1417,59 +1417,42 @@ class AndroidTVTimeFixer:
 
     @staticmethod
     def _is_private_ip(ip_str: str) -> bool:
-        """Проверяет, является ли IP-адрес локальным (RFC 1918)"""
+        """Проверяет, является ли IP-адрес локальным (192.168.x.x или 10.x.x.x)"""
         try:
-            addr = ipaddress.IPv4Address(ip_str)
-            return addr.is_private and not addr.is_loopback
-        except ValueError:
+            return ip_str.startswith('192.168.') or ip_str.startswith('10.')
+        except Exception:
             return False
 
     @staticmethod
     def _get_local_scan_networks(local_ip: str) -> List[ipaddress.IPv4Network]:
         """
         Определяет сети для сканирования на основе локального IP.
-        Для 192.168.x.x — сканируем /24 текущей подсети + /24 подсеть .0 и .1
-        Для 10.x.x.x — сканируем /24 текущей подсети
-        Для 172.16-31.x.x — сканируем /24 текущей подсети
-        Остальные (Docker, VPN и т.д.) — пропускаем
+        Для 192.168.x.x — сканируем всю 192.168.0.0/16 (65 534 хоста)
+        Для 10.x.x.x — сканируем всю 10.0.0.0/8 (16 777 214 хостов — ограничиваем /16)
+        Остальные (Docker 172.x, VPN и т.д.) — пропускаем
         """
         try:
             addr = ipaddress.IPv4Address(local_ip)
         except ValueError:
             return []
 
-        # Только RFC 1918 приватные адреса
-        if not addr.is_private or addr.is_loopback:
+        if addr.is_loopback:
             return []
 
-        octets = local_ip.split('.')
         networks = []
 
         if local_ip.startswith('192.168.'):
-            # Домашние сети — сканируем текущую /24
-            current_net = ipaddress.IPv4Network(f"{local_ip}/24", strict=False)
-            networks.append(current_net)
-            # Если мы в .1.x, добавим .0.x и наоборот
-            third_octet = int(octets[2])
-            for extra in (0, 1):
-                if extra != third_octet:
-                    extra_net = ipaddress.IPv4Network(f"192.168.{extra}.0/24", strict=False)
-                    if extra_net not in networks:
-                        networks.append(extra_net)
+            # Домашние сети — вся 192.168.0.0/16
+            networks.append(ipaddress.IPv4Network('192.168.0.0/16', strict=False))
         elif local_ip.startswith('10.'):
-            # Крупные корпоративные/домашние сети — только /24
-            current_net = ipaddress.IPv4Network(f"{local_ip}/24", strict=False)
-            networks.append(current_net)
-        elif addr in ipaddress.IPv4Network('172.16.0.0/12'):
-            # 172.16.0.0 - 172.31.255.255 — только /24
-            current_net = ipaddress.IPv4Network(f"{local_ip}/24", strict=False)
-            networks.append(current_net)
+            # 10.0.0.0/8 слишком большой, сканируем /16 от текущего IP
+            networks.append(ipaddress.IPv4Network(f"{local_ip}/16", strict=False))
 
         return networks
 
     def scan_network_for_android_devices(self) -> List[str]:
         """Сканирует локальные подсети в поисках устройств с открытым ADB-портом 5555.
-        Сканируются только приватные сети (192.168.x.x, 10.x.x.x, 172.16-31.x.x)."""
+        192.168.x.x — вся 192.168.0.0/16, 10.x.x.x — текущая /16."""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
@@ -1502,7 +1485,7 @@ class AndroidTVTimeFixer:
         found: List[str] = []
         checked = 0
 
-        workers = min(200, total)
+        workers = min(500, total)
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {executor.submit(self._check_adb_port, ip): ip for ip in hosts}
             for future in as_completed(futures):
@@ -1510,7 +1493,7 @@ class AndroidTVTimeFixer:
                 checked += 1
                 if result:
                     found.append(result)
-                if checked % 50 == 0 or checked == total:
+                if checked % 200 == 0 or checked == total:
                     print(
                         Fore.CYAN + "\r  " +
                         locales.get("scan_progress", checked=checked, total=total, found=len(found)),
