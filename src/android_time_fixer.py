@@ -2123,12 +2123,12 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("auto_no_reachable_servers"))
             return
 
-        # Сортировка: приоритет локальным серверам, затем success_rate (убыв.) и avg_rtt (возр.)
+        # Сортировка: success_rate (убыв.) → avg_rtt (возр.)
+        # Региональные серверы получают лёгкий бонус: -10% к RTT при равном success_rate
         priority_set = set(priority_servers)
         results.sort(key=lambda x: (
-            x['server'] not in priority_set,  # False (0) для приоритетных — они первые
             -x['success_rate'],
-            x['avg_rtt']
+            x['avg_rtt'] * (0.9 if x['server'] in priority_set else 1.0)
         ))
 
         # Шаг 5: Показать топ-5
