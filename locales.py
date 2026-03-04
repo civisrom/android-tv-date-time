@@ -158,6 +158,14 @@ arising from the use of this program.
                 en="\nCurrent device information:\n",
                 ru="\nТекущая информация об устройстве:\n"
             ),
+            "checking_port": Translation(
+                en="Checking port {port} availability on {ip}...",
+                ru="Проверка доступности порта {port} на {ip}..."
+            ),
+            "port_not_available": Translation(
+                en="Port {port} is not available on {ip}. The device may be off, ADB is not enabled, or the port is incorrect.",
+                ru="Порт {port} недоступен на {ip}. Устройство может быть выключено, ADB не включён или порт указан неверно."
+            ),
             "confirm_connection": Translation(
                 en="Please confirm the connection on the TV screen if prompted.",
                 ru="Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос."
@@ -1069,12 +1077,12 @@ vn: Вьетнам
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter device IP or IP:port (press Enter for saved: {saved_ip}, or 's' to scan network): ",
-                ru="Введите IP или IP:порт (Enter для сохранённого: {saved_ip}, или 's' для сканирования): "
+                en="Enter IP or IP:port if port differs from 5555 (press Enter for saved: {saved_ip}, or 's' to scan network): ",
+                ru="Введите IP или IP:порт если порт отличается от 5555 (Enter для сохранённого: {saved_ip}, или 's' для сканирования): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter device IP or IP:port (or 's' to scan network): ",
-                ru="Введите IP или IP:порт (или 's' для сканирования сети): "
+                en="Enter IP or IP:port if port differs from 5555 (or 's' to scan network): ",
+                ru="Введите IP или IP:порт если порт отличается от 5555 (или 's' для сканирования сети): "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",
