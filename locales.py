@@ -792,8 +792,8 @@ arising from the use of this program.
                 ru="Введите IP-адрес устройства (нажмите Enter для использования сохранённого: {saved_ip}): "
             ),
             "invalid_ip_format": Translation(
-                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx",
-                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx"
+                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: 5555)",
+                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: 5555)"
             ),
             "invalid_ntp_server_format": Translation(
                 en="Invalid NTP server format. Use a valid domain name (e.g., time.google.com) or IP address.",
@@ -1069,12 +1069,12 @@ vn: Вьетнам
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter device IP (press Enter for saved: {saved_ip}, or 's' to scan network): ",
-                ru="Введите IP устройства (Enter для сохранённого: {saved_ip}, или 's' для сканирования): "
+                en="Enter device IP or IP:port (press Enter for saved: {saved_ip}, or 's' to scan network): ",
+                ru="Введите IP или IP:порт (Enter для сохранённого: {saved_ip}, или 's' для сканирования): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter device IP (or 's' to scan network): ",
-                ru="Введите IP устройства (или 's' для сканирования сети): "
+                en="Enter device IP or IP:port (or 's' to scan network): ",
+                ru="Введите IP или IP:порт (или 's' для сканирования сети): "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",

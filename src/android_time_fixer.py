@@ -1201,7 +1201,29 @@ class AndroidTVTimeFixer:
                 print(Fore.RED + locales.get("invalid_choice"))
 
     @staticmethod
+    def parse_ip_port(address: str) -> Tuple[str, int]:
+        """Разбирает адрес вида 'ip' или 'ip:port'. Возвращает (ip, port), порт по умолчанию 5555."""
+        if ':' in address:
+            parts = address.rsplit(':', 1)
+            ip = parts[0]
+            try:
+                port = int(parts[1])
+                if not (1 <= port <= 65535):
+                    port = 5555
+            except ValueError:
+                ip = address
+                port = 5555
+        else:
+            ip = address
+            port = 5555
+        return ip.strip(), port
+
+    @staticmethod
     def validate_ip(ip: str) -> bool:
+        """Проверяет IP-адрес, допускает формат ip или ip:port"""
+        # Отделяем порт если есть
+        if ':' in ip:
+            ip = ip.rsplit(':', 1)[0]
         pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
         if not re.match(pattern, ip):
             return False
@@ -1336,6 +1358,7 @@ class AndroidTVTimeFixer:
         if not self.validate_ip(ip):
             raise AndroidTVTimeFixerError(locales.get("invalid_ip_format"))
 
+        host, port = self.parse_ip_port(ip)
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
 
@@ -1351,7 +1374,7 @@ class AndroidTVTimeFixer:
             if remaining_time <= 0:
                 break
             try:
-                self.device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
+                self.device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
                 connection_established = True
                 self.connected_ip = ip
@@ -1614,7 +1637,8 @@ class AndroidTVTimeFixer:
         for idx, ip in enumerate(ip_list, 1):
             print(Fore.CYAN + locales.get("batch_connecting", idx=idx, total=total, ip=ip))
             try:
-                device = AdbDeviceTcp(ip.strip(), 5555, default_transport_timeout_s=9.)
+                host, port = self.parse_ip_port(ip)
+                device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
                 device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 device.shell(f'settings put global ntp_server {ntp_server}')
                 confirmed = device.shell('settings get global ntp_server').strip()
