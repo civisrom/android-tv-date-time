@@ -165,9 +165,8 @@ Run via PowerShell
 3. Copy server to clipboard
 4. Paste server from clipboard
 5. Remove server from favorites
-6. Ping NTP servers
-7. Export / Import settings
-8. Return to main menu
+6. Export / Import settings
+7. Return to main menu
 ```
 
 ### Network Scan Submenu
@@ -230,7 +229,6 @@ Opens a submenu for managing favorite servers:
 - **Copy server** — copies the current device server to clipboard
 - **Paste server** — sets the server from clipboard on the device
 - **Remove server** — removes a selected server from the favorites list
-- **Ping NTP servers** — test server availability
 - **Export / Import settings** — save and restore all settings (language, IP, favorite servers) to a JSON file
 
 ### Item 8 — Network scan & batch NTP update
