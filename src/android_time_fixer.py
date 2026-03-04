@@ -1359,6 +1359,12 @@ class AndroidTVTimeFixer:
             raise AndroidTVTimeFixerError(locales.get("invalid_ip_format"))
 
         host, port = self.parse_ip_port(ip)
+
+        # Проверяем доступность порта перед попыткой подключения
+        print(Fore.CYAN + locales.get("checking_port", ip=host, port=port))
+        if not self._check_port_available(host, port):
+            raise AndroidTVTimeFixerError(locales.get("port_not_available", ip=host, port=port))
+
         pub, priv = self.load_keys()
         signer = PythonRSASigner(pub, priv)
 
@@ -1437,16 +1443,21 @@ class AndroidTVTimeFixer:
     # Network scan
     # ──────────────────────────────────────────────────────────
 
-    def _check_adb_port(self, ip: str) -> Optional[str]:
-        """Проверяет, открыт ли ADB-порт 5555 на указанном IP"""
+    @staticmethod
+    def _check_port_available(ip: str, port: int, timeout: float = 2.0) -> bool:
+        """Проверяет, открыт ли указанный порт на IP-адресе"""
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(0.2)
-            result = sock.connect_ex((ip, 5555))
+            sock.settimeout(timeout)
+            result = sock.connect_ex((ip, port))
             sock.close()
-            return ip if result == 0 else None
+            return result == 0
         except Exception:
-            return None
+            return False
+
+    def _check_adb_port(self, ip: str) -> Optional[str]:
+        """Проверяет, открыт ли ADB-порт 5555 на указанном IP"""
+        return ip if self._check_port_available(ip, 5555, timeout=0.2) else None
 
     @staticmethod
     def _is_private_ip(ip_str: str) -> bool:
