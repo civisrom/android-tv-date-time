@@ -171,8 +171,8 @@ arising from the use of this program.
                 ru="Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос."
             ),
             "connection_success": Translation(
-                en="Successfully connected to {ip}:5555",
-                ru="Подключение к {ip}:5555 выполнено успешно"
+                en="Successfully connected to {ip}:{port}",
+                ru="Подключение к {ip}:{port} выполнено успешно"
             ),
             "waiting_for_connection": Translation(
                 en="\rWaiting for connection... {remaining_time} sec.",
