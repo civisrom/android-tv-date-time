@@ -1211,7 +1211,7 @@ class AndroidTVTimeFixer:
                 if not (1 <= port <= 65535):
                     port = 5555
             except ValueError:
-                ip = address
+                ip = parts[0]
                 port = 5555
         else:
             ip = address
@@ -1304,12 +1304,14 @@ class AndroidTVTimeFixer:
     
     def connect_or_reuse(self, ip: str) -> None:
         """Подключается к устройству или переиспользует существующее соединение"""
-        if self.device and self.connected_ip == ip:
+        host, port = self.parse_ip_port(ip)
+        normalized = f"{host}:{port}"
+        if self.device and self.connected_ip == normalized:
             try:
                 # Проверяем, что соединение ещё активно
                 self.device.shell('echo ok')
-                self.logger.info(f"Reusing existing connection to {ip}")
-                print(Fore.GREEN + locales.get("connection_reused", ip=ip))
+                self.logger.info(f"Reusing existing connection to {normalized}")
+                print(Fore.GREEN + locales.get("connection_reused", ip=normalized))
                 return
             except Exception:
                 # Соединение потеряно, переподключаемся
@@ -1383,9 +1385,9 @@ class AndroidTVTimeFixer:
                 self.device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
                 self.device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
                 connection_established = True
-                self.connected_ip = ip
-                self.process_manager.device_ip = ip
-                self.logger.info(locales.get_en('connection_success', ip=ip))
+                self.connected_ip = f"{host}:{port}"
+                self.process_manager.device_ip = f"{host}:{port}"
+                self.logger.info(locales.get_en('connection_success', ip=host, port=port))
                 break
             except Exception as e:
                 last_error = str(e)
@@ -1461,9 +1463,14 @@ class AndroidTVTimeFixer:
 
     @staticmethod
     def _is_private_ip(ip_str: str) -> bool:
-        """Проверяет, является ли IP-адрес локальным (192.168.x.x или 10.x.x.x)"""
+        """Проверяет, является ли IP-адрес локальным (192.168.x.x, 10.x.x.x или 172.16-31.x.x)"""
         try:
-            return ip_str.startswith('192.168.') or ip_str.startswith('10.')
+            if ip_str.startswith('192.168.') or ip_str.startswith('10.'):
+                return True
+            if ip_str.startswith('172.'):
+                second_octet = int(ip_str.split('.')[1])
+                return 16 <= second_octet <= 31
+            return False
         except Exception:
             return False
 
@@ -1523,6 +1530,15 @@ class AndroidTVTimeFixer:
             extra_net = ipaddress.IPv4Network('10.1.0.0/16', strict=False)
             if extra_net != current_net:
                 networks.append(extra_net)
+        elif local_ip.startswith('172.'):
+            # Fallback: 172.16.0.0/12 private range
+            try:
+                second_octet = int(local_ip.split('.')[1])
+                if 16 <= second_octet <= 31:
+                    current_net = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
+                    networks.append(current_net)
+            except (ValueError, IndexError):
+                pass
 
         return networks
 
@@ -1541,6 +1557,9 @@ class AndroidTVTimeFixer:
         found: List[str] = []
         checked = 0
 
+        if total == 0:
+            print(Fore.YELLOW + locales.get("scan_complete", count=0))
+            return []
         workers = min(500, total)
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {executor.submit(self._check_adb_port, ip): ip for ip in hosts}
@@ -1960,7 +1979,7 @@ class AndroidTVTimeFixer:
         'America/New_York': ['us'], 'America/Chicago': ['us'],
         'America/Denver': ['us'], 'America/Los_Angeles': ['us'],
         'America/Toronto': ['ca'], 'America/Vancouver': ['ca'],
-        'America/Sao_Paulo': ['br'], 'America/Argentina/Buenos_Aires': ['br'],
+        'America/Sao_Paulo': ['br'], 'America/Argentina/Buenos_Aires': ['ar'],
         'Australia/Sydney': ['au'], 'Australia/Melbourne': ['au'],
         'Asia/Tokyo': ['jp'], 'Asia/Seoul': ['kr'],
         'Asia/Shanghai': ['cn'], 'Asia/Hong_Kong': ['hk'],
@@ -2004,7 +2023,6 @@ class AndroidTVTimeFixer:
             tz_name = time.tzname[0] if time.tzname else ''
             # Пытаемся получить IANA timezone
             try:
-                import zoneinfo
                 tz_key = str(datetime.datetime.now().astimezone().tzinfo)
             except Exception:
                 tz_key = ''
