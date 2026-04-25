@@ -3,6 +3,11 @@
 # Запускает AndroidTVTimeFixer.exe в текущем каталоге
 ##############################################################
 
+param(
+    [switch]$KeepOpenOnError
+)
+
+$ErrorActionPreference = "Stop"
 $Host.UI.RawUI.WindowTitle = "Android TV Time Fixer"
 
 # Определяем каталог скрипта (работает и при двойном клике)
@@ -31,4 +36,24 @@ Set-Location $scriptDir
 [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
 $env:PYTHONIOENCODING = "utf-8"
 
-& $exePath
+try {
+    & $exePath
+    $exitCode = $LASTEXITCODE
+    if ($null -eq $exitCode) {
+        $exitCode = 0
+    }
+} catch {
+    $exitCode = 1
+    Write-Host ""
+    Write-Host "ERROR: Failed to start $exeName" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Yellow
+}
+
+if ($KeepOpenOnError -and $exitCode -ne 0) {
+    Write-Host ""
+    Write-Host "$exeName exited with code $exitCode." -ForegroundColor Red
+    Write-Host "Check the messages above or android_tv_fixer.log in this folder." -ForegroundColor Cyan
+    Read-Host "Press Enter to close"
+}
+
+exit $exitCode
