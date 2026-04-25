@@ -11,8 +11,8 @@ permissions:
 env:
   PYTHON_VERSION: '3.11'
   CI_DEBUG: true
-  POETRY_VERSION: '2.1.4'
-  PYINSTALLER_VERSION: '6.15'
+  POETRY_VERSION: '2.3.4'
+  PYINSTALLER_VERSION: '6.20.0'
 
 jobs:
   update-dependencies:
