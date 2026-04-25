@@ -91,15 +91,6 @@ jobs:
           poetry env use python
         shell: bash
 
-      - name: Install dependencies
-        run: |
-          poetry install --no-interaction --no-root --with dev --all-extras
-          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}" psutil
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            poetry run pip install wmi
-          fi
-        shell: bash
-
       - name: Install system dependencies
         if: runner.os == 'Linux'
         run: |
@@ -112,6 +103,15 @@ jobs:
         run: |
           # Suppress warning if openssl is already installed
           brew list openssl@3 &>/dev/null || brew install openssl@3
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-root --with dev --all-extras
+          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}" psutil
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            poetry run pip install wmi
+          fi
         shell: bash
 
       - name: Setup ADB
@@ -132,6 +132,12 @@ jobs:
           
       - name: Check Poetry source
         run: poetry config --list
+
+      - name: Validate project
+        run: |
+          poetry check --lock
+          poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
+        shell: bash
 
       - name: Generate application icon
         run: poetry run python scripts/generate_icon.py

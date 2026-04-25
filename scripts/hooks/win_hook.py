@@ -82,3 +82,6 @@ def load_windows_dlls(resources_path: str, logger: logging.Logger) -> None:
             raise OSError(f"Failed to load {target_dll}")
     
     logger.info("Windows DLLs loaded successfully")
+
+if getattr(sys, 'frozen', False) or __name__ == '__main__':
+    setup_windows_environment()

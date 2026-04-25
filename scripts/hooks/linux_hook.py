@@ -83,5 +83,5 @@ def _setup_udev_rules(logger: logging.Logger) -> None:
     except Exception as e:
         logger.warning(f"Could not setup udev rules: {e}")
 
-if __name__ == '__main__':
+if getattr(sys, 'frozen', False) or __name__ == '__main__':
     setup_linux_environment()

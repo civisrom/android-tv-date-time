@@ -1096,6 +1096,10 @@ vn: Вьетнам
                 en="  Progress: {checked}/{total} checked, {found} found",
                 ru="  Прогресс: {checked}/{total} проверено, {found} найдено"
             ),
+            "scan_complete": Translation(
+                en="Scan complete. Found devices: {count}",
+                ru="Сканирование завершено. Найдено устройств: {count}"
+            ),
             "scan_found": Translation(
                 en="Found {count} device(s) with open ADB port:",
                 ru="Найдено {count} устройств с открытым портом ADB:"

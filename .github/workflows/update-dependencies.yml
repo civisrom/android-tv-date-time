@@ -11,8 +11,7 @@ permissions:
 env:
   PYTHON_VERSION: '3.11'
   CI_DEBUG: true
-  POETRY_VERSION: '2.1.4'
-  PYINSTALLER_VERSION: '6.15'
+  POETRY_VERSION: '2.3.1'
 
 jobs:
   update-dependencies:
@@ -48,46 +47,37 @@ jobs:
           poetry env use python
         shell: bash
 
-      - name: Install Project Dependencies
-        run: |
-          poetry lock
-          poetry install --no-interaction --no-root
-          poetry install --no-interaction --with dev --all-extras
-          poetry run pip install pyinstaller==${{ env.PYINSTALLER_VERSION }}
-        shell: bash
-
-      - name: Clear Poetry cache
-        run: |
-          rm -rf ~/.cache/pypoetry
-
       - name: Cache Poetry dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pypoetry
+          path: |
+            .venv
+            ~/.cache/pypoetry
           key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
 
       - name: Update dependencies
         run: |
-          poetry self update
-          poetry lock
-          poetry install
-          poetry update
+          poetry update --no-interaction
+          poetry check --lock
+          poetry install --no-interaction --no-root --with dev --all-extras
+          poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
         env:
           POETRY_CACHE_DIR: ~/.cache/pypoetry
+        shell: bash
 
       - name: Configure Git user
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit and push changes to main
+      - name: Commit and push changes
         run: |
           git add poetry.lock
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
             git commit -m "Update dependencies"
-            git push origin main
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
