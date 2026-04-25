@@ -1031,23 +1031,17 @@ class AndroidTVTimeFixer:
         if not ip and self.last_device_ip:
             return self.last_device_ip
 
-        # 's' → авто-сканирование сети
-        if ip.lower() == 's':
-            found = self.scan_network_for_android_devices()
-            if not found:
-                return self.get_device_ip_input()  # повторный запрос
-            raw = input(Fore.GREEN + locales.get("scan_select_device") + Fore.WHITE).strip()
-            if not raw:
-                return self.get_device_ip_input()
-            try:
-                idx = int(raw)
-                if 1 <= idx <= len(found):
-                    selected_ip = found[idx - 1]
-                    self.save_last_ip(selected_ip)
-                    return selected_ip
-            except ValueError:
-                pass
-            print(Fore.RED + locales.get("invalid_input"))
+        # 's' → авто-сканирование сети, CIDR → сканирование указанной подсети
+        if ip.lower() == 's' or '/' in ip:
+            found = (
+                self.scan_custom_network(ip)
+                if '/' in ip
+                else self.scan_network_for_android_devices()
+            )
+            selected_ip = self._select_scanned_device(found)
+            if selected_ip:
+                self.save_last_ip(selected_ip)
+                return selected_ip
             return self.get_device_ip_input()
 
         return ip
@@ -1482,27 +1476,161 @@ class AndroidTVTimeFixer:
         """Проверяет, открыт ли ADB-порт 5555 на указанном IP"""
         return ip if self._check_port_available(ip, 5555, timeout=0.2) else None
 
+    def _select_scanned_device(self, found: List[str]) -> str:
+        """Выбор устройства из результатов сканирования."""
+        if not found:
+            return ''
+
+        raw = input(Fore.GREEN + locales.get("scan_select_device") + Fore.WHITE).strip()
+        if not raw:
+            return ''
+        try:
+            idx = int(raw)
+            if 1 <= idx <= len(found):
+                return found[idx - 1]
+        except ValueError:
+            pass
+        print(Fore.RED + locales.get("invalid_input"))
+        return ''
+
     @classmethod
     def _get_private_local_ips(cls) -> List[str]:
         """Возвращает локальные private IPv4 адреса без зависимости от внешнего интернета."""
-        ips = []
+        ips = [ip for _iface, ip, _network, _is_virtual in cls._get_local_interface_networks()]
+        return list(dict.fromkeys(ips))
+
+    @classmethod
+    def _get_local_interface_networks(cls) -> List[Tuple[str, str, ipaddress.IPv4Network, bool]]:
+        """Возвращает scannable private IPv4 сети локальных интерфейсов."""
+        interfaces = []
+        seen_networks = set()
         try:
-            for _iface_name, addrs in psutil.net_if_addrs().items():
+            stats = psutil.net_if_stats()
+            for iface_name, addrs in psutil.net_if_addrs().items():
+                iface_stats = stats.get(iface_name)
+                if iface_stats and not iface_stats.isup:
+                    continue
                 for addr in addrs:
                     if addr.family != socket.AF_INET:
                         continue
                     ip = addr.address
-                    try:
-                        parsed = ipaddress.IPv4Address(ip)
-                    except ValueError:
+                    if not cls._is_scannable_local_ip(ip):
                         continue
-                    if parsed.is_loopback:
+                    if addr.netmask:
+                        network = ipaddress.IPv4Network(f"{ip}/{addr.netmask}", strict=False)
+                    else:
+                        networks = cls._get_local_scan_networks(ip)
+                        if not networks:
+                            continue
+                        network = networks[0]
+                    if network in seen_networks:
                         continue
-                    if cls._is_private_ip(ip) and ip not in ips:
-                        ips.append(ip)
+                    seen_networks.add(network)
+                    interfaces.append((
+                        iface_name,
+                        ip,
+                        network,
+                        cls._is_virtual_interface_name(iface_name),
+                    ))
         except Exception:
             pass
+        return interfaces
+
+    @classmethod
+    def _get_default_route_local_ips(cls) -> List[str]:
+        """Определяет local IP интерфейса основного маршрута без подключения к внешнему хосту."""
+        detected = []
+        try:
+            if sys.platform == 'win32':
+                detected.extend(cls._get_windows_default_route_ips())
+            elif sys.platform == 'darwin':
+                detected.extend(cls._get_macos_default_route_ips())
+            else:
+                detected.extend(cls._get_linux_default_route_ips())
+        except Exception:
+            pass
+        return [ip for ip in dict.fromkeys(detected) if cls._is_scannable_local_ip(ip)]
+
+    @classmethod
+    def _get_linux_default_route_ips(cls) -> List[str]:
+        result = subprocess.run(
+            ['ip', '-4', 'route', 'show', 'default'],
+            capture_output=True, text=True, timeout=3
+        )
+        ips = []
+        for line in result.stdout.splitlines():
+            src_match = re.search(r'\bsrc\s+(\d{1,3}(?:\.\d{1,3}){3})', line)
+            if src_match:
+                ips.append(src_match.group(1))
+                continue
+            dev_match = re.search(r'\bdev\s+(\S+)', line)
+            if dev_match:
+                ip = cls._get_interface_ipv4(dev_match.group(1))
+                if ip:
+                    ips.append(ip)
         return ips
+
+    @classmethod
+    def _get_macos_default_route_ips(cls) -> List[str]:
+        result = subprocess.run(
+            ['route', '-n', 'get', 'default'],
+            capture_output=True, text=True, timeout=3
+        )
+        iface = ''
+        for line in result.stdout.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('interface:'):
+                iface = stripped.split(':', 1)[1].strip()
+                break
+        ip = cls._get_interface_ipv4(iface) if iface else ''
+        return [ip] if ip else []
+
+    @staticmethod
+    def _get_windows_default_route_ips() -> List[str]:
+        result = subprocess.run(
+            ['route', 'PRINT', '-4', '0.0.0.0'],
+            capture_output=True, text=True, timeout=5
+        )
+        routes = []
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            if parts[0] != '0.0.0.0' or parts[1] != '0.0.0.0':
+                continue
+            try:
+                metric = int(parts[4])
+            except ValueError:
+                metric = 0
+            routes.append((metric, parts[3]))
+        return [ip for _metric, ip in sorted(routes)]
+
+    @staticmethod
+    def _get_interface_ipv4(iface_name: str) -> str:
+        try:
+            for addr in psutil.net_if_addrs().get(iface_name, []):
+                if addr.family == socket.AF_INET:
+                    return addr.address
+        except Exception:
+            pass
+        return ''
+
+    @classmethod
+    def _is_scannable_local_ip(cls, ip: str) -> bool:
+        try:
+            parsed = ipaddress.IPv4Address(ip)
+        except ValueError:
+            return False
+        return not parsed.is_loopback and cls._is_private_ip(ip)
+
+    @staticmethod
+    def _is_virtual_interface_name(iface_name: str) -> bool:
+        name = iface_name.lower()
+        virtual_markers = (
+            'virtual', 'vbox', 'vmware', 'hyper-v', 'vethernet',
+            'docker', 'wsl', 'npcap', 'loopback'
+        )
+        return any(marker in name for marker in virtual_markers)
 
     @staticmethod
     def _is_private_ip(ip_str: str) -> bool:
@@ -1639,65 +1767,162 @@ class AndroidTVTimeFixer:
         print()  # новая строка после прогресса
         return found
 
+    @staticmethod
+    def _unique_networks(networks: List[ipaddress.IPv4Network]) -> List[ipaddress.IPv4Network]:
+        unique = []
+        for network in networks:
+            if network not in unique:
+                unique.append(network)
+        return unique
+
+    @staticmethod
+    def _network_hosts_count(network: ipaddress.IPv4Network) -> int:
+        return network.num_addresses - 2 if network.prefixlen < 31 else network.num_addresses
+
+    @staticmethod
+    def _make_wide_network(ip: str) -> Optional[ipaddress.IPv4Network]:
+        if ip.startswith('192.168.'):
+            return ipaddress.IPv4Network('192.168.0.0/16', strict=False)
+        if ip.startswith('10.'):
+            return ipaddress.IPv4Network(f"{ip}/16", strict=False)
+        if ip.startswith('172.'):
+            try:
+                second_octet = int(ip.split('.')[1])
+                if 16 <= second_octet <= 31:
+                    return ipaddress.IPv4Network(f"{ip}/16", strict=False)
+            except (ValueError, IndexError):
+                return None
+        return None
+
+    @classmethod
+    def _get_wide_candidates(
+            cls,
+            interfaces: List[Tuple[str, str, ipaddress.IPv4Network, bool]],
+            scanned_networks: List[ipaddress.IPv4Network]
+    ) -> List[ipaddress.IPv4Network]:
+        candidates = []
+        for _iface_name, ip, network, _is_virtual in interfaces:
+            if network not in scanned_networks or network.prefixlen <= 16:
+                continue
+            wide = cls._make_wide_network(ip)
+            if wide and wide != network and wide not in candidates:
+                candidates.append(wide)
+        return candidates
+
+    def scan_custom_network(self, cidr: str) -> List[str]:
+        """Сканирует подсеть, введённую пользователем вручную."""
+        try:
+            network = ipaddress.IPv4Network(cidr.strip(), strict=False)
+        except ValueError:
+            print(Fore.RED + locales.get("scan_invalid_cidr", cidr=cidr))
+            return []
+
+        if network.version != 4 or not network.is_private:
+            print(Fore.RED + locales.get("scan_invalid_cidr", cidr=cidr))
+            return []
+
+        hosts_count = self._network_hosts_count(network)
+        if hosts_count > 4096:
+            answer = input(
+                Fore.YELLOW +
+                locales.get("scan_large_custom_offer", network=str(network), hosts=hosts_count) +
+                Fore.WHITE
+            ).strip().lower()
+            if answer not in ('y', 'yes', 'д', 'да'):
+                return []
+
+        found = self._scan_networks([network])
+        if found:
+            print(Fore.GREEN + locales.get("scan_found", count=len(found)))
+            for i, ip in enumerate(found, 1):
+                print(Fore.WHITE + f"  {i}. {ip}")
+        else:
+            print(Fore.YELLOW + locales.get("scan_none"))
+            print(Fore.YELLOW + locales.get("scan_firewall_hint"))
+        return found
+
+    def _choose_additional_networks(
+            self,
+            additional: List[Tuple[str, str, ipaddress.IPv4Network, bool]]
+    ) -> List[ipaddress.IPv4Network]:
+        print(Fore.CYAN + locales.get("scan_additional_available"))
+        for idx, (iface_name, ip, network, is_virtual) in enumerate(additional, 1):
+            marker = locales.get("scan_virtual_marker") if is_virtual else locales.get("scan_physical_marker")
+            print(Fore.WHITE + f"  {idx}. {network}  {iface_name} ({ip}) {marker}")
+
+        answer = input(Fore.GREEN + locales.get("scan_additional_prompt") + Fore.WHITE).strip().lower()
+        if answer in ('', 'n', 'no', 'н', 'нет'):
+            return []
+        if answer in ('all', 'a', 'все'):
+            return self._unique_networks([network for _iface, _ip, network, _virt in additional])
+
+        selected = []
+        for raw in re.split(r'[\s,]+', answer):
+            if not raw:
+                continue
+            try:
+                idx = int(raw)
+            except ValueError:
+                continue
+            if 1 <= idx <= len(additional):
+                network = additional[idx - 1][2]
+                if network not in selected:
+                    selected.append(network)
+        if not selected:
+            print(Fore.RED + locales.get("invalid_input"))
+        return selected
+
     def scan_network_for_android_devices(self) -> List[str]:
         """Сканирует локальные подсети в поисках устройств с открытым ADB-портом 5555.
         Автоматически определяет подсеть через psutil, fallback на /16."""
-        local_ips = self._get_private_local_ips()
-        if not local_ips:
+        interfaces = self._get_local_interface_networks()
+        if not interfaces:
             print(Fore.RED + locales.get("scan_local_ip_error"))
             return []
 
-        networks = []
-        wide_candidates = []
-        for local_ip in local_ips:
-            if not self._is_private_ip(local_ip):
-                print(Fore.YELLOW + locales.get("scan_not_private", ip=local_ip))
-                continue
+        default_ips = self._get_default_route_local_ips()
+        primary = [item for item in interfaces if item[1] in default_ips]
+        if not primary:
+            primary = [item for item in interfaces if not item[3]]
+        if not primary:
+            primary = interfaces[:1]
 
-            detected = self._detect_interface_network(local_ip)
-            if detected:
-                hosts_count = detected.num_addresses - 2 if detected.prefixlen < 31 else detected.num_addresses
-                print(Fore.GREEN + locales.get("scan_net_detected", network=str(detected), hosts=hosts_count))
-                if detected.prefixlen > 16:
-                    if local_ip.startswith('192.168.'):
-                        wide_net = ipaddress.IPv4Network('192.168.0.0/16', strict=False)
-                    elif local_ip.startswith('10.'):
-                        wide_net = ipaddress.IPv4Network(f"{local_ip}/16", strict=False)
-                    else:
-                        wide_net = None
-                    if wide_net and wide_net != detected and wide_net not in wide_candidates:
-                        wide_candidates.append(wide_net)
-                    if local_ip.startswith('10.'):
-                        extra = ipaddress.IPv4Network('10.1.0.0/16', strict=False)
-                        if extra not in wide_candidates and extra != detected:
-                            wide_candidates.append(extra)
-            else:
-                fallback_net = "192.168.0.0/16" if local_ip.startswith('192.168.') else f"{local_ip}/16"
-                print(Fore.YELLOW + locales.get("scan_net_fallback", network=fallback_net))
+        primary_networks = self._unique_networks([network for _iface, _ip, network, _virt in primary])
+        additional = [
+            item for item in interfaces
+            if item[2] not in primary_networks
+        ]
 
-            for network in self._get_local_scan_networks(local_ip):
-                if network not in networks:
-                    networks.append(network)
-
-        if not networks:
+        if not primary_networks:
             print(Fore.RED + locales.get("scan_local_ip_error"))
             return []
 
-        # Этап 1: сканируем определённые подсети (обычно /24)
-        found = self._scan_networks(networks)
+        for network in primary_networks:
+            hosts_count = self._network_hosts_count(network)
+            print(Fore.GREEN + locales.get("scan_net_detected", network=str(network), hosts=hosts_count))
 
-        # Этап 2: если /24 ничего не нашёл и есть куда расширять — предлагаем /16
+        found = self._scan_networks(primary_networks)
+        scanned_networks = list(primary_networks)
+
+        if not found and additional:
+            print(Fore.YELLOW + locales.get("scan_none"))
+            selected_additional = self._choose_additional_networks(additional)
+            if selected_additional:
+                found = self._scan_networks(selected_additional)
+                scanned_networks.extend(selected_additional)
+
         wide_scan_offered = False
+        wide_candidates = self._get_wide_candidates(interfaces, scanned_networks)
         if not found and wide_candidates:
             wide_scan_offered = True
             print(Fore.YELLOW + locales.get("scan_none"))
             print(Fore.CYAN + locales.get(
                 "scan_wide_offer",
-                narrow=", ".join(str(n) for n in networks),
+                narrow=", ".join(str(n) for n in scanned_networks),
                 wide=", ".join(str(n) for n in wide_candidates)
             ))
             answer = input(Fore.WHITE).strip().lower()
-            if answer in ('y', 'yes', 'д', 'да', ''):
+            if answer in ('y', 'yes', 'д', 'да'):
                 found = self._scan_networks(wide_candidates)
 
         if found:
