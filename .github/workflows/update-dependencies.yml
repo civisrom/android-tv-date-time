@@ -12,7 +12,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PYTHON_VERSION: '3.11'
   CI_DEBUG: true
-  POETRY_VERSION: '2.3.1'
+  POETRY_VERSION: '2.3.4'
 
 jobs:
   update-dependencies:
