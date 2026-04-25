@@ -1484,25 +1484,130 @@ class AndroidTVTimeFixer:
 
     @classmethod
     def _get_private_local_ips(cls) -> List[str]:
-        """Возвращает локальные private IPv4 адреса без зависимости от внешнего интернета."""
-        ips = []
+        """Возвращает private IPv4 адреса, предпочитая интерфейсы основного маршрута."""
+        default_ips = cls._get_default_route_local_ips()
+        if default_ips:
+            return default_ips
+
+        candidates = []
         try:
-            for _iface_name, addrs in psutil.net_if_addrs().items():
+            stats = psutil.net_if_stats()
+            for iface_name, addrs in psutil.net_if_addrs().items():
+                iface_stats = stats.get(iface_name)
+                if iface_stats and not iface_stats.isup:
+                    continue
                 for addr in addrs:
                     if addr.family != socket.AF_INET:
                         continue
                     ip = addr.address
-                    try:
-                        parsed = ipaddress.IPv4Address(ip)
-                    except ValueError:
-                        continue
-                    if parsed.is_loopback:
-                        continue
-                    if cls._is_private_ip(ip) and ip not in ips:
-                        ips.append(ip)
+                    if cls._is_scannable_local_ip(ip):
+                        candidates.append((iface_name, ip))
         except Exception:
             pass
+
+        non_virtual = [
+            ip for iface_name, ip in candidates
+            if not cls._is_virtual_interface_name(iface_name)
+        ]
+        if non_virtual:
+            return list(dict.fromkeys(non_virtual))
+        return list(dict.fromkeys(ip for _iface_name, ip in candidates))
+
+    @classmethod
+    def _get_default_route_local_ips(cls) -> List[str]:
+        """Определяет local IP интерфейса основного маршрута без подключения к внешнему хосту."""
+        detected = []
+        try:
+            if sys.platform == 'win32':
+                detected.extend(cls._get_windows_default_route_ips())
+            elif sys.platform == 'darwin':
+                detected.extend(cls._get_macos_default_route_ips())
+            else:
+                detected.extend(cls._get_linux_default_route_ips())
+        except Exception:
+            pass
+        return [ip for ip in dict.fromkeys(detected) if cls._is_scannable_local_ip(ip)]
+
+    @classmethod
+    def _get_linux_default_route_ips(cls) -> List[str]:
+        result = subprocess.run(
+            ['ip', '-4', 'route', 'show', 'default'],
+            capture_output=True, text=True, timeout=3
+        )
+        ips = []
+        for line in result.stdout.splitlines():
+            src_match = re.search(r'\bsrc\s+(\d{1,3}(?:\.\d{1,3}){3})', line)
+            if src_match:
+                ips.append(src_match.group(1))
+                continue
+            dev_match = re.search(r'\bdev\s+(\S+)', line)
+            if dev_match:
+                ip = cls._get_interface_ipv4(dev_match.group(1))
+                if ip:
+                    ips.append(ip)
         return ips
+
+    @classmethod
+    def _get_macos_default_route_ips(cls) -> List[str]:
+        result = subprocess.run(
+            ['route', '-n', 'get', 'default'],
+            capture_output=True, text=True, timeout=3
+        )
+        iface = ''
+        for line in result.stdout.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('interface:'):
+                iface = stripped.split(':', 1)[1].strip()
+                break
+        ip = cls._get_interface_ipv4(iface) if iface else ''
+        return [ip] if ip else []
+
+    @staticmethod
+    def _get_windows_default_route_ips() -> List[str]:
+        result = subprocess.run(
+            ['route', 'PRINT', '-4', '0.0.0.0'],
+            capture_output=True, text=True, timeout=5
+        )
+        routes = []
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            if parts[0] != '0.0.0.0' or parts[1] != '0.0.0.0':
+                continue
+            try:
+                metric = int(parts[4])
+            except ValueError:
+                metric = 0
+            routes.append((metric, parts[3]))
+        return [ip for _metric, ip in sorted(routes)]
+
+    @staticmethod
+    def _get_interface_ipv4(iface_name: str) -> str:
+        try:
+            for addr in psutil.net_if_addrs().get(iface_name, []):
+                if addr.family == socket.AF_INET:
+                    return addr.address
+        except Exception:
+            pass
+        return ''
+
+    @classmethod
+    def _is_scannable_local_ip(cls, ip: str) -> bool:
+        try:
+            parsed = ipaddress.IPv4Address(ip)
+        except ValueError:
+            return False
+        return not parsed.is_loopback and cls._is_private_ip(ip)
+
+    @staticmethod
+    def _is_virtual_interface_name(iface_name: str) -> bool:
+        name = iface_name.lower()
+        virtual_markers = (
+            'virtual', 'vbox', 'vmware', 'hyper-v', 'vethernet',
+            'docker', 'wsl', 'npcap', 'loopback'
+        )
+        return any(marker in name for marker in virtual_markers)
 
     @staticmethod
     def _is_private_ip(ip_str: str) -> bool:
