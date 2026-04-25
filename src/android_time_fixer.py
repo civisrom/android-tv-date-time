@@ -37,6 +37,7 @@ except ImportError:
 # FileHandler добавляется в AndroidTVTimeFixer._setup_logging()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+logger.propagate = False
 
 class ADBProcessManager:
     def __init__(self, adb_path, device_ip=None):
@@ -485,6 +486,7 @@ class AndroidTVTimeFixer:
         """Настраивает логирование для класса с выводом в файл и консоль"""
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False
 
         # Очищаем существующие обработчики чтобы избежать дублирования
         if self.logger.handlers:
