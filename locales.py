@@ -1077,12 +1077,12 @@ vn: Вьетнам
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter IP or IP:port if port differs from 5555 (press Enter for saved: {saved_ip}, or 's' to scan network): ",
-                ru="Введите IP или IP:порт если порт отличается от 5555 (Enter для сохранённого: {saved_ip}, или 's' для сканирования): "
+                en="Enter IP, IP:port, CIDR subnet, or 's' to scan (Enter for saved: {saved_ip}): ",
+                ru="Введите IP, IP:порт, CIDR-подсеть или 's' для сканирования (Enter для сохранённого: {saved_ip}): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter IP or IP:port if port differs from 5555 (or 's' to scan network): ",
-                ru="Введите IP или IP:порт если порт отличается от 5555 (или 's' для сканирования сети): "
+                en="Enter IP, IP:port, CIDR subnet, or 's' to scan network: ",
+                ru="Введите IP, IP:порт, CIDR-подсеть или 's' для сканирования сети: "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",
@@ -1095,6 +1095,10 @@ vn: Вьетнам
             "scan_progress": Translation(
                 en="  Progress: {checked}/{total} checked, {found} found",
                 ru="  Прогресс: {checked}/{total} проверено, {found} найдено"
+            ),
+            "scan_complete": Translation(
+                en="Scan complete. Found devices: {count}",
+                ru="Сканирование завершено. Найдено устройств: {count}"
             ),
             "scan_found": Translation(
                 en="Found {count} device(s) with open ADB port:",
@@ -1123,6 +1127,30 @@ vn: Вьетнам
             "scan_wide_offer": Translation(
                 en="No devices found in {narrow}. Scan wider range {wide}? (y/n): ",
                 ru="В подсети {narrow} устройства не найдены. Сканировать расширенный диапазон {wide}? (y/n): "
+            ),
+            "scan_additional_available": Translation(
+                en="Additional local networks are available:",
+                ru="Доступны дополнительные локальные сети:"
+            ),
+            "scan_additional_prompt": Translation(
+                en="Scan additional networks? Enter number(s), 'all', or 'n': ",
+                ru="Сканировать дополнительные сети? Введите номер(а), 'all' или 'n': "
+            ),
+            "scan_virtual_marker": Translation(
+                en="[virtual/VPN]",
+                ru="[виртуальная/VPN]"
+            ),
+            "scan_physical_marker": Translation(
+                en="[network]",
+                ru="[сеть]"
+            ),
+            "scan_invalid_cidr": Translation(
+                en="Invalid or unsupported CIDR subnet: {cidr}",
+                ru="Некорректная или неподдерживаемая CIDR-подсеть: {cidr}"
+            ),
+            "scan_large_custom_offer": Translation(
+                en="Subnet {network} contains {hosts} hosts and may take a long time. Continue? (y/n): ",
+                ru="Подсеть {network} содержит {hosts} хостов и может сканироваться долго. Продолжить? (y/n): "
             ),
             "scan_firewall_hint": Translation(
                 en="Hint: Make sure this program is allowed through your firewall (Windows Defender, iptables, etc.).",

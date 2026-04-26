@@ -87,5 +87,5 @@ def _configure_security(adb_path: str, logger: logging.Logger) -> None:
     except Exception as e:
         logger.warning(f"Could not configure security settings: {e}")
 
-if __name__ == '__main__':
+if getattr(sys, 'frozen', False) or __name__ == '__main__':
     setup_macos_environment()

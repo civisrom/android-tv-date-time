@@ -1,8 +1,6 @@
 import os
 import sys
 import logging
-import ctypes
-from pathlib import Path
 from typing import Set
 
 # Global ADB path for import by android_time_fixer.py
@@ -10,6 +8,7 @@ ADB_PATH = os.path.join(
     getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
     'resources', 'adb.exe'
 )
+_DLL_DIRECTORY_HANDLES = []
 
 def setup_windows_environment() -> None:
     logger = setup_logger()
@@ -23,7 +22,7 @@ def setup_windows_environment() -> None:
         paths = [base_path, resources_path]
         update_path(paths, logger)
         
-        load_windows_dlls(resources_path, logger)
+        configure_windows_dll_search(resources_path, logger)
         
         os.environ['ANDROID_HOME'] = resources_path
         
@@ -64,21 +63,19 @@ def update_path(paths: list, logger: logging.Logger) -> None:
     
     logger.info("PATH environment updated")
 
-def load_windows_dlls(resources_path: str, logger: logging.Logger) -> None:
-    stable_dir = os.path.join(os.path.expanduser('~'), '.android')
-    os.makedirs(stable_dir, exist_ok=True)
-    
+def configure_windows_dll_search(resources_path: str, logger: logging.Logger) -> None:
     for dll_name in ['AdbWinApi.dll', 'AdbWinUsbApi.dll']:
-        source_dll = os.path.join(resources_path, dll_name)
-        target_dll = os.path.join(stable_dir, dll_name)
-        
-        if not os.path.exists(source_dll):
-            raise FileNotFoundError(f"Required DLL not found: {source_dll}")
-            
-        import shutil
-        shutil.copy2(source_dll, target_dll)
-        
-        if not ctypes.windll.kernel32.LoadLibraryW(target_dll):
-            raise OSError(f"Failed to load {target_dll}")
-    
-    logger.info("Windows DLLs loaded successfully")
+        dll_path = os.path.join(resources_path, dll_name)
+        if not os.path.exists(dll_path):
+            raise FileNotFoundError(f"Required DLL not found: {dll_path}")
+
+    try:
+        _DLL_DIRECTORY_HANDLES.append(os.add_dll_directory(resources_path))
+        logger.info("Windows DLL search path updated")
+    except (AttributeError, OSError) as e:
+        # PATH already contains resources_path; that is enough for adb.exe and
+        # keeps startup from failing on systems that reject add_dll_directory.
+        logger.warning(f"Could not update DLL search path: {e}")
+
+if getattr(sys, 'frozen', False) or __name__ == '__main__':
+    setup_windows_environment()

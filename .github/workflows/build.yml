@@ -20,6 +20,7 @@ permissions:
   actions: write
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PYTHON_VERSION: '3.11'
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: src/android_time_fixer.py
@@ -52,7 +53,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           
@@ -61,13 +62,13 @@ jobs:
         run: exit 1
         
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
       - name: Set up Poetry cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .venv
@@ -91,15 +92,6 @@ jobs:
           poetry env use python
         shell: bash
 
-      - name: Install dependencies
-        run: |
-          poetry install --no-interaction --no-root --with dev --all-extras
-          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}" psutil
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            poetry run pip install wmi
-          fi
-        shell: bash
-
       - name: Install system dependencies
         if: runner.os == 'Linux'
         run: |
@@ -112,6 +104,15 @@ jobs:
         run: |
           # Suppress warning if openssl is already installed
           brew list openssl@3 &>/dev/null || brew install openssl@3
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-root --with dev --all-extras
+          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}" psutil
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            poetry run pip install wmi
+          fi
         shell: bash
 
       - name: Setup ADB
@@ -132,6 +133,12 @@ jobs:
           
       - name: Check Poetry source
         run: poetry config --list
+
+      - name: Validate project
+        run: |
+          poetry check --lock
+          poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
+        shell: bash
 
       - name: Generate application icon
         run: poetry run python scripts/generate_icon.py
@@ -157,7 +164,7 @@ jobs:
         shell: bash
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
           path: dist/${{ env.APP_NAME }}-*.zip
@@ -171,7 +178,7 @@ jobs:
     
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
@@ -186,7 +193,7 @@ jobs:
           fi
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
