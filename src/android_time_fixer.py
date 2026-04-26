@@ -1337,37 +1337,34 @@ class AndroidTVTimeFixer:
     def verify_ntp_server(self, server: str, count: int = 3, timeout: int = 3) -> bool:
         """Проверяет что NTP-сервер действительно синхронизирует время (не просто доступен)"""
         print(Fore.CYAN + locales.get("ntp_verify_before_apply"))
-        ntp_client = ntplib.NTPClient()
-        rtts = []
-        offsets = []
+        result = self._test_ntp_server(server, count=count, timeout=timeout)
 
-        for i in range(count):
-            try:
-                start_time = time.time()
-                response = ntp_client.request(server, version=3, timeout=timeout)
-                rtt = (time.time() - start_time) * 1000
-                rtts.append(rtt)
-                offsets.append(response.offset)
-            except Exception:
-                pass
+        if result['status'] != 'Reachable':
+            print(Fore.RED + locales.get("ntp_verify_failed", server=server))
+            self.logger.warning(
+                f"NTP server {server} rejected: unavailable as NTP server "
+                f"({result.get('error') or 'unknown error'})"
+            )
+            return False
 
-        if not rtts:
-            response = input(Fore.YELLOW + locales.get("ntp_verify_failed", server=server) + Fore.WHITE).strip()
-            return response.lower() in ('y', 'yes', 'д', 'да')
-
-        success_rate = (len(rtts) / count) * 100
-        avg_rtt = sum(rtts) / len(rtts)
-        avg_offset = sum(offsets) / len(offsets)
+        avg_offset = result['offset']
 
         # Проверяем что offset адекватный (сервер реально синхронизирует время)
+        if avg_offset is None:
+            print(Fore.RED + locales.get("ntp_verify_failed", server=server))
+            self.logger.warning(f"NTP server {server} rejected: missing offset")
+            return False
+
         if abs(avg_offset) > 60:
             print(Fore.RED + locales.get("ntp_verify_bad_offset", server=server, offset=avg_offset))
-            response = input(Fore.YELLOW + locales.get("ntp_verify_force_apply") + Fore.WHITE).strip()
-            return response.lower() in ('y', 'yes', 'д', 'да')
+            self.logger.warning(
+                f"NTP server {server} rejected: bad offset {avg_offset}"
+            )
+            return False
 
         print(Fore.GREEN + locales.get("ntp_verify_detailed",
-                                       server=server, rtt=avg_rtt,
-                                       success=success_rate, offset=avg_offset))
+                                       server=server, rtt=result['avg_rtt'],
+                                       success=result['success_rate'], offset=avg_offset))
         return True
 
     def connect(self, ip: str) -> None:
@@ -1435,6 +1432,8 @@ class AndroidTVTimeFixer:
             raise AndroidTVTimeFixerError(locales.get('no_device_connected'))
         if not self.validate_ntp_server(ntp_server):
             raise AndroidTVTimeFixerError(locales.get("invalid_ntp_server_format"))
+        if not self.verify_ntp_server(ntp_server):
+            raise AndroidTVTimeFixerError(locales.get("ntp_server_not_added", server=ntp_server))
     
         try:
             self.device.shell(f'settings put global ntp_server {shlex.quote(ntp_server)}')
@@ -1451,9 +1450,6 @@ class AndroidTVTimeFixer:
         """Проверяет и устанавливает NTP-сервер. Возвращает True если установлен."""
         if not self.device:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
-
-        if not self.verify_ntp_server(ntp_server):
-            return False
 
         self.set_ntp_server(ntp_server)
         return True
@@ -1945,6 +1941,13 @@ class AndroidTVTimeFixer:
 
     def batch_set_ntp(self, ntp_server: str, ip_list: List[str]) -> None:
         """Устанавливает NTP-сервер на нескольких устройствах одновременно"""
+        if not self.validate_ntp_server(ntp_server):
+            print(Fore.RED + locales.get("invalid_ntp_server_format"))
+            return
+        if not self.verify_ntp_server(ntp_server):
+            print(Fore.RED + locales.get("ntp_server_not_added", server=ntp_server))
+            return
+
         try:
             pub, priv = self.load_keys()
             signer = PythonRSASigner(pub, priv)

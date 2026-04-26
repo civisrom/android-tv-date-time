@@ -209,8 +209,8 @@ arising from the use of this program.
                 ru="Не удалось получить текущий сервер NTP: {error}"
             ),
             "ntp_server_set": Translation(
-                en="NTP server set to {ntp_server}",
-                ru="Сервер NTP установлен на {ntp_server}"
+                en="NTP server {ntp_server} is reachable and has been added",
+                ru="Сервер NTP {ntp_server} доступен и добавлен"
             ),
             "ntp_server_confirmation_failed": Translation(
                 en="Failed to confirm NTP server change.",
@@ -219,6 +219,10 @@ arising from the use of this program.
             "ntp_server_update_failed": Translation(
                 en="Failed to update NTP server: {error}",
                 ru="Не удалось обновить сервер NTP: {error}"
+            ),
+            "ntp_server_not_added": Translation(
+                en="Warning: NTP server {server} is unavailable or does not work as a time server. It was not added.",
+                ru="Предупреждение: NTP-сервер {server} недоступен или не работает как сервер времени. Он не добавлен."
             ),
             "available_country_codes": Translation(
                 en="\nAvailable country codes:",
@@ -345,8 +349,8 @@ arising from the use of this program.
                 ru="Не удалось скопировать сервер"
             ),
             "server_set_from_clipboard": Translation(
-                en="Server {server} set from clipboard",
-                ru="Установлен сервер из буфера обмена: {server}"
+                en="Server {server} read from clipboard",
+                ru="Сервер получен из буфера обмена: {server}"
             ),
             "error_occurred": Translation(
                 en="Error: {error}",
@@ -1183,8 +1187,8 @@ vn: Вьетнам
                 ru="  [{idx}/{total}] Подключение к {ip}..."
             ),
             "batch_success": Translation(
-                en="  OK  {ip}: NTP set to {server}",
-                ru="  ОК  {ip}: NTP установлен на {server}"
+                en="  OK  {ip}: NTP server {server} is reachable and has been added",
+                ru="  ОК  {ip}: NTP-сервер {server} доступен и добавлен"
             ),
             "batch_failed": Translation(
                 en="  ERR {ip}: {error}",
@@ -1282,16 +1286,12 @@ vn: Вьетнам
                 ru="NTP-сервер {server} работает корректно:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
             ),
             "ntp_verify_failed": Translation(
-                en="Warning: NTP server {server} is not reachable (0/3 attempts). Apply anyway? (y/n): ",
-                ru="Внимание: NTP-сервер {server} недоступен (0/3 попыток). Применить всё равно? (y/n): "
+                en="Warning: NTP server {server} is not reachable as a time server. It will not be added.",
+                ru="Предупреждение: NTP-сервер {server} недоступен как сервер времени. Он не будет добавлен."
             ),
             "ntp_verify_bad_offset": Translation(
-                en="Warning: NTP server {server} responds but time offset is too large ({offset:.1f}s). Server may not sync time correctly.",
-                ru="Внимание: NTP-сервер {server} отвечает, но смещение времени слишком большое ({offset:.1f}с). Сервер может некорректно синхронизировать время."
-            ),
-            "ntp_verify_force_apply": Translation(
-                en="Apply this server anyway? (y/n): ",
-                ru="Всё равно применить этот сервер? (y/n): "
+                en="Warning: NTP server {server} responds but time offset is too large ({offset:.1f}s). It will not be added.",
+                ru="Предупреждение: NTP-сервер {server} отвечает, но смещение времени слишком большое ({offset:.1f}с). Он не будет добавлен."
             ),
             "connection_reused": Translation(
                 en="Using existing connection to {ip}",
@@ -1382,8 +1382,8 @@ vn: Вьетнам
                 ru="[Авто] Установить {server} на устройство? (y/n): "
             ),
             "auto_installed": Translation(
-                en="[Auto] NTP server {server} successfully installed on device!",
-                ru="[Авто] NTP-сервер {server} успешно установлен на устройство!"
+                en="[Auto] NTP server {server} is reachable and has been added to the device!",
+                ru="[Авто] NTP-сервер {server} доступен и добавлен на устройство!"
             ),
             "auto_cancelled": Translation(
                 en="[Auto] Installation cancelled by user.",
