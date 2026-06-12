@@ -1,0 +1,4 @@
+# Windows launcher scripts must always have CRLF line endings:
+# cmd.exe parsing of multi-line blocks is unreliable with LF-only files
+*.bat text eol=crlf
+*.ps1 text eol=crlf

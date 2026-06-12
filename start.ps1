@@ -1,4 +1,4 @@
-##############################################################
+﻿##############################################################
 # Android TV Time Fixer — PowerShell Launcher
 # Запускает AndroidTVTimeFixer.exe в текущем каталоге
 ##############################################################
@@ -31,9 +31,16 @@ if (-not (Test-Path $exePath)) {
 
 Set-Location $scriptDir
 
-# Устанавливаем UTF-8, чтобы корректно отображались кириллица и спецсимволы
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+# Устанавливаем UTF-8, чтобы корректно отображались кириллица и спецсимволы.
+# В try/catch: при перенаправленных дескрипторах консоли установка кодировки
+# может бросить исключение, а при ErrorActionPreference = "Stop" это завершило
+# бы скрипт до запуска программы и окно закрылось бы без сообщения об ошибке.
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+} catch {
+    Write-Host "Warning: could not set UTF-8 console encoding" -ForegroundColor Yellow
+}
 $env:PYTHONIOENCODING = "utf-8"
 
 try {
