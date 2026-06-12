@@ -12,6 +12,7 @@ import json
 import psutil
 import atexit
 import signal
+import threading
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -54,27 +55,23 @@ class ADBProcessManager:
         try:
             # Регистрация обработчиков завершения
             atexit.register(self.terminate_adb_processes)
-            
-            # Настройка обработчиков сигналов
-            signal.signal(signal.SIGINT, self.signal_handler)
+
+            # SIGINT не перехватываем: стандартный KeyboardInterrupt обрабатывается
+            # в terminal_mode() и main(), а atexit гарантирует очистку процессов.
             signal.signal(signal.SIGTERM, self.signal_handler)
         except Exception as e:
             self.logger.error(f"Error in setup_process_termination: {e}")
 
     def signal_handler(self, signum, frame):
         """
-        Обработчик системных сигналов для завершения процессов
+        Обработчик SIGTERM: корректно завершает процессы ADB и выходит
         """
         try:
-            self.logger.info(locales.get_en("terminal_mode_exit_ctrl_c"))
-            print("\n" + Fore.YELLOW + locales.get("terminal_mode_exit_ctrl_c"))
-            
-            # Сначала отключаем устройство
-            self.disconnect_device()
-            
-            # Затем завершаем процессы
+            self.logger.info(f"Received signal {signum}, shutting down")
+
+            # terminate_adb_processes() сам выполняет disconnect перед kill-server
             self.terminate_adb_processes()
-            
+
             sys.exit(0)
         except Exception as e:
             self.logger.error(f"Error in signal handler: {e}")
@@ -122,16 +119,19 @@ class ADBProcessManager:
             self.disconnect_device()
 
             # 1. Штатное завершение через ADB
-            subprocess.run([self.adb_path, 'kill-server'], 
-                           stdout=subprocess.DEVNULL, 
-                           stderr=subprocess.DEVNULL, 
+            subprocess.run([self.adb_path, 'kill-server'],
+                           stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL,
                            timeout=5)
             self.logger.info("ADB kill-server executed successfully")
         except subprocess.TimeoutExpired:
             self.logger.warning("ADB kill-server timed out")
+        except Exception as e:
+            # Вызывается из atexit: исключение не должно уйти наверх
+            self.logger.warning(f"ADB kill-server failed: {e}")
 
         # 2. Завершение через psutil
-        psutil_terminated = self._terminate_via_psutil()
+        self._terminate_via_psutil()
 
         # 3. Завершение через platform-специфичные методы
         if sys.platform == 'win32':
@@ -150,7 +150,7 @@ class ADBProcessManager:
         try:
             for proc in psutil.process_iter(['name', 'exe']):
                 try:
-                    if (proc.info['name'] == 'adb.exe' or 
+                    if (proc.info['name'] in ('adb', 'adb.exe') or
                         (proc.info['exe'] and self.adb_path in proc.info['exe'])):
                         
                         # Мягкое завершение
@@ -247,9 +247,7 @@ class ADBProcessManager:
         который можно использовать при завершении программы
         """
         try:
-            # Сначала отключаем устройство
-            self.disconnect_device()
-            # Затем завершаем процессы
+            # terminate_adb_processes() сам выполняет disconnect перед kill-server
             self.terminate_adb_processes()
         except Exception as e:
             self.logger.error(f"Error during cleanup: {e}")
@@ -565,6 +563,20 @@ class AndroidTVTimeFixer:
             Tuple[int, str, str]: (код возврата, stdout, stderr)
         """
         stdout_lines = []
+        stderr_lines = []
+
+        # Читаем stderr в отдельном потоке, чтобы заполненный pipe
+        # не заблокировал процесс, пока мы построчно читаем stdout
+        def _drain_stderr() -> None:
+            try:
+                for line in process.stderr:
+                    stderr_lines.append(line)
+            except Exception:
+                pass
+
+        stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        stderr_thread.start()
+
         try:
             while True:
                 output = process.stdout.readline()
@@ -575,11 +587,11 @@ class AndroidTVTimeFixer:
                     stdout_lines.append(clean_output)
                     print(Fore.GREEN + clean_output)
 
-            return_code = process.poll()
-            _, stderr = process.communicate(timeout=5)
-            return return_code, '\n'.join(stdout_lines), stderr
+            process.wait(timeout=5)
+            stderr_thread.join(timeout=5)
+            return process.returncode, '\n'.join(stdout_lines), ''.join(stderr_lines)
 
-        except TimeoutError:
+        except subprocess.TimeoutExpired:
             process.kill()
             raise TimeoutError("Command execution timeout exceeded")
 
@@ -726,17 +738,19 @@ class AndroidTVTimeFixer:
             return
     
         try:
-            # Пробуем выполнить команду с автоматическими попытками переподключения
-            if 'adb' in command:
+            args = shlex.split(command)
+            if not args:
+                return
+
+            # Логику ADB-переподключения применяем только когда команда
+            # действительно начинается с adb, а не просто содержит подстроку 'adb'
+            first_token = os.path.basename(args[0]).lower()
+            if first_token in ('adb', 'adb.exe'):
                 connection_success = self._retry_adb_connection(command)
                 if not connection_success:
                     return
-    
+
             else:
-                args = shlex.split(command)
-                if not args:
-                    return
-    
                 self.logger.debug(f"The command is being executed: {' '.join(args)}")
                 
                 process = Popen(
@@ -956,7 +970,7 @@ class AndroidTVTimeFixer:
         """Загружает сохраненные серверы из файла"""
         if self.servers_file.exists():
             try:
-                with open(self.servers_file, 'r') as f:
+                with open(self.servers_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
                 self.logger.warning(locales.get_en('logger_warning', error=str(e)))
@@ -965,8 +979,8 @@ class AndroidTVTimeFixer:
     def save_servers(self):
         """Сохраняет серверы в файл"""
         try:
-            with open(self.servers_file, 'w') as f:
-                json.dump(self.saved_servers, f, indent=2)
+            with open(self.servers_file, 'w', encoding='utf-8') as f:
+                json.dump(self.saved_servers, f, ensure_ascii=False, indent=2)
         except Exception as e:
             self.logger.warning(locales.get_en('logger_warning_2', error=str(e)))
 
@@ -974,7 +988,7 @@ class AndroidTVTimeFixer:
         """Загружает последний использованный IP адрес из файла настроек"""
         if self.settings_file.exists():
             try:
-                with open(self.settings_file, 'r') as f:
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                     return settings.get('last_device_ip', '')
             except Exception as e:
@@ -986,11 +1000,11 @@ class AndroidTVTimeFixer:
         try:
             settings = {}
             if self.settings_file.exists():
-                with open(self.settings_file, 'r') as f:
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
             settings['last_device_ip'] = ip
-            with open(self.settings_file, 'w') as f:
-                json.dump(settings, f, indent=2)
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
             self.last_device_ip = ip
         except Exception as e:
             self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
@@ -999,7 +1013,7 @@ class AndroidTVTimeFixer:
         """Загружает сохранённый язык из файла настроек"""
         if self.settings_file.exists():
             try:
-                with open(self.settings_file, 'r') as f:
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                     return settings.get('language', '')
             except Exception as e:
@@ -1011,42 +1025,43 @@ class AndroidTVTimeFixer:
         try:
             settings = {}
             if self.settings_file.exists():
-                with open(self.settings_file, 'r') as f:
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
             settings['language'] = language
-            with open(self.settings_file, 'w') as f:
-                json.dump(settings, f, indent=2)
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
         except Exception as e:
             self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
 
     def get_device_ip_input(self) -> str:
         """Получает IP адрес устройства: сохранённый, ручной ввод или авто-сканирование сети"""
-        if self.last_device_ip:
-            print(Fore.GREEN + locales.get('enter_device_ip_scan',
-                                           saved_ip=self.last_device_ip), end="")
-        else:
-            print(Fore.GREEN + locales.get('enter_device_ip_scan_no_saved'), end="")
+        while True:
+            if self.last_device_ip:
+                print(Fore.GREEN + locales.get('enter_device_ip_scan',
+                                               saved_ip=self.last_device_ip), end="")
+            else:
+                print(Fore.GREEN + locales.get('enter_device_ip_scan_no_saved'), end="")
 
-        ip = input(Fore.WHITE).strip()
+            ip = input(Fore.WHITE).strip()
 
-        # Enter без ввода → сохранённый IP
-        if not ip and self.last_device_ip:
-            return self.last_device_ip
+            # Enter без ввода → сохранённый IP
+            if not ip and self.last_device_ip:
+                return self.last_device_ip
 
-        # 's' → авто-сканирование сети, CIDR → сканирование указанной подсети
-        if ip.lower() == 's' or '/' in ip:
-            found = (
-                self.scan_custom_network(ip)
-                if '/' in ip
-                else self.scan_network_for_android_devices()
-            )
-            selected_ip = self._select_scanned_device(found)
-            if selected_ip:
-                self.save_last_ip(selected_ip)
-                return selected_ip
-            return self.get_device_ip_input()
+            # 's' → авто-сканирование сети, CIDR → сканирование указанной подсети
+            if ip.lower() == 's' or '/' in ip:
+                found = (
+                    self.scan_custom_network(ip)
+                    if '/' in ip
+                    else self.scan_network_for_android_devices()
+                )
+                selected_ip = self._select_scanned_device(found)
+                if selected_ip:
+                    self.save_last_ip(selected_ip)
+                    return selected_ip
+                continue
 
-        return ip
+            return ip
 
     @staticmethod
     def validate_ntp_server(server: str) -> bool:
@@ -1223,9 +1238,15 @@ class AndroidTVTimeFixer:
     @staticmethod
     def validate_ip(ip: str) -> bool:
         """Проверяет IP-адрес, допускает формат ip или ip:port"""
-        # Отделяем порт если есть
+        # Отделяем порт если есть и проверяем его явно,
+        # чтобы некорректный порт не подменялся молча на 5555
         if ':' in ip:
-            ip = ip.rsplit(':', 1)[0]
+            ip, port_str = ip.rsplit(':', 1)
+            try:
+                if not (1 <= int(port_str) <= 65535):
+                    return False
+            except ValueError:
+                return False
         pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
         if not re.match(pattern, ip):
             return False
@@ -1394,9 +1415,10 @@ class AndroidTVTimeFixer:
             if remaining_time <= 0:
                 break
             try:
-                self.device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
-                self.device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
+                device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
+                device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
                 connection_established = True
+                self.device = device
                 self.connected_ip = f"{host}:{port}"
                 self.process_manager.device_ip = f"{host}:{port}"
                 self.logger.info(locales.get_en('connection_success', ip=host, port=port))
@@ -1411,6 +1433,10 @@ class AndroidTVTimeFixer:
         print()  # Новая строка после завершения ожидания
 
         if not connection_established:
+            # Не оставляем недоподключённый объект: иначе проверки
+            # "if not self.device" дальше по коду пройдут ложно-успешно
+            self.device = None
+            self.connected_ip = None
             raise AndroidTVTimeFixerError(
                 locales.get("connection_failed", timeout=self.connection_timeout) + "\n" +
                 locales.get("ensure_steps") + "\n" +
@@ -1443,6 +1469,8 @@ class AndroidTVTimeFixer:
             new_ntp = self.get_current_ntp()
             if ntp_server not in new_ntp:
                 raise AndroidTVTimeFixerError(locales.get("ntp_server_confirmation_failed"))
+        except AndroidTVTimeFixerError:
+            raise
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("ntp_server_update_failed", error=str(e)))
 	
@@ -1961,10 +1989,11 @@ class AndroidTVTimeFixer:
 
         for idx, ip in enumerate(ip_list, 1):
             print(Fore.CYAN + locales.get("batch_connecting", idx=idx, total=total, ip=ip))
+            device = None
             try:
                 host, port = self.parse_ip_port(ip)
-                if not self.validate_ip(ip) or not self.validate_ntp_server(ntp_server):
-                    raise AndroidTVTimeFixerError(locales.get("invalid_input"))
+                if not self.validate_ip(ip):
+                    raise AndroidTVTimeFixerError(locales.get("invalid_ip_format"))
                 device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
                 device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 device.shell(f'settings put global ntp_server {shlex.quote(ntp_server)}')
@@ -1978,6 +2007,12 @@ class AndroidTVTimeFixer:
             except Exception as e:
                 print(Fore.RED + locales.get("batch_failed", ip=ip, error=str(e)))
                 failed += 1
+            finally:
+                if device is not None:
+                    try:
+                        device.close()
+                    except Exception:
+                        pass
 
         print(Fore.CYAN + locales.get("batch_summary", success=success, failed=failed, total=total))
 
