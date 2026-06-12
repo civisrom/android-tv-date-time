@@ -20,13 +20,12 @@ from typing import Optional, Tuple, List
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 import ntplib
 import pyperclip
-import colorama
-from colorama import Fore, Style, init
-from adb_shell.auth.keygen import keygen
+from colorama import Fore, init
+from adb_shell.auth.keygen import keygen, write_public_keyfile
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 sys.path.append(str(Path(__file__).parent))
-from locales import locales, set_language
+from locales import locales, set_language, Language
 init(autoreset=True)
 
 try:
@@ -845,10 +844,10 @@ class AndroidTVTimeFixer:
         rtts = []
         offsets = []
         last_error = None
+        ntp_client = ntplib.NTPClient()
 
         for _ in range(count):
             try:
-                ntp_client = ntplib.NTPClient()
                 start_time = time.time()
                 ntp_response = ntp_client.request(server, version=3, timeout=timeout)
                 rtt = (time.time() - start_time) * 1000
@@ -984,54 +983,47 @@ class AndroidTVTimeFixer:
         except Exception as e:
             self.logger.warning(locales.get_en('logger_warning_2', error=str(e)))
 
-    def load_last_ip(self) -> str:
-        """Загружает последний использованный IP адрес из файла настроек"""
+    def _load_setting(self, key: str) -> str:
+        """Читает одно значение из файла настроек"""
         if self.settings_file.exists():
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get('last_device_ip', '')
+                    return json.load(f).get(key, '')
             except Exception as e:
                 self.logger.warning(locales.get_en('settings_load_error', error=str(e)))
         return ''
+
+    def _save_setting(self, key: str, value: str) -> bool:
+        """Записывает одно значение в файл настроек, сохраняя остальные"""
+        try:
+            settings = {}
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+            settings[key] = value
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
+            return False
+
+    def load_last_ip(self) -> str:
+        """Загружает последний использованный IP адрес из файла настроек"""
+        return self._load_setting('last_device_ip')
 
     def save_last_ip(self, ip: str) -> None:
         """Сохраняет последний использованный IP адрес в файл настроек"""
-        try:
-            settings = {}
-            if self.settings_file.exists():
-                with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-            settings['last_device_ip'] = ip
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
+        if self._save_setting('last_device_ip', ip):
             self.last_device_ip = ip
-        except Exception as e:
-            self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
 
     def load_language(self) -> str:
         """Загружает сохранённый язык из файла настроек"""
-        if self.settings_file.exists():
-            try:
-                with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                    return settings.get('language', '')
-            except Exception as e:
-                self.logger.warning(locales.get_en('settings_load_error', error=str(e)))
-        return ''
+        return self._load_setting('language')
 
     def save_language(self, language: str) -> None:
         """Сохраняет выбранный язык в файл настроек"""
-        try:
-            settings = {}
-            if self.settings_file.exists():
-                with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-            settings['language'] = language
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
+        self._save_setting('language', language)
 
     def get_device_ip_input(self) -> str:
         """Получает IP адрес устройства: сохранённый, ручной ввод или авто-сканирование сети"""
@@ -1262,12 +1254,18 @@ class AndroidTVTimeFixer:
             priv_key = self.keys_folder / 'adbkey'
             pub_key = self.keys_folder / 'adbkey.pub'
 
-            if not priv_key.exists() or not pub_key.exists():
+            if priv_key.exists() and pub_key.exists():
+                self.logger.info(locales.get_en('existing_adb_keys'))
+            elif priv_key.exists():
+                # Потерян только публичный ключ — восстанавливаем его из
+                # приватного: перегенерация пары сбросила бы авторизацию
+                # программы на всех ранее подключённых устройствах
+                write_public_keyfile(str(priv_key), str(pub_key))
+                self.logger.info(locales.get_en('adb_pubkey_restored'))
+            else:
                 self.keys_folder.mkdir(parents=True, exist_ok=True)
                 keygen(str(priv_key))
                 self.logger.info(locales.get_en('gen_keys'))
-            else:
-                self.logger.info(locales.get_en('existing_adb_keys'))
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get('key_generation_error', error=str(e)))
 
@@ -1414,6 +1412,7 @@ class AndroidTVTimeFixer:
             remaining_time = int(self.connection_timeout - (time.time() - start_time))
             if remaining_time <= 0:
                 break
+            device = None
             try:
                 device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
                 device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
@@ -1425,6 +1424,13 @@ class AndroidTVTimeFixer:
                 break
             except Exception as e:
                 last_error = str(e)
+                # Закрываем сокет неудачной попытки: иначе при минутном
+                # ожидании подтверждения накапливаются открытые соединения
+                if device is not None:
+                    try:
+                        device.close()
+                    except Exception:
+                        pass
                 remaining_time = max(0, int(self.connection_timeout - (time.time() - start_time)))
                 print(locales.get("waiting_for_connection", remaining_time=remaining_time), end='')
                 if remaining_time > 0:
@@ -2481,7 +2487,10 @@ class AndroidTVTimeFixer:
             print(Fore.CYAN + locales.get("auto_priority_count", count=len(priority_servers)))
 
         print(Fore.CYAN + locales.get("auto_checking_ntp"))
+        # Региональные серверы ставим в начало очереди, чтобы они реально
+        # проверялись первыми, как обещает сообщение auto_priority_count
         all_servers = list(dict.fromkeys(
+            priority_servers +
             list(self.ntp_servers.values()) + self.custom_ntp_servers
         ))
 
@@ -2561,7 +2570,6 @@ class AndroidTVTimeFixer:
             print(Fore.YELLOW + locales.get("auto_cancelled"))
 
     def show_country_codes(self) -> None:
-        from locales import Language
         is_ru = locales.current_language == Language.RU
         print(Fore.YELLOW + locales.get("available_country_codes_full"))
         for code, server in self.ntp_servers.items():
@@ -2571,7 +2579,6 @@ class AndroidTVTimeFixer:
 
     def show_country_hints(self, partial: str) -> None:
         """Показывает подходящие коды стран по частичному вводу"""
-        from locales import Language
         is_ru = locales.current_language == Language.RU
         partial = partial.strip().lower()
         matches = []
@@ -2617,46 +2624,66 @@ class AndroidTVTimeFixer:
                 self.logger.error(f"Failed to set custom NTP server: {e}")
                 print(locales.get("error_message", error=str(e)))
 
+    def _get_all_props(self) -> dict:
+        """Читает все системные свойства одним вызовом getprop"""
+        raw = self.device.shell('getprop')
+        return {
+            m.group(1): m.group(2)
+            for m in re.finditer(r'\[([^\]]+)\]:\s*\[([^\]]*)\]', raw)
+        }
+
     def get_device_info(self) -> dict:
         if not self.device:
             raise AndroidTVTimeFixerError(locales.get("no_device_connected"))
 
         try:
             ip_address, mac_address = self._get_device_network_info()
+
+            # Один вызов getprop вместо отдельного round-trip на каждое свойство
+            props = self._get_all_props()
+
+            battery_raw = self.device.shell('dumpsys battery').splitlines()
+            battery_level = next((l.strip() for l in battery_raw if 'level' in l), '')
+            battery_status = next((l.strip() for l in battery_raw if 'status' in l), '')
+
+            meminfo = self.device.shell('cat /proc/meminfo').splitlines()
+            total_ram = next((l.strip() for l in meminfo if l.startswith('MemTotal')), '')
+            available_ram = next((l.strip() for l in meminfo if l.startswith('MemAvailable')), '')
+
             device_info = {
-                'model': self.device.shell('getprop ro.product.model').strip(),
-                'brand': self.device.shell('getprop ro.product.brand').strip(),
-                'name': self.device.shell('getprop ro.product.name').strip(),
-                'android_version': self.device.shell('getprop ro.build.version.release').strip(),
-                'api_level': self.device.shell('getprop ro.build.version.sdk').strip(),
-                'serial': self.device.shell('getprop ro.serialno').strip(),
-                'boot_serial': self.device.shell('getprop ro.boot.serialno').strip(),
-                'cpu_arch': self.device.shell('getprop ro.product.cpu.abi').strip(),
-                'hardware': self.device.shell('getprop ro.hardware').strip(),
+                'model': props.get('ro.product.model', ''),
+                'brand': props.get('ro.product.brand', ''),
+                'name': props.get('ro.product.name', ''),
+                'android_version': props.get('ro.build.version.release', ''),
+                'api_level': props.get('ro.build.version.sdk', ''),
+                'serial': props.get('ro.serialno', ''),
+                'boot_serial': props.get('ro.boot.serialno', ''),
+                'cpu_arch': props.get('ro.product.cpu.abi', ''),
+                'hardware': props.get('ro.hardware', ''),
                 'ip_address': ip_address,
                 'mac_address': mac_address,
                 # Дополнительные сетевые параметры
-                'network_type': self.device.shell('getprop gsm.network.type').strip(),
-                'cellular_operator': self.device.shell('getprop gsm.operator.alpha').strip(),
+                'network_type': props.get('gsm.network.type', ''),
+                'cellular_operator': props.get('gsm.operator.alpha', ''),
                 # Информация о подключениях
-                'battery_level': self.device.shell('dumpsys battery | grep level').strip(),
-                'battery_status': self.device.shell('dumpsys battery | grep status').strip(),
-                'manufacturer': self.device.shell('getprop ro.product.manufacturer').strip(),
-                'device': self.device.shell('getprop ro.product.device').strip(),
-                'build_id': self.device.shell('getprop ro.build.id').strip(),
-                'build_fingerprint': self.device.shell('getprop ro.build.fingerprint').strip(),
+                'battery_level': battery_level,
+                'battery_status': battery_status,
+                'manufacturer': props.get('ro.product.manufacturer', ''),
+                'device': props.get('ro.product.device', ''),
+                'build_id': props.get('ro.build.id', ''),
+                'build_fingerprint': props.get('ro.build.fingerprint', ''),
                 'uptime': self.device.shell('cat /proc/uptime').strip(),
-                'total_ram': self.device.shell("cat /proc/meminfo | grep 'MemTotal'").strip(),
-                'available_ram': self.device.shell("cat /proc/meminfo | grep 'MemAvailable'").strip(),
+                'total_ram': total_ram,
+                'available_ram': available_ram,
                 'screen_resolution': self.device.shell('wm size').strip(),
                 'screen_density': self.device.shell('wm density').strip(),
-                'timezone': self.device.shell('getprop persist.sys.timezone').strip(),
-                'locale': self.device.shell('getprop persist.sys.locale').strip(),
+                'timezone': props.get('persist.sys.timezone', ''),
+                'locale': props.get('persist.sys.locale', ''),
                 'cpu_cores': self.device.shell('cat /proc/cpuinfo | grep "^processor" | wc -l').strip(),
-                'bootloader_version': self.device.shell('getprop ro.bootloader').strip(),  # Версия загрузчика
-                'baseband_version': self.device.shell('getprop gsm.version.baseband').strip(),
+                'bootloader_version': props.get('ro.bootloader', ''),
+                'baseband_version': props.get('gsm.version.baseband', ''),
                 'kernel_version': self.device.shell('uname -r').strip(),
-                'secure_boot_status': self.device.shell('getprop ro.boot.secureboot').strip()
+                'secure_boot_status': props.get('ro.boot.secureboot', '')
             }
             return device_info
         except Exception as e:

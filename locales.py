@@ -116,6 +116,10 @@ arising from the use of this program.
                 en="Existing ADB keys are being used",
                 ru="Используются существующие ключи ADB"
             ),
+            "adb_pubkey_restored": Translation(
+                en="Public ADB key restored from the existing private key",
+                ru="Публичный ключ ADB восстановлен из существующего приватного ключа"
+            ),
             "key_generation_error": Translation(
                 en="Failed to generate keys: {error}",
                 ru="Не удалось сгенерировать ключи: {error}"
