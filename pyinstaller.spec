@@ -155,6 +155,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 # Определяем путь к иконке в зависимости от платформы
 if sys.platform == 'win32':
     icon_path = os.path.join(BASEPATH, 'icon.ico')
+elif sys.platform == 'darwin':
+    icon_path = os.path.join(BASEPATH, 'icon.icns')
 else:
     icon_path = os.path.join(BASEPATH, 'icon.png')
 

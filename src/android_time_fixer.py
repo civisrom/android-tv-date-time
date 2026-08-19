@@ -3,6 +3,8 @@ import sys
 import re
 import socket
 import shlex
+import shutil
+import stat
 import time
 import datetime
 import ipaddress
@@ -13,13 +15,15 @@ import psutil
 import atexit
 import signal
 import threading
+import tempfile
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import Any, Optional, Tuple, List
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 import ntplib
 import pyperclip
+from platformdirs import user_data_path
 from colorama import Fore, init
 from adb_shell.auth.keygen import keygen, write_public_keyfile
 from adb_shell.adb_device import AdbDeviceTcp
@@ -28,32 +32,34 @@ sys.path.append(str(Path(__file__).parent))
 from locales import locales, set_language, Language
 init(autoreset=True)
 
-try:
-    import wmi
-except ImportError:
-    wmi = None
-
 # Настройка базового логгера (только консольный вывод на уровне модуля)
 # FileHandler добавляется в AndroidTVTimeFixer._setup_logging()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
+APP_VERSION = '1.0.0'
 
 class ADBProcessManager:
-    def __init__(self, adb_path, device_ip=None):
+    """Аккуратно отключает только ADB-адрес, использованный приложением.
+
+    Приложение не владеет глобальным ADB-сервером, поэтому cleanup не должен
+    завершать сторонние процессы ADB или ломать сессии Android Studio.
+    """
+
+    def __init__(self, adb_path: str, device_ip: Optional[str] = None) -> None:
         self.adb_path = adb_path
         self.device_ip = device_ip
         self.logger = logging.getLogger(__name__)
         self.setup_process_termination()
 
-    def setup_process_termination(self):
+    def setup_process_termination(self) -> None:
         """
         Настройка механизмов завершения процессов ADB
         при выходе из программы или закрытии терминала
         """
         try:
             # Регистрация обработчиков завершения
-            atexit.register(self.terminate_adb_processes)
+            atexit.register(self.cleanup)
 
             # SIGINT не перехватываем: стандартный KeyboardInterrupt обрабатывается
             # в terminal_mode() и main(), а atexit гарантирует очистку процессов.
@@ -61,22 +67,21 @@ class ADBProcessManager:
         except Exception as e:
             self.logger.error(f"Error in setup_process_termination: {e}")
 
-    def signal_handler(self, signum, frame):
+    def signal_handler(self, signum: int, frame: Any) -> None:
         """
         Обработчик SIGTERM: корректно завершает процессы ADB и выходит
         """
         try:
             self.logger.info(f"Received signal {signum}, shutting down")
 
-            # terminate_adb_processes() сам выполняет disconnect перед kill-server
-            self.terminate_adb_processes()
+            self.cleanup()
 
             sys.exit(0)
         except Exception as e:
             self.logger.error(f"Error in signal handler: {e}")
             sys.exit(1)
 
-    def disconnect_device(self):
+    def disconnect_device(self) -> None:
         """
         Отключение устройства через ADB перед завершением процессов
         """
@@ -107,147 +112,39 @@ class ADBProcessManager:
             self.logger.warning("ADB disconnect timed out")
         except Exception as e:
             self.logger.error(f"Error during device disconnect: {e}")
+        finally:
+            self.device_ip = None
 
-    def terminate_adb_processes(self):
-        """
-        Комплексный метод завершения всех процессов ADB
-        с использованием нескольких подходов
-        """
+    def terminate_adb_processes(self) -> None:
+        """Обратная совместимость: отключает только известный адрес устройства."""
+        self.disconnect_device()
+
+    def reset_adb_server(self) -> None:
+        """Штатно завершает глобальный ADB-сервер перед terminal mode."""
         try:
-            # Сначала отключаем устройство
-            self.disconnect_device()
-
-            # 1. Штатное завершение через ADB
-            subprocess.run([self.adb_path, 'kill-server'],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL,
-                           timeout=5)
-            self.logger.info("ADB kill-server executed successfully")
+            result = subprocess.run(
+                [self.adb_path, 'kill-server'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False
+            )
+            if result.returncode == 0:
+                self.logger.info("ADB server stopped before terminal mode")
+            else:
+                self.logger.warning(f"ADB kill-server exited with code {result.returncode}")
         except subprocess.TimeoutExpired:
             self.logger.warning("ADB kill-server timed out")
         except Exception as e:
-            # Вызывается из atexit: исключение не должно уйти наверх
             self.logger.warning(f"ADB kill-server failed: {e}")
 
-        # 2. Завершение через psutil
-        self._terminate_via_psutil()
-
-        # 3. Завершение через platform-специфичные методы
-        if sys.platform == 'win32':
-            self._terminate_windows_processes()
-        else:
-            self._terminate_unix_processes()
-
-    def _terminate_via_psutil(self):
-        """
-        Завершение процессов через psutil
-
-        Returns:
-            bool: Успешность завершения
-        """
-        terminated = False
-        try:
-            for proc in psutil.process_iter(['name', 'exe']):
-                try:
-                    if (proc.info['name'] in ('adb', 'adb.exe') or
-                        (proc.info['exe'] and self.adb_path in proc.info['exe'])):
-                        
-                        # Мягкое завершение
-                        proc.terminate()
-                        
-                        # Если не завершился - принудительно
-                        try:
-                            proc.wait(timeout=3)
-                            terminated = True
-                        except psutil.TimeoutExpired:
-                            proc.kill()
-                            terminated = True
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    pass
-            
-            if terminated:
-                self.logger.info("Processes terminated via psutil")
-        except Exception as e:
-            self.logger.error(f"Error terminating via psutil: {e}")
-        
-        return terminated
-
-    def _terminate_windows_processes(self):
-        """Расширенное завершение процессов ADB в Windows"""
-        try:
-            # 1. Завершение через taskkill
-            subprocess.run(['taskkill', '/F', '/IM', 'adb.exe'], 
-                           stdout=subprocess.DEVNULL, 
-                           stderr=subprocess.DEVNULL, 
-                           timeout=5)
-            
-            # 2. Завершение через WMI (если доступно)
-            if wmi is not None:
-                self._terminate_via_wmi()
-            
-            self.logger.info("Windows ADB processes terminated")
-        except subprocess.TimeoutExpired:
-            self.logger.warning("taskkill timed out")
-        except Exception as e:
-            self.logger.error(f"Error terminating Windows processes: {e}")
-
-    def _terminate_via_wmi(self):
-        """
-        Завершение процессов ADB с использованием WMI
-        Работает только в Windows
-        """
-        if wmi is None:
-            self.logger.warning("WMI module not available")
-            return
-
-        try:
-            # Создаем WMI объект
-            c = wmi.WMI()
-            
-            # Находим процессы ADB по имени
-            processes = c.Win32_Process(name='adb.exe')
-            
-            for process in processes:
-                try:
-                    # Немедленное завершение процесса
-                    process.Terminate()
-                    self.logger.info(f"Terminated ADB process with PID {process.ProcessId}")
-                except Exception as e:
-                    self.logger.error(f"Error terminating process via WMI: {e}")
-            
-            # Дополнительный поиск по пути
-            processes_by_path = c.Win32_Process(ExecutablePath=self.adb_path)
-            for process in processes_by_path:
-                try:
-                    process.Terminate()
-                    self.logger.info(f"Terminated ADB process with PID {process.ProcessId}")
-                except Exception as e:
-                    self.logger.error(f"Error terminating process by path via WMI: {e}")
-        
-        except Exception as e:
-            self.logger.error(f"WMI termination error: {e}")
-
-    def _terminate_unix_processes(self):
-        """Завершение процессов ADB в Unix-системах"""
-        try:
-            subprocess.run(['pkill', '-9', 'adb'], 
-                           stdout=subprocess.DEVNULL, 
-                           stderr=subprocess.DEVNULL, 
-                           timeout=5)
-            self.logger.info("Unix ADB processes terminated")
-        except subprocess.TimeoutExpired:
-            self.logger.warning("pkill timed out")
-        except Exception as e:
-            self.logger.error(f"Error terminating Unix processes: {e}")
-
-    def cleanup(self):
+    def cleanup(self) -> None:
         """
         Метод для явного вызова очистки,
         который можно использовать при завершении программы
         """
         try:
-            # terminate_adb_processes() сам выполняет disconnect перед kill-server
-            self.terminate_adb_processes()
+            self.disconnect_device()
         except Exception as e:
             self.logger.error(f"Error during cleanup: {e}")
 
@@ -256,9 +153,19 @@ class AndroidTVTimeFixerError(Exception):
     pass
 
 class AndroidTVTimeFixer:
-    def __init__(self):
+    MAX_SCAN_HOSTS = 65_534
+    TERMINAL_COMMAND_TIMEOUT = 300
+
+    def __init__(self) -> None:
         self.current_path = Path.cwd()
-        self.keys_folder = self.current_path / 'keys'
+        self.data_dir = Path(user_data_path("AndroidTVTimeFixer", appauthor=False))
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        if os.name != 'nt':
+            self.data_dir.chmod(0o700)
+        self.keys_folder = self.data_dir / 'keys'
+        self.servers_file = self.data_dir / 'saved_servers.json'
+        self.settings_file = self.data_dir / 'settings.json'
+        self._migrate_legacy_data()
         self._setup_logging()
         self._adb_path: Optional[str] = None
         self._adb_path = self.get_adb_path()
@@ -268,9 +175,7 @@ class AndroidTVTimeFixer:
         self.max_connection_retries = 5
         self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
-        self.servers_file = self.current_path / 'saved_servers.json'
         self.saved_servers = self.load_saved_servers()
-        self.settings_file = self.current_path / 'settings.json'
         self.last_device_ip = self.load_last_ip()
         self.ntp_servers = {
             'at': 'at.pool.ntp.org',
@@ -479,6 +384,60 @@ class AndroidTVTimeFixer:
             'time.android.com'
         ]
 
+    def _migrate_legacy_data(self) -> None:
+        """Копирует portable-настройки в защищённый каталог данных один раз."""
+        try:
+            if self.current_path.resolve() == self.data_dir.resolve():
+                return
+
+            for name in ('settings.json', 'saved_servers.json'):
+                source = self.current_path / name
+                destination = self.data_dir / name
+                if source.is_file() and not destination.exists():
+                    shutil.copy2(source, destination)
+                self._secure_file(destination)
+
+            legacy_keys = self.current_path / 'keys'
+            if legacy_keys.is_dir():
+                self.keys_folder.mkdir(parents=True, exist_ok=True)
+                if os.name != 'nt':
+                    self.keys_folder.chmod(0o700)
+                for name in ('adbkey', 'adbkey.pub'):
+                    source = legacy_keys / name
+                    destination = self.keys_folder / name
+                    if source.is_file() and not destination.exists():
+                        shutil.copy2(source, destination)
+                    self._secure_file(destination)
+        except OSError as e:
+            logger.warning(f"Could not migrate legacy application data: {e}")
+
+    @staticmethod
+    def _secure_file(path: Path) -> None:
+        """Ограничивает доступ к чувствительному файлу текущим пользователем."""
+        if os.name != 'nt' and path.exists():
+            path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+    @classmethod
+    def _atomic_write_json(cls, path: Path, data: Any) -> None:
+        """Атомарно сохраняет JSON и не оставляет обрезанный целевой файл."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temp_name = tempfile.mkstemp(prefix=f'.{path.name}.', suffix='.tmp', dir=path.parent)
+        temp_path = Path(temp_name)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as temp_file:
+                json.dump(data, temp_file, ensure_ascii=False, indent=2)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            cls._secure_file(temp_path)
+            os.replace(temp_path, path)
+            cls._secure_file(path)
+        except Exception:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+
     def _setup_logging(self) -> None:
         """Настраивает логирование для класса с выводом в файл и консоль"""
         self.logger = logging.getLogger(__name__)
@@ -500,8 +459,9 @@ class AndroidTVTimeFixer:
 
         # Обработчик для записи в файл
         try:
-            log_file = self.current_path / 'android_tv_fixer.log'
+            log_file = self.data_dir / 'android_tv_fixer.log'
             file_handler = logging.FileHandler(log_file, encoding='utf-8', mode='a')
+            self._secure_file(log_file)
             file_handler.setLevel(logging.INFO)
             file_handler.setFormatter(formatter)
             self.logger.addHandler(file_handler)
@@ -551,7 +511,11 @@ class AndroidTVTimeFixer:
         self.logger.info(f"Используется ADB по пути: {self._adb_path}")
         return self._adb_path
 
-    def _process_command_output(self, process: Popen) -> Tuple[int, str, str]:
+    def _process_command_output(
+            self,
+            process: Popen,
+            timeout: int = TERMINAL_COMMAND_TIMEOUT
+    ) -> Tuple[int, str, str]:
         """
         Обрабатывает вывод команды и возвращает результат
         
@@ -564,40 +528,100 @@ class AndroidTVTimeFixer:
         stdout_lines = []
         stderr_lines = []
 
-        # Читаем stderr в отдельном потоке, чтобы заполненный pipe
-        # не заблокировал процесс, пока мы построчно читаем stdout
-        def _drain_stderr() -> None:
+        def _drain_stream(stream: Any, output: List[str], display: bool = False) -> None:
             try:
-                for line in process.stderr:
-                    stderr_lines.append(line)
+                for line in stream:
+                    output.append(line)
+                    if display:
+                        print(Fore.GREEN + line.rstrip('\r\n'))
             except Exception:
                 pass
 
-        stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        if process.stdout is None or process.stderr is None:
+            raise RuntimeError("Command output pipes are not configured")
+
+        stdout_thread = threading.Thread(
+            target=_drain_stream, args=(process.stdout, stdout_lines, True), daemon=True
+        )
+        stderr_thread = threading.Thread(
+            target=_drain_stream, args=(process.stderr, stderr_lines), daemon=True
+        )
+        stdout_thread.start()
         stderr_thread.start()
 
         try:
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    clean_output = output.strip()
-                    stdout_lines.append(clean_output)
-                    print(Fore.GREEN + clean_output)
-
-            process.wait(timeout=5)
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self._terminate_process_tree(process)
+            raise TimeoutError(f"Command execution timeout exceeded ({timeout} sec.)")
+        except BaseException:
+            if process.poll() is None:
+                self._terminate_process_tree(process)
+            raise
+        finally:
+            stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
-            return process.returncode, '\n'.join(stdout_lines), ''.join(stderr_lines)
+            process.stdout.close()
+            process.stderr.close()
 
+        return process.returncode, ''.join(stdout_lines), ''.join(stderr_lines)
+
+    @staticmethod
+    def _popen_group_options() -> dict:
+        """Изолирует команду, чтобы timeout мог завершить всё дерево процессов."""
+        if os.name == 'nt':
+            return {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP}
+        return {'start_new_session': True}
+
+    @staticmethod
+    def _terminate_process_tree(process: Popen) -> None:
+        """Завершает принадлежащее terminal mode дерево по PID/группе."""
+        if process.poll() is not None:
+            return
+
+        try:
+            if os.name == 'nt':
+                result = subprocess.run(
+                    ['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                    check=False
+                )
+                if result.returncode != 0 and process.poll() is None:
+                    process.kill()
+            else:
+                process_group = os.getpgid(process.pid)
+                if process_group == os.getpgrp():
+                    process.kill()
+                else:
+                    os.killpg(process_group, signal.SIGKILL)
+        except (OSError, subprocess.SubprocessError):
+            if process.poll() is None:
+                process.kill()
+
+        try:
+            process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             process.kill()
-            raise TimeoutError("Command execution timeout exceeded")
+            process.wait(timeout=5)
+
+    @staticmethod
+    def _split_terminal_command(command: str) -> List[str]:
+        """Разбирает команду, сохраняя обратные слеши Windows-путей."""
+        args = shlex.split(command, posix=os.name != 'nt')
+        if os.name == 'nt':
+            return [
+                arg[1:-1] if len(arg) >= 2 and arg[0] == arg[-1] == '"' else arg
+                for arg in args
+            ]
+        return args
 
     def _retry_adb_connection(self, command: str, max_retries: int = 5, delay: int = 2) -> bool:
         """
-        Пытается переподключиться к устройству несколько раз, выполняя 'adb kill-server' и 'adb disconnect'
-        только на 3-й, 4-й и 5-й попытке. Использует порт 5555 по умолчанию.
+        Пытается переподключиться к устройству несколько раз. На поздних
+        попытках отключает только конкретный адрес, не перезапуская глобальный
+        ADB-сервер. Использует порт 5555 по умолчанию.
     
         Args:
             command (str): Выполняемая команда.
@@ -622,48 +646,25 @@ class AndroidTVTimeFixer:
     
         for attempt in range(max_retries):
             try:
-                # Выполнение команд adb kill-server и adb disconnect только на 3-й, 4-й и 5-й попытке
-                if attempt >= 2:
-                    self.logger.info(f"Попытка {attempt + 1}: Execute 'adb kill-server' to restart the ADB server.")
-                    
-                    # Выполняем adb kill-server
-                    kill_server_command = [self.get_adb_path(), 'kill-server']
-                    kill_server_process = Popen(
-                        kill_server_command,
+                if attempt >= 2 and device_ip:
+                    self.logger.info(f"Попытка {attempt + 1}: Execute 'adb disconnect {device_ip}'")
+                    disconnect_process = subprocess.run(
+                        [self.get_adb_path(), 'disconnect', device_ip],
                         stdout=PIPE,
                         stderr=PIPE,
                         universal_newlines=True,
                         encoding=encoding,
-                        bufsize=1
+                        timeout=10,
+                        check=False
                     )
-                    _, kill_server_stderr = kill_server_process.communicate()
-    
-                    if kill_server_process.returncode != 0:
-                        self.logger.warning(f"Error while executing 'adb kill-server': {kill_server_stderr.strip()}")
-                    else:
-                        self.logger.info("'adb kill-server' completed successfully.")
-    
-                    # Выполняем adb disconnect для конкретного IP, если он есть
-                    if device_ip:
-                        self.logger.info(f"Попытка {attempt + 1}: Execute 'adb disconnect {device_ip}'")
-                        disconnect_command = [self.get_adb_path(), 'disconnect', device_ip]
-                        disconnect_process = Popen(
-                            disconnect_command,
-                            stdout=PIPE,
-                            stderr=PIPE,
-                            universal_newlines=True,
-                            encoding=encoding,
-                            bufsize=1
+                    if disconnect_process.returncode != 0:
+                        self.logger.warning(
+                            f"Error while executing 'adb disconnect': "
+                            f"{disconnect_process.stderr.strip()}"
                         )
-                        _, disconnect_stderr = disconnect_process.communicate()
-    
-                        if disconnect_process.returncode != 0:
-                            self.logger.warning(f"Error while executing 'adb disconnect': {disconnect_stderr.strip()}")
-                        else:
-                            self.logger.info("'adb disconnect' completed successfully.")
     
                 # Выполнение основной команды подключения
-                args = shlex.split(command)
+                args = self._split_terminal_command(command)
                 if not args:
                     return False
     
@@ -676,7 +677,8 @@ class AndroidTVTimeFixer:
                     stderr=PIPE,
                     universal_newlines=True,
                     encoding=encoding,
-                    bufsize=1
+                    bufsize=1,
+                    **self._popen_group_options()
                 )
     
                 return_code, stdout, stderr = self._process_command_output(process)
@@ -705,7 +707,7 @@ class AndroidTVTimeFixer:
                         continue
                     else:
                         self.logger.error("All connection attempts failed.")
-                        print(f"\033[31mAll connection attempts failed.\033[0m")
+                        print("\033[31mAll connection attempts failed.\033[0m")
                         return False
 
                 if return_code == 0:
@@ -737,19 +739,24 @@ class AndroidTVTimeFixer:
             return
     
         try:
-            args = shlex.split(command)
+            args = self._split_terminal_command(command)
             if not args:
                 return
 
             # Логику ADB-переподключения применяем только когда команда
             # действительно начинается с adb, а не просто содержит подстроку 'adb'
             first_token = os.path.basename(args[0]).lower()
-            if first_token in ('adb', 'adb.exe'):
+            if (
+                    first_token in ('adb', 'adb.exe') and
+                    len(args) > 1 and args[1].lower() == 'connect'
+            ):
                 connection_success = self._retry_adb_connection(command)
                 if not connection_success:
                     return
 
             else:
+                if first_token in ('adb', 'adb.exe'):
+                    args[0] = self.get_adb_path()
                 self.logger.debug(f"The command is being executed: {' '.join(args)}")
                 
                 process = Popen(
@@ -758,7 +765,8 @@ class AndroidTVTimeFixer:
                     stderr=PIPE,
                     universal_newlines=True,
                     encoding='utf-8' if sys.platform != 'win32' else 'cp866',
-                    bufsize=1
+                    bufsize=1,
+                    **self._popen_group_options()
                 )
                 
                 return_code, stdout, stderr = self._process_command_output(process)
@@ -793,9 +801,10 @@ class AndroidTVTimeFixer:
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
         print(Fore.YELLOW + locales.get("terminal_mode_help"))
 
-        # Завершаем процессы ADB при входе в терминальный режим,
-        # чтобы пользователь мог управлять ADB-сервером вручную
-        self.process_manager.terminate_adb_processes()
+        # Освобождаем transport библиотеки и, согласно ожидаемому поведению,
+        # штатно завершаем ADB-сервер перед ручным управлением.
+        self._close_device()
+        self.process_manager.reset_adb_server()
 
         try:
             while True:
@@ -805,8 +814,7 @@ class AndroidTVTimeFixer:
                     # Проверяем специальные команды
                     if command.lower() in ['exit', 'quit', 'q']:
                         self.logger.info("Exit terminal mode")
-                        # Завершаем процессы ADB только при выходе
-                        self.process_manager.terminate_adb_processes()
+                        self.process_manager.cleanup()
                         break
                     elif command.lower() in ['help', '?']:
                         print(Fore.YELLOW + locales.get("terminal_mode_commands"))
@@ -833,8 +841,6 @@ class AndroidTVTimeFixer:
             self.logger.error(f"Critical error in terminal mode: {str(e)}", exc_info=True)
             print(Fore.RED + locales.get("terminal_mode_critical_error", error=str(e)))
         finally:
-            # Дополнительная страховка - очистка процессов при любом выходе
-            # Хотя основное завершение происходит при командах exit/quit/q
             self.process_manager.cleanup()
 	
     def _test_ntp_server(self, server: str, count: int = 2, timeout: int = 2) -> dict:
@@ -965,30 +971,55 @@ class AndroidTVTimeFixer:
 
         self.logger.info(f"NTP ping test completed: {reachable_count} reachable, {unreachable_count} unreachable")
 	
+    @classmethod
+    def _normalize_saved_servers(cls, data: Any) -> dict:
+        """Проверяет схему пользовательского списка NTP-серверов."""
+        if not isinstance(data, dict):
+            raise ValueError("saved_servers must be an object")
+
+        normalized = {'favorite_servers': [], 'custom_servers': []}
+        for key in normalized:
+            values = data.get(key, [])
+            if not isinstance(values, list):
+                raise ValueError(f"{key} must be a list")
+            for value in values:
+                if not isinstance(value, str) or not cls.validate_ntp_server(value.strip()):
+                    raise ValueError(f"Invalid NTP server in {key}")
+                server = value.strip()
+                if server not in normalized[key]:
+                    normalized[key].append(server)
+        return normalized
+
     def load_saved_servers(self) -> dict:
         """Загружает сохраненные серверы из файла"""
         if self.servers_file.exists():
             try:
                 with open(self.servers_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    return self._normalize_saved_servers(json.load(f))
             except Exception as e:
                 self.logger.warning(locales.get_en('logger_warning', error=str(e)))
         return {'favorite_servers': [], 'custom_servers': []}
 
-    def save_servers(self):
+    def save_servers(self) -> bool:
         """Сохраняет серверы в файл"""
         try:
-            with open(self.servers_file, 'w', encoding='utf-8') as f:
-                json.dump(self.saved_servers, f, ensure_ascii=False, indent=2)
+            self.saved_servers = self._normalize_saved_servers(self.saved_servers)
+            self._atomic_write_json(self.servers_file, self.saved_servers)
+            return True
         except Exception as e:
             self.logger.warning(locales.get_en('logger_warning_2', error=str(e)))
+            return False
 
     def _load_setting(self, key: str) -> str:
         """Читает одно значение из файла настроек"""
         if self.settings_file.exists():
             try:
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    return json.load(f).get(key, '')
+                    settings = json.load(f)
+                if not isinstance(settings, dict):
+                    raise ValueError("settings must be an object")
+                value = settings.get(key, '')
+                return value if isinstance(value, str) else ''
             except Exception as e:
                 self.logger.warning(locales.get_en('settings_load_error', error=str(e)))
         return ''
@@ -1000,9 +1031,10 @@ class AndroidTVTimeFixer:
             if self.settings_file.exists():
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
+                if not isinstance(settings, dict):
+                    settings = {}
             settings[key] = value
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
+            self._atomic_write_json(self.settings_file, settings)
             return True
         except Exception as e:
             self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
@@ -1012,18 +1044,22 @@ class AndroidTVTimeFixer:
         """Загружает последний использованный IP адрес из файла настроек"""
         return self._load_setting('last_device_ip')
 
-    def save_last_ip(self, ip: str) -> None:
+    def save_last_ip(self, ip: str) -> bool:
         """Сохраняет последний использованный IP адрес в файл настроек"""
-        if self._save_setting('last_device_ip', ip):
+        if self.validate_ip(ip) and self._save_setting('last_device_ip', ip):
             self.last_device_ip = ip
+            return True
+        return False
 
     def load_language(self) -> str:
         """Загружает сохранённый язык из файла настроек"""
         return self._load_setting('language')
 
-    def save_language(self, language: str) -> None:
+    def save_language(self, language: str) -> bool:
         """Сохраняет выбранный язык в файл настроек"""
-        self._save_setting('language', language)
+        if language in ('en', 'ru'):
+            return self._save_setting('language', language)
+        return False
 
     def get_device_ip_input(self) -> str:
         """Получает IP адрес устройства: сохранённый, ручной ввод или авто-сканирование сети"""
@@ -1263,9 +1299,12 @@ class AndroidTVTimeFixer:
                 write_public_keyfile(str(priv_key), str(pub_key))
                 self.logger.info(locales.get_en('adb_pubkey_restored'))
             else:
-                self.keys_folder.mkdir(parents=True, exist_ok=True)
+                self.keys_folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 keygen(str(priv_key))
                 self.logger.info(locales.get_en('gen_keys'))
+            if os.name != 'nt':
+                self.keys_folder.chmod(0o700)
+            self._secure_file(priv_key)
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get('key_generation_error', error=str(e)))
 
@@ -1335,6 +1374,22 @@ class AndroidTVTimeFixer:
         result = subprocess.run([self.get_adb_path(), 'shell', 'getprop'], capture_output=True, text=True)
         print(Fore.GREEN + locales.get("current_device_info"))
         print(result.stdout)
+
+    def _close_device(self) -> None:
+        """Закрывает активный adb-shell transport и очищает состояние."""
+        device = self.device
+        self.device = None
+        self.connected_ip = None
+        if device is not None:
+            try:
+                device.close()
+            except Exception as e:
+                self.logger.debug(f"Could not close ADB transport: {e}")
+
+    def close(self) -> None:
+        """Освобождает только ресурсы, принадлежащие этому экземпляру."""
+        self._close_device()
+        self.process_manager.cleanup()
     
     def connect_or_reuse(self, ip: str) -> None:
         """Подключается к устройству или переиспользует существующее соединение"""
@@ -1349,8 +1404,9 @@ class AndroidTVTimeFixer:
                 return
             except Exception:
                 # Соединение потеряно, переподключаемся
-                self.device = None
-                self.connected_ip = None
+                self._close_device()
+        elif self.device:
+            self._close_device()
         self.connect(ip)
 
     def verify_ntp_server(self, server: str, count: int = 3, timeout: int = 3) -> bool:
@@ -1417,9 +1473,9 @@ class AndroidTVTimeFixer:
                 device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
                 device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
                 connection_established = True
+                self._close_device()
                 self.device = device
                 self.connected_ip = f"{host}:{port}"
-                self.process_manager.device_ip = f"{host}:{port}"
                 self.logger.info(locales.get_en('connection_success', ip=host, port=port))
                 break
             except Exception as e:
@@ -1473,7 +1529,7 @@ class AndroidTVTimeFixer:
     
             # Проверяем изменение
             new_ntp = self.get_current_ntp()
-            if ntp_server not in new_ntp:
+            if new_ntp != ntp_server:
                 raise AndroidTVTimeFixerError(locales.get("ntp_server_confirmation_failed"))
         except AndroidTVTimeFixerError:
             raise
@@ -1747,14 +1803,16 @@ class AndroidTVTimeFixer:
 
     def _scan_networks(self, networks: List[ipaddress.IPv4Network]) -> List[str]:
         """Сканирует список сетей на наличие устройств с открытым ADB-портом 5555."""
-        hosts_set: set = set()
-        for net in networks:
-            for h in net.hosts():
-                hosts_set.add(str(h))
-        hosts = sorted(hosts_set, key=lambda ip: tuple(int(o) for o in ip.split('.')))
-        total = len(hosts)
+        collapsed_networks = list(ipaddress.collapse_addresses(networks))
+        total = sum(self._network_hosts_count(network) for network in collapsed_networks)
 
-        net_names = ", ".join(str(n) for n in networks)
+        if total > self.MAX_SCAN_HOSTS:
+            print(Fore.RED + locales.get(
+                "scan_too_large", hosts=total, limit=self.MAX_SCAN_HOSTS
+            ))
+            return []
+
+        net_names = ", ".join(str(n) for n in collapsed_networks)
         print(Fore.CYAN + locales.get("scan_start", network=net_names))
 
         found: List[str] = []
@@ -1764,7 +1822,11 @@ class AndroidTVTimeFixer:
             print(Fore.YELLOW + locales.get("scan_complete", count=0))
             return []
         workers = min(500, total)
-        host_iter = iter(hosts)
+        host_iter = (
+            str(host)
+            for network in collapsed_networks
+            for host in network.hosts()
+        )
         with ThreadPoolExecutor(max_workers=workers) as executor:
             pending = {}
 
@@ -1854,6 +1916,11 @@ class AndroidTVTimeFixer:
             return []
 
         hosts_count = self._network_hosts_count(network)
+        if hosts_count > self.MAX_SCAN_HOSTS:
+            print(Fore.RED + locales.get(
+                "scan_too_large", hosts=hosts_count, limit=self.MAX_SCAN_HOSTS
+            ))
+            return []
         if hosts_count > 4096:
             answer = input(
                 Fore.YELLOW +
@@ -2004,7 +2071,7 @@ class AndroidTVTimeFixer:
                 device.connect(rsa_keys=[signer], auth_timeout_s=15)
                 device.shell(f'settings put global ntp_server {shlex.quote(ntp_server)}')
                 confirmed = device.shell('settings get global ntp_server').strip()
-                if ntp_server in confirmed:
+                if confirmed == ntp_server:
                     print(Fore.GREEN + locales.get("batch_success", ip=ip, server=ntp_server))
                     success += 1
                 else:
@@ -2061,7 +2128,7 @@ class AndroidTVTimeFixer:
     def export_settings(self, path: Optional[str] = None) -> None:
         """Экспортирует все настройки в JSON-файл"""
         if path is None:
-            path = str(self.current_path / 'backup.json')
+            path = str(self.data_dir / 'backup.json')
         export_data = {
             'version': '1.0.0',
             'exported_at': datetime.datetime.now().isoformat(),
@@ -2070,8 +2137,7 @@ class AndroidTVTimeFixer:
             'saved_servers': self.saved_servers,
         }
         try:
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, ensure_ascii=False, indent=2)
+            self._atomic_write_json(Path(path).expanduser(), export_data)
             print(Fore.GREEN + locales.get("export_success", path=path))
             self.logger.info(f"Settings exported to: {path}")
         except Exception as e:
@@ -2086,14 +2152,30 @@ class AndroidTVTimeFixer:
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError("Backup root must be an object")
+
+            saved_servers = self.saved_servers
             if 'saved_servers' in data:
-                self.saved_servers = data['saved_servers']
-                self.save_servers()
-            if 'language' in data and data['language'] in ('en', 'ru'):
-                self.save_language(data['language'])
-                set_language(data['language'])
-            if 'last_ip' in data and data['last_ip']:
-                self.save_last_ip(data['last_ip'])
+                saved_servers = self._normalize_saved_servers(data['saved_servers'])
+
+            language = data.get('language', '')
+            if language and language not in ('en', 'ru'):
+                raise ValueError("Invalid language in backup")
+
+            last_ip = data.get('last_ip', '')
+            if last_ip and (not isinstance(last_ip, str) or not self.validate_ip(last_ip)):
+                raise ValueError("Invalid device IP in backup")
+
+            self.saved_servers = saved_servers
+            if not self.save_servers():
+                raise OSError("Could not save imported server settings")
+            if language:
+                if not self.save_language(language):
+                    raise OSError("Could not save imported language")
+                set_language(language)
+            if last_ip and not self.save_last_ip(last_ip):
+                raise OSError("Could not save imported device IP")
             print(Fore.GREEN + locales.get("import_success", path=path))
             self.logger.info(f"Settings imported from: {path}")
         except Exception as e:
@@ -2971,9 +3053,11 @@ def main():
 
     finally:
         fixer.logger.info("Application cleanup started")
-        # Явная очистка при завершении программы
-        fixer.process_manager.cleanup()
+        fixer.close()
         fixer.logger.info("Application cleanup completed")
 
 if __name__ == '__main__':
-    main()
+    if '--version' in sys.argv:
+        print(f"AndroidTVTimeFixer {APP_VERSION}")
+    else:
+        main()

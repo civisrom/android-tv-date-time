@@ -22,13 +22,13 @@ def create_png(width, height, pixels):
     ihdr_data = struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)
     ihdr = png_chunk(b'IHDR', ihdr_data)
 
-    raw_data = b''
+    raw_data = bytearray()
     for y in range(height):
-        raw_data += b'\x00'
+        raw_data.append(0)
         for x in range(width):
-            raw_data += bytes(pixels[y * width + x])
+            raw_data.extend(pixels[y * width + x])
 
-    compressed = zlib.compress(raw_data, 9)
+    compressed = zlib.compress(bytes(raw_data), 9)
     idat = png_chunk(b'IDAT', compressed)
     iend = png_chunk(b'IEND', b'')
 
@@ -46,6 +46,15 @@ def create_ico(png_data, size):
         22
     )
     return ico_header + ico_entry + png_data
+
+
+def create_icns(png_images):
+    """Создаёт ICNS-контейнер из PNG разных размеров без внешних библиотек."""
+    chunks = []
+    for icon_type, png_data in png_images:
+        chunks.append(icon_type + struct.pack('>I', len(png_data) + 8) + png_data)
+    body = b''.join(chunks)
+    return b'icns' + struct.pack('>I', len(body) + 8) + body
 
 
 def lerp(a, b, t):
@@ -185,7 +194,6 @@ def generate_icon(size=256):
                                         tv_hh + tv_border + 16 * s,
                                         tv_r + tv_border + 12 * s)
             if d_outer_glow < 0:
-                glow_intensity = min(1.0, (-d_outer_glow) / (14 * s))
                 # Только ближняя зона к рамке
                 d_outer = rounded_rect(x, y, cx, tv_cy,
                                        tv_hw + tv_border, tv_hh + tv_border,
@@ -318,7 +326,6 @@ def main():
     size = 256
     print(f"Generating {size}x{size} icon...")
     pixels = generate_icon(size)
-
     png_data = create_png(size, size, pixels)
 
     png_path = os.path.join(project_root, 'icon.png')
@@ -331,6 +338,19 @@ def main():
     with open(ico_path, 'wb') as f:
         f.write(ico_data)
     print(f"Created: {ico_path}")
+
+    # ICNS ожидает PNG-элементы с типами ic07/ic08/ic09 для 128/256/512 px.
+    icns_images = [(b'ic08', png_data)]
+    for icns_type, icns_size in ((b'ic07', 128), (b'ic09', 512)):
+        print(f"Generating {icns_size}x{icns_size} icon for macOS...")
+        icns_pixels = generate_icon(icns_size)
+        icns_images.append(
+            (icns_type, create_png(icns_size, icns_size, icns_pixels))
+        )
+    icns_path = os.path.join(project_root, 'icon.icns')
+    with open(icns_path, 'wb') as f:
+        f.write(create_icns(icns_images))
+    print(f"Created: {icns_path}")
 
     print("Icon generation complete!")
 

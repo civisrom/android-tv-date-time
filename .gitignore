@@ -42,6 +42,15 @@ dist/
 .env.local
 .env.*.local
 
+# Runtime data and secrets
+keys/
+adbkey
+adbkey.pub
+settings.json
+saved_servers.json
+backup.json
+android_tv_fixer.log
+
 # OS
 .DS_Store
 Thumbs.db

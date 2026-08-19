@@ -1160,6 +1160,10 @@ vn: Вьетнам
                 en="Subnet {network} contains {hosts} hosts and may take a long time. Continue? (y/n): ",
                 ru="Подсеть {network} содержит {hosts} хостов и может сканироваться долго. Продолжить? (y/n): "
             ),
+            "scan_too_large": Translation(
+                en="Scan cancelled: the selected network contains {hosts} hosts; the safe limit is {limit}.",
+                ru="Сканирование отменено: выбранная сеть содержит {hosts} хостов; безопасный лимит — {limit}."
+            ),
             "scan_firewall_hint": Translation(
                 en="Hint: Make sure this program is allowed through your firewall (Windows Defender, iptables, etc.).",
                 ru="Подсказка: Убедитесь, что программа добавлена в исключения файрвола (Брандмауэр Windows, iptables и т.д.)."

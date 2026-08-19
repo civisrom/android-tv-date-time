@@ -2,8 +2,6 @@ import os
 import sys
 import logging
 import stat
-from pathlib import Path
-from typing import List
 
 # Global ADB path for import by android_time_fixer.py
 ADB_PATH = os.path.join(
@@ -23,9 +21,6 @@ def setup_linux_environment() -> None:
         
         # Настраиваем окружение
         _configure_environment(base_path, resources_path, logger)
-        
-        # Проверяем USB правила
-        _setup_udev_rules(logger)
         
         logger.info("Linux environment setup completed")
         
@@ -68,20 +63,6 @@ def _configure_environment(base_path: str, resources_path: str, logger: logging.
     
     os.environ['ANDROID_HOME'] = resources_path
     logger.info("Environment variables configured")
-
-def _setup_udev_rules(logger: logging.Logger) -> None:
-    try:
-        if os.geteuid() == 0:  # Проверяем root права
-            rules_content = 'SUBSYSTEM=="usb", ATTR{idVendor}=="0502", MODE="0666", GROUP="plugdev"\n'
-            rules_path = '/etc/udev/rules.d/51-android.rules'
-            
-            if not os.path.exists(rules_path):
-                with open(rules_path, 'w') as f:
-                    f.write(rules_content)
-                os.system('udevadm control --reload-rules')
-                logger.info("USB rules installed")
-    except Exception as e:
-        logger.warning(f"Could not setup udev rules: {e}")
 
 if getattr(sys, 'frozen', False) or __name__ == '__main__':
     setup_linux_environment()

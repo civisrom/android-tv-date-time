@@ -129,6 +129,16 @@
 1.  Скачайте архив `AndroidTVTimeFixer-macos.zip` из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases).
 2.  Распакуйте архив и запустите приложение.
 
+### Данные приложения
+
+ADB-ключи, настройки и журнал хранятся в защищённом каталоге пользователя:
+
+- Windows: `%LOCALAPPDATA%\AndroidTVTimeFixer`
+- Linux: `$XDG_DATA_HOME/AndroidTVTimeFixer` или `~/.local/share/AndroidTVTimeFixer`
+- macOS: `~/Library/Application Support/AndroidTVTimeFixer`
+
+При первом запуске существующие настройки и ADB-ключи из папки программы копируются автоматически.
+
 ## Подготовка Android TV
 
 ### Включение отладки ADB (режим разработчика)

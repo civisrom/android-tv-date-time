@@ -59,7 +59,7 @@ try {
 if ($KeepOpenOnError -and $exitCode -ne 0) {
     Write-Host ""
     Write-Host "$exeName exited with code $exitCode." -ForegroundColor Red
-    Write-Host "Check the messages above or android_tv_fixer.log in this folder." -ForegroundColor Cyan
+    Write-Host "Check the messages above or the AndroidTVTimeFixer user data folder." -ForegroundColor Cyan
     Read-Host "Press Enter to close"
 }
 

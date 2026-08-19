@@ -2,9 +2,6 @@ import os
 import sys
 import logging
 import stat
-import subprocess
-from pathlib import Path
-from typing import Optional
 
 # Global ADB path for import by android_time_fixer.py
 ADB_PATH = os.path.join(
@@ -24,10 +21,7 @@ def setup_macos_environment() -> None:
         
         # Настраиваем окружение
         _configure_environment(base_path, resources_path, logger)
-        
-        # Проверяем и настраиваем безопасность
-        _configure_security(adb_path, logger)
-        
+
         logger.info("MacOS environment setup completed")
         
     except Exception as e:
@@ -69,23 +63,6 @@ def _configure_environment(base_path: str, resources_path: str, logger: logging.
     
     os.environ['ANDROID_HOME'] = resources_path
     logger.info("Environment variables configured")
-
-def _configure_security(adb_path: str, logger: logging.Logger) -> None:
-    try:
-        # Проверяем карантин
-        result = subprocess.run(['xattr', adb_path], capture_output=True, text=True)
-        if 'com.apple.quarantine' in result.stdout:
-            subprocess.run(['xattr', '-d', 'com.apple.quarantine', adb_path])
-            logger.info("Quarantine attribute removed from ADB")
-            
-        # Проверяем подпись
-        result = subprocess.run(['codesign', '-v', adb_path], capture_output=True)
-        if result.returncode != 0:
-            subprocess.run(['codesign', '-s', '-', '--force', adb_path])
-            logger.info("ADB binary signed")
-            
-    except Exception as e:
-        logger.warning(f"Could not configure security settings: {e}")
 
 if getattr(sys, 'frozen', False) or __name__ == '__main__':
     setup_macos_environment()

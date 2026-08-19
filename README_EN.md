@@ -129,6 +129,16 @@ Run via PowerShell
 1.  Download the `AndroidTVTimeFixer-macos.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
 2.  Extract the archive and run the application.
 
+### Application data
+
+ADB keys, settings, and the log are stored in the protected user data directory:
+
+- Windows: `%LOCALAPPDATA%\AndroidTVTimeFixer`
+- Linux: `$XDG_DATA_HOME/AndroidTVTimeFixer` or `~/.local/share/AndroidTVTimeFixer`
+- macOS: `~/Library/Application Support/AndroidTVTimeFixer`
+
+On first launch, existing settings and ADB keys from the application folder are copied automatically.
+
 ## Android TV Setup
 
 ### Enabling ADB Debugging (Developer Mode)

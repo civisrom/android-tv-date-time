@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHON_VERSION: '3.11'
+  POETRY_VERSION: '2.3.4'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            python: '3.11'
+          - os: ubuntu-22.04
+            python: '3.12'
+          - os: windows-latest
+            python: '3.11'
+          - os: macos-latest
+            python: '3.11'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install Poetry
+        run: python -m pip install "poetry==${{ env.POETRY_VERSION }}"
+
+      - name: Install project
+        run: poetry install --no-interaction --with dev
+
+      - name: Validate metadata and lock file
+        run: poetry check --lock
+
+      - name: Check Python sources
+        run: |
+          poetry run python -c "import android_time_fixer"
+          poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
+          poetry run flake8 --select=F src/android_time_fixer.py locales.py scripts tests
+
+      - name: Run regression tests
+        run: poetry run python -m unittest discover -s tests -v

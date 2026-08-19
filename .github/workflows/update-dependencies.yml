@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -20,21 +21,20 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
       - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install poetry==${{ env.POETRY_VERSION }}
+        run: python -m pip install poetry==${{ env.POETRY_VERSION }}
         shell: bash
 
       - name: Configure Poetry
@@ -49,7 +49,7 @@ jobs:
         shell: bash
 
       - name: Cache Poetry dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             .venv
@@ -64,6 +64,8 @@ jobs:
           poetry check --lock
           poetry install --no-interaction --no-root --with dev --all-extras
           poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
+          poetry run flake8 --select=F src/android_time_fixer.py locales.py scripts tests
+          poetry run python -m unittest discover -s tests -v
         env:
           POETRY_CACHE_DIR: ~/.cache/pypoetry
         shell: bash
@@ -73,12 +75,22 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit and push changes
+      - name: Commit changes and open pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh auth setup-git
           git add poetry.lock
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
+            update_branch="automation/dependency-update-${GITHUB_RUN_ID}"
+            git switch -c "$update_branch"
             git commit -m "Update dependencies"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            git push origin "HEAD:${update_branch}"
+            gh pr create \
+              --base "${GITHUB_REF_NAME}" \
+              --head "$update_branch" \
+              --title "Update dependencies" \
+              --body "Automated monthly dependency update. Validation and regression tests passed."
           fi
