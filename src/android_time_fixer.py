@@ -115,10 +115,6 @@ class ADBProcessManager:
         finally:
             self.device_ip = None
 
-    def terminate_adb_processes(self) -> None:
-        """Обратная совместимость: отключает только известный адрес устройства."""
-        self.disconnect_device()
-
     def reset_adb_server(self) -> None:
         """Штатно завершает глобальный ADB-сервер перед terminal mode."""
         try:
@@ -204,8 +200,6 @@ class AndroidTVTimeFixer:
         self.process_manager = ADBProcessManager(self._adb_path)
         self.device = None
         self.connected_ip = None
-        self.max_connection_retries = 5
-        self.connection_retry_delay = 5
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.saved_servers = self.load_saved_servers()
         self.last_device_ip = self.load_last_ip()
@@ -1071,8 +1065,8 @@ class AndroidTVTimeFixer:
                 self.logger.warning(locales.get_en('settings_load_error', error=str(e)))
         return ''
 
-    def _save_setting(self, key: str, value: str) -> bool:
-        """Записывает одно значение в файл настроек, сохраняя остальные"""
+    def _save_settings(self, values: dict) -> bool:
+        """Записывает значения в файл настроек одной атомарной записью"""
         try:
             settings = {}
             if self.settings_file.exists():
@@ -1080,12 +1074,16 @@ class AndroidTVTimeFixer:
                     settings = json.load(f)
                 if not isinstance(settings, dict):
                     settings = {}
-            settings[key] = value
+            settings.update(values)
             self._atomic_write_json(self.settings_file, settings)
             return True
         except Exception as e:
             self.logger.warning(locales.get_en('settings_save_error', error=str(e)))
             return False
+
+    def _save_setting(self, key: str, value: str) -> bool:
+        """Записывает одно значение в файл настроек, сохраняя остальные"""
+        return self._save_settings({key: value})
 
     def load_last_ip(self) -> str:
         """Загружает последний использованный IP адрес из файла настроек"""
@@ -1383,61 +1381,6 @@ class AndroidTVTimeFixer:
         except Exception as e:
             raise AndroidTVTimeFixerError(locales.get("key_loading_error", error=str(e)))
 
-    def list_devices(self):
-        """Получить список подключенных устройств через adb."""
-        result = subprocess.run([self.get_adb_path(), 'devices'], capture_output=True, text=True)
-        lines = result.stdout.splitlines()
-
-        devices = []
-        skipped = []
-        for line in lines[1:]:
-            if not line.strip():
-                continue
-            parts = line.split()
-            if len(parts) >= 2 and parts[1] == 'device':
-                devices.append(parts[0])
-            elif len(parts) >= 2:
-                skipped.append(f"{parts[0]} ({parts[1]})")
-
-        if len(devices) == 0:
-            print(Fore.RED + locales.get("no_connected_devices"))
-            if skipped:
-                self.logger.warning(f"Skipped unavailable ADB devices: {', '.join(skipped)}")
-            return None
-
-        return devices
-
-    def select_device(self, devices):
-        """Выбор устройства из списка для подключения."""
-        print(Fore.GREEN + locales.get("choose_device_to_connect"))
-        for i, device in enumerate(devices, 1):
-            print(Fore.YELLOW + f"{i}. {device}")
-
-        choice = input(Fore.WHITE + locales.get("enter_device_number"))
-
-        try:
-            choice = int(choice)
-            if 1 <= choice <= len(devices):
-                return devices[choice - 1]
-            else:
-                print(Fore.RED + locales.get("invalid_device_number"))
-                return None
-        except ValueError:
-            print(Fore.RED + locales.get("invalid_input"))
-            return None
-
-    def connect_to_device(self, device):
-        """Подключение к выбранному устройству через adb."""
-        print(Fore.GREEN + locales.get("connecting_to_device", device_id=device))
-
-        subprocess.run([self.get_adb_path(), '-s', device, 'shell'], check=True)
-
-    def show_device_info_adb(self):
-        """Получение информации о текущем подключенном устройстве через adb shell."""
-        result = subprocess.run([self.get_adb_path(), 'shell', 'getprop'], capture_output=True, text=True)
-        print(Fore.GREEN + locales.get("current_device_info"))
-        print(result.stdout)
-
     def _close_device(self) -> None:
         """Закрывает активный adb-shell transport и очищает состояние."""
         device = self.device
@@ -1680,12 +1623,6 @@ class AndroidTVTimeFixer:
             pass
         print(Fore.RED + locales.get("invalid_input"))
         return ''
-
-    @classmethod
-    def _get_private_local_ips(cls) -> List[str]:
-        """Возвращает локальные private IPv4 адреса без зависимости от внешнего интернета."""
-        ips = [ip for _iface, ip, _network, _is_virtual in cls._get_local_interface_networks()]
-        return list(dict.fromkeys(ips))
 
     @classmethod
     def _get_local_interface_networks(cls) -> List[Tuple[str, str, ipaddress.IPv4Network, bool]]:
@@ -2304,15 +2241,27 @@ class AndroidTVTimeFixer:
             if last_ip and (not isinstance(last_ip, str) or not self.validate_ip(last_ip)):
                 raise ValueError("Invalid device IP in backup")
 
+            # Настройки лежат в двух файлах, и раньше сбой на втором оставлял
+            # язык из бэкапа при старом списке серверов. Теперь язык и адрес
+            # пишутся одной записью, а неудача откатывает уже записанное
+            previous_servers = self.saved_servers
+            new_settings = {
+                'language': language or self.load_language(),
+                'last_device_ip': last_ip or self.load_last_ip(),
+            }
+
             self.saved_servers = saved_servers
             if not self.save_servers():
+                self.saved_servers = previous_servers
                 raise OSError("Could not save imported server settings")
+            if not self._save_settings(new_settings):
+                self.saved_servers = previous_servers
+                self.save_servers()
+                raise OSError("Could not save imported settings")
+
+            self.last_device_ip = new_settings['last_device_ip']
             if language:
-                if not self.save_language(language):
-                    raise OSError("Could not save imported language")
                 set_language(language)
-            if last_ip and not self.save_last_ip(last_ip):
-                raise OSError("Could not save imported device IP")
             print(Fore.GREEN + locales.get("import_success", path=path))
             self.logger.info(f"Settings imported from: {path}")
         except Exception as e:
@@ -2628,7 +2577,9 @@ class AndroidTVTimeFixer:
                 if iana:
                     tz_key = iana
 
-            if not tz_key:
+            # Без IANA-имени ни страну, ни континент не определить: раньше
+            # это печаталось как пустой регион с пустым списком приоритетов
+            if not tz_key or '/' not in tz_key:
                 return [], []
 
             priority = []
@@ -2642,7 +2593,7 @@ class AndroidTVTimeFixer:
                     break
 
             # 2. Региональные пулы по континенту из timezone
-            continent = tz_key.split('/')[0] if '/' in tz_key else ''
+            continent = tz_key.split('/')[0]
             region_pools = self._tz_region_pools.get(continent, [])
             for pool in region_pools:
                 if pool not in priority:
@@ -2972,7 +2923,7 @@ class AndroidTVTimeFixer:
             print(Fore.RED + "{}".format(current_ntp))
             print(Fore.YELLOW + locales.get("device_info"))
             for key, value in device_info.items():
-                print(f"  {key.capitalize()}: {value}")
+                print(f"  {key.replace('_', ' ').capitalize()}: {value}")
         except Exception as e:
             self.logger.error(f"Failed to retrieve device info: {e}")
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))

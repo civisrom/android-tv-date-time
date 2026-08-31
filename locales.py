@@ -132,15 +132,6 @@ arising from the use of this program.
                 en="Failed to load keys: {error}",
                 ru="Не удалось загрузить ключи: {error}"
             ),
-            "no_connected_devices": Translation(
-                en="No connected devices.",
-                ru="Нет подключенных устройств."
-            ),
-            
-            "choose_device_to_connect": Translation(
-                en="Select a device to connect:",
-                ru="Выберите устройство для подключения:"
-            ),
             "enter_device_number": Translation(
                 en="Enter the device number: ",
                 ru="Введите номер устройства: "
@@ -152,10 +143,6 @@ arising from the use of this program.
             "invalid_input": Translation(
                 en="Invalid input.",
                 ru="Некорректный ввод."
-            ),
-            "connecting_to_device": Translation(
-                en="Connecting to device {device_id}...",
-                ru="Подключение к устройству {device_id}..."
             ),
             
             "current_device_info": Translation(

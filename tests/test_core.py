@@ -155,18 +155,29 @@ class ReliabilityTests(unittest.TestCase):
     def test_import_reports_failure_when_persistence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             backup = Path(temp_dir) / 'backup.json'
-            backup.write_text(json.dumps({'language': 'ru'}), encoding='utf-8')
+            backup.write_text(
+                json.dumps({
+                    'language': 'ru',
+                    'saved_servers': {'favorite_servers': ['time.google.com'],
+                                      'custom_servers': []},
+                }),
+                encoding='utf-8',
+            )
             fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
             fixer.logger = logging.getLogger('test')
-            fixer.saved_servers = {'favorite_servers': [], 'custom_servers': []}
+            fixer.settings_file = Path(temp_dir) / 'settings.json'
+            previous_servers = {'favorite_servers': [], 'custom_servers': []}
+            fixer.saved_servers = previous_servers
             fixer.save_servers = lambda: True
-            fixer.save_language = lambda language: False
+            fixer._save_settings = lambda values: False
             output = io.StringIO()
 
             with contextlib.redirect_stdout(output):
                 fixer.import_settings(str(backup))
 
             self.assertNotIn('successfully', output.getvalue().lower())
+            # Список серверов не должен остаться применённым от неудачного импорта
+            self.assertIs(fixer.saved_servers, previous_servers)
 
     def test_ntp_confirmation_requires_exact_value(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
