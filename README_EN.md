@@ -131,13 +131,18 @@ Run via PowerShell
 
 ### Application data
 
-ADB keys, settings, and the log are stored in the protected user data directory:
+The program is portable: ADB keys, settings, and the log live **next to the executable**
+(`keys/`, `settings.json`, `saved_servers.json`, `android_tv_fixer.log`).
+
+When the program folder is not writable (installed under `Program Files`, or launched
+straight from an archive), the data falls back to the user data directory:
 
 - Windows: `%LOCALAPPDATA%\AndroidTVTimeFixer`
 - Linux: `$XDG_DATA_HOME/AndroidTVTimeFixer` or `~/.local/share/AndroidTVTimeFixer`
 - macOS: `~/Library/Application Support/AndroidTVTimeFixer`
 
-On first launch, existing settings and ADB keys from the application folder are copied automatically.
+In that case, existing settings and ADB keys from the application folder are copied
+automatically on first launch.
 
 ## Android TV Setup
 
