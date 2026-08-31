@@ -18,7 +18,7 @@ class Locales:
     def __init__(self):
         # Default language is Russian
         self.current_language: Language = Language.RU
-        
+
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
             # Disclaimer text
@@ -144,7 +144,7 @@ arising from the use of this program.
                 en="Invalid input.",
                 ru="Некорректный ввод."
             ),
-            
+
             "current_device_info": Translation(
                 en="\nCurrent device information:\n",
                 ru="\nТекущая информация об устройстве:\n"
@@ -214,14 +214,6 @@ arising from the use of this program.
             "ntp_server_not_added": Translation(
                 en="Warning: NTP server {server} is unavailable or does not work as a time server. It was not added.",
                 ru="Предупреждение: NTP-сервер {server} недоступен или не работает как сервер времени. Он не добавлен."
-            ),
-            "available_country_codes": Translation(
-                en="\nAvailable country codes:",
-                ru="\nДоступные коды стран (копируем в буфер обмена наприм. ru или by и вставляем в пункте 1 глав. меню):"
-            ),
-            "country_code_server": Translation(
-                en="{code} — {server}",
-                ru="{code} — {server}"
             ),
             "available_alternative_ntp_servers": Translation(
                 en="\nAvailable alternative NTP servers:",
@@ -740,7 +732,7 @@ arising from the use of this program.
                  en="Error executing command: {error}",
                  ru="Ошибка выполнения команды: {error}"
             ),
-                
+
             # Main menu items
             "main_menu": Translation(
                 en="\nMain Menu:",
@@ -786,14 +778,6 @@ arising from the use of this program.
                 en="Enter menu option number:",
                 ru="Введите номер пункта меню:"
             ),
-            "enter_device_ip": Translation(
-                en="Enter the IP address of your device (TV, Nvidia Shield) (find it in Settings > Network and Internet): ",
-                ru="Введите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): "
-            ),
-            "enter_device_ip_with_saved": Translation(
-                en="Enter the IP address of your device (press Enter to use saved: {saved_ip}): ",
-                ru="Введите IP-адрес устройства (нажмите Enter для использования сохранённого: {saved_ip}): "
-            ),
             "invalid_ip_format": Translation(
                 en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: 5555)",
                 ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: 5555)"
@@ -806,33 +790,9 @@ arising from the use of this program.
                 en="Enter your country code (e.g. us for USA, uk for United Kingdom, see country codes menu, q to exit): ",
                 ru="Введите код вашей страны (например, ru для России, by для Беларуси, смотри в меню коды стран, для возврата q): "
             ),
-            "time_settings_updated": Translation(
-                en="Time settings updated successfully!",
-                ru="Настройки времени успешно обновлены!"
-            ),
             "invalid_country_code": Translation(
                 en="Invalid country code",
                 ru="Недействительный код страны"
-            ),
-
-            "ntp_server_reachable": Translation(
-                en="NTP server is reachable",
-                ru="NTP-сервер доступен"
-            ),
-            
-            "ntp_server_unreachable": Translation(
-                en="NTP server is unreachable",
-                ru="NTP-сервер недоступен"
-            ),
-
-            "connection_error": Translation(
-                en="Connection error occurred",
-                ru="Произошла ошибка подключения"
-            ),
-
-            "ping_servers": Translation(
-                en="6. Ping NTP Servers",
-                ru="6. Пинговать NTP-серверы"
             ),
 
             "ping_results_summary": Translation(
@@ -857,171 +817,6 @@ arising from the use of this program.
                 ru="Проверка доступности NTP-серверов (может занять время)..."
             ),
 
-            "country_codes_description": Translation(
-                en="\nCountry code description (can be copied to clipboard):",
-                ru="\nРасшифровка кодов стран (копируем в буфер обмена наприм. ru и вставляем в пункте 1 глав. меню):"
-            ),
-            "country_codes": Translation(
-                en="""
-at: Austria
-ba: Bosnia and Herzegovina
-be: Belgium
-bg: Bulgaria
-by: Belarus
-ch: Switzerland
-cy: Cyprus
-cz: Czech Republic
-de: Germany
-dk: Denmark
-ee: Estonia
-es: Spain
-fi: Finland
-fr: France
-gi: Gibraltar
-gr: Greece
-hr: Croatia
-hu: Hungary
-ie: Ireland
-is: Iceland
-it: Italy
-li: Liechtenstein
-lt: Lithuania
-lu: Luxembourg
-lv: Latvia
-md: Moldova
-mk: North Macedonia
-nl: Netherlands
-no: Norway
-pl: Poland
-pt: Portugal
-ro: Romania
-rs: Serbia
-ru: Russia
-se: Sweden
-si: Slovenia
-sk: Slovakia
-tr: Turkey
-uk: United Kingdom
-us: United States
-ca: Canada
-br: Brazil
-au: Australia
-cn: China
-jp: Japan
-kz: Kazakhstan
-ae: United Arab Emirates
-am: Armenia
-az: Azerbaijan
-bd: Bangladesh
-bh: Bahrain
-ge: Georgia
-hk: Hong Kong
-id: Indonesia
-il: Israel
-in: India
-ir: Iran
-kg: Kyrgyzstan
-kh: Cambodia
-kr: Korea
-lk: Sri Lanka
-mn: Mongolia
-mv: Maldives
-my: Malaysia
-np: Nepal
-ph: Philippines
-pk: Pakistan
-ps: Palestinian Territory
-qa: Qatar
-sa: Saudi Arabia
-sg: Singapore
-th: Thailand
-tj: Tajikistan
-tw: Taiwan
-uz: Uzbekistan
-ua: Ukraine
-vn: Vietnam
-""",
-                ru="""
-at: Австрия
-ba: Босния и Герцеговина
-be: Бельгия
-bg: Болгария
-by: Беларусь
-ch: Швейцария
-cy: Кипр
-cz: Чехия
-de: Германия
-dk: Дания
-ee: Эстония
-es: Испания
-fi: Финляндия
-fr: Франция
-gi: Гибралтар
-gr: Греция
-hr: Хорватия
-hu: Венгрия
-ie: Ирландия
-is: Исландия
-it: Италия
-li: Лихтенштейн
-lt: Литва
-lu: Люксембург
-lv: Латвия
-md: Молдова
-mk: Северная Македония
-nl: Нидерланды
-no: Норвегия
-pl: Польша
-pt: Португалия
-ro: Румыния
-rs: Сербия
-ru: Россия
-se: Швеция
-si: Словения
-sk: Словакия
-tr: Турция
-uk: Великобритания
-us: США
-ca: Канада
-br: Бразилия
-au: Австралия
-cn: Китай
-jp: Япония
-kz: Казахстан
-ae: Объединённые Арабские Эмираты
-am: Армения
-az: Азербайджан
-bd: Бангладеш
-bh: Бахрейн
-ge: Грузия
-hk: Гонконг
-id: Индонезия
-il: Израиль
-in: Индия
-ir: Иран
-kg: Кыргызстан
-kh: Камбоджа
-kr: Корея
-lk: Шри-Ланка
-mn: Монголия
-mv: Мальдивы
-my: Малайзия
-np: Непал
-ph: Филиппины
-pk: Пакистан
-ps: Палестинская территория
-qa: Катар
-sa: Саудовская Аравия
-sg: Сингапур
-th: Таиланд
-tj: Таджикистан
-tw: Тайвань
-uz: Узбекистан
-ua: Украина
-vn: Вьетнам
-
-"""
-            ),
             # ─── Merged country codes display ───────────────────────────
             "available_country_codes_full": Translation(
                 en="\nAvailable country codes (code: country -> NTP server):",
@@ -1040,10 +835,6 @@ vn: Вьетнам
             "hint_type_hint": Translation(
                 en="Tip: enter ? to search by partial name, e.g. ?rus or ?uni",
                 ru="Подсказка: введите ? для поиска по названию, например ?рос или ?сша"
-            ),
-            "enter_country_code_search": Translation(
-                en="Enter country code or ?<text> to search: ",
-                ru="Введите код страны или ?<текст> для поиска: "
             ),
 
             # ─── Network scan ────────────────────────────────────────────
@@ -1111,17 +902,9 @@ vn: Вьетнам
                 en="Could not determine local IP address",
                 ru="Не удалось определить локальный IP-адрес"
             ),
-            "scan_not_private": Translation(
-                en="Your IP address ({ip}) is not in a supported local network range (192.168.x.x or 10.x.x.x). Network scan is only available on local networks.",
-                ru="Ваш IP-адрес ({ip}) не входит в поддерживаемый диапазон локальных сетей (192.168.x.x или 10.x.x.x). Сканирование доступно только в локальных сетях."
-            ),
             "scan_net_detected": Translation(
                 en="Network auto-detected: {network} ({hosts} hosts)",
                 ru="Сеть определена автоматически: {network} ({hosts} хостов)"
-            ),
-            "scan_net_fallback": Translation(
-                en="Could not detect subnet mask, using fallback range: {network}",
-                ru="Не удалось определить маску подсети, используется запасной диапазон: {network}"
             ),
             "scan_wide_offer": Translation(
                 en="No devices found in {narrow}. Scan wider range {wide}? (y/n): ",
@@ -1295,10 +1078,6 @@ vn: Вьетнам
             "connection_reused": Translation(
                 en="Using existing connection to {ip}",
                 ru="Используется существующее подключение к {ip}"
-            ),
-            "reconnect_or_reuse": Translation(
-                en="Already connected to {ip}. Use existing connection? (y/n): ",
-                ru="Уже подключено к {ip}. Использовать текущее подключение? (y/n): "
             ),
             "exit_message": Translation(
                 en="\nExiting the program...",
