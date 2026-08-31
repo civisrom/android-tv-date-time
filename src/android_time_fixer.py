@@ -174,10 +174,14 @@ class AndroidTVTimeFixer:
         архива) — иначе файлы просто не создавались бы.
         """
         program_dir = cls._program_dir()
-        probe = program_dir / '.write_test'
         try:
-            probe.touch()
-            probe.unlink()
+            # Имя пробы уникально: с общим '.write_test' два одновременно
+            # запущенных экземпляра удаляли файл друг у друга, проигравший
+            # получал OSError и уходил в каталог пользователя — настройки и
+            # ключи разъезжались по двум разным путям
+            probe_fd, probe_name = tempfile.mkstemp(prefix='.write_test.', dir=program_dir)
+            os.close(probe_fd)
+            os.unlink(probe_name)
             return program_dir
         except OSError:
             return Path(user_data_path("AndroidTVTimeFixer", appauthor=False))
@@ -1183,11 +1187,20 @@ class AndroidTVTimeFixer:
             self.logger.warning(locales.get_en('copy_to_clipboard_2', error=str(e)))
             return ""
 
-    def add_to_favorites(self, server: str):
-        """Добавляет сервер в избранное"""
-        if server not in self.saved_servers['favorite_servers']:
-            self.saved_servers['favorite_servers'].append(server)
-            self.save_servers()
+    def add_to_favorites(self, server: str) -> bool:
+        """Добавляет сервер в избранное. Отклоняет некорректный адрес."""
+        # Без проверки прочитанное с устройства мусорное значение попадало в
+        # список, после чего _normalize_saved_servers валил каждое следующее
+        # сохранение и файл избранного переставал обновляться вообще
+        if not self.validate_ntp_server(server):
+            return False
+        if server in self.saved_servers['favorite_servers']:
+            return True
+        self.saved_servers['favorite_servers'].append(server)
+        if self.save_servers():
+            return True
+        self.saved_servers['favorite_servers'].remove(server)
+        return False
 
     def remove_from_favorites(self, server: str):
         """Удаляет сервер из избранного"""
@@ -1225,11 +1238,12 @@ class AndroidTVTimeFixer:
                     continue
                 try:
                     current_ntp = self.get_current_ntp()
-                    if current_ntp and current_ntp != 'null':
-                        self.add_to_favorites(current_ntp)
+                    if not current_ntp or current_ntp == 'null':
+                        print(Fore.RED + locales.get("no_device_connected"))
+                    elif self.add_to_favorites(current_ntp):
                         print(Fore.GREEN + locales.get("server_added_to_favorites", server=current_ntp))
                     else:
-                        print(Fore.RED + locales.get("no_device_connected"))
+                        print(Fore.RED + locales.get("invalid_ntp_server_format"))
                 except AndroidTVTimeFixerError as e:
                     print(Fore.RED + locales.get("error_message", error=str(e)))
 
@@ -1253,9 +1267,10 @@ class AndroidTVTimeFixer:
                         server = server.strip()
                         if self.validate_ntp_server(server):
                             print(Fore.GREEN + locales.get("server_set_from_clipboard", server=server))
-                            if self.device:
-                                if self.fix_time(server):
-                                    print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=server))
+                            if not self.device:
+                                print(Fore.RED + locales.get("connect_device_first"))
+                            elif self.fix_time(server):
+                                print(Fore.GREEN + locales.get("ntp_server_set", ntp_server=server))
                         else:
                             print(Fore.RED + locales.get("invalid_ntp_server_format"))
                     else:
@@ -1305,7 +1320,6 @@ class AndroidTVTimeFixer:
                 if not (1 <= port <= 65535):
                     port = 5555
             except ValueError:
-                ip = parts[0]
                 port = 5555
         else:
             ip = address
@@ -1918,12 +1932,15 @@ class AndroidTVTimeFixer:
         # ответившие с задержкой или отброшенные при наплыве запросов.
         # Поэтому не ответившие адреса перепроверяем ещё раз — дольше и
         # меньшим числом потоков, уже по прогретому ARP.
-        remaining = [ip for ip in hosts if ip not in set(found)]
+        found_set = set(found)
+        remaining = [ip for ip in hosts if ip not in found_set]
         if 0 < len(remaining) <= self.MAX_RETRY_HOSTS:
             print(Fore.CYAN + locales.get("scan_retry", count=len(remaining)))
             found.extend(self._probe_hosts(remaining, timeout=3.0, workers=min(32, len(remaining))))
 
-        return found
+        # Порядок завершения задач произволен, а найденное на втором проходе
+        # иначе всегда оказывалось в хвосте: пользователь выбирает по номеру
+        return sorted(found, key=ipaddress.IPv4Address)
 
     def _probe_hosts(self, hosts: List[str], timeout: float, workers: int) -> List[str]:
         """Проверяет порт 5555 на списке адресов, печатая прогресс."""
@@ -2137,7 +2154,7 @@ class AndroidTVTimeFixer:
         elif not wide_scan_offered:
             print(Fore.YELLOW + locales.get("scan_none"))
             print(Fore.YELLOW + locales.get("scan_firewall_hint"))
-        elif not found:
+        else:
             print(Fore.YELLOW + locales.get("scan_firewall_hint"))
 
         return found
@@ -2708,7 +2725,7 @@ class AndroidTVTimeFixer:
                 result = future.result()
                 checked += 1
                 # Фильтруем: только доступные с адекватным offset (<60 сек)
-                if result['status'] == 'Reachable' and (result['offset'] is None or abs(result['offset']) <= 60):
+                if result['status'] == 'Reachable' and abs(result['offset']) <= 60:
                     results.append(result)
                 if checked % 10 == 0 or checked == total:
                     print(

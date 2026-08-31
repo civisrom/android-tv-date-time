@@ -177,6 +177,29 @@ class ReliabilityTests(unittest.TestCase):
         with self.assertRaises(AndroidTVTimeFixerError):
             fixer.set_ntp_server('time.google.com')
 
+    def test_invalid_server_never_enters_favorites(self) -> None:
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.saved_servers = {'favorite_servers': [], 'custom_servers': []}
+        fixer.save_servers = lambda: True
+
+        self.assertFalse(fixer.add_to_favorites('not a host'))
+        self.assertEqual(fixer.saved_servers['favorite_servers'], [])
+        self.assertTrue(fixer.add_to_favorites('time.google.com'))
+        self.assertEqual(fixer.saved_servers['favorite_servers'], ['time.google.com'])
+
+    def test_scan_results_are_ordered_by_address(self) -> None:
+        import ipaddress
+
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        passes = [['192.168.0.112'], ['192.168.0.9']]
+        fixer._probe_hosts = lambda hosts, timeout, workers: passes.pop(0)
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = fixer._scan_networks([ipaddress.IPv4Network('192.168.0.0/24')])
+
+        self.assertEqual(result, ['192.168.0.9', '192.168.0.112'])
+
     def test_close_device_closes_transport(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
         device = _FakeDevice('time.google.com')
