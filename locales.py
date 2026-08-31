@@ -1100,6 +1100,10 @@ vn: Вьетнам
                 en="Scanning network {network} for open ADB port 5555...",
                 ru="Сканирование сети {network} на открытый порт ADB 5555..."
             ),
+            "scan_retry": Translation(
+                en="Rechecking {count} addresses that did not respond (slower, more reliable)...",
+                ru="Повторная проверка {count} не ответивших адресов (медленнее, но надёжнее)..."
+            ),
             "scan_progress": Translation(
                 en="  Progress: {checked}/{total} checked, {found} found",
                 ru="  Прогресс: {checked}/{total} проверено, {found} найдено"

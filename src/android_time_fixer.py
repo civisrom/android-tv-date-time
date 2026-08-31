@@ -1631,19 +1631,23 @@ class AndroidTVTimeFixer:
         """Проверяет, открыт ли ADB-порт 5555 на указанном IP"""
         return ip if self._check_port_available(ip, 5555, timeout=timeout) else None
 
+    # Второй проход имеет смысл только для подсети обозримого размера
+    MAX_RETRY_HOSTS = 1024
+
     @staticmethod
     def _scan_limits(total: int) -> Tuple[float, int]:
         """
-        Подбирает таймаут и число потоков под размер выборки.
+        Подбирает таймаут и число потоков первого прохода.
 
-        Таймаут 0.2 с не переживал холодный ARP: пока адрес не разрешён в MAC,
-        SYN стоит в очереди, а Android TV по Wi-Fi в режиме энергосбережения
-        отвечает на ARP только через 0.5-1.5 с. Поэтому устройство терялось при
-        первом сканировании /24 и находилось при повторном проходе по /16,
-        когда ARP-кэш уже прогрет.
+        Одного прохода недостаточно: пока адрес не разрешён в MAC, SYN стоит
+        в очереди ARP, а Android TV по Wi-Fi в энергосбережении отвечает на
+        ARP с задержкой. Хуже того, при наплыве одновременных ARP-запросов
+        Windows возвращает "host unreachable" сразу, вообще не дожидаясь
+        таймаута — поэтому увеличение таймаута само по себе не помогает,
+        нужен именно повторный проход по не ответившим адресам.
         """
         if total <= 1024:
-            return 1.5, min(128, total)
+            return 1.5, min(64, total)
         return 0.6, min(512, total)
 
     def _select_scanned_device(self, found: List[str]) -> str:
@@ -1897,18 +1901,37 @@ class AndroidTVTimeFixer:
         net_names = ", ".join(str(n) for n in collapsed_networks)
         print(Fore.CYAN + locales.get("scan_start", network=net_names))
 
-        found: List[str] = []
-        checked = 0
-
         if total == 0:
             print(Fore.YELLOW + locales.get("scan_complete", count=0))
             return []
-        timeout, workers = self._scan_limits(total)
-        host_iter = (
+
+        hosts = [
             str(host)
             for network in collapsed_networks
             for host in network.hosts()
-        )
+        ]
+
+        timeout, workers = self._scan_limits(len(hosts))
+        found = self._probe_hosts(hosts, timeout, workers)
+
+        # Первый проход прогревает ARP-кэш, но сам по себе теряет узлы,
+        # ответившие с задержкой или отброшенные при наплыве запросов.
+        # Поэтому не ответившие адреса перепроверяем ещё раз — дольше и
+        # меньшим числом потоков, уже по прогретому ARP.
+        remaining = [ip for ip in hosts if ip not in set(found)]
+        if 0 < len(remaining) <= self.MAX_RETRY_HOSTS:
+            print(Fore.CYAN + locales.get("scan_retry", count=len(remaining)))
+            found.extend(self._probe_hosts(remaining, timeout=3.0, workers=min(32, len(remaining))))
+
+        return found
+
+    def _probe_hosts(self, hosts: List[str], timeout: float, workers: int) -> List[str]:
+        """Проверяет порт 5555 на списке адресов, печатая прогресс."""
+        total = len(hosts)
+        found: List[str] = []
+        checked = 0
+        host_iter = iter(hosts)
+
         with ThreadPoolExecutor(max_workers=workers) as executor:
             pending = {}
 
@@ -1933,7 +1956,7 @@ class AndroidTVTimeFixer:
                     checked += 1
                     if result:
                         found.append(result)
-                    if checked % 200 == 0 or checked == total:
+                    if checked % 50 == 0 or checked == total:
                         print(
                             Fore.CYAN + "\r  " +
                             locales.get("scan_progress", checked=checked, total=total, found=len(found)),
