@@ -161,6 +161,10 @@ arising from the use of this program.
                 en="Please confirm the connection on the TV screen if prompted.",
                 ru="Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос."
             ),
+            "connection_prompt_sent": Translation(
+                en="Authorization request sent to the device (attempt {attempt}). Confirm it on the TV screen.",
+                ru="Запрос авторизации отправлен на устройство (попытка {attempt}). Подтвердите его на экране ТВ."
+            ),
             "connection_success": Translation(
                 en="Successfully connected to {ip}:{port}",
                 ru="Подключение к {ip}:{port} выполнено успешно"

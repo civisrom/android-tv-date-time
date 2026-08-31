@@ -211,6 +211,83 @@ class ReliabilityTests(unittest.TestCase):
 
         self.assertEqual(result, ['192.168.0.9', '192.168.0.112'])
 
+    def test_connect_retries_and_reports_each_authorization_prompt(self) -> None:
+        created = []
+
+        class _FlakyDevice:
+            def __init__(self, host, port, default_transport_timeout_s=None):
+                self.closed = False
+                created.append(self)
+
+            def connect(self, rsa_keys, auth_timeout_s, auth_callback):
+                auth_callback(self)
+                if len(created) == 1:
+                    raise RuntimeError('user dismissed the prompt')
+                return True
+
+            def close(self):
+                self.closed = True
+
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.device = None
+        fixer.connected_ip = None
+        fixer.connection_timeout = 30
+        fixer.process_manager = mock.Mock(device_ip=None)
+        fixer.load_keys = lambda: (b'pub', b'priv')
+        fixer._wait_for_port = lambda host, port: True
+
+        output = io.StringIO()
+        with mock.patch('src.android_time_fixer.AdbDeviceTcp', _FlakyDevice), \
+                mock.patch('src.android_time_fixer.PythonRSASigner', lambda pub, priv: object()), \
+                mock.patch('src.android_time_fixer.time.sleep'), \
+                contextlib.redirect_stdout(output):
+            fixer.connect('192.168.1.20')
+
+        # Каждая попытка заново запрашивает подтверждение на устройстве
+        printed = output.getvalue()
+        self.assertEqual(len(created), 2)
+        self.assertEqual(printed.count('attempt 1') + printed.count('попытка 1'), 1)
+        self.assertEqual(printed.count('attempt 2') + printed.count('попытка 2'), 1)
+        # Сокет неудачной попытки закрыт, успешный остаётся открытым
+        self.assertTrue(created[0].closed)
+        self.assertFalse(created[1].closed)
+        self.assertIs(fixer.device, created[1])
+        self.assertEqual(fixer.connected_ip, '192.168.1.20:5555')
+        self.assertEqual(fixer.process_manager.device_ip, '192.168.1.20:5555')
+
+    def test_connect_closes_socket_when_interrupted(self) -> None:
+        created = []
+
+        class _InterruptedDevice:
+            def __init__(self, host, port, default_transport_timeout_s=None):
+                self.closed = False
+                created.append(self)
+
+            def connect(self, rsa_keys, auth_timeout_s, auth_callback):
+                raise KeyboardInterrupt
+
+            def close(self):
+                self.closed = True
+
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.device = None
+        fixer.connected_ip = None
+        fixer.connection_timeout = 30
+        fixer.process_manager = mock.Mock(device_ip=None)
+        fixer.load_keys = lambda: (b'pub', b'priv')
+        fixer._wait_for_port = lambda host, port: True
+
+        with mock.patch('src.android_time_fixer.AdbDeviceTcp', _InterruptedDevice), \
+                mock.patch('src.android_time_fixer.PythonRSASigner', lambda pub, priv: object()), \
+                contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(KeyboardInterrupt):
+                fixer.connect('192.168.1.20')
+
+        self.assertTrue(created[0].closed)
+        self.assertIsNone(fixer.device)
+
     def test_close_device_closes_transport(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
         device = _FakeDevice('time.google.com')

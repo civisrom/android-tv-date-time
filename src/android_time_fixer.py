@@ -1473,15 +1473,41 @@ class AndroidTVTimeFixer:
         print(locales.get("waiting_for_connection", remaining_time=self.connection_timeout))
         print(locales.get("confirm_connection"))
 
+        attempt = 0
+
+        def announce_prompt(_device: Any) -> None:
+            # adb_shell зовёт это ровно перед отправкой публичного ключа —
+            # в этот момент запрос и появляется на экране устройства
+            print()
+            print(Fore.YELLOW + locales.get("connection_prompt_sent", attempt=attempt))
+
         while True:
             remaining_time = int(self.connection_timeout - (time.time() - start_time))
             if remaining_time <= 0:
                 break
+            attempt += 1
             device = None
             try:
                 device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
-                device.connect(rsa_keys=[signer], auth_timeout_s=min(15, remaining_time))
+                device.connect(
+                    rsa_keys=[signer],
+                    auth_timeout_s=min(15, remaining_time),
+                    auth_callback=announce_prompt
+                )
                 connection_established = True
+            except Exception as e:
+                last_error = str(e)
+            finally:
+                # Сокет неудачной попытки закрываем и при Ctrl+C: иначе при
+                # минутном ожидании подтверждения накапливаются открытые
+                # соединения, а прерывание оставляло сессию висеть на устройстве
+                if device is not None and not connection_established:
+                    try:
+                        device.close()
+                    except Exception:
+                        pass
+
+            if connection_established:
                 self._close_device()
                 self.device = device
                 self.connected_ip = f"{host}:{port}"
@@ -1490,19 +1516,16 @@ class AndroidTVTimeFixer:
                 self.process_manager.device_ip = f"{host}:{port}"
                 self.logger.info(locales.get_en('connection_success', ip=host, port=port))
                 break
-            except Exception as e:
-                last_error = str(e)
-                # Закрываем сокет неудачной попытки: иначе при минутном
-                # ожидании подтверждения накапливаются открытые соединения
-                if device is not None:
-                    try:
-                        device.close()
-                    except Exception:
-                        pass
-                remaining_time = max(0, int(self.connection_timeout - (time.time() - start_time)))
-                print(locales.get("waiting_for_connection", remaining_time=remaining_time), end='')
-                if remaining_time > 0:
-                    time.sleep(1)
+
+            remaining_time = max(0, int(self.connection_timeout - (time.time() - start_time)))
+            # ljust затирает хвост предыдущего значения счётчика, flush нужен
+            # потому что строка без перевода не выталкивается из буфера сама
+            print(
+                locales.get("waiting_for_connection", remaining_time=remaining_time).ljust(50),
+                end='', flush=True
+            )
+            if remaining_time > 0:
+                time.sleep(1)
 
         print()  # Новая строка после завершения ожидания
 
