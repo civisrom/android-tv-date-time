@@ -972,6 +972,10 @@ arising from the use of this program.
                 en="  [{idx}/{total}] Connecting to {ip}...",
                 ru="  [{idx}/{total}] Подключение к {ip}..."
             ),
+            "batch_prompt_sent": Translation(
+                en="  Authorization request sent to {ip}. Confirm it on the device screen.",
+                ru="  Запрос авторизации отправлен на {ip}. Подтвердите его на экране устройства."
+            ),
             "batch_success": Translation(
                 en="  OK  {ip}: NTP server {server} is reachable and has been added",
                 ru="  ОК  {ip}: NTP-сервер {server} доступен и добавлен"

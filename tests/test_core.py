@@ -11,7 +11,7 @@ import time
 import unittest
 from unittest import mock
 
-from src.android_time_fixer import APP_VERSION, AndroidTVTimeFixer, AndroidTVTimeFixerError
+from src.android_time_fixer import APP_VERSION, AndroidTVTimeFixer, AndroidTVTimeFixerError, locales
 from scripts.generate_icon import create_icns, create_png
 
 
@@ -247,14 +247,58 @@ class ReliabilityTests(unittest.TestCase):
         # Каждая попытка заново запрашивает подтверждение на устройстве
         printed = output.getvalue()
         self.assertEqual(len(created), 2)
-        self.assertEqual(printed.count('attempt 1') + printed.count('попытка 1'), 1)
-        self.assertEqual(printed.count('attempt 2') + printed.count('попытка 2'), 1)
+        for attempt in (1, 2):
+            self.assertIn(locales.get('connection_prompt_sent', attempt=attempt), printed)
         # Сокет неудачной попытки закрыт, успешный остаётся открытым
         self.assertTrue(created[0].closed)
         self.assertFalse(created[1].closed)
         self.assertIs(fixer.device, created[1])
         self.assertEqual(fixer.connected_ip, '192.168.1.20:5555')
         self.assertEqual(fixer.process_manager.device_ip, '192.168.1.20:5555')
+
+    def test_batch_reports_authorization_prompt_per_device(self) -> None:
+        created = []
+
+        class _PromptingDevice:
+            def __init__(self, host, port, default_transport_timeout_s=None):
+                self.host = host
+                self.closed = False
+                self.ntp = ''
+                created.append(self)
+
+            def connect(self, rsa_keys, auth_timeout_s, auth_callback):
+                auth_callback(self)
+                return True
+
+            def shell(self, command):
+                if command.startswith('settings put global ntp_server'):
+                    self.ntp = command.rsplit(' ', 1)[1]
+                    return ''
+                return self.ntp
+
+            def close(self):
+                self.closed = True
+
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.device = None
+        fixer.connected_ip = None
+        fixer.load_keys = lambda: (b'pub', b'priv')
+        fixer._wait_for_port = lambda host, port: True
+        fixer.verify_ntp_server = lambda server: True
+
+        output = io.StringIO()
+        with mock.patch('src.android_time_fixer.AdbDeviceTcp', _PromptingDevice), \
+                mock.patch('src.android_time_fixer.PythonRSASigner', lambda pub, priv: object()), \
+                contextlib.redirect_stdout(output):
+            fixer.batch_set_ntp('time.google.com', ['192.168.1.20', '192.168.1.21'])
+
+        printed = output.getvalue()
+        # Подсказка печатается для каждого устройства и содержит его адрес
+        for ip in ('192.168.1.20', '192.168.1.21'):
+            self.assertIn(locales.get('batch_prompt_sent', ip=ip), printed)
+        self.assertEqual(len(created), 2)
+        self.assertTrue(all(device.closed for device in created))
 
     def test_connect_closes_socket_when_interrupted(self) -> None:
         created = []

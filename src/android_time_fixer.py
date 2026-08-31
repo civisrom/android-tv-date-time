@@ -2163,8 +2163,18 @@ class AndroidTVTimeFixer:
                         raise AndroidTVTimeFixerError(
                             locales.get("port_not_available", ip=host, port=port)
                         )
+                    # Коллбэк срабатывает только когда ключ ещё не авторизован:
+                    # иначе групповой прогон молча висел 15 секунд на устройстве,
+                    # ждущем подтверждения, без единой подсказки пользователю
+                    def announce_prompt(_device: Any) -> None:
+                        print(Fore.YELLOW + locales.get("batch_prompt_sent", ip=ip))
+
                     device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
-                    device.connect(rsa_keys=[signer], auth_timeout_s=15)
+                    device.connect(
+                        rsa_keys=[signer],
+                        auth_timeout_s=15,
+                        auth_callback=announce_prompt
+                    )
 
                 device.shell(f'settings put global ntp_server {shlex.quote(ntp_server)}')
                 confirmed = device.shell('settings get global ntp_server').strip()
