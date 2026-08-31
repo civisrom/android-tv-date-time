@@ -1085,12 +1085,12 @@ vn: Вьетнам
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter IP, IP:port, CIDR subnet, or 's' to scan (Enter for saved: {saved_ip}): ",
-                ru="Введите IP, IP:порт, CIDR-подсеть или 's' для сканирования (Enter для сохранённого: {saved_ip}): "
+                en="Enter IP, IP:port, CIDR subnet, 's' to scan, 'q' to cancel (Enter for saved: {saved_ip}): ",
+                ru="Введите IP, IP:порт, CIDR-подсеть, 's' для сканирования, 'q' для отмены (Enter для сохранённого: {saved_ip}): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter IP, IP:port, CIDR subnet, or 's' to scan network: ",
-                ru="Введите IP, IP:порт, CIDR-подсеть или 's' для сканирования сети: "
+                en="Enter IP, IP:port, CIDR subnet, 's' to scan network, or 'q' to cancel: ",
+                ru="Введите IP, IP:порт, CIDR-подсеть, 's' для сканирования сети или 'q' для отмены: "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",

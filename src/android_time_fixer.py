@@ -37,7 +37,7 @@ init(autoreset=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-APP_VERSION = '1.0.0'
+APP_VERSION = '2.4.2'
 
 class ADBProcessManager:
     """Аккуратно отключает только ADB-адрес, использованный приложением.
@@ -156,11 +156,39 @@ class AndroidTVTimeFixer:
     MAX_SCAN_HOSTS = 65_534
     TERMINAL_COMMAND_TIMEOUT = 300
 
+    @staticmethod
+    def _program_dir() -> Path:
+        """Каталог программы: рядом с .exe в собранной сборке, иначе рабочий каталог."""
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).resolve().parent
+        return Path.cwd()
+
+    @classmethod
+    def _resolve_data_dir(cls) -> Path:
+        """
+        Каталог для android_tv_fixer.log, settings.json, saved_servers.json и keys/.
+
+        Программа переносимая, поэтому данные лежат рядом с ней. Каталог
+        пользователя используется только когда в папку программы писать
+        нельзя (Program Files, запуск из распакованного во временную папку
+        архива) — иначе файлы просто не создавались бы.
+        """
+        program_dir = cls._program_dir()
+        probe = program_dir / '.write_test'
+        try:
+            probe.touch()
+            probe.unlink()
+            return program_dir
+        except OSError:
+            return Path(user_data_path("AndroidTVTimeFixer", appauthor=False))
+
     def __init__(self) -> None:
         self.current_path = Path.cwd()
-        self.data_dir = Path(user_data_path("AndroidTVTimeFixer", appauthor=False))
+        self.data_dir = self._resolve_data_dir()
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        if os.name != 'nt':
+        # 0700 ставим только на собственный каталог данных: сужать права
+        # у папки программы (или у рабочего каталога исходников) нельзя
+        if os.name != 'nt' and self.data_dir != self._program_dir():
             self.data_dir.chmod(0o700)
         self.keys_folder = self.data_dir / 'keys'
         self.servers_file = self.data_dir / 'saved_servers.json'
@@ -668,7 +696,7 @@ class AndroidTVTimeFixer:
                 if not args:
                     return False
     
-                if args[0] == 'adb':
+                if os.path.basename(args[0]).lower() in ('adb', 'adb.exe'):
                     args[0] = self.get_adb_path()
     
                 process = Popen(
@@ -791,11 +819,24 @@ class AndroidTVTimeFixer:
             self.logger.error(error_msg, exc_info=True)
             print(Fore.RED + locales.get("command_execution_error", error=error_msg))
 
+    @staticmethod
+    def _console_codepage() -> Optional[int]:
+        """Текущая кодовая страница консоли Windows или None"""
+        try:
+            import ctypes
+            return int(ctypes.windll.kernel32.GetConsoleOutputCP())
+        except Exception:
+            return None
+
     def terminal_mode(self) -> None:
         """Режим терминала для выполнения команд"""
-        # Установка кодировки для Windows
+        # Установка кодировки для Windows. Прежнюю кодовую страницу
+        # запоминаем: лаунчер выставляет UTF-8, и без восстановления
+        # весь дальнейший вывод меню на кириллице ломался.
+        previous_codepage = None
         if sys.platform == 'win32':
-            os.system('chcp 866')
+            previous_codepage = self._console_codepage()
+            os.system('chcp 866 >nul')
     
         self.logger.info("Terminal mode started")
         print(Fore.GREEN + locales.get("terminal_mode_welcome"))
@@ -842,6 +883,8 @@ class AndroidTVTimeFixer:
             print(Fore.RED + locales.get("terminal_mode_critical_error", error=str(e)))
         finally:
             self.process_manager.cleanup()
+            if previous_codepage:
+                os.system(f'chcp {previous_codepage} >nul')
 	
     def _test_ntp_server(self, server: str, count: int = 2, timeout: int = 2) -> dict:
         """Проверка NTP-сервера с несколькими попытками и детальной диагностикой ошибок.
@@ -1072,9 +1115,15 @@ class AndroidTVTimeFixer:
 
             ip = input(Fore.WHITE).strip()
 
-            # Enter без ввода → сохранённый IP
-            if not ip and self.last_device_ip:
-                return self.last_device_ip
+            # Enter без ввода → сохранённый IP, иначе спрашиваем заново
+            if not ip:
+                if self.last_device_ip:
+                    return self.last_device_ip
+                continue
+
+            # 'q' → выход в меню
+            if ip.lower() == 'q':
+                return ''
 
             # 's' → авто-сканирование сети, CIDR → сканирование указанной подсети
             if ip.lower() == 's' or '/' in ip:
@@ -1380,6 +1429,9 @@ class AndroidTVTimeFixer:
         device = self.device
         self.device = None
         self.connected_ip = None
+        process_manager = getattr(self, 'process_manager', None)
+        if process_manager is not None:
+            process_manager.device_ip = None
         if device is not None:
             try:
                 device.close()
@@ -1451,7 +1503,7 @@ class AndroidTVTimeFixer:
 
         # Проверяем доступность порта перед попыткой подключения
         print(Fore.CYAN + locales.get("checking_port", ip=host, port=port))
-        if not self._check_port_available(host, port):
+        if not self._wait_for_port(host, port):
             raise AndroidTVTimeFixerError(locales.get("port_not_available", ip=host, port=port))
 
         pub, priv = self.load_keys()
@@ -1476,6 +1528,9 @@ class AndroidTVTimeFixer:
                 self._close_device()
                 self.device = device
                 self.connected_ip = f"{host}:{port}"
+                # Без этого disconnect_device() всегда выходил вхолостую:
+                # адрес, который приложение должно отключить, не сохранялся
+                self.process_manager.device_ip = f"{host}:{port}"
                 self.logger.info(locales.get_en('connection_success', ip=host, port=port))
                 break
             except Exception as e:
@@ -1497,8 +1552,7 @@ class AndroidTVTimeFixer:
         if not connection_established:
             # Не оставляем недоподключённый объект: иначе проверки
             # "if not self.device" дальше по коду пройдут ложно-успешно
-            self.device = None
-            self.connected_ip = None
+            self._close_device()
             raise AndroidTVTimeFixerError(
                 locales.get("connection_failed", timeout=self.connection_timeout) + "\n" +
                 locales.get("ensure_steps") + "\n" +
@@ -1552,17 +1606,45 @@ class AndroidTVTimeFixer:
     def _check_port_available(ip: str, port: int, timeout: float = 2.0) -> bool:
         """Проверяет, открыт ли указанный порт на IP-адресе"""
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
-            result = sock.connect_ex((ip, port))
-            sock.close()
-            return result == 0
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                return sock.connect_ex((ip, port)) == 0
         except Exception:
             return False
 
-    def _check_adb_port(self, ip: str) -> Optional[str]:
+    def _wait_for_port(self, host: str, port: int, attempts: int = 3, timeout: float = 3.0) -> bool:
+        """
+        Проверяет доступность порта несколькими попытками.
+
+        Одиночная проверка с таймаутом 2 с не переживала холодный ARP и
+        энергосбережение Wi-Fi: устройство отвечало позже, и подключение
+        обрывалось ещё до входа в цикл ожидания подтверждения на устройстве.
+        """
+        for attempt in range(attempts):
+            if self._check_port_available(host, port, timeout=timeout):
+                return True
+            if attempt < attempts - 1:
+                time.sleep(1)
+        return False
+
+    def _check_adb_port(self, ip: str, timeout: float) -> Optional[str]:
         """Проверяет, открыт ли ADB-порт 5555 на указанном IP"""
-        return ip if self._check_port_available(ip, 5555, timeout=0.2) else None
+        return ip if self._check_port_available(ip, 5555, timeout=timeout) else None
+
+    @staticmethod
+    def _scan_limits(total: int) -> Tuple[float, int]:
+        """
+        Подбирает таймаут и число потоков под размер выборки.
+
+        Таймаут 0.2 с не переживал холодный ARP: пока адрес не разрешён в MAC,
+        SYN стоит в очереди, а Android TV по Wi-Fi в режиме энергосбережения
+        отвечает на ARP только через 0.5-1.5 с. Поэтому устройство терялось при
+        первом сканировании /24 и находилось при повторном проходе по /16,
+        когда ARP-кэш уже прогрет.
+        """
+        if total <= 1024:
+            return 1.5, min(128, total)
+        return 0.6, min(512, total)
 
     def _select_scanned_device(self, found: List[str]) -> str:
         """Выбор устройства из результатов сканирования."""
@@ -1821,7 +1903,7 @@ class AndroidTVTimeFixer:
         if total == 0:
             print(Fore.YELLOW + locales.get("scan_complete", count=0))
             return []
-        workers = min(500, total)
+        timeout, workers = self._scan_limits(total)
         host_iter = (
             str(host)
             for network in collapsed_networks
@@ -1835,7 +1917,7 @@ class AndroidTVTimeFixer:
                     ip = next(host_iter)
                 except StopIteration:
                     return
-                pending[executor.submit(self._check_adb_port, ip)] = ip
+                pending[executor.submit(self._check_adb_port, ip, timeout)] = ip
 
             for _ in range(workers):
                 submit_next()
@@ -2014,7 +2096,8 @@ class AndroidTVTimeFixer:
         wide_candidates = self._get_wide_candidates(interfaces, scanned_networks)
         if not found and wide_candidates:
             wide_scan_offered = True
-            print(Fore.YELLOW + locales.get("scan_none"))
+            # scan_none здесь не печатаем: scan_wide_offer уже начинается
+            # с "В подсети ... устройства не найдены"
             print(Fore.CYAN + locales.get(
                 "scan_wide_offer",
                 narrow=", ".join(str(n) for n in scanned_networks),
@@ -2063,12 +2146,26 @@ class AndroidTVTimeFixer:
         for idx, ip in enumerate(ip_list, 1):
             print(Fore.CYAN + locales.get("batch_connecting", idx=idx, total=total, ip=ip))
             device = None
+            reused = False
             try:
                 host, port = self.parse_ip_port(ip)
                 if not self.validate_ip(ip):
                     raise AndroidTVTimeFixerError(locales.get("invalid_ip_format"))
-                device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
-                device.connect(rsa_keys=[signer], auth_timeout_s=15)
+
+                # Если это устройство уже подключено интерактивно, работаем через
+                # тот же transport: второе соединение к тому же adbd конфликтует
+                # с первым, а закрытие его в finally обрывало бы активную сессию
+                if self.device is not None and self.connected_ip == f"{host}:{port}":
+                    device = self.device
+                    reused = True
+                else:
+                    if not self._wait_for_port(host, port):
+                        raise AndroidTVTimeFixerError(
+                            locales.get("port_not_available", ip=host, port=port)
+                        )
+                    device = AdbDeviceTcp(host, port, default_transport_timeout_s=9.)
+                    device.connect(rsa_keys=[signer], auth_timeout_s=15)
+
                 device.shell(f'settings put global ntp_server {shlex.quote(ntp_server)}')
                 confirmed = device.shell('settings get global ntp_server').strip()
                 if confirmed == ntp_server:
@@ -2081,7 +2178,7 @@ class AndroidTVTimeFixer:
                 print(Fore.RED + locales.get("batch_failed", ip=ip, error=str(e)))
                 failed += 1
             finally:
-                if device is not None:
+                if device is not None and not reused:
                     try:
                         device.close()
                     except Exception:
@@ -2274,6 +2371,8 @@ class AndroidTVTimeFixer:
             elif choice == '4':
                 if not self.device:
                     ip = self.get_device_ip_input()
+                    if not ip:      # отмена по 'q'
+                        continue
                     if not self.validate_ip(ip):
                         print(Fore.RED + locales.get("invalid_ip_format"))
                         continue
@@ -2709,10 +2808,14 @@ class AndroidTVTimeFixer:
     def _get_all_props(self) -> dict:
         """Читает все системные свойства одним вызовом getprop"""
         raw = self.device.shell('getprop')
-        return {
-            m.group(1): m.group(2)
-            for m in re.finditer(r'\[([^\]]+)\]:\s*\[([^\]]*)\]', raw)
-        }
+        props = {}
+        # Разбираем построчно и жадно до последней ']': значения свойств
+        # (например ro.build.description) сами могут содержать ']'
+        for line in raw.splitlines():
+            match = re.match(r'^\[([^\]]+)\]:\s*\[(.*)\]$', line.strip())
+            if match:
+                props[match.group(1)] = match.group(2)
+        return props
 
     def get_device_info(self) -> dict:
         if not self.device:
@@ -2835,7 +2938,17 @@ class AndroidTVTimeFixer:
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
 
 def main():
-    fixer = AndroidTVTimeFixer()
+    try:
+        fixer = AndroidTVTimeFixer()
+    except Exception as e:
+        # Конструктор падает, например, когда не найден adb: без этого
+        # обработчика окно закрывалось с голым traceback
+        logger.error(f"Startup failed: {e}", exc_info=True)
+        print(Fore.RED + f"Startup failed: {e}")
+        if sys.platform == 'win32':
+            input("Press Enter to exit...")
+        sys.exit(1)
+
     fixer.logger.info("=" * 50)
     fixer.logger.info("Application started")
 
@@ -2908,6 +3021,8 @@ def main():
             if choice == '1':
                 fixer.logger.info("Menu: Change NTP server by country code")
                 ip = fixer.get_device_ip_input()
+                if not ip:          # отмена по 'q'
+                    continue
                 fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
@@ -2959,6 +3074,8 @@ def main():
             elif choice == '2':
                 fixer.logger.info("Menu: Change NTP server to custom")
                 ip = fixer.get_device_ip_input()
+                if not ip:          # отмена по 'q'
+                    continue
                 fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
@@ -2984,6 +3101,8 @@ def main():
             elif choice == '5':
                 fixer.logger.info("Menu: Show device information")
                 ip = fixer.get_device_ip_input()
+                if not ip:          # отмена по 'q'
+                    continue
                 fixer.logger.info(f"User entered IP: {ip}")
                 if fixer.validate_ip(ip):
                     try:
