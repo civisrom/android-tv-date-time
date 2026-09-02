@@ -5,7 +5,16 @@ on:
     branches:
       - dev
       - main
+    # Правки только в Android-модуле не должны гонять питоновскую матрицу:
+    # зелёный статус здесь означал бы, что проверено то, чего не проверяли.
+    # Их проверяет отдельный workflow android.yml.
+    paths-ignore:
+      - 'android/**'
+      - '.github/workflows/android.yml'
   pull_request:
+    paths-ignore:
+      - 'android/**'
+      - '.github/workflows/android.yml'
 
 permissions:
   contents: read

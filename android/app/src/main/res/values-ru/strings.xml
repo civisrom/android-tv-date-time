@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Android TV Time Fixer</string>
+    <string name="mode_television">Запущено на телевизоре: подключение к этому же устройству.</string>
+    <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети.</string>
+    <string name="milestone_one_notice">Каркас сборки. Дальше — подключение и смена NTP.</string>
+</resources>

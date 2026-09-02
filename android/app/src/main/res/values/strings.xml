@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Android TV Time Fixer</string>
+    <string name="mode_television">Running on a TV: it will connect to this device itself.</string>
+    <string name="mode_handheld">Running on a phone: it will connect to a TV over the network.</string>
+    <string name="milestone_one_notice">Skeleton build. Connecting and NTP changes come next.</string>
+</resources>
