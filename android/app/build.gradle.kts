@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+import groovy.json.JsonSlurper
+
 android {
     namespace = "com.civisrom.tvtimefixer"
     compileSdk = 37
@@ -55,6 +57,97 @@ android {
     lint {
         warningsAsErrors = false
         abortOnError = true
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Генерация NtpData.kt из общего shared/ntp-data.json.
+// Данные не дублируются вручную намеренно: расхождение между десктопной и
+// мобильной половиной означало бы, что они предлагают разные серверы, а
+// заметить это можно было бы очень нескоро.
+// ──────────────────────────────────────────────────────────
+
+abstract class GenerateNtpDataTask : DefaultTask() {
+
+    @get:InputFile
+    abstract val sourceJson: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    private fun quote(value: String?): String {
+        val safe = (value ?: "")
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("$", "\\$")
+        return "\"" + safe + "\""
+    }
+
+    @TaskAction
+    fun generate() {
+        @Suppress("UNCHECKED_CAST")
+        val root = JsonSlurper().parse(sourceJson.get().asFile) as Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val countries = root["countries"] as List<Map<String, String>>
+        @Suppress("UNCHECKED_CAST")
+        val alternatives = root["alternative_servers"] as List<String>
+
+        val target = outputDir.get().asFile.resolve("com/civisrom/tvtimefixer/data/NtpData.kt")
+        target.parentFile.mkdirs()
+        target.writeText(buildString {
+            appendLine("// Сгенерировано из shared/ntp-data.json. Не редактировать вручную:")
+            appendLine("// правьте таблицы в src/android_time_fixer.py и запускайте")
+            appendLine("// scripts/export_ntp_data.py.")
+            appendLine("package com.civisrom.tvtimefixer.data")
+            appendLine()
+            appendLine("/** Страна и её NTP-сервер из общего справочника. */")
+            appendLine("data class NtpCountry(")
+            appendLine("    val code: String,")
+            appendLine("    val server: String,")
+            appendLine("    val nameEn: String,")
+            appendLine("    val nameRu: String,")
+            appendLine(")")
+            appendLine()
+            appendLine("object NtpData {")
+            appendLine("    val countries: List<NtpCountry> = listOf(")
+            countries.forEach {
+                appendLine(
+                    "        NtpCountry(" + quote(it["code"]) + ", " + quote(it["server"]) +
+                        ", " + quote(it["name_en"]) + ", " + quote(it["name_ru"]) + "),"
+                )
+            }
+            appendLine("    )")
+            appendLine()
+            appendLine("    /** Региональные пулы, Cloudflare, Google и прочие вне разбивки по странам. */")
+            appendLine("    val alternativeServers: List<String> = listOf(")
+            alternatives.forEach { appendLine("        " + quote(it) + ",") }
+            appendLine("    )")
+            appendLine()
+            appendLine("    val byCode: Map<String, NtpCountry> = countries.associateBy { it.code }")
+            appendLine()
+            appendLine("    /** Все известные адреса без повторов, страны первыми — как в десктопной версии. */")
+            appendLine("    val allServers: List<String> =")
+            appendLine("        (countries.map { it.server } + alternativeServers).distinct()")
+            appendLine("}")
+        })
+        logger.lifecycle(
+            "NtpData.kt: " + countries.size + " стран, " + alternatives.size + " альтернативных серверов"
+        )
+    }
+}
+
+val generateNtpData = tasks.register<GenerateNtpDataTask>("generateNtpData") {
+    description = "Генерирует NtpData.kt из общего shared/ntp-data.json"
+    sourceJson.set(layout.projectDirectory.file("../../shared/ntp-data.json"))
+    outputDir.set(layout.buildDirectory.dir("generated/ntpdata"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.kotlin?.addGeneratedSourceDirectory(
+            generateNtpData,
+            GenerateNtpDataTask::outputDir,
+        )
     }
 }
 
