@@ -390,6 +390,29 @@ menu item 11.
 *   Linux (Ubuntu, Debian, Fedora, etc.)
 *   macOS
 
+## License
+
+This program is distributed under the **Apache License 2.0** — the full text is
+in [LICENSE](LICENSE). You are free to use, modify and redistribute it,
+including commercially, provided you keep the copyright notice and state any
+changes you made.
+
+### Third-party code
+
+The full list is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). In short:
+
+*   **Android Debug Bridge (`adb`)** — shipped inside the release archives,
+    Apache-2.0, part of the Android Open Source Project. Google's Android SDK
+    Terms explicitly exempt open source components from their restrictions, so
+    redistribution follows Apache-2.0.
+*   **Python libraries** — Apache-2.0, BSD, MIT and PSF, all permissive.
+*   **python-zeroconf** — **LGPL-2.1-or-later**, used as a fallback for mDNS
+    discovery. It ends up inside the pre-built executables, so the LGPL requires
+    that you be able to replace it with your own version: see
+    THIRD-PARTY-NOTICES.md for rebuild instructions. The `zeroconf` import is
+    optional — the program runs without it, using the mDNS support of the
+    bundled `adb`.
+
 ## Disclaimer
 
 **WARNING: IMPORTANT TO READ BEFORE USING THE PROGRAM**
