@@ -14,7 +14,12 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
-from android_time_fixer import adb_env  # noqa: E402
+try:
+    from android_time_fixer import adb_env
+except ImportError:  # ветка без поддержки беспроводной отладки
+    print("В этой ветке нет adb_env(): запускайте пробу на ветке, где реализована "
+          "изоляция ADB (gh workflow run adb-home-probe.yml --ref dev).")
+    sys.exit(1)
 
 PROBE_SERVER_PORT = 5199
 ADB_ARTEFACTS = ('adbkey', 'adbkey.pub', f'adb.{PROBE_SERVER_PORT}')
