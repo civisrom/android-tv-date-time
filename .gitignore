@@ -58,6 +58,7 @@ Thumbs.db
 
 # Android
 android/**/build/
+android/.kotlin/
 android/local.properties
 android/.gradle/
 .gradle/
