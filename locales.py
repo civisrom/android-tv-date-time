@@ -157,6 +157,102 @@ arising from the use of this program.
                 en="Port {port} is not available on {ip}. The device may be off, ADB is not enabled, or the port is incorrect.",
                 ru="Порт {port} недоступен на {ip}. Устройство может быть выключено, ADB не включён или порт указан неверно."
             ),
+            "enter_scan_port": Translation(
+                en="ADB port to scan (Enter for {default}, 'q' to cancel): ",
+                ru="Порт ADB для сканирования (Enter — {default}, 'q' — отмена): "
+            ),
+            "invalid_port": Translation(
+                en="Invalid port. Allowed values: 1-65535.",
+                ru="Некорректный порт. Допустимы значения 1-65535."
+            ),
+            "adb_probe_failed": Translation(
+                en="Port {port} on {ip} is open, but it is not an ADB daemon (no valid response).",
+                ru="Порт {port} на {ip} открыт, но это не ADB-демон (нет корректного ответа)."
+            ),
+            "adb_protocol_tls_detected": Translation(
+                en="Device {ip} uses Android 11+ wireless debugging (encrypted connection).",
+                ru="На устройстве {ip} включена беспроводная отладка Android 11+ (шифрованное соединение)."
+            ),
+            "adb_tls_connect_try": Translation(
+                en="Connecting via the bundled adb (the device must be paired; see main menu item 11)...",
+                ru="Подключение через встроенный adb (устройство должно быть спарено — пункт 11 главного меню)..."
+            ),
+            "adb_tls_connect_ok": Translation(
+                en="Connected to {ip} over an encrypted connection.",
+                ru="Подключено к {ip} по шифрованному соединению."
+            ),
+            "adb_tls_pairing_required": Translation(
+                en="Could not connect to {ip}: the device requires pairing with a code. Use main menu item 11 (Wireless debugging) to pair it. Details: {error}",
+                ru="Не удалось подключиться к {ip}: устройство требует спаривания по коду. Спарьте его через пункт 11 главного меню («Беспроводная отладка»). Подробности: {error}"
+            ),
+            "wireless_menu": Translation(
+                en="\nWireless debugging (Android 11+):",
+                ru="\nБеспроводная отладка (Android 11+):"
+            ),
+            "wireless_pair_device": Translation(
+                en="Pair a device with a code",
+                ru="Спарить устройство по коду"
+            ),
+            "wireless_mdns_scan": Translation(
+                en="Find devices via mDNS",
+                ru="Найти устройства по mDNS"
+            ),
+            "enter_pairing_host": Translation(
+                en="Enter the pairing address IP or IP:port from the TV screen ('q' to cancel): ",
+                ru="Введите адрес спаривания IP или IP:порт с экрана ТВ ('q' — отмена): "
+            ),
+            "enter_connect_host": Translation(
+                en="Enter the device address IP or IP:port ('q' to cancel): ",
+                ru="Введите адрес устройства IP или IP:порт ('q' — отмена): "
+            ),
+            "enter_pairing_code": Translation(
+                en="Enter the 6-digit pairing code from the TV screen ('q' to cancel): ",
+                ru="Введите 6-значный код спаривания с экрана ТВ ('q' — отмена): "
+            ),
+            "invalid_pairing_code": Translation(
+                en="Invalid pairing code: exactly 6 digits are expected.",
+                ru="Некорректный код спаривания: ожидается ровно 6 цифр."
+            ),
+            "pairing_in_progress": Translation(
+                en="Pairing with {ip}...",
+                ru="Спаривание с {ip}..."
+            ),
+            "pairing_success": Translation(
+                en="Paired with {ip}. Now connect using the connection port (it differs from the pairing port).",
+                ru="Устройство {ip} спарено. Теперь подключаемся по порту подключения (он отличается от порта спаривания)."
+            ),
+            "pairing_failed": Translation(
+                en="Pairing with {ip} failed: {error}",
+                ru="Не удалось спарить устройство {ip}: {error}"
+            ),
+            "mdns_searching": Translation(
+                en="Searching for devices via mDNS...",
+                ru="Поиск устройств по mDNS..."
+            ),
+            "mdns_found": Translation(
+                en="Found devices: {count}",
+                ru="Найдено устройств: {count}"
+            ),
+            "mdns_none": Translation(
+                en="mDNS found no devices. Make sure wireless debugging is enabled on the device and the pairing dialog is open.",
+                ru="mDNS не нашёл устройств. Убедитесь, что на устройстве включена беспроводная отладка и открыт диалог спаривания."
+            ),
+            "mdns_unavailable": Translation(
+                en="mDNS discovery is unavailable: the bundled adb has no mDNS backend and the zeroconf library is not installed. Enter the address manually.",
+                ru="Обнаружение по mDNS недоступно: у встроенного adb нет mDNS-бэкенда, а библиотека zeroconf не установлена. Введите адрес вручную."
+            ),
+            "mdns_service_pairing": Translation(
+                en="Devices awaiting pairing (the pairing dialog is open on screen):",
+                ru="Устройства, ожидающие спаривания (на экране открыт диалог спаривания):"
+            ),
+            "mdns_service_connect": Translation(
+                en="Paired devices ready to connect:",
+                ru="Спаренные устройства, готовые к подключению:"
+            ),
+            "adb_shell_command_failed": Translation(
+                en="Failed to run the command on the device: {error}",
+                ru="Не удалось выполнить команду на устройстве: {error}"
+            ),
             "confirm_connection": Translation(
                 en="Please confirm the connection on the TV screen if prompted.",
                 ru="Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос."
@@ -774,6 +870,10 @@ arising from the use of this program.
                 en="8. Network scan & batch NTP update",
                 ru="8. Сканирование сети и групповое обновление NTP"
             ),
+            "menu_item_wireless": Translation(
+                en="11. Wireless debugging Android 11+ (pairing and mDNS discovery)",
+                ru="11. Беспроводная отладка Android 11+ (спаривание и поиск по mDNS)"
+            ),
             "menu_item_11": Translation(
                 en="0. Exit",
                 ru="0. Выход"
@@ -783,8 +883,8 @@ arising from the use of this program.
                 ru="Введите номер пункта меню:"
             ),
             "invalid_ip_format": Translation(
-                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: 5555)",
-                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: 5555)"
+                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: {port})",
+                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: {port})"
             ),
             "invalid_ntp_server_format": Translation(
                 en="Invalid NTP server format. Use a valid domain name (e.g., time.google.com) or IP address.",
@@ -879,8 +979,8 @@ arising from the use of this program.
                 ru="Выберите номер устройства (или Enter для отмены): "
             ),
             "scan_start": Translation(
-                en="Scanning network {network} for open ADB port 5555...",
-                ru="Сканирование сети {network} на открытый порт ADB 5555..."
+                en="Scanning network {network} for open ADB port {port}...",
+                ru="Сканирование сети {network} на открытый порт ADB {port}..."
             ),
             "scan_retry": Translation(
                 en="Rechecking {count} addresses that did not respond (slower, more reliable)...",
@@ -961,8 +1061,8 @@ arising from the use of this program.
                 ru="Введите NTP-сервер для всех устройств (или q для отмены): "
             ),
             "batch_enter_ips": Translation(
-                en="Enter IP addresses separated by comma, or press Enter to use {count} discovered device(s): ",
-                ru="Введите IP-адреса через запятую или Enter для {count} найденных устройств: "
+                en="Enter IP or IP:port addresses separated by comma, or press Enter to use {count} discovered device(s): ",
+                ru="Введите адреса IP или IP:порт через запятую или Enter для {count} найденных устройств: "
             ),
             "batch_no_targets": Translation(
                 en="No target devices. Run network scan first or enter IPs manually.",

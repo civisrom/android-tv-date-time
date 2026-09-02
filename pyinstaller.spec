@@ -45,8 +45,12 @@ packages = [
     'threading', 
     'adb_shell.adb_device', 
     'adb_shell.auth.sign_pythonrsa',
-    'ntplib', 
-    'psutil'
+    'ntplib',
+    'psutil',
+    # zeroconf тянет Cython-расширения и импортирует подмодули динамически,
+    # поэтому его собирает collect_all ниже; ifaddr — его зависимость
+    'zeroconf',
+    'ifaddr'
 ]
 
 # Only collect from actual packages to avoid warnings
