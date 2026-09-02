@@ -871,7 +871,7 @@ arising from the use of this program.
                 ru="8. Сканирование сети и групповое обновление NTP"
             ),
             "menu_item_wireless": Translation(
-                en="11. Wireless debugging Android 11+ (pairing and mDNS discovery)",
+                en="11. Android 11+ wireless debugging (pairing and mDNS discovery)",
                 ru="11. Беспроводная отладка Android 11+ (спаривание и поиск по mDNS)"
             ),
             "menu_item_11": Translation(

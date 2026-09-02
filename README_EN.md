@@ -65,9 +65,18 @@ Many televisions and Android TV boxes, particularly in regions with network rest
     *   Sorting by availability and speed
     *   Export/import settings to JSON
 
+*   **Android 11+ wireless debugging (new):**
+    *   Pair with a device using its 6-digit code, straight from the program
+    *   mDNS discovery — you need neither the IP address nor the port
+    *   Automatic protocol detection: the program works out on its own whether a
+        device speaks the old network debugging or the new encrypted one
+    *   Works with Google TV Streamer and Chromecast with Google TV on Android 14,
+        where the old network debugging is no longer offered
+    *   A private ADB server, so the program never disturbs your `adb` or Android Studio
+
 *   **Network Scan & Batch Operations:**
     *   Automatic local network scanning for Android TV devices
-    *   Detection of devices with open ADB port 5555
+    *   Configurable ADB scan port (5555 by default)
     *   Connect to discovered devices
     *   Batch NTP server update across multiple devices
     *   Device time vs PC time comparison (sync status)
@@ -157,15 +166,42 @@ automatically on first launch.
 
 ## Android TV Setup
 
-### Enabling ADB Debugging (Developer Mode)
+### Step 1. Enable developer mode
 
 1.  On your Android TV, open: **Settings** > **Device Preferences** > **About**.
 2.  Click on the **"Build"** item 7 times to unlock developer mode.
 3.  Go to: **Device Preferences** > **Developer options**.
-4.  Enable **"Network Debugging"**.
-5.  Open: **Settings** > **Date & Time**.
-6.  Enable: **Auto date & time** > **Use network time**.
-7.  For enhanced security, it is recommended to disable developer mode after completing the NTP server configuration.
+
+### Step 2. Enable debugging — one of two ways
+
+Look for **one** of these entries under Developer options. Which one you get
+depends on the firmware, not on the Android version.
+
+**Option A — "Network debugging" (classic).** Present on most TVs and boxes:
+Xiaomi, TCL, Nvidia Shield, Fire TV. Just turn the switch on. The device starts
+listening on port **5555**, and the program only needs its IP address.
+
+**Option B — "Wireless debugging" (Android 11+).** The only option on Google TV
+Streamer and Chromecast with Google TV after the Android 14 update. Turn the
+switch on and **leave the screen open** — the ports shown there are random and
+change. Then use **item 11** of the main menu (see the "Wireless debugging"
+section below).
+
+> The program works out which one you have by itself: enter an address and it
+> will tell you whether a pairing code is needed.
+
+### Step 3. Allow automatic time synchronisation
+
+1.  Open: **Settings** > **Date & Time**.
+2.  Enable: **Auto date & time** > **Use network time**.
+
+Without this the device will not contact the NTP server you set.
+
+### Step 4. After the setup
+
+For enhanced security, it is recommended to disable developer mode once the NTP
+server is configured. The NTP server you set is stored in the system and
+survives reboots — debugging is only needed while you configure it.
 
 ## Main Menu
 
@@ -180,6 +216,7 @@ automatically on first launch.
  8. Network scan & batch NTP update
  9. Auto-setup NTP server (experimental mode)
 10. Terminal mode (ADB and system commands)
+11. Android 11+ wireless debugging (pairing and mDNS discovery)
  0. Exit
 ```
 
@@ -191,8 +228,17 @@ automatically on first launch.
 3. Copy server to clipboard
 4. Paste server from clipboard
 5. Remove server from favorites
-6. Export / Import settings
-7. Return to main menu
+6. Ping NTP servers
+7. Export / Import settings
+8. Return to main menu
+```
+
+### Wireless Debugging Submenu
+
+```
+1. Pair a device with a code
+2. Find devices via mDNS
+3. Return to main menu
 ```
 
 ### Network Scan Submenu
@@ -260,7 +306,7 @@ Opens a submenu for managing favorite servers:
 ### Item 8 — Network scan & batch NTP update
 
 Opens a submenu for working with multiple devices:
-- **Scan network** — automatically discovers Android TV devices on the local network via open ADB port 5555
+- **Scan network** — first asks for the ADB port (Enter for 5555; the value is remembered), then discovers Android TV devices on the local network. Results are shown as `IP:port`, so a non-standard port is carried over automatically
 - **Connect to discovered device** — select and connect to one of the found devices
 - **Batch NTP update** — set an NTP server on all discovered or manually entered devices at once
 - **Time sync status** — compare device time with PC time
@@ -268,7 +314,7 @@ Opens a submenu for working with multiple devices:
 ### Item 9 — Auto-setup NTP server (experimental mode)
 
 Fully automatic mode:
-1. Scans the local network and discovers Android TV devices
+1. Asks for the ADB port and scans the local network, discovering Android TV devices
 2. Connects to the selected device
 3. Detects your region based on the system timezone
 4. Tests all available NTP servers (110+) and measures response times
@@ -287,6 +333,42 @@ Interactive mode for executing any ADB and system commands. Useful for advanced 
 
 Commands: `help` — help, `clear` — clear screen, `exit` — exit terminal mode.
 
+### Item 11 — Android 11+ wireless debugging
+
+Use this item when Developer options on your device offer **"Wireless
+debugging"** instead of "Network debugging" — that is how Google TV Streamer and
+Chromecast with Google TV behave on Android 14.
+
+It opens a submenu with two actions.
+
+**1. Pair a device with a code.** A one-off procedure: afterwards the computer
+and the TV know each other and you never have to repeat it.
+
+1.  On the TV: **Developer options** > **Wireless debugging** > **Pair device
+    with pairing code**. The screen shows an address, a port and a 6-digit code.
+2.  In the program, choose item 1. It searches for devices over mDNS and shows a
+    list — pick one by number. If mDNS is unavailable, type the address by hand
+    as `192.168.1.20:41234` (the **pairing** port from the TV screen).
+3.  Enter the 6-digit code.
+4.  Once pairing succeeds the program asks for the connection address.
+    **Note: this is a different port.** It is shown on the main "Wireless
+    debugging" screen, not in the pairing dialog. Over mDNS the program fills it
+    in for you.
+
+**2. Find devices via mDNS.** Shows two groups: devices waiting to be paired
+(the code dialog is open on their screen) and devices already paired and ready
+to connect. From the second group you can connect straight away by number.
+
+> **Why mDNS matters here.** Wireless debugging hands out **random** ports — a
+> different one for pairing and for connecting — and they change every time it
+> is switched on. mDNS discovery saves you from copying them off the screen. The
+> program first tries the bundled `adb`, and falls back to the `zeroconf`
+> library if that build has no mDNS backend. If neither works, entering the
+> address by hand still does.
+
+Once paired and connected, every other menu item works as usual: changing NTP,
+device information, terminal.
+
 ### Item 0 — Exit
 
 Closes the program.
@@ -295,8 +377,13 @@ Closes the program.
 
 The program has been tested and should work on Android TV devices (including Nvidia Shield) that meet the following requirements:
 
-*   Support for ADB connections over the network.
+*   ADB over the network — in either flavour: the classic "Network debugging"
+    (port 5555) or Android 11+ "Wireless debugging" with a pairing code.
 *   Support for NTP server management via `adb shell` commands.
+
+Verified on devices from Android 9 to 16. On Google TV Streamer and Chromecast
+with Google TV updated to Android 14 only wireless debugging is available — use
+menu item 11.
 
 **Supported Operating Systems:**
 *   Windows 10/11
