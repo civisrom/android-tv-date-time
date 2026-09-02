@@ -55,23 +55,31 @@ def serialise(payload: dict) -> str:
 
 
 def main() -> int:
+    # Импорт android_time_fixer поднимает colorama, которая на Windows
+    # подменяет stdout; вместе с cp1252 это роняло вывод. Сообщения ниже
+    # намеренно ASCII, а здесь снимаем зависимость от кодировки и для будущих.
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
+
     payload = serialise(build_payload())
 
     if '--check' in sys.argv:
         if not TARGET.exists():
-            print(f"{TARGET} отсутствует — запустите скрипт без --check")
+            print(f"{TARGET} is missing; run the script without --check")
             return 1
         if TARGET.read_text(encoding='utf-8') != payload:
-            print(f"{TARGET} устарел — перезапустите scripts/export_ntp_data.py")
+            print(f"{TARGET} is stale; re-run scripts/export_ntp_data.py")
             return 1
-        print(f"{TARGET} актуален")
+        print(f"{TARGET} is up to date")
         return 0
 
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     TARGET.write_text(payload, encoding='utf-8')
     data = json.loads(payload)
-    print(f"записано: {len(data['countries'])} стран, "
-          f"{len(data['alternative_servers'])} альтернативных серверов -> {TARGET}")
+    print(f"wrote {len(data['countries'])} countries and "
+          f"{len(data['alternative_servers'])} alternative servers -> {TARGET}")
     return 0
 
 
