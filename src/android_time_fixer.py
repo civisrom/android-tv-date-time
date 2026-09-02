@@ -94,15 +94,24 @@ def _subprocess_encoding() -> str:
 def adb_env(adb_home: Optional[Path], server_port: int) -> dict:
     """Окружение для дочерних процессов adb: свой сервер и свой каталог ключей.
 
-    Каталог adb задаётся ТОЛЬКО через HOME/USERPROFILE: проверено на
-    platform-tools 37.0.1 — ANDROID_USER_HOME и ANDROID_SDK_HOME этот бинарник
-    игнорирует и всё равно пишет в $HOME/.android. Поэтому HOME подменяется
-    здесь, в env дочернего процесса, и никогда в os.environ: иначе поехали бы
-    Path.home() и platformdirs у самой программы.
+    Свой порт сервера работает везде. С каталогом ключей сложнее — проверено
+    прямым запуском platform-tools 37.0.1 на всех трёх ОС (workflow
+    adb-home-probe.yml):
+
+    * Linux и macOS уводит только HOME (ANDROID_USER_HOME и ANDROID_SDK_HOME
+      этот бинарник игнорирует вопреки документации Android);
+    * Windows не уводит НИ ОДНА переменная — ни HOME, ни USERPROFILE, ни
+      ANDROID_USER_HOME, ни ANDROID_SDK_HOME, ни HOMEDRIVE+HOMEPATH: adb там
+      берёт профиль через системный API и всегда пишет в профиль пользователя.
+
+    Поэтому на Windows домашние переменные не трогаем вовсе: подменять их
+    ради нулевого эффекта — лишний риск для дочернего процесса. HOME
+    подменяется только в env дочернего процесса и никогда в os.environ, иначе
+    поехали бы Path.home() и platformdirs у самой программы.
     """
     env = os.environ.copy()
     env['ANDROID_ADB_SERVER_PORT'] = str(server_port)
-    if adb_home is not None:
+    if adb_home is not None and os.name != 'nt':
         env['HOME'] = str(adb_home)
         env['USERPROFILE'] = str(adb_home)
     return env
@@ -648,11 +657,16 @@ class AndroidTVTimeFixer:
         через env=. В os.environ ничего не пишем: подмена HOME всему процессу
         сломала бы Path.home() и platformdirs у самой программы.
         """
+        if os.name == 'nt':
+            # На Windows adb всё равно пишет в профиль пользователя, так что
+            # каталог остался бы пустым, а перенос ключей — копированием
+            # приватного ключа во второе место без всякой пользы
+            return
+
         try:
             self.adb_dot_android.mkdir(parents=True, exist_ok=True)
-            if os.name != 'nt':
-                self.adb_home.chmod(0o700)
-                self.adb_dot_android.chmod(0o700)
+            self.adb_home.chmod(0o700)
+            self.adb_dot_android.chmod(0o700)
         except OSError as e:
             logger.warning(f"Could not create the ADB home directory: {e}")
             return

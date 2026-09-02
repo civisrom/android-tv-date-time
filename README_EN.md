@@ -135,11 +135,15 @@ The program is portable: ADB keys, settings, and the log live **next to the exec
 (`keys/`, `adb/`, `settings.json`, `saved_servers.json`, `android_tv_fixer.log`).
 
 - `keys/` — the key for direct "network debugging" connections (legacy ADB protocol).
-- `adb/` — a private `adb` home (with `.android` inside) for Android 11+ wireless
-  debugging: it holds the key and the list of paired devices. The program also runs its
-  own ADB server port, so it never interferes with your `adb` or Android Studio. On the
-  first run, existing keys from `~/.android` are copied here so that already paired
-  devices keep working.
+- `adb/` — a private `adb` home for Android 11+ wireless debugging: it holds the key
+  and the list of paired devices. On the first run, existing keys from `~/.android` are
+  copied here so that already paired devices keep working. **Linux and macOS only:** on
+  Windows `adb` resolves the user profile through a system API and ignores environment
+  variables, so its keys stay in `%USERPROFILE%\.android` there (verified against
+  platform-tools 37.0.1).
+
+The program uses its own ADB server port on **every** platform, so it never interferes
+with your `adb` or Android Studio and never kills their sessions.
 
 When the program folder is not writable (installed under `Program Files`, or launched
 straight from an archive), the data falls back to the user data directory:

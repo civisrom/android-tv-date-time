@@ -554,18 +554,31 @@ class ReliabilityTests(unittest.TestCase):
         fixer.adb_env = adb_env(fixer.adb_home, DEFAULT_ADB_SERVER_PORT)
         return fixer
 
-    def test_adb_environment_isolates_home_and_server_port(self) -> None:
-        # Проверено на platform-tools 37.0.1: каталог adb задаётся ТОЛЬКО через
-        # HOME/USERPROFILE, ANDROID_USER_HOME и ANDROID_SDK_HOME игнорируются
-        # Путь сравниваем через Path: на Windows разделители обратные
-        adb_home = Path('/tmp/example/adb')
-        env = adb_env(adb_home, 5038)
-        self.assertEqual(env['HOME'], str(adb_home))
-        self.assertEqual(env['USERPROFILE'], str(adb_home))
+    def test_adb_environment_isolates_the_server_port_everywhere(self) -> None:
+        env = adb_env(Path('/tmp/example/adb'), 5038)
         self.assertEqual(env['ANDROID_ADB_SERVER_PORT'], '5038')
         # Остальное окружение сохраняется, иначе дочерний adb потеряет PATH
         self.assertIn('PATH', env)
 
+    @unittest.skipIf(os.name == 'nt', 'на Windows adb игнорирует любые переменные')
+    def test_adb_environment_redirects_the_key_store_on_posix(self) -> None:
+        # Проверено прямым запуском platform-tools 37.0.1: на Linux и macOS
+        # уводит только HOME, а ANDROID_USER_HOME/ANDROID_SDK_HOME — нет.
+        # Путь сравниваем через Path: разделители зависят от ОС
+        adb_home = Path('/tmp/example/adb')
+        env = adb_env(adb_home, 5038)
+        self.assertEqual(env['HOME'], str(adb_home))
+        self.assertEqual(env['USERPROFILE'], str(adb_home))
+
+    @unittest.skipUnless(os.name == 'nt', 'поведение, специфичное для Windows')
+    def test_adb_environment_leaves_home_alone_on_windows(self) -> None:
+        # adb там всё равно читает профиль через системный API, поэтому
+        # подменять домашние переменные — риск без выгоды
+        env = adb_env(Path('C:/example/adb'), 5038)
+        self.assertEqual(env.get('HOME'), os.environ.get('HOME'))
+        self.assertEqual(env.get('USERPROFILE'), os.environ.get('USERPROFILE'))
+
+    @unittest.skipIf(os.name == 'nt', 'на Windows каталог намеренно не создаётся')
     def test_adb_environment_never_touches_process_env(self) -> None:
         # Подмена HOME всему процессу сломала бы Path.home() и platformdirs
         with tempfile.TemporaryDirectory() as temp_dir:

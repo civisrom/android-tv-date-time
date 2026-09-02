@@ -60,6 +60,17 @@ PYTHONPATH=src $PY -c "import android_time_fixer"
 `https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip`
 (sha256 `d230f138…`, тот же, что в `build.yml`).
 
+## Измеренные ограничения платформ
+
+- **Изоляция ключей: только Linux и macOS.** Измерено прямым запуском
+  platform-tools 37.0.1 на всех трёх раннерах (workflow `adb-home-probe.yml`):
+  на Linux и macOS каталог adb уводит только `HOME`; на Windows не уводит **ни
+  одна** переменная — ни `HOME`, ни `USERPROFILE`, ни `ANDROID_USER_HOME`, ни
+  `ANDROID_SDK_HOME`, ни `HOMEDRIVE`+`HOMEPATH`. Там adb берёт профиль через
+  системный API, поэтому ключи остаются в `%USERPROFILE%\.android`, и код на
+  Windows намеренно не создаёт каталог и не переносит ключи. **Изоляция порта
+  ADB-сервера работает на всех трёх ОС** и от этого не зависит.
+
 ## Что осталось непроверенным
 
 - **Живое устройство с беспроводной отладкой.** `adb pair` проверен только на
@@ -72,13 +83,7 @@ PYTHONPATH=src $PY -c "import android_time_fixer"
 - **Заморозка zeroconf в PyInstaller** на трёх платформах — только в CI. Если
   сборка упадёт на импорте, внести `.pyd`/`.so` zeroconf в `upx_exclude`
   (`pyinstaller.spec`): UPX умеет портить Cython-расширения.
-- **Изоляция ключей на Windows.** Подмена `HOME`/`USERPROFILE` проверена только
-  на Linux. Если adb под Windows берёт профиль через Win32 API
-  (`SHGetFolderPath(CSIDL_PROFILE)`), а не из переменной окружения, то ключи там
-  останутся в реальном `%USERPROFILE%\.android`. Деградация безопасная: сам
-  `ANDROID_ADB_SERVER_PORT` работает независимо, программа продолжает работать —
-  просто без изоляции ключей. Проверяется одной командой на Windows:
-  `set USERPROFILE=C:\tmp\x && adb start-server && dir C:\tmp\x\.android`.
+
 
 ## Обязательные идиомы проекта
 
