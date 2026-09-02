@@ -557,9 +557,11 @@ class ReliabilityTests(unittest.TestCase):
     def test_adb_environment_isolates_home_and_server_port(self) -> None:
         # Проверено на platform-tools 37.0.1: каталог adb задаётся ТОЛЬКО через
         # HOME/USERPROFILE, ANDROID_USER_HOME и ANDROID_SDK_HOME игнорируются
-        env = adb_env(Path('/tmp/example/adb'), 5038)
-        self.assertEqual(env['HOME'], '/tmp/example/adb')
-        self.assertEqual(env['USERPROFILE'], '/tmp/example/adb')
+        # Путь сравниваем через Path: на Windows разделители обратные
+        adb_home = Path('/tmp/example/adb')
+        env = adb_env(adb_home, 5038)
+        self.assertEqual(env['HOME'], str(adb_home))
+        self.assertEqual(env['USERPROFILE'], str(adb_home))
         self.assertEqual(env['ANDROID_ADB_SERVER_PORT'], '5038')
         # Остальное окружение сохраняется, иначе дочерний adb потеряет PATH
         self.assertIn('PATH', env)
