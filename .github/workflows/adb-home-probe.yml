@@ -63,3 +63,12 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
         run: poetry run python scripts/probe_adb_home.py "${{ matrix.adb_bin }}"
+
+      # Если основной способ на этой ОС не работает, показываем, какие ещё
+      # переменные окружения могли бы увести adb в свой каталог.
+      - name: Explore which environment variables adb honours
+        if: always()
+        shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
+        run: poetry run python scripts/probe_adb_home.py "${{ matrix.adb_bin }}" --explore

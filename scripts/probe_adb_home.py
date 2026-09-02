@@ -33,9 +33,70 @@ def snapshot(directory: Path) -> set:
         return set()
 
 
+#: Наборы переменных-кандидатов: чем ещё можно попробовать увести adb в свой
+#: каталог, если основной способ (HOME/USERPROFILE) на этой ОС не сработал.
+CANDIDATES = (
+    ('HOME + USERPROFILE', ('HOME', 'USERPROFILE')),
+    ('ANDROID_USER_HOME', ('ANDROID_USER_HOME',)),
+    ('ANDROID_SDK_HOME', ('ANDROID_SDK_HOME',)),
+    ('USERPROFILE', ('USERPROFILE',)),
+    ('HOME', ('HOME',)),
+    ('HOMEDRIVE + HOMEPATH', ('HOMEDRIVE', 'HOMEPATH')),
+)
+
+
+def explore(adb: str, real_android: Path) -> int:
+    """Перебирает наборы переменных и печатает, какой из них уводит adb."""
+    import os
+
+    print(f"ОС: {sys.platform}. Ищем переменные, которыми adb можно увести в свой каталог.\n")
+    winners = []
+    for index, (label, names) in enumerate(CANDIDATES):
+        port = PROBE_SERVER_PORT + 1 + index
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home = Path(temp_dir) / 'adb'
+            (home / '.android').mkdir(parents=True)
+            env = os.environ.copy()
+            env['ANDROID_ADB_SERVER_PORT'] = str(port)
+            for name in names:
+                if name == 'HOMEDRIVE':
+                    env[name] = str(home.drive or 'C:')
+                elif name == 'HOMEPATH':
+                    env[name] = str(home)[len(home.drive):] if home.drive else str(home)
+                else:
+                    env[name] = str(home)
+
+            before = snapshot(real_android)
+            subprocess.run([adb, 'start-server'], env=env,
+                           capture_output=True, text=True, timeout=120)
+            subprocess.run([adb, 'devices'], env=env,
+                           capture_output=True, text=True, timeout=120)
+            ours = snapshot(home / '.android') | snapshot(home)
+            leaked = snapshot(real_android) - before
+            subprocess.run([adb, 'kill-server'], env=env,
+                           capture_output=True, text=True, timeout=60)
+
+            marker = f'adb.{port}'
+            works = marker in ours or 'adbkey' in ours
+            if works:
+                winners.append(label)
+            print(f"  {label:22} -> {'УВОДИТ' if works else 'не уводит':10} "
+                  f"| у нас: {sorted(ours) or 'ничего'} | утекло: {sorted(leaked) or 'ничего'}")
+
+    print()
+    if winners:
+        print("Сработали наборы:", ", ".join(winners))
+        return 0
+    print("Ни один набор переменных не уводит adb с этой ОС.")
+    return 1
+
+
 def main() -> int:
     adb = str(Path(sys.argv[1]).resolve())
     real_android = Path.home() / '.android'
+
+    if '--explore' in sys.argv:
+        return explore(adb, real_android)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         adb_home = Path(temp_dir) / 'adb'
