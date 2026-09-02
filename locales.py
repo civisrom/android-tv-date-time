@@ -18,7 +18,7 @@ class Locales:
     def __init__(self):
         # Default language is Russian
         self.current_language: Language = Language.RU
-        
+
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
             # Disclaimer text
@@ -116,6 +116,10 @@ arising from the use of this program.
                 en="Existing ADB keys are being used",
                 ru="Используются существующие ключи ADB"
             ),
+            "adb_pubkey_restored": Translation(
+                en="Public ADB key restored from the existing private key",
+                ru="Публичный ключ ADB восстановлен из существующего приватного ключа"
+            ),
             "key_generation_error": Translation(
                 en="Failed to generate keys: {error}",
                 ru="Не удалось сгенерировать ключи: {error}"
@@ -127,15 +131,6 @@ arising from the use of this program.
             "key_loading_error": Translation(
                 en="Failed to load keys: {error}",
                 ru="Не удалось загрузить ключи: {error}"
-            ),
-            "no_connected_devices": Translation(
-                en="No connected devices.",
-                ru="Нет подключенных устройств."
-            ),
-            
-            "choose_device_to_connect": Translation(
-                en="Select a device to connect:",
-                ru="Выберите устройство для подключения:"
             ),
             "enter_device_number": Translation(
                 en="Enter the device number: ",
@@ -149,11 +144,7 @@ arising from the use of this program.
                 en="Invalid input.",
                 ru="Некорректный ввод."
             ),
-            "connecting_to_device": Translation(
-                en="Connecting to device {device_id}...",
-                ru="Подключение к устройству {device_id}..."
-            ),
-            
+
             "current_device_info": Translation(
                 en="\nCurrent device information:\n",
                 ru="\nТекущая информация об устройстве:\n"
@@ -166,9 +157,109 @@ arising from the use of this program.
                 en="Port {port} is not available on {ip}. The device may be off, ADB is not enabled, or the port is incorrect.",
                 ru="Порт {port} недоступен на {ip}. Устройство может быть выключено, ADB не включён или порт указан неверно."
             ),
+            "enter_scan_port": Translation(
+                en="ADB port to scan (Enter for {default}, 'q' to cancel): ",
+                ru="Порт ADB для сканирования (Enter — {default}, 'q' — отмена): "
+            ),
+            "invalid_port": Translation(
+                en="Invalid port. Allowed values: 1-65535.",
+                ru="Некорректный порт. Допустимы значения 1-65535."
+            ),
+            "adb_probe_failed": Translation(
+                en="Port {port} on {ip} is open, but it is not an ADB daemon (no valid response).",
+                ru="Порт {port} на {ip} открыт, но это не ADB-демон (нет корректного ответа)."
+            ),
+            "adb_protocol_tls_detected": Translation(
+                en="Device {ip} uses Android 11+ wireless debugging (encrypted connection).",
+                ru="На устройстве {ip} включена беспроводная отладка Android 11+ (шифрованное соединение)."
+            ),
+            "adb_tls_connect_try": Translation(
+                en="Connecting via the bundled adb (the device must be paired; see main menu item 11)...",
+                ru="Подключение через встроенный adb (устройство должно быть спарено — пункт 11 главного меню)..."
+            ),
+            "adb_tls_connect_ok": Translation(
+                en="Connected to {ip} over an encrypted connection.",
+                ru="Подключено к {ip} по шифрованному соединению."
+            ),
+            "adb_tls_pairing_required": Translation(
+                en="Could not connect to {ip}: the device requires pairing with a code. Use main menu item 11 (Wireless debugging) to pair it. Details: {error}",
+                ru="Не удалось подключиться к {ip}: устройство требует спаривания по коду. Спарьте его через пункт 11 главного меню («Беспроводная отладка»). Подробности: {error}"
+            ),
+            "wireless_menu": Translation(
+                en="\nWireless debugging (Android 11+):",
+                ru="\nБеспроводная отладка (Android 11+):"
+            ),
+            "wireless_pair_device": Translation(
+                en="Pair a device with a code",
+                ru="Спарить устройство по коду"
+            ),
+            "wireless_mdns_scan": Translation(
+                en="Find devices via mDNS",
+                ru="Найти устройства по mDNS"
+            ),
+            "enter_pairing_host": Translation(
+                en="Enter the pairing address IP or IP:port from the TV screen ('q' to cancel): ",
+                ru="Введите адрес спаривания IP или IP:порт с экрана ТВ ('q' — отмена): "
+            ),
+            "enter_connect_host": Translation(
+                en="Enter the device address IP or IP:port ('q' to cancel): ",
+                ru="Введите адрес устройства IP или IP:порт ('q' — отмена): "
+            ),
+            "enter_pairing_code": Translation(
+                en="Enter the 6-digit pairing code from the TV screen ('q' to cancel): ",
+                ru="Введите 6-значный код спаривания с экрана ТВ ('q' — отмена): "
+            ),
+            "invalid_pairing_code": Translation(
+                en="Invalid pairing code: exactly 6 digits are expected.",
+                ru="Некорректный код спаривания: ожидается ровно 6 цифр."
+            ),
+            "pairing_in_progress": Translation(
+                en="Pairing with {ip}...",
+                ru="Спаривание с {ip}..."
+            ),
+            "pairing_success": Translation(
+                en="Paired with {ip}. Now connect using the connection port (it differs from the pairing port).",
+                ru="Устройство {ip} спарено. Теперь подключаемся по порту подключения (он отличается от порта спаривания)."
+            ),
+            "pairing_failed": Translation(
+                en="Pairing with {ip} failed: {error}",
+                ru="Не удалось спарить устройство {ip}: {error}"
+            ),
+            "mdns_searching": Translation(
+                en="Searching for devices via mDNS...",
+                ru="Поиск устройств по mDNS..."
+            ),
+            "mdns_found": Translation(
+                en="Found devices: {count}",
+                ru="Найдено устройств: {count}"
+            ),
+            "mdns_none": Translation(
+                en="mDNS found no devices. Make sure wireless debugging is enabled on the device and the pairing dialog is open.",
+                ru="mDNS не нашёл устройств. Убедитесь, что на устройстве включена беспроводная отладка и открыт диалог спаривания."
+            ),
+            "mdns_unavailable": Translation(
+                en="mDNS discovery is unavailable: the bundled adb has no mDNS backend and the zeroconf library is not installed. Enter the address manually.",
+                ru="Обнаружение по mDNS недоступно: у встроенного adb нет mDNS-бэкенда, а библиотека zeroconf не установлена. Введите адрес вручную."
+            ),
+            "mdns_service_pairing": Translation(
+                en="Devices awaiting pairing (the pairing dialog is open on screen):",
+                ru="Устройства, ожидающие спаривания (на экране открыт диалог спаривания):"
+            ),
+            "mdns_service_connect": Translation(
+                en="Paired devices ready to connect:",
+                ru="Спаренные устройства, готовые к подключению:"
+            ),
+            "adb_shell_command_failed": Translation(
+                en="Failed to run the command on the device: {error}",
+                ru="Не удалось выполнить команду на устройстве: {error}"
+            ),
             "confirm_connection": Translation(
                 en="Please confirm the connection on the TV screen if prompted.",
                 ru="Пожалуйста, подтвердите подключение на экране ТВ, если появится запрос."
+            ),
+            "connection_prompt_sent": Translation(
+                en="Authorization request sent to the device (attempt {attempt}). Confirm it on the TV screen.",
+                ru="Запрос авторизации отправлен на устройство (попытка {attempt}). Подтвердите его на экране ТВ."
             ),
             "connection_success": Translation(
                 en="Successfully connected to {ip}:{port}",
@@ -223,14 +314,6 @@ arising from the use of this program.
             "ntp_server_not_added": Translation(
                 en="Warning: NTP server {server} is unavailable or does not work as a time server. It was not added.",
                 ru="Предупреждение: NTP-сервер {server} недоступен или не работает как сервер времени. Он не добавлен."
-            ),
-            "available_country_codes": Translation(
-                en="\nAvailable country codes:",
-                ru="\nДоступные коды стран (копируем в буфер обмена наприм. ru или by и вставляем в пункте 1 глав. меню):"
-            ),
-            "country_code_server": Translation(
-                en="{code} — {server}",
-                ru="{code} — {server}"
             ),
             "available_alternative_ntp_servers": Translation(
                 en="\nAvailable alternative NTP servers:",
@@ -749,7 +832,7 @@ arising from the use of this program.
                  en="Error executing command: {error}",
                  ru="Ошибка выполнения команды: {error}"
             ),
-                
+
             # Main menu items
             "main_menu": Translation(
                 en="\nMain Menu:",
@@ -787,6 +870,10 @@ arising from the use of this program.
                 en="8. Network scan & batch NTP update",
                 ru="8. Сканирование сети и групповое обновление NTP"
             ),
+            "menu_item_wireless": Translation(
+                en="11. Wireless debugging Android 11+ (pairing and mDNS discovery)",
+                ru="11. Беспроводная отладка Android 11+ (спаривание и поиск по mDNS)"
+            ),
             "menu_item_11": Translation(
                 en="0. Exit",
                 ru="0. Выход"
@@ -795,17 +882,9 @@ arising from the use of this program.
                 en="Enter menu option number:",
                 ru="Введите номер пункта меню:"
             ),
-            "enter_device_ip": Translation(
-                en="Enter the IP address of your device (TV, Nvidia Shield) (find it in Settings > Network and Internet): ",
-                ru="Введите IP-адрес вашего устройства (ТВ, Nvidia Shield) (найдите в Настройки > Сеть и интернет): "
-            ),
-            "enter_device_ip_with_saved": Translation(
-                en="Enter the IP address of your device (press Enter to use saved: {saved_ip}): ",
-                ru="Введите IP-адрес устройства (нажмите Enter для использования сохранённого: {saved_ip}): "
-            ),
             "invalid_ip_format": Translation(
-                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: 5555)",
-                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: 5555)"
+                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: {port})",
+                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: {port})"
             ),
             "invalid_ntp_server_format": Translation(
                 en="Invalid NTP server format. Use a valid domain name (e.g., time.google.com) or IP address.",
@@ -815,33 +894,9 @@ arising from the use of this program.
                 en="Enter your country code (e.g. us for USA, uk for United Kingdom, see country codes menu, q to exit): ",
                 ru="Введите код вашей страны (например, ru для России, by для Беларуси, смотри в меню коды стран, для возврата q): "
             ),
-            "time_settings_updated": Translation(
-                en="Time settings updated successfully!",
-                ru="Настройки времени успешно обновлены!"
-            ),
             "invalid_country_code": Translation(
                 en="Invalid country code",
                 ru="Недействительный код страны"
-            ),
-
-            "ntp_server_reachable": Translation(
-                en="NTP server is reachable",
-                ru="NTP-сервер доступен"
-            ),
-            
-            "ntp_server_unreachable": Translation(
-                en="NTP server is unreachable",
-                ru="NTP-сервер недоступен"
-            ),
-
-            "connection_error": Translation(
-                en="Connection error occurred",
-                ru="Произошла ошибка подключения"
-            ),
-
-            "ping_servers": Translation(
-                en="6. Ping NTP Servers",
-                ru="6. Пинговать NTP-серверы"
             ),
 
             "ping_results_summary": Translation(
@@ -866,171 +921,6 @@ arising from the use of this program.
                 ru="Проверка доступности NTP-серверов (может занять время)..."
             ),
 
-            "country_codes_description": Translation(
-                en="\nCountry code description (can be copied to clipboard):",
-                ru="\nРасшифровка кодов стран (копируем в буфер обмена наприм. ru и вставляем в пункте 1 глав. меню):"
-            ),
-            "country_codes": Translation(
-                en="""
-at: Austria
-ba: Bosnia and Herzegovina
-be: Belgium
-bg: Bulgaria
-by: Belarus
-ch: Switzerland
-cy: Cyprus
-cz: Czech Republic
-de: Germany
-dk: Denmark
-ee: Estonia
-es: Spain
-fi: Finland
-fr: France
-gi: Gibraltar
-gr: Greece
-hr: Croatia
-hu: Hungary
-ie: Ireland
-is: Iceland
-it: Italy
-li: Liechtenstein
-lt: Lithuania
-lu: Luxembourg
-lv: Latvia
-md: Moldova
-mk: North Macedonia
-nl: Netherlands
-no: Norway
-pl: Poland
-pt: Portugal
-ro: Romania
-rs: Serbia
-ru: Russia
-se: Sweden
-si: Slovenia
-sk: Slovakia
-tr: Turkey
-uk: United Kingdom
-us: United States
-ca: Canada
-br: Brazil
-au: Australia
-cn: China
-jp: Japan
-kz: Kazakhstan
-ae: United Arab Emirates
-am: Armenia
-az: Azerbaijan
-bd: Bangladesh
-bh: Bahrain
-ge: Georgia
-hk: Hong Kong
-id: Indonesia
-il: Israel
-in: India
-ir: Iran
-kg: Kyrgyzstan
-kh: Cambodia
-kr: Korea
-lk: Sri Lanka
-mn: Mongolia
-mv: Maldives
-my: Malaysia
-np: Nepal
-ph: Philippines
-pk: Pakistan
-ps: Palestinian Territory
-qa: Qatar
-sa: Saudi Arabia
-sg: Singapore
-th: Thailand
-tj: Tajikistan
-tw: Taiwan
-uz: Uzbekistan
-ua: Ukraine
-vn: Vietnam
-""",
-                ru="""
-at: Австрия
-ba: Босния и Герцеговина
-be: Бельгия
-bg: Болгария
-by: Беларусь
-ch: Швейцария
-cy: Кипр
-cz: Чехия
-de: Германия
-dk: Дания
-ee: Эстония
-es: Испания
-fi: Финляндия
-fr: Франция
-gi: Гибралтар
-gr: Греция
-hr: Хорватия
-hu: Венгрия
-ie: Ирландия
-is: Исландия
-it: Италия
-li: Лихтенштейн
-lt: Литва
-lu: Люксембург
-lv: Латвия
-md: Молдова
-mk: Северная Македония
-nl: Нидерланды
-no: Норвегия
-pl: Польша
-pt: Португалия
-ro: Румыния
-rs: Сербия
-ru: Россия
-se: Швеция
-si: Словения
-sk: Словакия
-tr: Турция
-uk: Великобритания
-us: США
-ca: Канада
-br: Бразилия
-au: Австралия
-cn: Китай
-jp: Япония
-kz: Казахстан
-ae: Объединённые Арабские Эмираты
-am: Армения
-az: Азербайджан
-bd: Бангладеш
-bh: Бахрейн
-ge: Грузия
-hk: Гонконг
-id: Индонезия
-il: Израиль
-in: Индия
-ir: Иран
-kg: Кыргызстан
-kh: Камбоджа
-kr: Корея
-lk: Шри-Ланка
-mn: Монголия
-mv: Мальдивы
-my: Малайзия
-np: Непал
-ph: Филиппины
-pk: Пакистан
-ps: Палестинская территория
-qa: Катар
-sa: Саудовская Аравия
-sg: Сингапур
-th: Таиланд
-tj: Таджикистан
-tw: Тайвань
-uz: Узбекистан
-ua: Украина
-vn: Вьетнам
-
-"""
-            ),
             # ─── Merged country codes display ───────────────────────────
             "available_country_codes_full": Translation(
                 en="\nAvailable country codes (code: country -> NTP server):",
@@ -1049,10 +939,6 @@ vn: Вьетнам
             "hint_type_hint": Translation(
                 en="Tip: enter ? to search by partial name, e.g. ?rus or ?uni",
                 ru="Подсказка: введите ? для поиска по названию, например ?рос или ?сша"
-            ),
-            "enter_country_code_search": Translation(
-                en="Enter country code or ?<text> to search: ",
-                ru="Введите код страны или ?<текст> для поиска: "
             ),
 
             # ─── Network scan ────────────────────────────────────────────
@@ -1081,20 +967,24 @@ vn: Вьетнам
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter IP, IP:port, CIDR subnet, or 's' to scan (Enter for saved: {saved_ip}): ",
-                ru="Введите IP, IP:порт, CIDR-подсеть или 's' для сканирования (Enter для сохранённого: {saved_ip}): "
+                en="Enter IP, IP:port, CIDR subnet, 's' to scan, 'q' to cancel (Enter for saved: {saved_ip}): ",
+                ru="Введите IP, IP:порт, CIDR-подсеть, 's' для сканирования, 'q' для отмены (Enter для сохранённого: {saved_ip}): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter IP, IP:port, CIDR subnet, or 's' to scan network: ",
-                ru="Введите IP, IP:порт, CIDR-подсеть или 's' для сканирования сети: "
+                en="Enter IP, IP:port, CIDR subnet, 's' to scan network, or 'q' to cancel: ",
+                ru="Введите IP, IP:порт, CIDR-подсеть, 's' для сканирования сети или 'q' для отмены: "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",
                 ru="Выберите номер устройства (или Enter для отмены): "
             ),
             "scan_start": Translation(
-                en="Scanning network {network} for open ADB port 5555...",
-                ru="Сканирование сети {network} на открытый порт ADB 5555..."
+                en="Scanning network {network} for open ADB port {port}...",
+                ru="Сканирование сети {network} на открытый порт ADB {port}..."
+            ),
+            "scan_retry": Translation(
+                en="Rechecking {count} addresses that did not respond (slower, more reliable)...",
+                ru="Повторная проверка {count} не ответивших адресов (медленнее, но надёжнее)..."
             ),
             "scan_progress": Translation(
                 en="  Progress: {checked}/{total} checked, {found} found",
@@ -1116,17 +1006,9 @@ vn: Вьетнам
                 en="Could not determine local IP address",
                 ru="Не удалось определить локальный IP-адрес"
             ),
-            "scan_not_private": Translation(
-                en="Your IP address ({ip}) is not in a supported local network range (192.168.x.x or 10.x.x.x). Network scan is only available on local networks.",
-                ru="Ваш IP-адрес ({ip}) не входит в поддерживаемый диапазон локальных сетей (192.168.x.x или 10.x.x.x). Сканирование доступно только в локальных сетях."
-            ),
             "scan_net_detected": Translation(
                 en="Network auto-detected: {network} ({hosts} hosts)",
                 ru="Сеть определена автоматически: {network} ({hosts} хостов)"
-            ),
-            "scan_net_fallback": Translation(
-                en="Could not detect subnet mask, using fallback range: {network}",
-                ru="Не удалось определить маску подсети, используется запасной диапазон: {network}"
             ),
             "scan_wide_offer": Translation(
                 en="No devices found in {narrow}. Scan wider range {wide}? (y/n): ",
@@ -1156,6 +1038,10 @@ vn: Вьетнам
                 en="Subnet {network} contains {hosts} hosts and may take a long time. Continue? (y/n): ",
                 ru="Подсеть {network} содержит {hosts} хостов и может сканироваться долго. Продолжить? (y/n): "
             ),
+            "scan_too_large": Translation(
+                en="Scan cancelled: the selected network contains {hosts} hosts; the safe limit is {limit}.",
+                ru="Сканирование отменено: выбранная сеть содержит {hosts} хостов; безопасный лимит — {limit}."
+            ),
             "scan_firewall_hint": Translation(
                 en="Hint: Make sure this program is allowed through your firewall (Windows Defender, iptables, etc.).",
                 ru="Подсказка: Убедитесь, что программа добавлена в исключения файрвола (Брандмауэр Windows, iptables и т.д.)."
@@ -1175,8 +1061,8 @@ vn: Вьетнам
                 ru="Введите NTP-сервер для всех устройств (или q для отмены): "
             ),
             "batch_enter_ips": Translation(
-                en="Enter IP addresses separated by comma, or press Enter to use {count} discovered device(s): ",
-                ru="Введите IP-адреса через запятую или Enter для {count} найденных устройств: "
+                en="Enter IP or IP:port addresses separated by comma, or press Enter to use {count} discovered device(s): ",
+                ru="Введите адреса IP или IP:порт через запятую или Enter для {count} найденных устройств: "
             ),
             "batch_no_targets": Translation(
                 en="No target devices. Run network scan first or enter IPs manually.",
@@ -1185,6 +1071,10 @@ vn: Вьетнам
             "batch_connecting": Translation(
                 en="  [{idx}/{total}] Connecting to {ip}...",
                 ru="  [{idx}/{total}] Подключение к {ip}..."
+            ),
+            "batch_prompt_sent": Translation(
+                en="  Authorization request sent to {ip}. Confirm it on the device screen.",
+                ru="  Запрос авторизации отправлен на {ip}. Подтвердите его на экране устройства."
             ),
             "batch_success": Translation(
                 en="  OK  {ip}: NTP server {server} is reachable and has been added",
@@ -1296,10 +1186,6 @@ vn: Вьетнам
             "connection_reused": Translation(
                 en="Using existing connection to {ip}",
                 ru="Используется существующее подключение к {ip}"
-            ),
-            "reconnect_or_reuse": Translation(
-                en="Already connected to {ip}. Use existing connection? (y/n): ",
-                ru="Уже подключено к {ip}. Использовать текущее подключение? (y/n): "
             ),
             "exit_message": Translation(
                 en="\nExiting the program...",

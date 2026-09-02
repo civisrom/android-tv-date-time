@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "androidtvtimefixer"
-version = "1.0.0"
+version = "2.4.2"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
 packages = [
-    {include = "src/android_time_fixer.py"},
+    {include = "android_time_fixer.py", from = "src"},
     {include = "locales.py"}
 ]
 classifiers = [
@@ -16,19 +16,21 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
-adb-shell = {extras = ["network"], version = "^0.4.4"}
+adb-shell = "^0.4.4"
 pyperclip = "^1.11.0"
 colorama = "^0.4.6"
 platformdirs = "^4.9.6"
 packaging = "^26.2"
 typing-extensions = "^4.15.0"
-cryptography = "^47.0.0"
+cryptography = "^50.0.0"
 rsa = "^4.9.1"
+pyasn1 = "^0.6.4"
 ntplib = "^0.4.0"
+# Запасной путь mDNS-обнаружения, когда у adb нет своего бэкенда
+zeroconf = "^0.151.3"
 
 # Общая зависимость для всех платформ
 psutil = "^7.2.2"
-wmi = { version = "^1.5.1", markers = "sys_platform == 'win32'" }
 
 # macOS-специфичные зависимости
 pyobjc-framework-Cocoa = { version = "^12.1", markers = "sys_platform == 'darwin'" }
@@ -41,6 +43,7 @@ rich = "^15.0.0"
 black = "^26.3.1"
 flake8 = "^7.3.0"
 mypy = "^1.20.2"
+pyinstaller = "^6.20.0"
 
 [tool.mypy]
 python_version = "3.11"

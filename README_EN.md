@@ -129,6 +129,32 @@ Run via PowerShell
 1.  Download the `AndroidTVTimeFixer-macos.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
 2.  Extract the archive and run the application.
 
+### Application data
+
+The program is portable: ADB keys, settings, and the log live **next to the executable**
+(`keys/`, `adb/`, `settings.json`, `saved_servers.json`, `android_tv_fixer.log`).
+
+- `keys/` — the key for direct "network debugging" connections (legacy ADB protocol).
+- `adb/` — a private `adb` home for Android 11+ wireless debugging: it holds the key
+  and the list of paired devices. On the first run, existing keys from `~/.android` are
+  copied here so that already paired devices keep working. **Linux and macOS only:** on
+  Windows `adb` resolves the user profile through a system API and ignores environment
+  variables, so its keys stay in `%USERPROFILE%\.android` there (verified against
+  platform-tools 37.0.1).
+
+The program uses its own ADB server port on **every** platform, so it never interferes
+with your `adb` or Android Studio and never kills their sessions.
+
+When the program folder is not writable (installed under `Program Files`, or launched
+straight from an archive), the data falls back to the user data directory:
+
+- Windows: `%LOCALAPPDATA%\AndroidTVTimeFixer`
+- Linux: `$XDG_DATA_HOME/AndroidTVTimeFixer` or `~/.local/share/AndroidTVTimeFixer`
+- macOS: `~/Library/Application Support/AndroidTVTimeFixer`
+
+In that case, existing settings and ADB keys from the application folder are copied
+automatically on first launch.
+
 ## Android TV Setup
 
 ### Enabling ADB Debugging (Developer Mode)

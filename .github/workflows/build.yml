@@ -15,9 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  packages: write
-  actions: write
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -25,8 +23,7 @@ env:
   APP_NAME: AndroidTVTimeFixer
   SOURCE_FILE: src/android_time_fixer.py
   POETRY_VERSION: '2.3.4'
-  PYINSTALLER_VERSION: '6.20.0'
-  ADB_VERSION: '37.0.0'
+  ADB_VERSION: '37.0.1'
 
 jobs:
   setup-and-build:
@@ -37,15 +34,18 @@ jobs:
         include:
           - os: windows-latest
             platform: Windows
-            adb_url: https://dl.google.com/android/repository/platform-tools-latest-windows.zip
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip
+            adb_sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
             adb_base: "adb.exe AdbWinApi.dll AdbWinUsbApi.dll"
           - os: ubuntu-22.04
             platform: Linux
-            adb_url: https://dl.google.com/android/repository/platform-tools-latest-linux.zip
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
+            adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
             adb_base: "adb"
           - os: macos-latest
             platform: macOS
-            adb_url: https://dl.google.com/android/repository/platform-tools-latest-darwin.zip
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
+            adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
             adb_base: "adb"
 
     runs-on: ${{ matrix.os }}
@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           
@@ -62,13 +62,13 @@ jobs:
         run: exit 1
         
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
       - name: Set up Poetry cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             .venv
@@ -80,9 +80,7 @@ jobs:
             poetry-${{ runner.os }}-
 
       - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install "poetry==${{ env.POETRY_VERSION }}"
+        run: python -m pip install "poetry==${{ env.POETRY_VERSION }}"
         shell: bash
 
       - name: Configure Poetry
@@ -107,19 +105,15 @@ jobs:
         shell: bash
 
       - name: Install dependencies
-        run: |
-          poetry install --no-interaction --no-root --with dev --all-extras
-          poetry run pip install "pyinstaller==${{ env.PYINSTALLER_VERSION }}" psutil
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            poetry run pip install wmi
-          fi
+        run: poetry install --no-interaction --no-root --with dev --all-extras
         shell: bash
 
       - name: Setup ADB
         shell: bash
         run: |
           mkdir -p resources temp_adb
-          curl -L ${{ matrix.adb_url }} -o temp_adb/platform-tools.zip
+          curl --fail --show-error --location ${{ matrix.adb_url }} -o temp_adb/platform-tools.zip
+          python -c "import hashlib, pathlib, sys; p = pathlib.Path('temp_adb/platform-tools.zip'); actual = hashlib.file_digest(p.open('rb'), 'sha256').hexdigest(); expected = '${{ matrix.adb_sha256 }}'; print(f'ADB SHA256: {actual}'); sys.exit(0 if actual == expected else 'ADB checksum mismatch')"
           unzip -o temp_adb/platform-tools.zip -d temp_adb/
           
           for file in ${{ matrix.adb_base }}; do
@@ -138,6 +132,8 @@ jobs:
         run: |
           poetry check --lock
           poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
+          poetry run flake8 --select=F src/android_time_fixer.py locales.py scripts tests
+          poetry run python -m unittest discover -s tests -v
         shell: bash
 
       - name: Generate application icon
@@ -146,6 +142,15 @@ jobs:
 
       - name: Build executable
         run: poetry run pyinstaller --clean pyinstaller.spec
+        shell: bash
+
+      - name: Smoke-test executable
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            ./dist/${{ env.APP_NAME }}.exe --version
+          else
+            ./dist/${{ env.APP_NAME }} --version
+          fi
         shell: bash
 
       - name: Package build
@@ -161,13 +166,16 @@ jobs:
             chmod +x "${{ env.APP_NAME }}"
             zip -j "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}"
           fi
+          python -c "import glob, hashlib, pathlib; p = pathlib.Path(glob.glob('${{ env.APP_NAME }}-*.zip')[0]); digest = hashlib.file_digest(p.open('rb'), 'sha256').hexdigest(); pathlib.Path(str(p) + '.sha256').write_text(f'{digest}  {p.name}\n', encoding='ascii')"
         shell: bash
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.APP_NAME }}-${{ matrix.platform }}
-          path: dist/${{ env.APP_NAME }}-*.zip
+          path: |
+            dist/${{ env.APP_NAME }}-*.zip
+            dist/${{ env.APP_NAME }}-*.sha256
           retention-days: 90
           if-no-files-found: error
 
@@ -175,10 +183,12 @@ jobs:
     needs: setup-and-build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           path: dist
           merge-multiple: true
@@ -193,11 +203,13 @@ jobs:
           fi
 
       - name: Create release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/*.sha256
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
           draft: false

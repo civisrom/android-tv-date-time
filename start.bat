@@ -19,6 +19,18 @@ if not exist "%~dp0AndroidTVTimeFixer.exe" (
     exit /b 1
 )
 
+:: Проверяем существование start.ps1
+if not exist "%~dp0start.ps1" (
+    echo.
+    echo  ERROR: start.ps1 not found in:
+    echo  %~dp0
+    echo.
+    echo  Place start.ps1 in the same folder as start.bat
+    echo.
+    pause
+    exit /b 1
+)
+
 :: Открываем НОВОЕ окно PowerShell и закрываем cmd
 start "Android TV Time Fixer" powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1" -KeepOpenOnError
 exit
