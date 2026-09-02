@@ -59,4 +59,7 @@ jobs:
 
       - name: Probe where adb stores its keys
         shell: bash
+        # Без этого консоль Windows (cp1252) роняет вывод на кириллице
+        env:
+          PYTHONIOENCODING: utf-8
         run: poetry run python scripts/probe_adb_home.py "${{ matrix.adb_bin }}"
