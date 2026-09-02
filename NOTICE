@@ -1,0 +1,12 @@
+Android TV Time Fixer
+Copyright 2026 Orientalium
+
+This product includes software developed as part of the Android Open Source
+Project (https://source.android.com/), namely the Android Debug Bridge (adb)
+binaries redistributed in the release archives, licensed under the Apache
+License, Version 2.0.
+
+This product depends on third-party software listed in THIRD-PARTY-NOTICES.md,
+including python-zeroconf, which is licensed under the GNU Lesser General Public
+License, version 2.1 or later. See THIRD-PARTY-NOTICES.md for the corresponding
+notices and for instructions on replacing that component.

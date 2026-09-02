@@ -4,11 +4,13 @@ version = "2.4.2"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
+license = "Apache-2.0"
 packages = [
     {include = "android_time_fixer.py", from = "src"},
     {include = "locales.py"}
 ]
 classifiers = [
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux"

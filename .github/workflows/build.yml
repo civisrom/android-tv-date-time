@@ -157,14 +157,17 @@ jobs:
         run: |
           cd dist
           PLATFORM_LOWER=$(echo "${{ matrix.platform }}" | tr '[:upper:]' '[:lower:]')
+          # Лицензии обязаны ехать вместе с бинарником: в него вшиты adb под
+          # Apache-2.0 и python-zeroconf под LGPL-2.1
+          cp ../LICENSE ../NOTICE ../THIRD-PARTY-NOTICES.md .
           if [ "${{ runner.os }}" == "Windows" ]; then
             # Включаем start.bat и start.ps1 в Windows-архив
             cp ../start.bat . 2>/dev/null || true
             cp ../start.ps1 . 2>/dev/null || true
-            7z a -tzip "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}.exe" start.bat start.ps1
+            7z a -tzip "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}.exe" start.bat start.ps1 LICENSE NOTICE THIRD-PARTY-NOTICES.md
           else
             chmod +x "${{ env.APP_NAME }}"
-            zip -j "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}"
+            zip -j "${{ env.APP_NAME }}-${PLATFORM_LOWER}.zip" "${{ env.APP_NAME }}" LICENSE NOTICE THIRD-PARTY-NOTICES.md
           fi
           python -c "import glob, hashlib, pathlib; p = pathlib.Path(glob.glob('${{ env.APP_NAME }}-*.zip')[0]); digest = hashlib.file_digest(p.open('rb'), 'sha256').hexdigest(); pathlib.Path(str(p) + '.sha256').write_text(f'{digest}  {p.name}\n', encoding='ascii')"
         shell: bash
