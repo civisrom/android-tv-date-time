@@ -1,0 +1,62 @@
+name: ADB home probe
+
+# Диагностика: проверяет, что adb_env() действительно уводит adb в свой каталог
+# ключей на каждой поддерживаемой ОС. На Linux ответ известен (adb слушает
+# только HOME), Windows и macOS до этого не проверялись.
+# Запускается вручную: gh workflow run adb-home-probe.yml --ref dev
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  POETRY_VERSION: '2.3.4'
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-win.zip
+            adb_sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
+            adb_bin: platform-tools/adb.exe
+          - os: ubuntu-22.04
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
+            adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
+            adb_bin: platform-tools/adb
+          - os: macos-latest
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
+            adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
+            adb_bin: platform-tools/adb
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: python -m pip install "poetry==${{ env.POETRY_VERSION }}"
+
+      - name: Install project
+        run: poetry install --no-interaction --with dev
+
+      - name: Download ADB
+        shell: bash
+        run: |
+          curl --fail --show-error --location "${{ matrix.adb_url }}" -o platform-tools.zip
+          python -c "import hashlib, pathlib, sys; p = pathlib.Path('platform-tools.zip'); actual = hashlib.file_digest(p.open('rb'), 'sha256').hexdigest(); expected = '${{ matrix.adb_sha256 }}'; print(f'ADB SHA256: {actual}'); sys.exit(0 if actual == expected else 'ADB checksum mismatch')"
+          unzip -q platform-tools.zip
+
+      - name: Probe where adb stores its keys
+        shell: bash
+        run: poetry run python scripts/probe_adb_home.py "${{ matrix.adb_bin }}"
