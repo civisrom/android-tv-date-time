@@ -42,6 +42,9 @@ dist/
 .env.local
 .env.*.local
 
+# Локальные заметки и исследования: только на машине разработчика
+docs/
+
 # Runtime data and secrets
 keys/
 adbkey
