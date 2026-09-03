@@ -20,7 +20,7 @@
 
 **Android TV Time Fixer** — это кроссплатформенная утилита для Windows, Linux и macOS, предназначенная для управления настройками NTP-сервера на устройствах Android TV через ADB (Android Debug Bridge).
 
-Начиная с версии 2.5.0 у проекта две половины:
+Начиная с версии 2.6.0 у проекта две половины:
 
 *   **Программа для компьютера** — полнофункциональная консольная утилита,
     описанная ниже. Windows, Linux, macOS.
@@ -170,15 +170,15 @@
 
 ### Android (APK)
 
-1.  Скачайте `AndroidTVTimeFixer-2.5.0.apk` из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+1.  Скачайте `AndroidTVTimeFixer-2.6.0.apk` из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases).
 2.  Сверьте контрольную сумму с файлом `.apk.sha256` рядом:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.5.0.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.0.apk.sha256
     ```
 3.  Установите:
     *   **На телефон** — откройте файл и разрешите установку из неизвестных
         источников для файлового менеджера или браузера.
-    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.5.0.apk`
+    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.0.apk`
         с компьютера, либо любым файловым менеджером на телевизоре. Иконка
         появится и в обычном лаунчере, и в лаунчере Android TV.
 
