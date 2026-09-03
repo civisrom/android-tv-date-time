@@ -54,10 +54,21 @@ class DeviceRepository(private val client: AdbClient) {
         }
     }
 
+    /**
+     * Собирает сведения об устройстве девятью командами подряд.
+     *
+     * Обязательна из них только первая: `getprop` заодно проверяет, что связь
+     * жива, и её отказ пробрасывается наружу. Остальные необязательны — на
+     * конкретной прошивке команды может не быть или она ответит отказом
+     * (`dumpsys battery` на приставке без батареи, `wm` на урезанном образе).
+     * Раньше любая из них стирала весь экран: исключение уходило в
+     * `runCatching{}.getOrNull()` у вызывающего, и человек видел пустой раздел
+     * без единого слова о причине.
+     */
     fun readDeviceInfo(): DeviceInfo {
         val props = parseGetProp(client.shell("getprop").output)
-        val uptimeSeconds = parseUptimeSeconds(client.shell("cat /proc/uptime").output)
-        val meminfo = client.shell("cat /proc/meminfo").output
+        val uptimeSeconds = parseUptimeSeconds(optional("cat /proc/uptime"))
+        val meminfo = optional("cat /proc/meminfo")
 
         return DeviceInfo(
             model = props["ro.product.model"].orEmpty(),
@@ -68,17 +79,23 @@ class DeviceRepository(private val client: AdbClient) {
             cpuAbi = props["ro.product.cpu.abi"].orEmpty(),
             timezone = props["persist.sys.timezone"].orEmpty(),
             locale = props["persist.sys.locale"].orEmpty(),
-            currentNtpServer = currentNtpServer(),
-            batteryLevel = parseBatteryLevel(client.shell("dumpsys battery").output),
+            currentNtpServer = optional("settings get $NTP_SETTING").trim()
+                .takeUnless { it == "null" }
+                .orEmpty(),
+            batteryLevel = parseBatteryLevel(optional("dumpsys battery")),
             totalRam = parseMemInfo(meminfo, "MemTotal"),
             availableRam = parseMemInfo(meminfo, "MemAvailable"),
-            screenResolution = client.shell("wm size").trimmedOutput,
-            screenDensity = client.shell("wm density").trimmedOutput,
-            cpuCores = client.shell("cat /proc/cpuinfo | grep \"^processor\" | wc -l").trimmedOutput,
-            kernelVersion = client.shell("uname -r").trimmedOutput,
+            screenResolution = optional("wm size").trim(),
+            screenDensity = optional("wm density").trim(),
+            cpuCores = optional("cat /proc/cpuinfo | grep \"^processor\" | wc -l").trim(),
+            kernelVersion = optional("uname -r").trim(),
             uptime = uptimeSeconds?.let(::formatUptime).orEmpty(),
         )
     }
+
+    /** Вывод необязательной команды: пустая строка вместо исключения. */
+    private fun optional(command: String): String =
+        runCatching { client.shell(command).output }.getOrDefault("")
 
     private companion object {
         /**

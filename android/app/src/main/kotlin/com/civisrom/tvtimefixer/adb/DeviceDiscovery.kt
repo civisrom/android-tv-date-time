@@ -1,13 +1,7 @@
 package com.civisrom.tvtimefixer.adb
 
-import android.content.Context
 import com.civisrom.tvtimefixer.data.DeviceAddress
-import com.flyfishxu.kadb.mdns.KadbMdnsAndroid
-import com.flyfishxu.kadb.mdns.MdnsConfig
-import com.flyfishxu.kadb.mdns.MdnsServiceType
-import com.flyfishxu.kadb.mdns.MdnsStatus
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 /** Найденное в сети устройство. */
 data class DiscoveredDevice(
@@ -47,44 +41,31 @@ interface DeviceDiscovery : AutoCloseable {
     fun stop()
 }
 
-/** Реализация поверх KadbMdns, которая внутри использует системный NsdManager. */
-class KadbDeviceDiscovery(context: Context) : DeviceDiscovery {
+/**
+ * Имена mDNS-сервисов, которые объявляет adbd.
+ *
+ * Порт спаривания и порт подключения — разные сервисы, и это единственный
+ * способ отличить устройство, ждущее кода, от готового к подключению.
+ */
+const val SERVICE_LEGACY = "_adb._tcp"
+const val SERVICE_TLS_CONNECT = "_adb-tls-connect._tcp"
+const val SERVICE_TLS_PAIRING = "_adb-tls-pairing._tcp"
 
-    private val mdns = KadbMdnsAndroid(
-        context.applicationContext,
-        MdnsConfig(
-            serviceTypes = setOf(
-                MdnsServiceType.TLS_CONNECT,
-                MdnsServiceType.TLS_PAIRING,
-                MdnsServiceType.ADB,
-            ),
-            preferIpv4 = true,
-        ),
-    )
-
-    override val state: Flow<DiscoveryState> = mdns.state.map { discovery ->
-        DiscoveryState(
-            // FAILED означает, что системный сервис обнаружения недоступен;
-            // это не ошибка приложения, а повод предложить ввод адреса вручную
-            available = discovery.status != MdnsStatus.FAILED,
-            searching = discovery.loading,
-            devices = discovery.allDevices.map { endpoint ->
-                DiscoveredDevice(
-                    name = endpoint.name,
-                    address = DeviceAddress(endpoint.host, endpoint.port),
-                    kind = when (endpoint.serviceType) {
-                        MdnsServiceType.TLS_PAIRING -> DiscoveredDevice.Kind.AWAITING_PAIRING
-                        MdnsServiceType.TLS_CONNECT -> DiscoveredDevice.Kind.READY_TO_CONNECT
-                        MdnsServiceType.ADB -> DiscoveredDevice.Kind.LEGACY
-                    },
-                )
-            },
-        )
+/**
+ * Вид устройства по типу mDNS-сервиса, либо null для чужого сервиса.
+ *
+ * Сравнивать строку напрямую нельзя: NsdManager отдаёт тип по-разному —
+ * с завершающей точкой, в другом регистре, иногда вместе с доменом
+ * (`_adb._tcp.local.`). Разные прошивки расходятся здесь между собой, а цена
+ * промаха — пустой список устройств без единой жалобы.
+ */
+fun serviceKindOf(serviceType: String): DiscoveredDevice.Kind? {
+    var value = serviceType.trim().lowercase().trimEnd('.')
+    if (value.endsWith(".local")) value = value.removeSuffix(".local").trimEnd('.')
+    return when (value) {
+        SERVICE_TLS_PAIRING -> DiscoveredDevice.Kind.AWAITING_PAIRING
+        SERVICE_TLS_CONNECT -> DiscoveredDevice.Kind.READY_TO_CONNECT
+        SERVICE_LEGACY -> DiscoveredDevice.Kind.LEGACY
+        else -> null
     }
-
-    override fun start() = mdns.start()
-
-    override fun stop() = mdns.stop()
-
-    override fun close() = mdns.close()
 }

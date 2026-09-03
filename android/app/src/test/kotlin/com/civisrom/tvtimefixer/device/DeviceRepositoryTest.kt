@@ -4,6 +4,7 @@ import com.civisrom.tvtimefixer.adb.AdbClient
 import com.civisrom.tvtimefixer.adb.ShellResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /** Поддельное устройство с реалистичным выводом команд. */
@@ -167,5 +168,61 @@ class DeviceRepositoryTest {
         assertEquals("", parseMemInfo("", "MemTotal"))
         assertEquals(null, parseUptimeSeconds("мусор"))
         assertTrue(parseGetProp("").isEmpty())
+    }
+
+    /**
+     * Устройство, у которого часть команд отвечает отказом.
+     *
+     * Ровно это и случилось на живом телевизоре: раздел «Устройство» оказался
+     * пустым, а кнопка «Обновить» выглядела ненажатой, потому что одна
+     * упавшая команда уносила весь результат.
+     */
+    private class PartlyBrokenDevice(private val failing: Set<String>) : AdbClient {
+        override fun shell(command: String): ShellResult {
+            if (failing.any { command.startsWith(it) }) {
+                throw IllegalStateException("java.io.IOException: closed")
+            }
+            val out = when {
+                command == "getprop" -> "[ro.product.model]: [BRAVIA 4K GB]\n" +
+                    "[ro.product.manufacturer]: [Sony]\n"
+                command == "uname -r" -> "5.10.101-android13\n"
+                else -> ""
+            }
+            return ShellResult(out, "", 0)
+        }
+
+        override fun isAlive() = true
+        override fun close() = Unit
+    }
+
+    @Test
+    fun `отказ необязательной команды не стирает остальные сведения`() {
+        val device = PartlyBrokenDevice(
+            failing = setOf("dumpsys battery", "wm ", "cat /proc/meminfo", "settings get"),
+        )
+        val info = DeviceRepository(device).readDeviceInfo()
+
+        // Главное: результат вообще есть, а не потерян целиком
+        assertEquals("BRAVIA 4K GB", info.model)
+        assertEquals("Sony", info.manufacturer)
+        assertEquals("5.10.101-android13", info.kernelVersion)
+        // Упавшие команды дают пустоту, и такие строки экран просто не рисует
+        assertEquals("", info.batteryLevel)
+        assertEquals("", info.totalRam)
+        assertEquals("", info.screenResolution)
+        assertEquals("", info.currentNtpServer)
+    }
+
+    @Test
+    fun `отказ getprop пробрасывается наружу`() {
+        // getprop заодно проверяет связь: если не отвечает он, молчать нельзя —
+        // вызывающий обязан показать причину
+        val device = PartlyBrokenDevice(failing = setOf("getprop"))
+        try {
+            DeviceRepository(device).readDeviceInfo()
+            fail("ожидалось исключение")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message!!.contains("closed"))
+        }
     }
 }

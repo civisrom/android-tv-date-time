@@ -41,6 +41,7 @@
     <string name="discovery_kind_awaiting_pairing">Waiting to be paired</string>
     <string name="discovery_kind_ready">Ready to connect</string>
     <string name="discovery_kind_legacy">Network debugging</string>
+    <string name="discovery_failed">Network discovery could not start on this device: %1$s. Enter the address manually — everything else works.</string>
     <string name="discovery_permission_needed">Allow access to nearby devices so the app can find TVs on the network.</string>
     <string name="discovery_grant_permission">Grant permission</string>
 
@@ -48,14 +49,31 @@
     <string name="ntp_title">Time server</string>
     <string name="ntp_current">Current: %1$s</string>
     <string name="ntp_current_unset">No time server is set</string>
-    <string name="ntp_by_country">Choose by country</string>
-    <string name="ntp_custom_hint">Or enter a server manually</string>
+    <string name="ntp_by_country">Pick a country — its address goes into the field below</string>
+    <string name="ntp_custom_hint">Time server address</string>
     <string name="ntp_apply">Apply</string>
     <string name="ntp_search_country">Search country</string>
     <string name="ntp_applied">Time server set to %1$s.</string>
     <string name="ntp_invalid">That is not a valid server address.</string>
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
+
+    <string name="discovery_pair_action">Pair</string>
+    <string name="ntp_show_all">Show all servers (%1$d)</string>
+    <string name="ntp_hide_all">Hide the server list</string>
+    <string name="ntp_check">Check</string>
+    <string name="ntp_check_ok">Answers as a time server: %1$d ms, %2$d%% of replies, clock offset %3$s s.</string>
+    <string name="ntp_check_failed">Does not answer as a time server: %1$s</string>
+    <string name="ntp_check_bad_clock">It answers, but reports a time that is far off. Applying it would break the clock rather than fix it.</string>
+    <string name="ntp_check_rejected">Not applied: %1$s</string>
+    <string name="ntp_apply_anyway">Apply anyway</string>
+    <string name="ntp_scan_title">Find the fastest server</string>
+    <string name="ntp_scan_start">Find the best one</string>
+    <string name="ntp_scan_cancel">Stop</string>
+    <string name="ntp_scan_progress">Checked %1$d of %2$d, %3$d usable</string>
+    <string name="ntp_scan_best">Best servers</string>
+    <string name="ntp_scan_entry">%1$s — %2$d ms, %3$d%% of replies</string>
+    <string name="ntp_scan_none">No server answered. The network may be blocking NTP.</string>
 
     <!-- Сведения об устройстве -->
     <string name="info_title">Device</string>
@@ -77,5 +95,6 @@
     <string name="info_kernel">Kernel</string>
     <string name="info_ntp">Time server</string>
     <string name="info_refresh">Refresh</string>
+    <string name="last_crash">The app closed unexpectedly last time. Details:\n%1$s</string>
     <string name="action_failed">Something went wrong: %1$s</string>
 </resources>

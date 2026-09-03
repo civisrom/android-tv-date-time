@@ -189,7 +189,6 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kadb.android)
-    implementation(libs.kadb.mdns.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)

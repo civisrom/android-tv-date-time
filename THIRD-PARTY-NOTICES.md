@@ -32,7 +32,7 @@ work** from the desktop executables and is subject to a different licence — se
 
 | Component | Licence |
 |---|---|
-| `com.flyfishxu:kadb-android`, `com.flyfishxu:kadb-mdns-android` 2.1.3 | Apache-2.0 |
+| `com.flyfishxu:kadb-android` 2.1.3 | Apache-2.0 |
 | **`com.github.Flyfish233:spake2-java` 1.1.1** | **GPL-3.0-only** |
 | `cafe.cryptography:ed25519-elisabeth`, `curve25519-elisabeth` 0.1.0 | MIT |
 | `asia.hombre:kyber`, `asia.hombre:keccak` 2.0.1 | Apache-2.0 |

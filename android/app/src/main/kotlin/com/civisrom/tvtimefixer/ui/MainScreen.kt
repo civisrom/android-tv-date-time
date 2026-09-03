@@ -24,11 +24,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import java.util.Locale
+import kotlin.math.abs
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
 import com.civisrom.tvtimefixer.data.NtpData
+import com.civisrom.tvtimefixer.data.NtpProbeResult
+import com.civisrom.tvtimefixer.data.isUsable
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
@@ -36,7 +40,10 @@ interface AppActions {
     fun connectLoopback()
     fun disconnect()
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
-    fun applyNtpServer(server: String)
+    fun checkNtpServer(server: String)
+    fun applyNtpServer(server: String, force: Boolean = false)
+    fun scanNtpServers()
+    fun cancelNtpScan()
     fun refreshDeviceInfo()
     fun requestDiscoveryPermission()
 }
@@ -69,9 +76,14 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
             }
         }
 
+        // Адрес спаривания живёт здесь, а не внутри формы: кнопка «Спарить»
+        // у найденного устройства обязана его заполнять, а список устройств и
+        // форма — разные ветки дерева
+        var pairingAddress by rememberSaveable { mutableStateOf("") }
+
         ConnectionSection(mode, state, actions)
         HorizontalDivider()
-        DiscoverySection(state, actions)
+        DiscoverySection(state, actions, onPair = { pairingAddress = it })
 
         if (state.connected) {
             HorizontalDivider()
@@ -80,7 +92,12 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
             DeviceInfoSection(state, actions)
         } else {
             HorizontalDivider()
-            PairingSection(state, actions)
+            PairingSection(
+                state = state,
+                actions = actions,
+                pairingAddress = pairingAddress,
+                onPairingAddressChange = { pairingAddress = it },
+            )
         }
     }
 }
@@ -132,7 +149,7 @@ private fun ConnectionSection(mode: DeviceMode, state: AppState, actions: AppAct
 }
 
 @Composable
-private fun DiscoverySection(state: AppState, actions: AppActions) {
+private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.discovery_title), style = MaterialTheme.typography.titleMedium)
         when {
@@ -150,7 +167,12 @@ private fun DiscoverySection(state: AppState, actions: AppActions) {
             state.discovered.isEmpty() -> Text(stringResource(R.string.discovery_empty))
         }
         state.discovered.forEach { device ->
-            DiscoveredRow(device, enabled = !state.busy, onConnect = actions::connect)
+            DiscoveredRow(
+                device = device,
+                enabled = !state.busy,
+                onConnect = actions::connect,
+                onPair = onPair,
+            )
         }
     }
 }
@@ -160,17 +182,22 @@ private fun DiscoveredRow(
     device: DiscoveredDevice,
     enabled: Boolean,
     onConnect: (String) -> Unit,
+    onPair: (String) -> Unit,
 ) {
-    val connectable = device.kind != DiscoveredDevice.Kind.AWAITING_PAIRING
+    val awaitingPairing = device.kind == DiscoveredDevice.Kind.AWAITING_PAIRING
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(device.name, style = MaterialTheme.typography.bodyLarge)
             Text("${device.address}  ·  ${stringResource(device.kind.labelRes())}")
-            if (connectable) {
-                Button(
-                    onClick = { onConnect(device.address.toString()) },
-                    enabled = enabled,
-                ) {
+            if (awaitingPairing) {
+                // Подключаться к такому устройству нечем: сперва код. Кнопка
+                // переносит адрес в форму спаривания — раньше это приходилось
+                // делать вручную, переписывая порт с экрана телевизора
+                Button(onClick = { onPair(device.address.toString()) }, enabled = enabled) {
+                    Text(stringResource(R.string.discovery_pair_action))
+                }
+            } else {
+                Button(onClick = { onConnect(device.address.toString()) }, enabled = enabled) {
                     Text(stringResource(R.string.connect_action))
                 }
             }
@@ -179,8 +206,12 @@ private fun DiscoveredRow(
 }
 
 @Composable
-private fun PairingSection(state: AppState, actions: AppActions) {
-    var pairingAddress by rememberSaveable { mutableStateOf("") }
+private fun PairingSection(
+    state: AppState,
+    actions: AppActions,
+    pairingAddress: String,
+    onPairingAddressChange: (String) -> Unit,
+) {
     var code by rememberSaveable { mutableStateOf("") }
     var connectAddress by rememberSaveable { mutableStateOf("") }
 
@@ -193,7 +224,7 @@ private fun PairingSection(state: AppState, actions: AppActions) {
 
         OutlinedTextField(
             value = pairingAddress,
-            onValueChange = { pairingAddress = it },
+            onValueChange = onPairingAddressChange,
             label = { Text(stringResource(R.string.pairing_address_hint)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -225,14 +256,27 @@ private fun PairingSection(state: AppState, actions: AppActions) {
 private fun NtpSection(state: AppState, actions: AppActions) {
     var custom by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
+    var showAll by rememberSaveable { mutableStateOf(false) }
+
+    // Поиск идёт и по странам, и по альтернативным адресам: для человека это
+    // один список серверов, а не две разные сущности
     val matches = remember(query) {
-        if (query.isBlank()) emptyList() else NtpData.countries.filter { country ->
-            query.trim().lowercase().let { needle ->
-                country.code.contains(needle) ||
-                    country.nameEn.lowercase().contains(needle) ||
-                    country.nameRu.lowercase().contains(needle)
-            }
-        }.take(8)
+        val needle = query.trim().lowercase()
+        if (needle.isEmpty()) {
+            emptyList()
+        } else {
+            val countries = NtpData.countries
+                .filter {
+                    it.code.contains(needle) ||
+                        it.nameEn.lowercase().contains(needle) ||
+                        it.nameRu.lowercase().contains(needle)
+                }
+                .map { "${it.code.uppercase()} · ${it.nameEn} · ${it.server}" to it.server }
+            val alternatives = NtpData.alternativeServers
+                .filter { it.lowercase().contains(needle) }
+                .map { it to it }
+            (countries + alternatives).take(12)
+        }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,12 +297,23 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        matches.forEach { country ->
-            TextButton(
-                onClick = { actions.applyNtpServer(country.server) },
-                enabled = !state.busy,
-            ) {
-                Text("${country.code.uppercase()} · ${country.nameEn} · ${country.server}")
+        matches.forEach { (label, server) ->
+            TextButton(onClick = { custom = server }, enabled = !state.busy) { Text(label) }
+        }
+
+        if (query.isBlank()) {
+            TextButton(onClick = { showAll = !showAll }) {
+                Text(
+                    stringResource(
+                        if (showAll) R.string.ntp_hide_all else R.string.ntp_show_all,
+                        NtpData.alternativeServers.size,
+                    ),
+                )
+            }
+            if (showAll) {
+                NtpData.alternativeServers.forEach { server ->
+                    TextButton(onClick = { custom = server }, enabled = !state.busy) { Text(server) }
+                }
             }
         }
 
@@ -269,10 +324,121 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(onClick = { actions.applyNtpServer(custom) }, enabled = !state.busy) {
-            Text(stringResource(R.string.ntp_apply))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { actions.applyNtpServer(custom) },
+                enabled = !state.busy && custom.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.ntp_apply))
+            }
+            TextButton(
+                onClick = { actions.checkNtpServer(custom) },
+                enabled = !state.busy && custom.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.ntp_check))
+            }
+        }
+
+        state.ntpCheck?.let { NtpCheckCard(it) }
+
+        // Итог показывается здесь, а не в карточке вверху экрана: раздел
+        // находится далеко внизу, и подтверждение там не видно
+        state.ntpMessage?.let { message ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(message.res, *message.args.toTypedArray()),
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+        }
+
+        // Проверка идёт из сети телефона, а UDP-порт 123 закрывают и операторы,
+        // и часть роутеров: полный запрет оставил бы человека вообще без
+        // возможности задать сервер
+        state.ntpRejected?.let { rejected ->
+            Button(
+                onClick = { actions.applyNtpServer(rejected, force = true) },
+                enabled = !state.busy,
+            ) {
+                Text(stringResource(R.string.ntp_apply_anyway))
+            }
+        }
+
+        HorizontalDivider()
+        NtpScanBlock(state, actions, onPick = { custom = it })
+    }
+}
+
+/** Вердикт по одному адресу: отвечает ли он как сервер времени. */
+@Composable
+private fun NtpCheckCard(check: NtpProbeResult) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(check.server, style = MaterialTheme.typography.bodyLarge)
+            if (check.isUsable()) {
+                Text(
+                    stringResource(
+                        R.string.ntp_check_ok,
+                        check.avgRttMs ?: 0L,
+                        check.successRate,
+                        formatOffset(check.offsetSeconds),
+                    ),
+                )
+            } else if (check.reachable) {
+                Text(stringResource(R.string.ntp_check_bad_clock))
+            } else {
+                Text(stringResource(R.string.ntp_check_failed, check.error.orEmpty()))
+            }
         }
     }
+}
+
+/** Подбор самого быстрого сервера — аналог автонастройки десктопной версии. */
+@Composable
+private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit) {
+    val scan = state.ntpScan
+    Text(stringResource(R.string.ntp_scan_title), style = MaterialTheme.typography.bodyMedium)
+
+    if (scan == null || scan.finished) {
+        Button(onClick = actions::scanNtpServers, enabled = !state.busy) {
+            Text(stringResource(R.string.ntp_scan_start))
+        }
+    } else {
+        Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size))
+        Button(onClick = actions::cancelNtpScan) {
+            Text(stringResource(R.string.ntp_scan_cancel))
+        }
+    }
+
+    if (scan != null && scan.best.isNotEmpty()) {
+        Text(stringResource(R.string.ntp_scan_best), style = MaterialTheme.typography.bodyMedium)
+        scan.best.forEach { result ->
+            TextButton(onClick = { onPick(result.server) }, enabled = !state.busy) {
+                Text(
+                    stringResource(
+                        R.string.ntp_scan_entry,
+                        result.server,
+                        result.avgRttMs ?: 0L,
+                        result.successRate,
+                    ),
+                )
+            }
+        }
+    } else if (scan != null && scan.finished) {
+        Text(stringResource(R.string.ntp_scan_none))
+    }
+}
+
+/**
+ * Смещение часов с явным знаком: «+0,4» читается лучше, чем «0.4».
+ *
+ * Локаль берётся пользовательская намеренно: это число человек читает глазами,
+ * и в русском разделителем должна быть запятая.
+ */
+private fun formatOffset(seconds: Double?): String {
+    val value = seconds ?: return "—"
+    val sign = if (value >= 0) "+" else "-"
+    return sign + String.format(Locale.getDefault(), "%.1f", abs(value))
 }
 
 @Composable

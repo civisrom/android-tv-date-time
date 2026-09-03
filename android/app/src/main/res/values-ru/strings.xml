@@ -41,6 +41,7 @@
     <string name="discovery_kind_awaiting_pairing">Ожидает спаривания</string>
     <string name="discovery_kind_ready">Готово к подключению</string>
     <string name="discovery_kind_legacy">Отладка по сети</string>
+    <string name="discovery_failed">Поиск устройств в сети не запустился: %1$s. Введите адрес вручную — остальное работает.</string>
     <string name="discovery_permission_needed">Разрешите доступ к устройствам поблизости, иначе приложение не найдёт телевизоры в сети.</string>
     <string name="discovery_grant_permission">Разрешить</string>
 
@@ -48,14 +49,31 @@
     <string name="ntp_title">Сервер времени</string>
     <string name="ntp_current">Текущий: %1$s</string>
     <string name="ntp_current_unset">Сервер времени не задан</string>
-    <string name="ntp_by_country">Выбрать по стране</string>
-    <string name="ntp_custom_hint">Или введите сервер вручную</string>
+    <string name="ntp_by_country">Выберите страну — адрес подставится в поле ниже</string>
+    <string name="ntp_custom_hint">Адрес сервера времени</string>
     <string name="ntp_apply">Применить</string>
     <string name="ntp_search_country">Поиск страны</string>
     <string name="ntp_applied">Установлен сервер времени %1$s.</string>
     <string name="ntp_invalid">Это не похоже на адрес сервера.</string>
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
+
+    <string name="discovery_pair_action">Спарить</string>
+    <string name="ntp_show_all">Показать все серверы (%1$d)</string>
+    <string name="ntp_hide_all">Скрыть список серверов</string>
+    <string name="ntp_check">Проверить</string>
+    <string name="ntp_check_ok">Отвечает как сервер времени: %1$d мс, ответов %2$d%%, расхождение часов %3$s с.</string>
+    <string name="ntp_check_failed">Не отвечает как сервер времени: %1$s</string>
+    <string name="ntp_check_bad_clock">Отвечает, но сообщает сильно неверное время. Применить его — значит сломать часы, а не починить.</string>
+    <string name="ntp_check_rejected">Не применено: %1$s</string>
+    <string name="ntp_apply_anyway">Применить всё-таки</string>
+    <string name="ntp_scan_title">Подбор самого быстрого сервера</string>
+    <string name="ntp_scan_start">Подобрать лучший</string>
+    <string name="ntp_scan_cancel">Остановить</string>
+    <string name="ntp_scan_progress">Проверено %1$d из %2$d, годных %3$d</string>
+    <string name="ntp_scan_best">Лучшие серверы</string>
+    <string name="ntp_scan_entry">%1$s — %2$d мс, ответов %3$d%%</string>
+    <string name="ntp_scan_none">Ни один сервер не ответил. Возможно, сеть блокирует NTP.</string>
 
     <!-- Сведения об устройстве -->
     <string name="info_title">Устройство</string>
@@ -77,5 +95,6 @@
     <string name="info_kernel">Ядро</string>
     <string name="info_ntp">Сервер времени</string>
     <string name="info_refresh">Обновить</string>
+    <string name="last_crash">В прошлый раз приложение аварийно закрылось. Подробности:\n%1$s</string>
     <string name="action_failed">Не удалось выполнить действие: %1$s</string>
 </resources>
