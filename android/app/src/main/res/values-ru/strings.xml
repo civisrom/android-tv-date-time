@@ -34,7 +34,7 @@
     <string name="pairing_action">Спарить и подключиться</string>
 
     <!-- Обнаружение по mDNS -->
-    <string name="discovery_title">Устройства в сети</string>
+    <string name="discovery_title">Автоматически обнаруженные устройства в сети</string>
     <string name="discovery_searching">Идёт поиск…</string>
     <string name="discovery_empty">Устройства не найдены. Убедитесь, что беспроводная отладка включена и её экран открыт.</string>
     <string name="discovery_unavailable">Обнаружение в сети недоступно на этом устройстве. Введите адрес вручную.</string>
@@ -49,8 +49,10 @@
     <string name="ntp_title">Сервер времени</string>
     <string name="ntp_current">Текущий: %1$s</string>
     <string name="ntp_current_unset">Сервер времени не задан</string>
-    <string name="ntp_by_country">Ищите по коду страны, названию или адресу — например ru, by, kz, Россия, cloudflare. Нажатие на найденную строку подставит адрес в поле ниже.</string>
+    <string name="ntp_by_country">Ищите по коду страны, названию или адресу — например ru, by, kz. Регистр не важен. Нажатие на найденную строку подставит адрес в поле ниже.</string>
     <string name="ntp_custom_hint">Адрес сервера времени</string>
+    <string name="ntp_address_note">Можно ввести доменное имя (time.google.com) или IP-адрес (216.239.35.0) — годится и то, и другое.</string>
+    <string name="ntp_scan_entry_ip">IP: %1$s — нажмите, чтобы задать адресом вместо имени</string>
     <string name="ntp_apply">Применить</string>
     <string name="ntp_search_country">Поиск страны</string>
     <string name="ntp_applied">Установлен сервер времени %1$s.</string>
@@ -64,6 +66,7 @@
     <string name="ntp_hide_countries">Скрыть список стран</string>
     <string name="ntp_show_all">Показать альтернативные серверы времени (%1$d)</string>
     <string name="ntp_hide_all">Скрыть альтернативные серверы</string>
+    <string name="ntp_check_ip">IP-адрес: %1$s</string>
     <string name="ntp_check">Проверить</string>
     <string name="ntp_check_ok">Отвечает как сервер времени: %1$d мс, ответов %2$d%%, расхождение часов %3$s с.</string>
     <string name="ntp_check_failed">Не отвечает как сервер времени: %1$s</string>

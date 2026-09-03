@@ -131,6 +131,36 @@ class NtpProbeTest {
     }
 
     @Test
+    fun `IP отвечавшего сервера доходит до результата`() {
+        // Адрес нужен экрану: часть прошивок не резолвит имена, и тогда сервер
+        // задают числом. Отдельного запроса к DNS ради этого не делается —
+        // имя всё равно разрешается перед отправкой пакета
+        val probe = NtpProbe(
+            FakeSntp(mapOf("time.google.com" to listOf(SntpResult(30, 0.1, "216.239.35.0")))),
+            attempts = 1,
+        )
+        assertEquals("216.239.35.0", probe.test("time.google.com").ipAddress)
+    }
+
+    @Test
+    fun `у недоступного сервера IP не выдумывается`() {
+        val result = NtpProbe(FakeSntp(emptyMap()), attempts = 1).test("nowhere.example")
+        assertNull(result.ipAddress)
+    }
+
+    @Test
+    fun `IP берётся от первой удавшейся попытки`() {
+        val probe = NtpProbe(
+            FakeSntp(mapOf("ntp.example" to listOf(
+                SocketTimeoutException("Timeout"),
+                SntpResult(20, 0.1, "10.0.0.7"),
+            ))),
+            attempts = 2,
+        )
+        assertEquals("10.0.0.7", probe.test("ntp.example").ipAddress)
+    }
+
+    @Test
     fun `порядок совпадает с десктопным - успехи по убыванию, RTT по возрастанию`() {
         val slowButReliable = NtpProbeResult("slow", true, 100, 200, 0.1, null)
         val fastButFlaky = NtpProbeResult("flaky", true, 50, 10, 0.1, null)

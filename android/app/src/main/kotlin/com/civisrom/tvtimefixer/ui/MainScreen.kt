@@ -35,6 +35,7 @@ import com.civisrom.tvtimefixer.adb.addressOrNull
 import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
+import com.civisrom.tvtimefixer.data.searchNtpServers
 import com.civisrom.tvtimefixer.data.isUsable
 
 /** Действия, которые экран запрашивает у владельца состояния. */
@@ -281,24 +282,10 @@ private fun NtpSection(state: AppState, actions: AppActions) {
 
     // Поиск идёт и по странам, и по альтернативным адресам: для человека это
     // один список серверов, а не две разные сущности
-    val matches = remember(query) {
-        val needle = query.trim().lowercase()
-        if (needle.isEmpty()) {
-            emptyList()
-        } else {
-            val countries = NtpData.countries
-                .filter {
-                    it.code.contains(needle) ||
-                        it.nameEn.lowercase().contains(needle) ||
-                        it.nameRu.lowercase().contains(needle)
-                }
-                .map { "${it.code.uppercase()} · ${countryName(it)} · ${it.server}" to it.server }
-            val alternatives = NtpData.alternativeServers
-                .filter { it.lowercase().contains(needle) }
-                .map { it to it }
-            (countries + alternatives).take(12)
-        }
-    }
+    // Сам поиск — чистая функция в data/NtpSearch.kt, чтобы он проверялся
+    // тестами: промах здесь выглядит как «поиск не работает», и отличить его
+    // от опечатки пользователя без теста невозможно
+    val matches = remember(query) { searchNtpServers(query) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.ntp_title), style = MaterialTheme.typography.titleMedium)
@@ -318,8 +305,14 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        matches.forEach { (label, server) ->
-            TextButton(onClick = { custom = server }, enabled = !state.busy) { Text(label) }
+        matches.forEach { match ->
+            val country = match.country
+            val label = if (country == null) {
+                match.server
+            } else {
+                "${country.code.uppercase()} · ${countryName(country)} · ${country.server}"
+            }
+            TextButton(onClick = { custom = match.server }, enabled = !state.busy) { Text(label) }
         }
 
         // Списки раскрываются только при пустом поиске: иначе на экране
@@ -364,6 +357,10 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             label = { Text(stringResource(R.string.ntp_custom_hint)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            stringResource(R.string.ntp_address_note),
+            style = MaterialTheme.typography.bodySmall,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -416,6 +413,11 @@ private fun NtpCheckCard(check: NtpProbeResult) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(check.server, style = MaterialTheme.typography.bodyLarge)
+            // Здесь строка не нажимается, поэтому и текст другой: обещать
+            // нажатие там, где его нет, хуже, чем не показывать вовсе
+            check.ipAddress?.takeIf { it != check.server }?.let {
+                Text(stringResource(R.string.ntp_check_ip, it), style = MaterialTheme.typography.bodySmall)
+            }
             if (check.isUsable()) {
                 Text(
                     stringResource(
@@ -463,6 +465,15 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
                         result.successRate,
                     ),
                 )
+            }
+            // IP показывается отдельной нажимаемой строкой: часть прошивок
+            // не умеет резолвить имена, и тогда адрес нужно задавать числом.
+            // Запрос DNS ради этого не делается — адрес уже известен от пробы.
+            val ip = result.ipAddress
+            if (ip != null && ip != result.server) {
+                TextButton(onClick = { onPick(ip) }, enabled = !state.busy) {
+                    Text(stringResource(R.string.ntp_scan_entry_ip, ip))
+                }
             }
         }
     } else if (scan != null && scan.finished) {

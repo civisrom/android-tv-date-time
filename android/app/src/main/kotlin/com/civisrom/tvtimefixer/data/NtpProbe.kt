@@ -12,6 +12,8 @@ data class NtpProbeResult(
     val avgRttMs: Long?,
     val offsetSeconds: Double?,
     val error: String?,
+    /** IP, к которому обратились. У адреса, введённого как IP, совпадает с ним. */
+    val ipAddress: String? = null,
 )
 
 /**
@@ -55,12 +57,14 @@ class NtpProbe(
         val rtts = mutableListOf<Long>()
         val offsets = mutableListOf<Double>()
         var lastError: String? = null
+        var resolved: String? = null
 
         repeat(attempts) {
             try {
                 val result = query.query(address)
                 rtts += result.rttMs
                 offsets += result.offsetSeconds
+                if (resolved == null) resolved = result.address.takeIf { it.isNotBlank() }
             } catch (e: Exception) {
                 lastError = e.message ?: e.javaClass.simpleName
             }
@@ -76,6 +80,7 @@ class NtpProbe(
             avgRttMs = rtts.sum() / rtts.size,
             offsetSeconds = offsets.sum() / offsets.size,
             error = null,
+            ipAddress = resolved,
         )
     }
 

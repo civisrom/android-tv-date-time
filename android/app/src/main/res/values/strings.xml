@@ -34,7 +34,7 @@
     <string name="pairing_action">Pair and connect</string>
 
     <!-- Обнаружение по mDNS -->
-    <string name="discovery_title">Devices on the network</string>
+    <string name="discovery_title">Devices found automatically on the network</string>
     <string name="discovery_searching">Searching…</string>
     <string name="discovery_empty">No devices found. Make sure wireless debugging is on and its screen is open.</string>
     <string name="discovery_unavailable">Network discovery is unavailable on this device. Enter the address manually.</string>
@@ -49,8 +49,10 @@
     <string name="ntp_title">Time server</string>
     <string name="ntp_current">Current: %1$s</string>
     <string name="ntp_current_unset">No time server is set</string>
-    <string name="ntp_by_country">Search by country code, country name or address — for example ru, by, kz, Russia, cloudflare. Tapping a result puts the address into the field below.</string>
+    <string name="ntp_by_country">Search by country code, country name or address — for example ru, by, kz. Case does not matter. Tapping a result puts the address into the field below.</string>
     <string name="ntp_custom_hint">Time server address</string>
+    <string name="ntp_address_note">A domain name (time.google.com) or an IP address (216.239.35.0) — both work.</string>
+    <string name="ntp_scan_entry_ip">IP: %1$s — tap to use the address instead of the name</string>
     <string name="ntp_apply">Apply</string>
     <string name="ntp_search_country">Search country</string>
     <string name="ntp_applied">Time server set to %1$s.</string>
@@ -64,6 +66,7 @@
     <string name="ntp_hide_countries">Hide the country list</string>
     <string name="ntp_show_all">Show alternative time servers (%1$d)</string>
     <string name="ntp_hide_all">Hide alternative servers</string>
+    <string name="ntp_check_ip">IP: %1$s</string>
     <string name="ntp_check">Check</string>
     <string name="ntp_check_ok">Answers as a time server: %1$d ms, %2$d%% of replies, clock offset %3$s s.</string>
     <string name="ntp_check_failed">Does not answer as a time server: %1$s</string>

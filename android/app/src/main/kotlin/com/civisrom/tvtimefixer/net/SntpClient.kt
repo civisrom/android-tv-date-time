@@ -2,10 +2,21 @@ package com.civisrom.tvtimefixer.net
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.Inet4Address
 import java.net.InetAddress
 
-/** Ответ сервера времени: сколько шёл обмен и насколько часы устройства расходятся. */
-data class SntpResult(val rttMs: Long, val offsetSeconds: Double)
+/**
+ * Ответ сервера времени: сколько шёл обмен и насколько часы устройства
+ * расходятся.
+ *
+ * [address] — IP, к которому обращались на самом деле. Отдельного запроса DNS
+ * для него не нужно: имя всё равно разрешается перед отправкой пакета.
+ */
+data class SntpResult(
+    val rttMs: Long,
+    val offsetSeconds: Double,
+    val address: String = "",
+)
 
 /**
  * Запрос к серверу времени.
@@ -100,7 +111,11 @@ object SntpPacket {
 class UdpSntpClient(private val timeoutMs: Int = 2_000) : SntpQuery {
 
     override fun query(host: String): SntpResult {
-        val address = InetAddress.getByName(host)
+        // IPv4 предпочитается намеренно: адрес показывается пользователю и
+        // подставляется в поле, а проверка адреса во всём проекте — только
+        // IPv4. Вернув IPv6, мы предложили бы адрес, который сами же отвергнем.
+        val resolved = InetAddress.getAllByName(host)
+        val address = resolved.firstOrNull { it is Inet4Address } ?: resolved.first()
         DatagramSocket().use { socket ->
             socket.soTimeout = timeoutMs
             val out = SntpPacket.request()
@@ -112,8 +127,9 @@ class UdpSntpClient(private val timeoutMs: Int = 2_000) : SntpQuery {
             socket.receive(incoming)
             val t4 = System.currentTimeMillis()
 
-            return SntpPacket.parse(buffer.copyOf(incoming.length), t1, t4)
+            val parsed = SntpPacket.parse(buffer.copyOf(incoming.length), t1, t4)
                 ?: throw NotAnNtpServerException("$host отвечает, но не по протоколу NTP")
+            return parsed.copy(address = address.hostAddress.orEmpty())
         }
     }
 }
