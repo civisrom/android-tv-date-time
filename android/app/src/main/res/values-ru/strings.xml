@@ -65,11 +65,14 @@
     <string name="info_api">Уровень API</string>
     <string name="info_serial">Серийный номер</string>
     <string name="info_cpu">Процессор</string>
+    <string name="info_cores">Ядер процессора</string>
     <string name="info_timezone">Часовой пояс</string>
     <string name="info_locale">Локаль</string>
     <string name="info_battery">Батарея</string>
     <string name="info_ram">Память</string>
+    <string name="info_ram_free">Свободно памяти</string>
     <string name="info_screen">Экран</string>
+    <string name="info_density">Плотность экрана</string>
     <string name="info_uptime">Время работы</string>
     <string name="info_kernel">Ядро</string>
     <string name="info_ntp">Сервер времени</string>

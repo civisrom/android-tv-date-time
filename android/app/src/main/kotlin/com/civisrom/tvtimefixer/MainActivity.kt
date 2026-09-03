@@ -25,6 +25,7 @@ import com.civisrom.tvtimefixer.ui.AppState
 import com.civisrom.tvtimefixer.ui.MainScreen
 import com.civisrom.tvtimefixer.ui.UiMessage
 import com.civisrom.tvtimefixer.ui.toUiMessage
+import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private val factory: AdbClientFactory = KadbAdbClientFactory()
     private val connector = DeviceConnector(factory)
     private var discovery: DeviceDiscovery? = null
+    private var permissionsRequested = false
 
     /**
      * Состояние экрана живёт в Activity, а не внутри setContent: `mutableStateOf`
@@ -110,8 +112,13 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun applyNtpServer(server: String) = run {
-            val client = connector.activeClient ?: return@run state
             withContext(Dispatchers.IO) {
+                // activeClient проверяет соединение живым обменом по сокету —
+                // это сеть, и читать его на главном потоке нельзя
+                val client = connector.activeClient ?: return@withContext state.copy(
+                    connection = ConnectionState.Disconnected,
+                    message = UiMessage(R.string.error_unreachable),
+                )
                 val repository = DeviceRepository(client)
                 val result = repository.setNtpServer(server)
                 // Значение перечитывается всегда: `settings put` рапортует об
@@ -145,7 +152,11 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         if (missingDiscoveryPermissions().isEmpty()) {
             startDiscovery()
-        } else {
+        } else if (!permissionsRequested) {
+            // Один раз за жизнь Activity: после отказа система отвечает
+            // отказом молча, и дёргать её при каждом возврате на экран
+            // бессмысленно — дальше решает кнопка «Разрешить»
+            permissionsRequested = true
             requestDiscoveryPermissions()
         }
     }
@@ -159,7 +170,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         discovery?.close()
-        connector.disconnect()
+        // Закрытие тоже идёт по сокету, а lifecycleScope здесь уже отменён:
+        // на главном потоке соединение осталось бы полузакрытым
+        thread { connector.disconnect() }
         super.onDestroy()
     }
 
@@ -202,8 +215,8 @@ class MainActivity : ComponentActivity() {
     /** Дочитывает сведения об устройстве, если соединение живо. */
     private suspend fun AppState.withDeviceData(): AppState {
         if (connection !is ConnectionState.Connected) return this
-        val client = connector.activeClient ?: return this
         return withContext(Dispatchers.IO) {
+            val client = connector.activeClient ?: return@withContext this@withDeviceData
             val repository = DeviceRepository(client)
             val info = runCatching { repository.readDeviceInfo() }.getOrNull()
             copy(deviceInfo = info, currentNtpServer = info?.currentNtpServer.orEmpty())

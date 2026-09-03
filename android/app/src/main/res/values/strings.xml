@@ -65,11 +65,14 @@
     <string name="info_api">API level</string>
     <string name="info_serial">Serial</string>
     <string name="info_cpu">CPU</string>
+    <string name="info_cores">CPU cores</string>
     <string name="info_timezone">Time zone</string>
     <string name="info_locale">Locale</string>
     <string name="info_battery">Battery</string>
     <string name="info_ram">RAM</string>
+    <string name="info_ram_free">RAM free</string>
     <string name="info_screen">Screen</string>
+    <string name="info_density">Screen density</string>
     <string name="info_uptime">Uptime</string>
     <string name="info_kernel">Kernel</string>
     <string name="info_ntp">Time server</string>
