@@ -24,10 +24,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Подпись релиза берётся из окружения и только из него: ключ и пароли
+    // не должны появляться ни в репозитории, ни в аргументах Gradle. Если
+    // ANDROID_KEYSTORE_PATH не задан, конфигурация не создаётся вовсе, и
+    // assembleRelease собирает неподписанный APK вместо того, чтобы упасть, —
+    // так сборку можно проверять и без доступа к ключу.
+    signingConfigs {
+        val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+        if (!keystorePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
