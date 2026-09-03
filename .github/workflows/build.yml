@@ -232,10 +232,13 @@ jobs:
           fi
 
       # Тесты гоняются здесь, а не только в android.yml: тот запускается по
-      # push в ветки, релиз же идёт по тегу и иначе выпускался бы непроверенным
+      # push в ветки, релиз же идёт по тегу и иначе выпускался бы непроверенным.
+      # Юнит-тесты существуют только в debug-варианте — AGP не создаёт для
+      # release задачу testReleaseUnitTest, а исходники тестов одни и те же;
+      # lint при этом берётся именно релизный.
       - name: Unit tests and lint
         working-directory: android
-        run: ./gradlew --no-daemon testReleaseUnitTest lintRelease
+        run: ./gradlew --no-daemon testDebugUnitTest lintRelease
 
       - name: Assemble release APK
         working-directory: android

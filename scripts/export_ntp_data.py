@@ -15,7 +15,12 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
+_ROOT = Path(__file__).resolve().parent.parent
+# Корень нужен наравне с src: android_time_fixer импортирует locales, а
+# тот лежит в корне. Без этого скрипт работает только там, где пакет
+# установлен, и падает в сборке, которая ставит зависимости с --no-root.
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / 'src'))
 from android_time_fixer import (  # noqa: E402
     COUNTRY_NAMES,
     CUSTOM_NTP_SERVERS,
