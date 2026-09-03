@@ -6,6 +6,9 @@ remains under its own license.
 
 ## Bundled binaries
 
+These apply to the desktop release archives
+(`AndroidTVTimeFixer-{windows,linux,macos}.zip`).
+
 ### Android Debug Bridge (adb)
 
 The release archives contain the `adb` executable from Android SDK
@@ -20,6 +23,51 @@ source software license are governed solely by the terms of that open source
 software license", so redistribution here follows Apache-2.0.
 
 Source: https://android.googlesource.com/platform/packages/modules/adb/
+
+## Android application (APK)
+
+The `AndroidTVTimeFixer-*.apk` published with each release is a **separate
+work** from the desktop executables and is subject to a different licence — see
+"The APK and the GPL" below. It bundles the following components.
+
+| Component | Licence |
+|---|---|
+| `com.flyfishxu:kadb-android`, `com.flyfishxu:kadb-mdns-android` 2.1.3 | Apache-2.0 |
+| **`com.github.Flyfish233:spake2-java` 1.1.1** | **GPL-3.0-only** |
+| `cafe.cryptography:ed25519-elisabeth`, `curve25519-elisabeth` 0.1.0 | MIT |
+| `asia.hombre:kyber`, `asia.hombre:keccak` 2.0.1 | Apache-2.0 |
+| `org.bouncycastle:bcprov-jdk18on`, `bcpkix-jdk18on`, `bcutil-jdk18on` | MIT |
+| AndroidX, Jetpack Compose, `androidx.tv:tv-material` | Apache-2.0 |
+| Kotlin standard library, `kotlinx-coroutines` | Apache-2.0 |
+
+## The APK and the GPL
+
+`spake2-java` (https://github.com/Flyfish233/spake2-java) is published under the
+**GNU General Public License, version 3**. It arrives as a transitive dependency
+of `kadb-android` and implements the SPAKE2 exchange that Android 11+ wireless
+debugging uses to pair with a six-digit code — without it the application cannot
+pair with a modern device at all.
+
+Because that code is linked into the APK, the APK as a combined work is
+distributed under the **GPL-3.0**, and a copy of its text ships with every
+release as `LICENSE-GPL-3.0.txt`. The source code of this project stays under
+the Apache License 2.0, which the GPL-3.0 permits to be combined in this
+direction; the desktop executables are unaffected, as `spake2-java` is not part
+of them.
+
+The complete corresponding source of the APK is this repository at the tag
+matching the release, plus the published sources of the dependencies listed
+above. To rebuild it:
+
+```bash
+git clone https://github.com/civisrom/android-tv-date-time
+cd android-tv-date-time && git checkout <release tag>
+cd android && ./gradlew assembleRelease
+```
+
+The build is described entirely by `android/app/build.gradle.kts` and reproduced
+automatically by `.github/workflows/build.yml`, so the result is equivalent to
+the published APK apart from the signature.
 
 ## Python dependencies
 

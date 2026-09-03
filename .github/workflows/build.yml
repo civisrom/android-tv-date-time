@@ -269,9 +269,9 @@ jobs:
             python3 -c "import pathlib, sys, hashlib; p = pathlib.Path(sys.argv[1]); digest = hashlib.file_digest(p.open('rb'), 'sha256').hexdigest(); pathlib.Path(str(p) + '.sha256').write_text(f'{digest}  {p.name}\n', encoding='ascii')" "$TARGET"
           fi
           # У скачавшего APK нет архива с лицензиями, который получает
-          # десктопная половина, а внутри тот же Apache-2.0 код kadb и
-          # bouncycastle — уведомления едут в релиз отдельными файлами
-          cp LICENSE NOTICE THIRD-PARTY-NOTICES.md dist/
+          # десктопная половина. GPL-3.0 здесь обязателен, а не для полноты:
+          # spake2-java внутри APK под ней, значит и весь APK тоже
+          cp LICENSE LICENSE-GPL-3.0.txt NOTICE THIRD-PARTY-NOTICES.md dist/
 
       # Подпись проверяется на собранном файле, а не по коду возврата Gradle:
       # сборка с пустым signingConfig проходит успешно и молча даёт APK,
@@ -291,6 +291,7 @@ jobs:
             dist/*.apk
             dist/*.apk.sha256
             dist/LICENSE
+            dist/LICENSE-GPL-3.0.txt
             dist/NOTICE
             dist/THIRD-PARTY-NOTICES.md
           retention-days: 90
@@ -329,10 +330,27 @@ jobs:
             dist/*.sha256
             dist/AndroidTVTimeFixer-*.apk
             dist/LICENSE
+            dist/LICENSE-GPL-3.0.txt
             dist/NOTICE
             dist/THIRD-PARTY-NOTICES.md
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
+          body: |
+            **Android APK — экспериментальный.** Приложение ни разу не
+            запускалось на живом телевизоре: собирается, проходит тесты и
+            подписано, но интерфейс и подключение никто не видел в работе.
+            Десктопных сборок это не касается.
+
+            APK распространяется под **GPL-3.0** (`LICENSE-GPL-3.0.txt`):
+            в него линкуется `spake2-java` под этой лицензией, без которого
+            невозможно спаривание по коду на Android 11+. Исходный код проекта
+            остаётся под Apache-2.0, десктопные сборки — тоже.
+
+            ---
+            **The Android APK is experimental** — it has never been run on a
+            real TV. It is distributed under the **GPL-3.0** (see
+            `LICENSE-GPL-3.0.txt`) because it links `spake2-java`; the project
+            sources and the desktop builds stay under Apache-2.0.
           draft: false
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
           generate_release_notes: true

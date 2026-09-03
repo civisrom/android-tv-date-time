@@ -10,3 +10,10 @@ This product depends on third-party software listed in THIRD-PARTY-NOTICES.md,
 including python-zeroconf, which is licensed under the GNU Lesser General Public
 License, version 2.1 or later. See THIRD-PARTY-NOTICES.md for the corresponding
 notices and for instructions on replacing that component.
+
+The Android application published as AndroidTVTimeFixer-*.apk links against
+spake2-java, which is licensed under the GNU General Public License, version 3.
+That APK is therefore distributed under the GPL-3.0, whose text accompanies it
+as LICENSE-GPL-3.0.txt; the source code of this project remains under the Apache
+License, Version 2.0. See THIRD-PARTY-NOTICES.md for details and for how to
+rebuild the APK from source.
