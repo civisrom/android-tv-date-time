@@ -111,7 +111,12 @@ As of version 2.5.0 the project has two halves:
     *   Pairing with a 6-digit code for Android 11+ wireless debugging
     *   mDNS discovery on the local network: no need to know the IP or the port
     *   The same NTP server reference as the desktop version — both are
-        generated from one shared file, so they cannot drift apart
+        generated from one shared file, so they cannot drift apart:
+        77 countries and 45 alternative servers
+    *   Servers are verified **as time servers**, not merely as reachable
+        hosts: the app sends a real SNTP request and inspects the reply
+    *   Finds the fastest server by testing the whole reference list
+    *   An address can be a domain name or an IP
     *   The result is verified by reading it back, not taken from the exit code
         of `settings put`
     *   Device details: model, Android version, memory, screen, uptime and more
@@ -179,6 +184,13 @@ Run via PowerShell
 
 Requires **Android 6.0** or newer. See
 [Android application](#android-application) for details.
+
+**About the Google Play Protect warning.** Installing an APK from outside
+Google Play makes the system show "App blocked to protect your device", saying
+Play Protect has never seen apps from this developer. That is expected for
+**any** third-party APK and not a sign of trouble: this app is not published on
+Google Play. Choose "Install anyway". The file's authenticity is established by
+the checksum in step 2 and by the APK signature.
 
 ### Application data
 
@@ -441,8 +453,19 @@ feature:
     and confusing them is the single most common cause of failure.
 *   Discover devices on the local network over mDNS, showing which ones are
     waiting to be paired and which are ready to connect.
-*   Pick an NTP server by country (search by code or name) or type an address
-    manually, with the same validation as the desktop version.
+*   Pick an NTP server by country (search by code or name), from the list of
+    alternative servers, or type an address by hand — a domain name or an IP.
+    Validation matches the desktop version.
+*   **Verification before applying.** The app sends a real SNTP request and
+    parses the reply: the address must answer as a time server and report a
+    time close to the real one (offset within 60 seconds). An open port is not
+    enough — otherwise the TV would get an address that "works" while its clock
+    stands still. An address that fails is not applied, but an "Apply anyway"
+    button remains: UDP port 123 is blocked by many mobile carriers and some
+    home routers, and a hard refusal would leave you with no options at all.
+*   **Finding the fastest server.** Tests the whole reference list (122
+    addresses) and shows the best five with round-trip time and reply rate. The
+    test runs from the phone's network and can be stopped at any time.
 *   Device details: model, manufacturer, Android and API version, serial number,
     CPU and core count, memory, screen and its density, time zone, locale,
     battery, kernel, uptime, current NTP server.
