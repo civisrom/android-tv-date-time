@@ -541,8 +541,11 @@ network" or "Running on a TV". The app works this out by itself; nothing to set.
 
 #### 2. "Connect to a device"
 
-Shows the current state: "Not connected", "Connecting to…", "Connected to
-192.168.0.112:5555", or the reason it failed.
+Shows the current state, **colour-coded** so it can be read at a glance:
+
+*   **green** — "Connected to 192.168.0.112:5555", the link is up;
+*   **red** — "Not connected", or the reason it failed;
+*   plain — "Connecting to…", while an attempt is in progress.
 
 **The input field** takes two forms:
 
@@ -588,6 +591,13 @@ Each row shows the name, the address and the kind of device:
     puts the address into the pairing form below.
 
 An empty list is not a problem: type the address by hand in the section above.
+
+**About the prompt on the TV.** The first time you connect, the TV asks to
+allow debugging from this device and shows a **key fingerprint**. That is a
+normal step, not a fault: it is how Android makes sure the right machine is
+connecting. Confirm it on the TV screen; ticking "Always allow" saves you from
+repeating it. Until it is confirmed, the app answers "Confirm the debugging
+prompt on the device screen".
 
 **About the permission.** On first launch the app asks for access to nearby
 devices. This is not about location: since Android 13 the system's network
@@ -643,8 +653,12 @@ app already knows the pairing address from the network search.
 This section appears only after you connect.
 
 The first line — **"Current:"** — is the value **read back from the TV**, not
-what you typed. "No time server is set" means none is stored on the device and
-the system default is in use.
+what you typed. When a server is set the line is **green**; "No time server is
+set" means none is stored on the device and the system default is in use.
+
+The outcome is marked the same way: **green** for "Time server set to …",
+**red** for any failure. The Check button follows suit — a usable server is
+green, a rejected one red.
 
 **Three ways to choose a server:**
 
