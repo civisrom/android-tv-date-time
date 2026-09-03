@@ -40,7 +40,7 @@ init(autoreset=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-APP_VERSION = '2.4.2'
+APP_VERSION = '2.5.0'
 
 #: Порт adbd для «отладки по сети» (adb tcpip). Беспроводная отладка
 #: Android 11+ открывает случайный порт, поэтому порт везде параметризован.
