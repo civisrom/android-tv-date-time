@@ -571,7 +571,7 @@ connection, not that the address merely looked valid.
 
 Once connected, the input field is replaced by a **Disconnect** button.
 
-#### 3. "Devices on the network"
+#### 3. "Devices found automatically on the network"
 
 The app looks for TVs over mDNS — the protocol devices use to announce
 themselves on a local network. **You need neither the address nor the port**: a
@@ -659,7 +659,8 @@ the system default is in use.
     the same set as the desktop version: regional pools, Cloudflare, Google, the
     Russian VNIIFTRI servers and others.
 *   **By hand.** The "Time server address" field takes a domain name
-    (`time.google.com`) or an IP address (`216.239.35.0`).
+    (`time.google.com`) or an IP address (`216.239.35.0`) — there is a reminder
+    of that under the field.
 
 The **Check** button sends a real NTP request to the address and parses the
 reply. The reply must actually come from a time server and carry a time close
@@ -688,8 +689,14 @@ line is updated with the value **read back from the device**.
 The **Find the best one** button tests all 122 known addresses and shows the
 five with the lowest round-trip time. It takes about half a minute, reports
 "Checked N of 122, M usable" and can be halted with **Stop** — what it found is
-kept. Tapping a row puts that address into the field; applying it is a separate
-step.
+kept.
+
+Each server found is shown on **two lines**: its name and its IP address.
+Tapping the name puts the name into the field, tapping the IP puts the numeric
+address there. This is not decoration: some TV firmwares cannot resolve domain
+names, and then the server has to be given as a number. No extra DNS lookup is
+made for this — the address is already known from the check itself. Applying
+the choice is a separate step, with the Apply button.
 
 #### 6. "Device"
 
