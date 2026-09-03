@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.util.Locale
@@ -119,6 +120,10 @@ private fun ConnectionSection(mode: DeviceMode, state: AppState, actions: AppAct
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.connect_title), style = MaterialTheme.typography.titleMedium)
+        // Состояние связи — то, ради чего на этот экран смотрят в первую
+        // очередь, поэтому оно различается не только текстом. Цвет берётся
+        // не произвольный: отказ идёт цветом ошибки из темы, чтобы совпадать
+        // с остальными сообщениями об ошибках
         Text(
             text = when (val connection = state.connection) {
                 is ConnectionState.Connected ->
@@ -128,6 +133,13 @@ private fun ConnectionSection(mode: DeviceMode, state: AppState, actions: AppAct
                 is ConnectionState.Failed -> stringResource(connection.reason.messageRes())
                 ConnectionState.Disconnected -> stringResource(R.string.connect_state_disconnected)
             },
+            color = when (state.connection) {
+                is ConnectionState.Connected -> ConnectedColor
+                is ConnectionState.Connecting -> MaterialTheme.colorScheme.onSurface
+                is ConnectionState.Failed, ConnectionState.Disconnected ->
+                    MaterialTheme.colorScheme.error
+            },
+            style = MaterialTheme.typography.titleSmall,
         )
 
         if (state.connected) {
@@ -177,6 +189,14 @@ private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (Stri
                 Text(stringResource(R.string.discovery_searching))
             state.discovered.isEmpty() -> Text(stringResource(R.string.discovery_empty))
         }
+        // Про запрос авторизации сказано здесь, до подключения: увидев на
+        // телевизоре окно с отпечатком ключа, человек должен понимать, что
+        // это нормальный шаг, а не сбой. Формулировка та же, что и в
+        // десктопной версии
+        Text(
+            stringResource(R.string.discovery_authorize_hint),
+            style = MaterialTheme.typography.bodySmall,
+        )
         state.discovered.forEach { device ->
             DiscoveredRow(
                 device = device,
@@ -208,6 +228,7 @@ private fun DiscoveredRow(
             if (connected) {
                 Text(
                     stringResource(R.string.discovery_connected),
+                    color = ConnectedColor,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else if (awaitingPairing) {
@@ -289,12 +310,17 @@ private fun NtpSection(state: AppState, actions: AppActions) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.ntp_title), style = MaterialTheme.typography.titleMedium)
+        // Заданный сервер выделен так же, как установленная связь: это второе
+        // состояние, ради которого на экран смотрят
+        val ntpIsSet = state.currentNtpServer.isNotEmpty()
         Text(
-            if (state.currentNtpServer.isEmpty()) {
-                stringResource(R.string.ntp_current_unset)
-            } else {
+            if (ntpIsSet) {
                 stringResource(R.string.ntp_current, state.currentNtpServer)
+            } else {
+                stringResource(R.string.ntp_current_unset)
             },
+            color = if (ntpIsSet) ConnectedColor else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleSmall,
         )
 
         Text(stringResource(R.string.ntp_by_country), style = MaterialTheme.typography.bodyMedium)
@@ -385,6 +411,14 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = stringResource(message.res, *message.args.toTypedArray()),
+                    // Успешная запись — зелёным, всё остальное здесь неудача:
+                    // «не применено», «неверный адрес», «устройство сообщает
+                    // другое значение»
+                    color = if (message.res == R.string.ntp_applied) {
+                        ConnectedColor
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
                     modifier = Modifier.padding(12.dp),
                 )
             }
@@ -426,11 +460,18 @@ private fun NtpCheckCard(check: NtpProbeResult) {
                         check.successRate,
                         formatOffset(check.offsetSeconds),
                     ),
+                    color = ConnectedColor,
                 )
             } else if (check.reachable) {
-                Text(stringResource(R.string.ntp_check_bad_clock))
+                Text(
+                    stringResource(R.string.ntp_check_bad_clock),
+                    color = MaterialTheme.colorScheme.error,
+                )
             } else {
-                Text(stringResource(R.string.ntp_check_failed, check.error.orEmpty()))
+                Text(
+                    stringResource(R.string.ntp_check_failed, check.error.orEmpty()),
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
@@ -480,6 +521,15 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
         Text(stringResource(R.string.ntp_scan_none))
     }
 }
+
+/**
+ * Зелёный для установленной связи.
+ *
+ * Задан явно, а не взят из схемы: в Material 3 нет роли «успех», а
+ * `primary` на светлой теме фиолетовый и о состоянии ничего не говорит.
+ * Отказ при этом берёт `error` из темы — там подходящая роль есть.
+ */
+private val ConnectedColor = Color(0xFF1B7F3B)
 
 /**
  * Название страны на языке интерфейса.

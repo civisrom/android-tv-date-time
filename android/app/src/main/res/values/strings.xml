@@ -60,6 +60,7 @@
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
 
+    <string name="discovery_authorize_hint">When connecting for the first time, the TV asks to allow debugging from this device and shows a key fingerprint. Confirm it on the TV screen — ticking “Always allow” saves you from repeating it.</string>
     <string name="discovery_connected">Connected to this device</string>
     <string name="discovery_pair_action">Pair</string>
     <string name="ntp_show_countries">Show countries and their codes (%1$d)</string>

@@ -60,6 +60,7 @@
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
 
+    <string name="discovery_authorize_hint">При первом подключении телевизор спросит разрешение на отладку с этого устройства и покажет отпечаток ключа. Подтвердите его на экране ТВ — отметка «Всегда разрешать» избавит от повторов.</string>
     <string name="discovery_connected">Подключено к этому устройству</string>
     <string name="discovery_pair_action">Спарить</string>
     <string name="ntp_show_countries">Показать страны и их коды (%1$d)</string>
