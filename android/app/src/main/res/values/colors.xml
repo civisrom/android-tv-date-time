@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Фон адаптивной иконки — тот же тёмный тон, что у десктопной иконки -->
+    <color name="ic_launcher_background">#141C36</color>
+</resources>
