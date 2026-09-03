@@ -49,7 +49,7 @@
     <string name="ntp_title">Сервер времени</string>
     <string name="ntp_current">Текущий: %1$s</string>
     <string name="ntp_current_unset">Сервер времени не задан</string>
-    <string name="ntp_by_country">Выберите страну — адрес подставится в поле ниже</string>
+    <string name="ntp_by_country">Ищите по коду страны, названию или адресу — например ru, by, kz, Россия, cloudflare. Нажатие на найденную строку подставит адрес в поле ниже.</string>
     <string name="ntp_custom_hint">Адрес сервера времени</string>
     <string name="ntp_apply">Применить</string>
     <string name="ntp_search_country">Поиск страны</string>
@@ -58,9 +58,12 @@
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
 
+    <string name="discovery_connected">Подключено к этому устройству</string>
     <string name="discovery_pair_action">Спарить</string>
-    <string name="ntp_show_all">Показать все серверы (%1$d)</string>
-    <string name="ntp_hide_all">Скрыть список серверов</string>
+    <string name="ntp_show_countries">Показать страны и их коды (%1$d)</string>
+    <string name="ntp_hide_countries">Скрыть список стран</string>
+    <string name="ntp_show_all">Показать альтернативные серверы времени (%1$d)</string>
+    <string name="ntp_hide_all">Скрыть альтернативные серверы</string>
     <string name="ntp_check">Проверить</string>
     <string name="ntp_check_ok">Отвечает как сервер времени: %1$d мс, ответов %2$d%%, расхождение часов %3$s с.</string>
     <string name="ntp_check_failed">Не отвечает как сервер времени: %1$s</string>

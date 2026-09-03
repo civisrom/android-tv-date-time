@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -30,6 +31,8 @@ import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.adb.addressOrNull
+import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.isUsable
@@ -53,6 +56,13 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // С targetSdk 35 и выше система рисует приложение под своими
+            // панелями, и отказаться от этого нельзя: без этого отступа
+            // заголовок уходил под строку состояния, а последняя кнопка
+            // раздела «Устройство» — под панель навигации. Ставится до
+            // verticalScroll, чтобы прокручиваемая область целиком лежала
+            // в безопасной зоне. На телевизоре панелей нет, отступ нулевой.
+            .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             // Поля под overscan: у части телевизоров края экрана обрезаны
             .padding(horizontal = 32.dp, vertical = 24.dp),
@@ -170,6 +180,10 @@ private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (Stri
             DiscoveredRow(
                 device = device,
                 enabled = !state.busy,
+                // Строка того устройства, с которым связь уже установлена,
+                // не должна предлагать подключиться: вверху экрана в это же
+                // время написано «Подключено», и человек не понимает, чему верить
+                connected = device.address == state.connection.addressOrNull(),
                 onConnect = actions::connect,
                 onPair = onPair,
             )
@@ -181,6 +195,7 @@ private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (Stri
 private fun DiscoveredRow(
     device: DiscoveredDevice,
     enabled: Boolean,
+    connected: Boolean,
     onConnect: (String) -> Unit,
     onPair: (String) -> Unit,
 ) {
@@ -189,7 +204,12 @@ private fun DiscoveredRow(
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(device.name, style = MaterialTheme.typography.bodyLarge)
             Text("${device.address}  ·  ${stringResource(device.kind.labelRes())}")
-            if (awaitingPairing) {
+            if (connected) {
+                Text(
+                    stringResource(R.string.discovery_connected),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else if (awaitingPairing) {
                 // Подключаться к такому устройству нечем: сперва код. Кнопка
                 // переносит адрес в форму спаривания — раньше это приходилось
                 // делать вручную, переписывая порт с экрана телевизора
@@ -257,6 +277,7 @@ private fun NtpSection(state: AppState, actions: AppActions) {
     var custom by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
     var showAll by rememberSaveable { mutableStateOf(false) }
+    var showCountries by rememberSaveable { mutableStateOf(false) }
 
     // Поиск идёт и по странам, и по альтернативным адресам: для человека это
     // один список серверов, а не две разные сущности
@@ -271,7 +292,7 @@ private fun NtpSection(state: AppState, actions: AppActions) {
                         it.nameEn.lowercase().contains(needle) ||
                         it.nameRu.lowercase().contains(needle)
                 }
-                .map { "${it.code.uppercase()} · ${it.nameEn} · ${it.server}" to it.server }
+                .map { "${it.code.uppercase()} · ${countryName(it)} · ${it.server}" to it.server }
             val alternatives = NtpData.alternativeServers
                 .filter { it.lowercase().contains(needle) }
                 .map { it to it }
@@ -301,13 +322,33 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             TextButton(onClick = { custom = server }, enabled = !state.busy) { Text(label) }
         }
 
+        // Списки раскрываются только при пустом поиске: иначе на экране
+        // оказались бы сразу и результаты поиска, и весь справочник
         if (query.isBlank()) {
+            TextButton(onClick = { showCountries = !showCountries }) {
+                Text(
+                    if (showCountries) {
+                        stringResource(R.string.ntp_hide_countries)
+                    } else {
+                        stringResource(R.string.ntp_show_countries, NtpData.countries.size)
+                    },
+                )
+            }
+            if (showCountries) {
+                NtpData.countries.forEach { country ->
+                    TextButton(onClick = { custom = country.server }, enabled = !state.busy) {
+                        Text("${country.code.uppercase()} · ${countryName(country)} · ${country.server}")
+                    }
+                }
+            }
+
             TextButton(onClick = { showAll = !showAll }) {
                 Text(
-                    stringResource(
-                        if (showAll) R.string.ntp_hide_all else R.string.ntp_show_all,
-                        NtpData.alternativeServers.size,
-                    ),
+                    if (showAll) {
+                        stringResource(R.string.ntp_hide_all)
+                    } else {
+                        stringResource(R.string.ntp_show_all, NtpData.alternativeServers.size)
+                    },
                 )
             }
             if (showAll) {
@@ -428,6 +469,15 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
         Text(stringResource(R.string.ntp_scan_none))
     }
 }
+
+/**
+ * Название страны на языке интерфейса.
+ *
+ * Справочник хранит оба названия, и показывать русское англоязычному
+ * пользователю нельзя — искать он будет по английскому.
+ */
+private fun countryName(country: NtpCountry): String =
+    if (Locale.getDefault().language == "ru") country.nameRu else country.nameEn
 
 /**
  * Смещение часов с явным знаком: «+0,4» читается лучше, чем «0.4».
