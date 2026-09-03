@@ -36,14 +36,33 @@ class KadbAdbClientFactory(
     private val socketTimeoutMs: Int = 15_000,
 ) : AdbClientFactory {
 
-    override fun connect(address: DeviceAddress): AdbClient =
-        try {
-            KadbAdbClient(
-                Kadb.create(address.host, address.port, connectTimeoutMs, socketTimeoutMs)
-            )
+    /**
+     * Открывает соединение и **проверяет его настоящей командой**.
+     *
+     * `Kadb.create` только запоминает адрес: ни сокета, ни рукопожатия оно не
+     * делает и потому не падает никогда — даже на заведомо чужом адресе.
+     * Соединение возникает лениво, при первой операции. Без пробы «Подключено»
+     * означало бы лишь, что адрес разобран: `connectionCheck()` возвращал бы
+     * false, `activeClient` — null, и каждая следующая команда тихо не
+     * выполнялась бы.
+     *
+     * Успех определяется по выводу пробы, а не по тому, что вызов вернулся:
+     * в этом проекте статус уже не раз означал не то, чем кажется.
+     */
+    override fun connect(address: DeviceAddress): AdbClient {
+        val kadb = Kadb.create(address.host, address.port, connectTimeoutMs, socketTimeoutMs)
+        val response = try {
+            kadb.shell(PROBE_COMMAND)
         } catch (e: Throwable) {
+            runCatching { kadb.close() }
             throw AdbConnectionException(classify(e), e)
         }
+        if (!response.output.contains(PROBE_TOKEN)) {
+            runCatching { kadb.close() }
+            throw AdbConnectionException(ConnectionError.UNREACHABLE)
+        }
+        return KadbAdbClient(kadb)
+    }
 
     override suspend fun pair(address: DeviceAddress, pairingCode: String) {
         withContext(Dispatchers.IO) {
@@ -56,6 +75,10 @@ class KadbAdbClientFactory(
     }
 
     private companion object {
+        /** Проба связи: одна команда, которая есть на любой прошивке. */
+        const val PROBE_TOKEN = "tvtimefixer"
+        const val PROBE_COMMAND = "echo $PROBE_TOKEN"
+
         /**
          * Раскладывает исключение на понятную пользователю причину.
          *

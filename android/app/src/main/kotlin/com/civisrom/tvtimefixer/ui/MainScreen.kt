@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -22,13 +23,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import java.util.Locale
+import kotlin.math.abs
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
+import com.civisrom.tvtimefixer.data.NtpProbeResult
+import com.civisrom.tvtimefixer.data.searchNtpServers
+import com.civisrom.tvtimefixer.data.isUsable
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
@@ -36,7 +44,10 @@ interface AppActions {
     fun connectLoopback()
     fun disconnect()
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
-    fun applyNtpServer(server: String)
+    fun checkNtpServer(server: String)
+    fun applyNtpServer(server: String, force: Boolean = false)
+    fun scanNtpServers()
+    fun cancelNtpScan()
     fun refreshDeviceInfo()
     fun requestDiscoveryPermission()
 }
@@ -46,6 +57,13 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // С targetSdk 35 и выше система рисует приложение под своими
+            // панелями, и отказаться от этого нельзя: без этого отступа
+            // заголовок уходил под строку состояния, а последняя кнопка
+            // раздела «Устройство» — под панель навигации. Ставится до
+            // verticalScroll, чтобы прокручиваемая область целиком лежала
+            // в безопасной зоне. На телевизоре панелей нет, отступ нулевой.
+            .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             // Поля под overscan: у части телевизоров края экрана обрезаны
             .padding(horizontal = 32.dp, vertical = 24.dp),
@@ -69,9 +87,14 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
             }
         }
 
+        // Адрес спаривания живёт здесь, а не внутри формы: кнопка «Спарить»
+        // у найденного устройства обязана его заполнять, а список устройств и
+        // форма — разные ветки дерева
+        var pairingAddress by rememberSaveable { mutableStateOf("") }
+
         ConnectionSection(mode, state, actions)
         HorizontalDivider()
-        DiscoverySection(state, actions)
+        DiscoverySection(state, actions, onPair = { pairingAddress = it })
 
         if (state.connected) {
             HorizontalDivider()
@@ -80,7 +103,12 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
             DeviceInfoSection(state, actions)
         } else {
             HorizontalDivider()
-            PairingSection(state, actions)
+            PairingSection(
+                state = state,
+                actions = actions,
+                pairingAddress = pairingAddress,
+                onPairingAddressChange = { pairingAddress = it },
+            )
         }
     }
 }
@@ -91,6 +119,10 @@ private fun ConnectionSection(mode: DeviceMode, state: AppState, actions: AppAct
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.connect_title), style = MaterialTheme.typography.titleMedium)
+        // Состояние связи — то, ради чего на этот экран смотрят в первую
+        // очередь, поэтому оно различается не только текстом. Цвет берётся
+        // не произвольный: отказ идёт цветом ошибки из темы, чтобы совпадать
+        // с остальными сообщениями об ошибках
         Text(
             text = when (val connection = state.connection) {
                 is ConnectionState.Connected ->
@@ -100,6 +132,13 @@ private fun ConnectionSection(mode: DeviceMode, state: AppState, actions: AppAct
                 is ConnectionState.Failed -> stringResource(connection.reason.messageRes())
                 ConnectionState.Disconnected -> stringResource(R.string.connect_state_disconnected)
             },
+            color = when (state.connection) {
+                is ConnectionState.Connected -> ConnectedColor
+                is ConnectionState.Connecting -> MaterialTheme.colorScheme.onSurface
+                is ConnectionState.Failed, ConnectionState.Disconnected ->
+                    MaterialTheme.colorScheme.error
+            },
+            style = MaterialTheme.typography.titleSmall,
         )
 
         if (state.connected) {
@@ -132,7 +171,7 @@ private fun ConnectionSection(mode: DeviceMode, state: AppState, actions: AppAct
 }
 
 @Composable
-private fun DiscoverySection(state: AppState, actions: AppActions) {
+private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.discovery_title), style = MaterialTheme.typography.titleMedium)
         when {
@@ -149,8 +188,28 @@ private fun DiscoverySection(state: AppState, actions: AppActions) {
                 Text(stringResource(R.string.discovery_searching))
             state.discovered.isEmpty() -> Text(stringResource(R.string.discovery_empty))
         }
+        // Про запрос авторизации сказано здесь, до подключения: увидев на
+        // телевизоре окно с отпечатком ключа, человек должен понимать, что
+        // это нормальный шаг, а не сбой. Формулировка та же, что и в
+        // десктопной версии
+        Text(
+            stringResource(R.string.discovery_authorize_hint),
+            style = MaterialTheme.typography.bodySmall,
+        )
         state.discovered.forEach { device ->
-            DiscoveredRow(device, enabled = !state.busy, onConnect = actions::connect)
+            DiscoveredRow(
+                device = device,
+                enabled = !state.busy,
+                // Строка того устройства, с которым связь уже установлена,
+                // не должна предлагать подключиться: вверху экрана в это же
+                // время написано «Подключено», и человек не понимает, чему
+                // верить. Сравнение именно с connectedAddress: addressOrNull()
+                // отдаёт адрес и при отказе, и тогда кнопка пропадала бы
+                // ровно там, где нужна вторая попытка
+                connected = device.address == state.connectedAddress,
+                onConnect = actions::connect,
+                onPair = onPair,
+            )
         }
     }
 }
@@ -159,18 +218,30 @@ private fun DiscoverySection(state: AppState, actions: AppActions) {
 private fun DiscoveredRow(
     device: DiscoveredDevice,
     enabled: Boolean,
+    connected: Boolean,
     onConnect: (String) -> Unit,
+    onPair: (String) -> Unit,
 ) {
-    val connectable = device.kind != DiscoveredDevice.Kind.AWAITING_PAIRING
+    val awaitingPairing = device.kind == DiscoveredDevice.Kind.AWAITING_PAIRING
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(device.name, style = MaterialTheme.typography.bodyLarge)
             Text("${device.address}  ·  ${stringResource(device.kind.labelRes())}")
-            if (connectable) {
-                Button(
-                    onClick = { onConnect(device.address.toString()) },
-                    enabled = enabled,
-                ) {
+            if (connected) {
+                Text(
+                    stringResource(R.string.discovery_connected),
+                    color = ConnectedColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else if (awaitingPairing) {
+                // Подключаться к такому устройству нечем: сперва код. Кнопка
+                // переносит адрес в форму спаривания — раньше это приходилось
+                // делать вручную, переписывая порт с экрана телевизора
+                Button(onClick = { onPair(device.address.toString()) }, enabled = enabled) {
+                    Text(stringResource(R.string.discovery_pair_action))
+                }
+            } else {
+                Button(onClick = { onConnect(device.address.toString()) }, enabled = enabled) {
                     Text(stringResource(R.string.connect_action))
                 }
             }
@@ -179,8 +250,12 @@ private fun DiscoveredRow(
 }
 
 @Composable
-private fun PairingSection(state: AppState, actions: AppActions) {
-    var pairingAddress by rememberSaveable { mutableStateOf("") }
+private fun PairingSection(
+    state: AppState,
+    actions: AppActions,
+    pairingAddress: String,
+    onPairingAddressChange: (String) -> Unit,
+) {
     var code by rememberSaveable { mutableStateOf("") }
     var connectAddress by rememberSaveable { mutableStateOf("") }
 
@@ -193,7 +268,7 @@ private fun PairingSection(state: AppState, actions: AppActions) {
 
         OutlinedTextField(
             value = pairingAddress,
-            onValueChange = { pairingAddress = it },
+            onValueChange = onPairingAddressChange,
             label = { Text(stringResource(R.string.pairing_address_hint)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -225,24 +300,29 @@ private fun PairingSection(state: AppState, actions: AppActions) {
 private fun NtpSection(state: AppState, actions: AppActions) {
     var custom by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
-    val matches = remember(query) {
-        if (query.isBlank()) emptyList() else NtpData.countries.filter { country ->
-            query.trim().lowercase().let { needle ->
-                country.code.contains(needle) ||
-                    country.nameEn.lowercase().contains(needle) ||
-                    country.nameRu.lowercase().contains(needle)
-            }
-        }.take(8)
-    }
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    var showCountries by rememberSaveable { mutableStateOf(false) }
+
+    // Поиск идёт и по странам, и по альтернативным адресам: для человека это
+    // один список серверов, а не две разные сущности
+    // Сам поиск — чистая функция в data/NtpSearch.kt, чтобы он проверялся
+    // тестами: промах здесь выглядит как «поиск не работает», и отличить его
+    // от опечатки пользователя без теста невозможно
+    val matches = remember(query) { searchNtpServers(query) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.ntp_title), style = MaterialTheme.typography.titleMedium)
+        // Заданный сервер выделен так же, как установленная связь: это второе
+        // состояние, ради которого на экран смотрят
+        val ntpIsSet = state.currentNtpServer.isNotEmpty()
         Text(
-            if (state.currentNtpServer.isEmpty()) {
-                stringResource(R.string.ntp_current_unset)
-            } else {
+            if (ntpIsSet) {
                 stringResource(R.string.ntp_current, state.currentNtpServer)
+            } else {
+                stringResource(R.string.ntp_current_unset)
             },
+            color = if (ntpIsSet) ConnectedColor else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleSmall,
         )
 
         Text(stringResource(R.string.ntp_by_country), style = MaterialTheme.typography.bodyMedium)
@@ -253,12 +333,49 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        matches.forEach { country ->
-            TextButton(
-                onClick = { actions.applyNtpServer(country.server) },
-                enabled = !state.busy,
-            ) {
-                Text("${country.code.uppercase()} · ${country.nameEn} · ${country.server}")
+        matches.forEach { match ->
+            val country = match.country
+            val label = if (country == null) {
+                match.server
+            } else {
+                "${country.code.uppercase()} · ${countryName(country)} · ${country.server}"
+            }
+            TextButton(onClick = { custom = match.server }, enabled = !state.busy) { Text(label) }
+        }
+
+        // Списки раскрываются только при пустом поиске: иначе на экране
+        // оказались бы сразу и результаты поиска, и весь справочник
+        if (query.isBlank()) {
+            TextButton(onClick = { showCountries = !showCountries }) {
+                Text(
+                    if (showCountries) {
+                        stringResource(R.string.ntp_hide_countries)
+                    } else {
+                        stringResource(R.string.ntp_show_countries, NtpData.countries.size)
+                    },
+                )
+            }
+            if (showCountries) {
+                NtpData.countries.forEach { country ->
+                    TextButton(onClick = { custom = country.server }, enabled = !state.busy) {
+                        Text("${country.code.uppercase()} · ${countryName(country)} · ${country.server}")
+                    }
+                }
+            }
+
+            TextButton(onClick = { showAll = !showAll }) {
+                Text(
+                    if (showAll) {
+                        stringResource(R.string.ntp_hide_all)
+                    } else {
+                        stringResource(R.string.ntp_show_all, NtpData.alternativeServers.size)
+                    },
+                )
+            }
+            if (showAll) {
+                NtpData.alternativeServers.forEach { server ->
+                    TextButton(onClick = { custom = server }, enabled = !state.busy) { Text(server) }
+                }
             }
         }
 
@@ -269,10 +386,172 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(onClick = { actions.applyNtpServer(custom) }, enabled = !state.busy) {
-            Text(stringResource(R.string.ntp_apply))
+        Text(
+            stringResource(R.string.ntp_address_note),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { actions.applyNtpServer(custom) },
+                enabled = !state.busy && custom.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.ntp_apply))
+            }
+            TextButton(
+                onClick = { actions.checkNtpServer(custom) },
+                enabled = !state.busy && custom.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.ntp_check))
+            }
+        }
+
+        state.ntpCheck?.let { NtpCheckCard(it) }
+
+        // Итог показывается здесь, а не в карточке вверху экрана: раздел
+        // находится далеко внизу, и подтверждение там не видно
+        state.ntpMessage?.let { message ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(message.res, *message.args.toTypedArray()),
+                    // Успешная запись — зелёным, всё остальное здесь неудача:
+                    // «не применено», «неверный адрес», «устройство сообщает
+                    // другое значение»
+                    color = if (message.res == R.string.ntp_applied) {
+                        ConnectedColor
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+        }
+
+        // Проверка идёт из сети телефона, а UDP-порт 123 закрывают и операторы,
+        // и часть роутеров: полный запрет оставил бы человека вообще без
+        // возможности задать сервер
+        state.ntpRejected?.let { rejected ->
+            Button(
+                onClick = { actions.applyNtpServer(rejected, force = true) },
+                enabled = !state.busy,
+            ) {
+                Text(stringResource(R.string.ntp_apply_anyway))
+            }
+        }
+
+        HorizontalDivider()
+        NtpScanBlock(state, actions, onPick = { custom = it })
+    }
+}
+
+/** Вердикт по одному адресу: отвечает ли он как сервер времени. */
+@Composable
+private fun NtpCheckCard(check: NtpProbeResult) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(check.server, style = MaterialTheme.typography.bodyLarge)
+            // Здесь строка не нажимается, поэтому и текст другой: обещать
+            // нажатие там, где его нет, хуже, чем не показывать вовсе
+            check.ipAddress?.takeIf { it != check.server }?.let {
+                Text(stringResource(R.string.ntp_check_ip, it), style = MaterialTheme.typography.bodySmall)
+            }
+            if (check.isUsable()) {
+                Text(
+                    stringResource(
+                        R.string.ntp_check_ok,
+                        check.avgRttMs ?: 0L,
+                        check.successRate,
+                        formatOffset(check.offsetSeconds),
+                    ),
+                    color = ConnectedColor,
+                )
+            } else if (check.reachable) {
+                Text(
+                    stringResource(R.string.ntp_check_bad_clock),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else {
+                Text(
+                    stringResource(R.string.ntp_check_failed, check.error.orEmpty()),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
+}
+
+/** Подбор самого быстрого сервера — аналог автонастройки десктопной версии. */
+@Composable
+private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit) {
+    val scan = state.ntpScan
+    Text(stringResource(R.string.ntp_scan_title), style = MaterialTheme.typography.bodyMedium)
+
+    if (scan == null || scan.finished) {
+        Button(onClick = actions::scanNtpServers, enabled = !state.busy) {
+            Text(stringResource(R.string.ntp_scan_start))
+        }
+    } else {
+        Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size))
+        Button(onClick = actions::cancelNtpScan) {
+            Text(stringResource(R.string.ntp_scan_cancel))
+        }
+    }
+
+    if (scan != null && scan.best.isNotEmpty()) {
+        Text(stringResource(R.string.ntp_scan_best), style = MaterialTheme.typography.bodyMedium)
+        scan.best.forEach { result ->
+            TextButton(onClick = { onPick(result.server) }, enabled = !state.busy) {
+                Text(
+                    stringResource(
+                        R.string.ntp_scan_entry,
+                        result.server,
+                        result.avgRttMs ?: 0L,
+                        result.successRate,
+                    ),
+                )
+            }
+            // IP показывается отдельной нажимаемой строкой: часть прошивок
+            // не умеет резолвить имена, и тогда адрес нужно задавать числом.
+            // Запрос DNS ради этого не делается — адрес уже известен от пробы.
+            val ip = result.ipAddress
+            if (ip != null && ip != result.server) {
+                TextButton(onClick = { onPick(ip) }, enabled = !state.busy) {
+                    Text(stringResource(R.string.ntp_scan_entry_ip, ip))
+                }
+            }
+        }
+    } else if (scan != null && scan.finished) {
+        Text(stringResource(R.string.ntp_scan_none))
+    }
+}
+
+/**
+ * Зелёный для установленной связи.
+ *
+ * Задан явно, а не взят из схемы: в Material 3 нет роли «успех», а
+ * `primary` на светлой теме фиолетовый и о состоянии ничего не говорит.
+ * Отказ при этом берёт `error` из темы — там подходящая роль есть.
+ */
+private val ConnectedColor = Color(0xFF1B7F3B)
+
+/**
+ * Название страны на языке интерфейса.
+ *
+ * Справочник хранит оба названия, и показывать русское англоязычному
+ * пользователю нельзя — искать он будет по английскому.
+ */
+private fun countryName(country: NtpCountry): String =
+    if (Locale.getDefault().language == "ru") country.nameRu else country.nameEn
+
+/**
+ * Смещение часов с явным знаком: «+0,4» читается лучше, чем «0.4».
+ *
+ * Локаль берётся пользовательская намеренно: это число человек читает глазами,
+ * и в русском разделителем должна быть запятая.
+ */
+private fun formatOffset(seconds: Double?): String {
+    val value = seconds ?: return "—"
+    val sign = if (value >= 0) "+" else "-"
+    return sign + String.format(Locale.getDefault(), "%.1f", abs(value))
 }
 
 @Composable

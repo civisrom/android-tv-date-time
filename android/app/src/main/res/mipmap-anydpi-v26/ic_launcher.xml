@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Адаптивная иконка (Android 8+): система сама обрежет её под форму,
+     принятую в лаунчере, поэтому отдельная круглая картинка не нужна.
+     Графика переднего плана лежит в безопасной зоне, иначе круглая маска
+     срезала бы телевизору углы. monochrome — тематические иконки Android 13+. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+</adaptive-icon>

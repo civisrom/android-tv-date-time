@@ -797,6 +797,79 @@ class ReliabilityTests(unittest.TestCase):
             self.assertTrue(1 <= port <= 65535)
             self.assertNotEqual(host, '')
 
+    def test_mdns_discover_all_covers_every_service_in_one_pass(self) -> None:
+        # Один запуск adb на все три сервиса: поиск идёт автоматически перед
+        # каждым запросом адреса, и три запуска подряд человек замечает
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.mdns_available = lambda: True
+        calls = []
+
+        def run_adb(args, timeout=15):
+            calls.append(args)
+            return 0, (
+                'adb-A\t_adb-tls-connect._tcp\t192.168.1.20:37105\n'
+                'adb-B\t_adb-tls-pairing._tcp\t192.168.1.21:41234\n'
+                'adb-C\t_adb._tcp\t192.168.1.5:5555\n'
+            )
+
+        fixer._run_adb = run_adb
+        found = fixer.mdns_discover_all()
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(found['connect'], ['192.168.1.20:37105'])
+        self.assertEqual(found['pairing'], ['192.168.1.21:41234'])
+        self.assertEqual(found['legacy'], ['192.168.1.5:5555'])
+
+    def test_mdns_connectable_includes_classic_network_debugging(self) -> None:
+        # Nvidia Shield на Android 11 не имеет экрана беспроводной отладки и
+        # объявляет только _adb._tcp: поиск, знающий лишь про TLS-сервисы,
+        # такое устройство не видит вовсе
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.mdns_available = lambda: True
+        fixer._run_adb = lambda args, timeout=15: (
+            0, 'adb-SHIELD\t_adb._tcp\t192.168.0.112:5555\n'
+        )
+
+        self.assertEqual(fixer.mdns_connectable(), ['192.168.0.112:5555'])
+
+    def test_mdns_connectable_merges_and_sorts_both_kinds(self) -> None:
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.mdns_available = lambda: True
+        fixer._run_adb = lambda args, timeout=15: (
+            0,
+            'a\t_adb-tls-connect._tcp\t192.168.1.112:37105\n'
+            'b\t_adb._tcp\t192.168.1.9:5555\n'
+            'c\t_adb-tls-pairing._tcp\t192.168.1.7:41234\n'
+        )
+
+        result = fixer.mdns_connectable()
+        # Отсортировано по адресу; ждущее спаривания сюда не попадает —
+        # подключиться к нему нельзя, сначала нужен код
+        self.assertEqual(result, ['192.168.1.9:5555', '192.168.1.112:37105'])
+
+    def test_mdns_discover_all_falls_back_to_zeroconf(self) -> None:
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.mdns_available = lambda: False
+        fixer._mdns_all_via_zeroconf = lambda timeout: {
+            'connect': ['192.168.1.9:37105'], 'pairing': [], 'legacy': [],
+        }
+
+        self.assertEqual(fixer.mdns_discover_all()['connect'], ['192.168.1.9:37105'])
+
+    def test_mdns_discover_all_survives_both_backends_missing(self) -> None:
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.mdns_available = lambda: False
+        fixer._mdns_all_via_zeroconf = lambda timeout: {
+            'connect': [], 'pairing': [], 'legacy': [],
+        }
+
+        self.assertEqual(fixer.mdns_connectable(), [])
+
     def test_mdns_available_rejects_unavailable_daemon(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
         fixer.logger = logging.getLogger('test')

@@ -20,7 +20,7 @@ import tempfile
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
-from typing import Any, Optional, Protocol, Tuple, List
+from typing import Any, Dict, Optional, Protocol, Tuple, List
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 import ntplib
 import pyperclip
@@ -40,7 +40,7 @@ init(autoreset=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-APP_VERSION = '2.5.0'
+APP_VERSION = '2.6.0'
 
 #: Порт adbd для «отладки по сети» (adb tcpip). Беспроводная отладка
 #: Android 11+ открывает случайный порт, поэтому порт везде параметризован.
@@ -134,6 +134,10 @@ class _MdnsCollector(ServiceListener):  # type: ignore[misc,valid-type]
     def __init__(self, zeroconf_instance: Any) -> None:
         self.zeroconf = zeroconf_instance
         self.found: List[str] = []
+        # Раскладка по типу сервиса нужна, чтобы один проход обслуживал все
+        # три сразу: по проходу на сервис — это три таймаута подряд, а поиск
+        # теперь идёт автоматически перед каждым запросом адреса
+        self.by_service: Dict[str, List[str]] = {}
 
     def add_service(self, zc: Any, type_: str, name: str) -> None:
         try:
@@ -148,6 +152,9 @@ class _MdnsCollector(ServiceListener):  # type: ignore[misc,valid-type]
             entry = f"{address}:{info.port}"
             if entry not in self.found:
                 self.found.append(entry)
+            bucket = self.by_service.setdefault(type_.rstrip('.').removesuffix('.local'), [])
+            if entry not in bucket:
+                bucket.append(entry)
 
     def update_service(self, zc: Any, type_: str, name: str) -> None:
         self.add_service(zc, type_, name)
@@ -1422,8 +1429,22 @@ class AndroidTVTimeFixer:
         return False
 
     def get_device_ip_input(self) -> str:
-        """Получает IP адрес устройства: сохранённый, ручной ввод или авто-сканирование сети"""
+        """Получает адрес устройства: найденный по mDNS, сохранённый, введённый
+        руками или найденный сканированием сети.
+
+        Поиск по mDNS идёт автоматически и первым: он быстрый, не требует от
+        человека знать ни адрес, ни порт, и это единственный способ узнать порт
+        беспроводной отладки, который меняется при каждом включении. Результат
+        не кешируется по той же причине.
+        """
+        discovered = self._announce_mdns_devices()
+
         while True:
+            if discovered:
+                print(Fore.GREEN + locales.get("mdns_pick_or_enter"))
+                for index, item in enumerate(discovered, 1):
+                    print(Fore.WHITE + f"  {index}. {item}")
+
             if self.last_device_ip:
                 print(Fore.GREEN + locales.get('enter_device_ip_scan',
                                                saved_ip=self.last_device_ip), end="")
@@ -1441,6 +1462,22 @@ class AndroidTVTimeFixer:
             # 'q' → выход в меню
             if ip.lower() == 'q':
                 return ''
+
+            # 'm' → искать по mDNS заново: порт беспроводной отладки меняется
+            # при каждом включении, и устройство могло появиться только что
+            if ip.lower() == 'm':
+                discovered = self._announce_mdns_devices()
+                continue
+
+            # Номер из списка найденных
+            if ip.isdigit() and discovered:
+                number = int(ip)
+                if 1 <= number <= len(discovered):
+                    chosen = discovered[number - 1]
+                    self.save_last_ip(chosen)
+                    return chosen
+                print(Fore.RED + locales.get("enter_valid_number"))
+                continue
 
             # 's' → авто-сканирование сети, CIDR → сканирование указанной подсети
             if ip.lower() == 's' or '/' in ip:
@@ -1463,6 +1500,36 @@ class AndroidTVTimeFixer:
                 continue
 
             return ip
+
+    def _announce_mdns_devices(self) -> List[str]:
+        """Ищет устройства по mDNS и сообщает о найденном.
+
+        Устройства, ждущие спаривания, показываются отдельно и в список выбора
+        не попадают: подключиться к ним нельзя, сначала нужен код.
+        """
+        print(Fore.CYAN + locales.get("mdns_searching"))
+        try:
+            found = self.mdns_discover_all()
+        except Exception as e:
+            # Молчать нельзя: человек увидел бы «Поиск...» и пустоту, не
+            # понимая, ничего не нашлось или поиск вообще не отработал
+            self.logger.debug(f"mDNS discovery failed: {e}")
+            print(Fore.YELLOW + locales.get("mdns_none_auto"))
+            return []
+
+        pairable = found.get('pairing', [])
+        if pairable:
+            print(Fore.YELLOW + locales.get("mdns_service_pairing"))
+            for item in pairable:
+                print(Fore.WHITE + f"  {item}")
+            print(Fore.YELLOW + locales.get("mdns_pairing_hint"))
+
+        connectable = self._sort_addresses(
+            list(dict.fromkeys(found.get('connect', []) + found.get('legacy', [])))
+        )
+        if not connectable and not pairable:
+            print(Fore.YELLOW + locales.get("mdns_none_auto"))
+        return connectable
 
     @staticmethod
     def validate_ntp_server(server: str) -> bool:
@@ -2118,6 +2185,80 @@ class AndroidTVTimeFixer:
                 except Exception:
                     pass
 
+    def _mdns_all_via_zeroconf(self, timeout: float) -> Dict[str, List[str]]:
+        """Один проход zeroconf сразу по всем сервисам adb."""
+        empty: Dict[str, List[str]] = {kind: [] for kind in ADB_MDNS_SERVICES}
+        if Zeroconf is None or ServiceBrowser is None:
+            return empty
+
+        zeroconf_instance = None
+        try:
+            zeroconf_instance = Zeroconf()
+            collector = _MdnsCollector(zeroconf_instance)
+            ServiceBrowser(
+                zeroconf_instance,
+                [f"{service}.local." for service in ADB_MDNS_SERVICES.values()],
+                collector,
+            )
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                time.sleep(0.2)
+            return {
+                kind: list(collector.by_service.get(service, []))
+                for kind, service in ADB_MDNS_SERVICES.items()
+            }
+        except Exception as e:
+            self.logger.debug(f"zeroconf discovery failed: {e}")
+            return empty
+        finally:
+            if zeroconf_instance is not None:
+                try:
+                    zeroconf_instance.close()
+                except Exception:
+                    pass
+
+    def mdns_discover_all(self, timeout: float = 2.0) -> Dict[str, List[str]]:
+        """Находит устройства по всем трём сервисам adb за один проход.
+
+        Отдельно от mdns_discover, который делает по запуску adb на сервис.
+        Здесь важна скорость: поиск идёт автоматически перед каждым запросом
+        адреса, и три запуска подряд человек замечает.
+
+        Таймаут короче, чем у mdns_discover, по той же причине.
+        """
+        output = ''
+        if self.mdns_available():
+            try:
+                _returncode, output = self._run_adb(['mdns', 'services'])
+            except Exception as e:
+                self.logger.debug(f"adb mdns services failed: {e}")
+                output = ''
+
+        found = {
+            kind: self._parse_mdns_services(output, service)
+            for kind, service in ADB_MDNS_SERVICES.items()
+        }
+        if not any(found.values()):
+            found = self._mdns_all_via_zeroconf(timeout)
+        return {kind: self._sort_addresses(items) for kind, items in found.items()}
+
+    @staticmethod
+    def _sort_addresses(addresses: List[str]) -> List[str]:
+        """Адреса по возрастанию IP. Порядок должен быть устойчивым: по нему
+        человек выбирает номер из списка."""
+        return sorted(addresses, key=lambda item: ipaddress.IPv4Address(item.split(':')[0]))
+
+    def mdns_connectable(self, timeout: float = 2.0) -> List[str]:
+        """Адреса, к которым можно подключаться прямо сейчас.
+
+        И новая беспроводная отладка, и классическая «отладка по сети»: на
+        части прошивок — Nvidia Shield, например — экрана беспроводной отладки
+        нет вовсе, устройство объявляет только `_adb._tcp`, и поиск, знающий
+        лишь про TLS-сервисы, его не видит.
+        """
+        found = self.mdns_discover_all(timeout)
+        return self._sort_addresses(list(dict.fromkeys(found['connect'] + found['legacy'])))
+
     def mdns_discover(self, kind: str = 'connect', timeout: float = 5.0) -> List[str]:
         """Находит устройства через mDNS. Возвращает адреса 'ip:port'.
 
@@ -2128,7 +2269,7 @@ class AndroidTVTimeFixer:
         found = self._mdns_via_adb(service)
         if not found:
             found = self._mdns_via_zeroconf(service, timeout)
-        return sorted(found, key=lambda item: ipaddress.IPv4Address(item.split(':')[0]))
+        return self._sort_addresses(found)
 
     # ──────────────────────────────────────────────────────────
     # Wireless debugging (Android 11+): pairing
@@ -3023,8 +3164,14 @@ class AndroidTVTimeFixer:
 
             elif choice == '2':
                 print(Fore.CYAN + locales.get("mdns_searching"))
-                connectable = self.mdns_discover('connect')
-                pairable = self.mdns_discover('pairing')
+                # Ищем и классическую «отладку по сети»: на части прошивок
+                # (Nvidia Shield, например) экрана беспроводной отладки нет
+                # вовсе, и устройство объявляет только _adb._tcp
+                found = self.mdns_discover_all()
+                connectable = self._sort_addresses(
+                    list(dict.fromkeys(found['connect'] + found['legacy']))
+                )
+                pairable = found['pairing']
 
                 if pairable:
                     print(Fore.YELLOW + locales.get("mdns_service_pairing"))

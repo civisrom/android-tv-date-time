@@ -37,6 +37,18 @@ android {
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")
                 keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+
+                // v1 и v2 нужны для установки: v1 — на Android 6, v2 — начиная
+                // с 7. v3 на установку не влияет вовсе, но без неё невозможна
+                // ротация ключа: потеряв ключ подписи, обновить уже
+                // установленное приложение будет нечем — Android принимает
+                // обновление только от того же ключа либо от его законного
+                // преемника, а преемственность объявляется именно в v3.
+                // Включать её нужно заранее: задним числом к выпущенному
+                // приложению это не применить.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
@@ -189,7 +201,6 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kadb.android)
-    implementation(libs.kadb.mdns.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
