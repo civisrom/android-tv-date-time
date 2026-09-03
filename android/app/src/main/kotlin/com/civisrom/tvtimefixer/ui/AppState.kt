@@ -2,6 +2,7 @@ package com.civisrom.tvtimefixer.ui
 
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
@@ -46,4 +47,16 @@ data class AppState(
     val ntpRejected: String? = null,
 ) {
     val connected: Boolean get() = connection is ConnectionState.Connected
+
+    /**
+     * Адрес, с которым связь **действительно установлена**, иначе null.
+     *
+     * Отдельно от `addressOrNull()`: та отвечает на другой вопрос — «какой
+     * адрес фигурирует в состоянии» — и возвращает его в том числе при отказе.
+     * Спутать эти два вопроса уже стоило дорого: после отмены запроса на
+     * экране телевизора найденное устройство подписывалось «Подключено» и
+     * теряло кнопку, то есть повторить попытку было нечем.
+     */
+    val connectedAddress: DeviceAddress?
+        get() = (connection as? ConnectionState.Connected)?.address
 }

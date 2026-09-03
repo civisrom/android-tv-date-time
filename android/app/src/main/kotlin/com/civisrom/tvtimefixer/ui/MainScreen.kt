@@ -32,7 +32,6 @@ import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
-import com.civisrom.tvtimefixer.adb.addressOrNull
 import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
@@ -203,8 +202,11 @@ private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (Stri
                 enabled = !state.busy,
                 // Строка того устройства, с которым связь уже установлена,
                 // не должна предлагать подключиться: вверху экрана в это же
-                // время написано «Подключено», и человек не понимает, чему верить
-                connected = device.address == state.connection.addressOrNull(),
+                // время написано «Подключено», и человек не понимает, чему
+                // верить. Сравнение именно с connectedAddress: addressOrNull()
+                // отдаёт адрес и при отказе, и тогда кнопка пропадала бы
+                // ровно там, где нужна вторая попытка
+                connected = device.address == state.connectedAddress,
                 onConnect = actions::connect,
                 onPair = onPair,
             )
