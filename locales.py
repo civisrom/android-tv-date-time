@@ -234,12 +234,24 @@ arising from the use of this program.
                 ru="Найдено устройств: {count}"
             ),
             "mdns_none": Translation(
-                en="mDNS found no devices. Make sure wireless debugging is enabled on the device and the pairing dialog is open.",
-                ru="mDNS не нашёл устройств. Убедитесь, что на устройстве включена беспроводная отладка и открыт диалог спаривания."
+                en="mDNS found no devices. Enable network debugging or wireless debugging on the device; for pairing, the pairing dialog must be open on its screen.",
+                ru="mDNS не нашёл устройств. Включите на устройстве отладку по сети или беспроводную отладку; для спаривания на его экране должен быть открыт диалог спаривания."
             ),
             "mdns_unavailable": Translation(
                 en="mDNS discovery is unavailable: the bundled adb has no mDNS backend and the zeroconf library is not installed. Enter the address manually.",
                 ru="Обнаружение по mDNS недоступно: у встроенного adb нет mDNS-бэкенда, а библиотека zeroconf не установлена. Введите адрес вручную."
+            ),
+            "mdns_pick_or_enter": Translation(
+                en="Devices found on the network — enter a number to connect:",
+                ru="Найдены устройства в сети — введите номер для подключения:"
+            ),
+            "mdns_pairing_hint": Translation(
+                en="  These need a pairing code first: use the wireless debugging menu.",
+                ru="  Им сначала нужен код спаривания: см. меню беспроводной отладки."
+            ),
+            "mdns_none_auto": Translation(
+                en="No devices found via mDNS. Enter the address by hand, 's' to scan the network, or 'm' to search again.",
+                ru="По mDNS ничего не найдено. Введите адрес вручную, 's' — сканировать сеть, 'm' — искать снова."
             ),
             "mdns_service_pairing": Translation(
                 en="Devices awaiting pairing (the pairing dialog is open on screen):",
@@ -967,12 +979,12 @@ arising from the use of this program.
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter IP, IP:port, CIDR subnet, 's' to scan, 'q' to cancel (Enter for saved: {saved_ip}): ",
-                ru="Введите IP, IP:порт, CIDR-подсеть, 's' для сканирования, 'q' для отмены (Enter для сохранённого: {saved_ip}): "
+                en="Enter a number, IP, IP:port, CIDR subnet, 's' to scan, 'm' to search again, 'q' to cancel (Enter for saved: {saved_ip}): ",
+                ru="Введите номер, IP, IP:порт, CIDR-подсеть, 's' для сканирования, 'm' — искать снова, 'q' для отмены (Enter для сохранённого: {saved_ip}): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter IP, IP:port, CIDR subnet, 's' to scan network, or 'q' to cancel: ",
-                ru="Введите IP, IP:порт, CIDR-подсеть, 's' для сканирования сети или 'q' для отмены: "
+                en="Enter a number, IP, IP:port, CIDR subnet, 's' to scan network, 'm' to search again, or 'q' to cancel: ",
+                ru="Введите номер, IP, IP:порт, CIDR-подсеть, 's' для сканирования сети, 'm' — искать снова или 'q' для отмены: "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",
