@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Android TV Time Fixer</string>
+
+    <!-- Режимы работы -->
+    <string name="mode_television">Запущено на телевизоре: подключение к этому же устройству.</string>
+    <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети.</string>
+
+    <!-- Подключение -->
+    <string name="connect_title">Подключение к устройству</string>
+    <string name="connect_address_hint">IP-адрес или IP:порт</string>
+    <string name="connect_action">Подключиться</string>
+    <string name="connect_disconnect">Отключиться</string>
+    <string name="connect_state_connecting">Подключение к %1$s…</string>
+    <string name="connect_state_connected">Подключено к %1$s</string>
+    <string name="connect_state_disconnected">Нет подключения</string>
+    <string name="connect_try_loopback">Подключиться к этому устройству</string>
+
+    <!-- Причины неудачного подключения -->
+    <string name="error_invalid_address">Неверный адрес. Используйте 192.168.1.20 или 192.168.1.20:37105.</string>
+    <string name="error_unreachable">Не удаётся достучаться до устройства. Проверьте, что оно в той же сети и отладка включена.</string>
+    <string name="error_pairing_required">Устройство требует спаривания по коду. Откройте на нём «Беспроводную отладку» и воспользуйтесь спариванием ниже.</string>
+    <string name="error_not_authorized">Подтвердите запрос отладки на экране устройства и повторите попытку.</string>
+    <string name="error_pairing_rejected">Устройство отвергло код спаривания. Коды быстро истекают — откройте новый.</string>
+    <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
+
+    <!-- Спаривание -->
+    <string name="pairing_title">Спаривание устройства</string>
+    <string name="pairing_hint">На телевизоре откройте «Для разработчиков» → «Беспроводная отладка» → «Подключение с помощью кода».</string>
+    <string name="pairing_address_hint">Адрес спаривания, например 192.168.1.20:41234</string>
+    <string name="pairing_code_hint">6-значный код</string>
+    <string name="pairing_connect_address_hint">Адрес подключения (другой порт)</string>
+    <string name="pairing_port_warning">Порт спаривания и порт подключения — разные. Оба показаны на экране телевизора.</string>
+    <string name="pairing_action">Спарить и подключиться</string>
+
+    <!-- Обнаружение по mDNS -->
+    <string name="discovery_title">Устройства в сети</string>
+    <string name="discovery_searching">Идёт поиск…</string>
+    <string name="discovery_empty">Устройства не найдены. Убедитесь, что беспроводная отладка включена и её экран открыт.</string>
+    <string name="discovery_unavailable">Обнаружение в сети недоступно на этом устройстве. Введите адрес вручную.</string>
+    <string name="discovery_kind_awaiting_pairing">Ожидает спаривания</string>
+    <string name="discovery_kind_ready">Готово к подключению</string>
+    <string name="discovery_kind_legacy">Отладка по сети</string>
+    <string name="discovery_permission_needed">Разрешите доступ к устройствам поблизости, иначе приложение не найдёт телевизоры в сети.</string>
+    <string name="discovery_grant_permission">Разрешить</string>
+
+    <!-- Сервер времени -->
+    <string name="ntp_title">Сервер времени</string>
+    <string name="ntp_current">Текущий: %1$s</string>
+    <string name="ntp_current_unset">Сервер времени не задан</string>
+    <string name="ntp_by_country">Выбрать по стране</string>
+    <string name="ntp_custom_hint">Или введите сервер вручную</string>
+    <string name="ntp_apply">Применить</string>
+    <string name="ntp_search_country">Поиск страны</string>
+    <string name="ntp_applied">Установлен сервер времени %1$s.</string>
+    <string name="ntp_invalid">Это не похоже на адрес сервера.</string>
+    <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
+    <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
+
+    <!-- Сведения об устройстве -->
+    <string name="info_title">Устройство</string>
+    <string name="info_model">Модель</string>
+    <string name="info_manufacturer">Производитель</string>
+    <string name="info_android">Android</string>
+    <string name="info_api">Уровень API</string>
+    <string name="info_serial">Серийный номер</string>
+    <string name="info_cpu">Процессор</string>
+    <string name="info_cores">Ядер процессора</string>
+    <string name="info_timezone">Часовой пояс</string>
+    <string name="info_locale">Локаль</string>
+    <string name="info_battery">Батарея</string>
+    <string name="info_ram">Память</string>
+    <string name="info_ram_free">Свободно памяти</string>
+    <string name="info_screen">Экран</string>
+    <string name="info_density">Плотность экрана</string>
+    <string name="info_uptime">Время работы</string>
+    <string name="info_kernel">Ядро</string>
+    <string name="info_ntp">Сервер времени</string>
+    <string name="info_refresh">Обновить</string>
+    <string name="action_failed">Не удалось выполнить действие: %1$s</string>
+</resources>

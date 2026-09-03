@@ -20,6 +20,14 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 
 **Android TV Time Fixer** is a cross-platform utility for Windows, Linux, and macOS, designed to manage NTP server settings on Android TV devices via ADB (Android Debug Bridge).
 
+As of version 2.5.0 the project has two halves:
+
+*   **The desktop program** — the full-featured console utility described
+    below. Windows, Linux, macOS.
+*   **The Android application (APK, experimental)** — the same thing from a
+    phone or tablet, with no computer involved at all. See
+    [Android application](#android-application).
+
 ## Screenshots
 
 ![Main Menu](screenshots/en.png)
@@ -73,6 +81,10 @@ Many televisions and Android TV boxes, particularly in regions with network rest
     *   Works with Google TV Streamer and Chromecast with Google TV on Android 14,
         where the old network debugging is no longer offered
     *   A private ADB server, so the program never disturbs your `adb` or Android Studio
+    *   **Linux and macOS:** ADB keys and the list of paired devices are kept
+        next to the program, so your `~/.android` is left alone (on Windows
+        `adb` resolves the profile through a system API and does not support
+        that isolation)
 
 *   **Network Scan & Batch Operations:**
     *   Automatic local network scanning for Android TV devices
@@ -91,6 +103,19 @@ Many televisions and Android TV boxes, particularly in regions with network rest
     *   Execute system commands
     *   Built-in ADB command reference
     *   App management, file operations, device reboot
+
+*   **Android application (new, experimental):**
+    *   A separate APK: change the NTP server straight from a phone, no computer
+    *   One file for two scenarios — from a phone to the TV over the network,
+        or installed on the Android TV itself
+    *   Pairing with a 6-digit code for Android 11+ wireless debugging
+    *   mDNS discovery on the local network: no need to know the IP or the port
+    *   The same NTP server reference as the desktop version — both are
+        generated from one shared file, so they cannot drift apart
+    *   The result is verified by reading it back, not taken from the exit code
+        of `settings put`
+    *   Device details: model, Android version, memory, screen, uptime and more
+    *   Interface in Russian and English, following the system language
 
 *   **Additional Features:**
     *   Save last used IP address
@@ -137,6 +162,23 @@ Run via PowerShell
 
 1.  Download the `AndroidTVTimeFixer-macos.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
 2.  Extract the archive and run the application.
+
+### Android (APK)
+
+1.  Download `AndroidTVTimeFixer-2.5.0.apk` from [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+2.  Verify it against the `.apk.sha256` file next to it:
+    ```bash
+    sha256sum -c AndroidTVTimeFixer-2.5.0.apk.sha256
+    ```
+3.  Install it:
+    *   **On a phone** — open the file and allow installation from unknown
+        sources for your file manager or browser.
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.5.0.apk`
+        from a computer, or any file manager on the TV. The icon appears both in
+        the regular launcher and in the Android TV launcher.
+
+Requires **Android 6.0** or newer. See
+[Android application](#android-application) for details.
 
 ### Application data
 
@@ -373,6 +415,65 @@ device information, terminal.
 
 Closes the program.
 
+## Android application
+
+A separate APK that does what the desktop program does, but from a phone — or
+straight from the TV it is installed on.
+
+### Two modes
+
+The application detects where it runs from the system UI mode and the leanback
+feature:
+
+*   **Phone or tablet** — controls the TV over the network, exactly like the
+    desktop program. This is the main, working scenario.
+*   **The Android TV itself** — tries to reach its own `adbd` at
+    `127.0.0.1:5555`. This is a **hypothesis, not a guarantee**: not every
+    firmware accepts an ADB connection from itself. That is precisely why
+    "Connect to this device" is a separate button — a refusal has to be visible
+    rather than look like a malfunction.
+
+### What it can do
+
+*   Connect to an address such as `192.168.1.20` or `192.168.1.20:37105`.
+*   Pair with a 6-digit code (Android 11+ wireless debugging). The pairing port
+    and the connection port are **different** — both are shown on the TV screen,
+    and confusing them is the single most common cause of failure.
+*   Discover devices on the local network over mDNS, showing which ones are
+    waiting to be paired and which are ready to connect.
+*   Pick an NTP server by country (search by code or name) or type an address
+    manually, with the same validation as the desktop version.
+*   Device details: model, manufacturer, Android and API version, serial number,
+    CPU and core count, memory, screen and its density, time zone, locale,
+    battery, kernel, uptime, current NTP server.
+
+### Permissions
+
+The application asks for access to nearby devices. This is not about location:
+
+*   since **Android 13** the system `NsdManager` behind mDNS returns an
+    **empty list without complaining** unless `NEARBY_WIFI_DEVICES` is granted —
+    there is no way to tell that apart from "nothing on the network";
+*   since **Android 17**, without `ACCESS_LOCAL_NETWORK`, connections to
+    `192.168.x.x` are severed, and the local network is all this application
+    ever talks to.
+
+A refusal does not break anything: the address can always be typed by hand, and
+the "Grant permission" button stays on screen.
+
+### Not verified yet
+
+An honest list — the application has **never been run on a real device**:
+
+*   The loopback hypothesis: whether a TV firmware accepts a connection from
+    itself.
+*   Code pairing and mDNS discovery on a real Android TV.
+*   Changing the NTP server, and whether it survives a reboot.
+*   How the interface looks and whether the remote (D-pad) reaches everything.
+
+That is why the release carrying the APK is marked as a pre-release. It says
+nothing about the desktop half, which is tested and stable.
+
 ## Compatibility
 
 The program has been tested and should work on Android TV devices (including Nvidia Shield) that meet the following requirements:
@@ -390,12 +491,22 @@ menu item 11.
 *   Linux (Ubuntu, Debian, Fedora, etc.)
 *   macOS
 
+**Android application:** Android 6.0 and newer; code pairing additionally
+requires Android 11 or newer on the controlled device.
+
 ## License
 
-This program is distributed under the **Apache License 2.0** — the full text is
-in [LICENSE](LICENSE). You are free to use, modify and redistribute it,
-including commercially, provided you keep the copyright notice and state any
-changes you made.
+The source code and the desktop builds are distributed under the
+**Apache License 2.0** — the full text is in [LICENSE](LICENSE). You are free to
+use, modify and redistribute them, including commercially, provided you keep the
+copyright notice and state any changes you made.
+
+**The pre-built APK is distributed under the GPL-3.0** — the text is in
+[LICENSE-GPL-3.0.txt](LICENSE-GPL-3.0.txt). The reason: it links `spake2-java`,
+which is under that licence and without which code pairing on Android 11+ is
+impossible. Apache-2.0 is compatible with the GPL-3.0 in this direction, so the
+project's source stays Apache-2.0 while the assembled APK falls under the
+GPL-3.0. The complete corresponding source is this repository at the release tag.
 
 ### Third-party code
 
@@ -406,6 +517,10 @@ The full list is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). In short:
     Terms explicitly exempt open source components from their restrictions, so
     redistribution follows Apache-2.0.
 *   **Python libraries** — Apache-2.0, BSD, MIT and PSF, all permissive.
+*   **`spake2-java`** — **GPL-3.0**, arrives with `kadb-android` and performs
+    the code pairing. APK only; it is not part of the desktop builds.
+*   **`kadb-android`, AndroidX, Compose, Kotlin** — Apache-2.0,
+    **BouncyCastle and elisabeth** — MIT. All of these are APK only.
 *   **python-zeroconf** — **LGPL-2.1-or-later**, used as a fallback for mDNS
     discovery. It ends up inside the pre-built executables, so the LGPL requires
     that you be able to replace it with your own version: see

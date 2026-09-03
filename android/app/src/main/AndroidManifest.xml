@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Обнаружение устройств по mDNS в локальной сети.
+         Android 13-16 требует NEARBY_WIFI_DEVICES, Android 17 (API 37) вводит
+         обязательное ACCESS_LOCAL_NETWORK: без него все сокеты в 192.168.x.x
+         блокируются, а всё приложение построено на локальной сети. -->
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- Одно приложение ставится и на телефон, и на телевизор. Ни одна из этих
+         возможностей не должна быть обязательной, иначе фильтры установки
+         отсекут половину устройств: у Chromecast и Google TV Streamer нет
+         тачскрина, у телефона нет leanback. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.faketouch" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:banner="@drawable/ic_banner"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TvTimeFixer">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <!-- Телефон: обычный лаунчер -->
+                <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Телевизор: без этой категории иконки на TV просто не будет -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

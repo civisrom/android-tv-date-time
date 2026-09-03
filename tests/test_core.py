@@ -816,6 +816,49 @@ class ReliabilityTests(unittest.TestCase):
         fixer._run_adb = boom
         self.assertFalse(fixer.mdns_available())
 
+    # ──────────────────────────────────────────────────────────
+    # Общие данные для Android-модуля
+    # ──────────────────────────────────────────────────────────
+
+    def test_shared_ntp_data_matches_the_source(self) -> None:
+        """shared/ntp-data.json обязан совпадать с таблицами в исходнике.
+
+        Android-модуль генерирует из этого файла Kotlin, поэтому расхождение
+        означало бы, что телефон и десктоп предлагают пользователю разные
+        серверы — незаметно и надолго.
+        """
+        import subprocess
+
+        root = Path(__file__).resolve().parent.parent
+        result = subprocess.run(
+            [sys.executable, str(root / 'scripts' / 'export_ntp_data.py'), '--check'],
+            capture_output=True, text=True, cwd=str(root), timeout=60,
+        )
+        self.assertEqual(
+            0, result.returncode,
+            "shared/ntp-data.json устарел; запустите scripts/export_ntp_data.py\n"
+            + (result.stdout or '') + (result.stderr or ''),
+        )
+
+    def test_shared_ntp_data_is_self_consistent(self) -> None:
+        from src.android_time_fixer import COUNTRY_NAMES, CUSTOM_NTP_SERVERS, NTP_SERVERS
+
+        root = Path(__file__).resolve().parent.parent
+        data = json.loads((root / 'shared' / 'ntp-data.json').read_text(encoding='utf-8'))
+
+        self.assertEqual(len(NTP_SERVERS), len(data['countries']))
+        self.assertEqual(len(CUSTOM_NTP_SERVERS), len(data['alternative_servers']))
+        # Каждая страна должна иметь и сервер, и оба названия
+        for entry in data['countries']:
+            code = entry['code']
+            self.assertEqual(NTP_SERVERS[code], entry['server'])
+            self.assertEqual(COUNTRY_NAMES[code], (entry['name_en'], entry['name_ru']))
+        # И всё это должно проходить собственную валидацию программы
+        for entry in data['countries']:
+            self.assertTrue(AndroidTVTimeFixer.validate_ntp_server(entry['server']), entry['server'])
+        for server in data['alternative_servers']:
+            self.assertTrue(AndroidTVTimeFixer.validate_ntp_server(server), server)
+
 
 if __name__ == '__main__':
     unittest.main()

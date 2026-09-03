@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Android TV Time Fixer</string>
+
+    <!-- Режимы работы -->
+    <string name="mode_television">Running on a TV: it will connect to this device itself.</string>
+    <string name="mode_handheld">Running on a phone: it will connect to a TV over the network.</string>
+
+    <!-- Подключение -->
+    <string name="connect_title">Connect to a device</string>
+    <string name="connect_address_hint">IP address or IP:port</string>
+    <string name="connect_action">Connect</string>
+    <string name="connect_disconnect">Disconnect</string>
+    <string name="connect_state_connecting">Connecting to %1$s…</string>
+    <string name="connect_state_connected">Connected to %1$s</string>
+    <string name="connect_state_disconnected">Not connected</string>
+    <string name="connect_try_loopback">Connect to this device</string>
+
+    <!-- Причины неудачного подключения: разные ответы требуют разных действий -->
+    <string name="error_invalid_address">Invalid address. Use 192.168.1.20 or 192.168.1.20:37105.</string>
+    <string name="error_unreachable">Cannot reach the device. Check that it is on the same network and that debugging is enabled.</string>
+    <string name="error_pairing_required">The device needs pairing with a code. Open Wireless debugging on it and use pairing below.</string>
+    <string name="error_not_authorized">Confirm the debugging prompt on the device screen, then try again.</string>
+    <string name="error_pairing_rejected">The device rejected the pairing code. Codes expire quickly — open a fresh one.</string>
+    <string name="error_unknown">Connection failed for an unexpected reason.</string>
+
+    <!-- Спаривание -->
+    <string name="pairing_title">Pair a device</string>
+    <string name="pairing_hint">On the TV open Developer options → Wireless debugging → Pair device with pairing code.</string>
+    <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
+    <string name="pairing_code_hint">6-digit code</string>
+    <string name="pairing_connect_address_hint">Connection address (a different port)</string>
+    <string name="pairing_port_warning">The pairing port and the connection port are different. Both are shown on the TV.</string>
+    <string name="pairing_action">Pair and connect</string>
+
+    <!-- Обнаружение по mDNS -->
+    <string name="discovery_title">Devices on the network</string>
+    <string name="discovery_searching">Searching…</string>
+    <string name="discovery_empty">No devices found. Make sure wireless debugging is on and its screen is open.</string>
+    <string name="discovery_unavailable">Network discovery is unavailable on this device. Enter the address manually.</string>
+    <string name="discovery_kind_awaiting_pairing">Waiting to be paired</string>
+    <string name="discovery_kind_ready">Ready to connect</string>
+    <string name="discovery_kind_legacy">Network debugging</string>
+    <string name="discovery_permission_needed">Allow access to nearby devices so the app can find TVs on the network.</string>
+    <string name="discovery_grant_permission">Grant permission</string>
+
+    <!-- Сервер времени -->
+    <string name="ntp_title">Time server</string>
+    <string name="ntp_current">Current: %1$s</string>
+    <string name="ntp_current_unset">No time server is set</string>
+    <string name="ntp_by_country">Choose by country</string>
+    <string name="ntp_custom_hint">Or enter a server manually</string>
+    <string name="ntp_apply">Apply</string>
+    <string name="ntp_search_country">Search country</string>
+    <string name="ntp_applied">Time server set to %1$s.</string>
+    <string name="ntp_invalid">That is not a valid server address.</string>
+    <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
+    <string name="ntp_failed">Could not change the time server: %1$s</string>
+
+    <!-- Сведения об устройстве -->
+    <string name="info_title">Device</string>
+    <string name="info_model">Model</string>
+    <string name="info_manufacturer">Manufacturer</string>
+    <string name="info_android">Android</string>
+    <string name="info_api">API level</string>
+    <string name="info_serial">Serial</string>
+    <string name="info_cpu">CPU</string>
+    <string name="info_cores">CPU cores</string>
+    <string name="info_timezone">Time zone</string>
+    <string name="info_locale">Locale</string>
+    <string name="info_battery">Battery</string>
+    <string name="info_ram">RAM</string>
+    <string name="info_ram_free">RAM free</string>
+    <string name="info_screen">Screen</string>
+    <string name="info_density">Screen density</string>
+    <string name="info_uptime">Uptime</string>
+    <string name="info_kernel">Kernel</string>
+    <string name="info_ntp">Time server</string>
+    <string name="info_refresh">Refresh</string>
+    <string name="action_failed">Something went wrong: %1$s</string>
+</resources>

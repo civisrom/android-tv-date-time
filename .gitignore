@@ -2,20 +2,20 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+/*.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -28,8 +28,6 @@ venv/
 # PyInstaller
 *.manifest
 *.spec
-build/
-dist/
 
 # IDE
 .idea/
@@ -49,7 +47,7 @@ docs/
 keys/
 adbkey
 adbkey.pub
-settings.json
+/settings.json
 saved_servers.json
 backup.json
 android_tv_fixer.log
@@ -57,3 +55,15 @@ android_tv_fixer.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Android
+android/**/build/
+android/.kotlin/
+android/local.properties
+android/.gradle/
+.gradle/
+*.iml
+*.jks
+*.keystore
+captures/
+.cxx/
