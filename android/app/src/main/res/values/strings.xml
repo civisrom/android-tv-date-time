@@ -22,6 +22,10 @@
     <string name="error_pairing_required">The device needs pairing with a code. Open Wireless debugging on it and use pairing below.</string>
     <string name="error_not_authorized">Confirm the debugging prompt on the device screen, then try again.</string>
     <string name="error_pairing_rejected">The device rejected the pairing code. Codes expire quickly — open a fresh one.</string>
+    <string name="error_pairing_timeout">Pairing timed out. Check the network and request a fresh pairing code.</string>
+    <string name="error_pairing_failed">Pairing could not finish. Check the pairing port and request a fresh code on the TV.</string>
+    <string name="error_tls_failed">The secure connection could not be established. Check the debugging port and try again.</string>
+    <string name="error_wireless_unsupported">Pairing requires Android 10 or later on the device running this app. Classic network debugging is still available.</string>
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
     <!-- Спаривание -->
@@ -42,7 +46,7 @@
     <string name="discovery_kind_ready">Ready to connect</string>
     <string name="discovery_kind_legacy">Network debugging</string>
     <string name="discovery_failed">Network discovery could not start on this device: %1$s. Enter the address manually — everything else works.</string>
-    <string name="discovery_permission_needed">Allow access to nearby devices so the app can find TVs on the network.</string>
+    <string name="discovery_permission_needed">Allow local network access to discover TVs and connect to their addresses.</string>
     <string name="discovery_grant_permission">Grant permission</string>
 
     <!-- Сервер времени -->

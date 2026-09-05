@@ -40,7 +40,7 @@ init(autoreset=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-APP_VERSION = '2.6.0'
+APP_VERSION = '2.6.1'
 
 #: Порт adbd для «отладки по сети» (adb tcpip). Беспроводная отладка
 #: Android 11+ открывает случайный порт, поэтому порт везде параметризован.
@@ -79,6 +79,7 @@ ADB_CONNECTION_ERRORS = (
     "error: device unauthorized",
     "cannot connect",
     "failed to connect",
+    "failed to authenticate",
     "unable to connect",
     "connection refused",
     "no route to host",
@@ -188,7 +189,7 @@ class PlatformToolsTransport:
             adb_path: str,
             serial: str,
             timeout: int = 30,
-            runner: Any = subprocess.run,
+            runner: Any = None,
             env: Optional[dict] = None
     ) -> None:
         # adb_path и runner передаются снаружи, чтобы транспорт можно было
@@ -196,7 +197,7 @@ class PlatformToolsTransport:
         self.adb_path = adb_path
         self.serial = serial
         self.timeout = timeout
-        self._runner = runner
+        self._runner = subprocess.run if runner is None else runner
         self.env = env
 
     def _run(self, args: List[str]) -> Tuple[int, str]:
@@ -2083,13 +2084,26 @@ class AndroidTVTimeFixer:
 
         output = (result.stdout or '').strip()
         lowered = output.lower()
-        if result.returncode != 0 or any(err in lowered for err in ADB_CONNECTION_ERRORS):
+        success_messages = (
+            f'connected to {serial}'.lower(),
+            f'already connected to {serial}'.lower(),
+        )
+        confirmed = any(line.strip().lower() in success_messages for line in output.splitlines())
+        if (result.returncode != 0 or not confirmed
+                or any(err in lowered for err in ADB_CONNECTION_ERRORS)):
             raise AndroidTVTimeFixerError(
                 locales.get('adb_tls_pairing_required', ip=serial, error=output)
             )
 
+        transport = PlatformToolsTransport(self.get_adb_path(), serial, env=self.adb_env)
+        try:
+            if transport.shell('echo androidtvtimefixer').strip() != 'androidtvtimefixer':
+                raise AndroidTVTimeFixerError(locales.get('adb_probe_failed', ip=host, port=port))
+        except Exception:
+            transport.close()
+            raise
         self.logger.info(locales.get_en('adb_tls_connect_ok', ip=serial))
-        return PlatformToolsTransport(self.get_adb_path(), serial, env=self.adb_env)
+        return transport
 
     # ──────────────────────────────────────────────────────────
     # mDNS discovery

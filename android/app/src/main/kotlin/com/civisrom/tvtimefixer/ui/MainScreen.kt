@@ -258,10 +258,14 @@ private fun PairingSection(
 ) {
     var code by rememberSaveable { mutableStateOf("") }
     var connectAddress by rememberSaveable { mutableStateOf("") }
+    val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.pairing_title), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.pairing_hint), style = MaterialTheme.typography.bodySmall)
+        if (!pairingSupported) {
+            Text(stringResource(R.string.error_wireless_unsupported), style = MaterialTheme.typography.bodySmall)
+        }
         // Самая частая причина неудачи: люди подставляют порт спаривания
         // в подключение, потому что оба показаны на одном экране телевизора
         Text(stringResource(R.string.pairing_port_warning), style = MaterialTheme.typography.bodySmall)
@@ -289,7 +293,7 @@ private fun PairingSection(
         )
         Button(
             onClick = { actions.pairAndConnect(pairingAddress, code, connectAddress) },
-            enabled = !state.busy,
+            enabled = !state.busy && pairingSupported,
         ) {
             Text(stringResource(R.string.pairing_action))
         }

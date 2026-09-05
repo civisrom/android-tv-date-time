@@ -12,14 +12,14 @@ android {
     defaultConfig {
         applicationId = "com.civisrom.tvtimefixer"
         // Покрывает и старые приставки Android TV 9/10, и требования kadb-android
-        // (его манифест объявляет minSdkVersion 23). Спаривание Android 11+
-        // включается по факту версии устройства, а не через minSdk.
+        // (его манифест объявляет minSdkVersion 23). TLS pairing requires
+        // Android 10+ on the client, independently of the controlled TV version.
         minSdk = 23
         targetSdk = 36
 
         // CI подставляет github.run_number: Android требует монотонного роста
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: "0.1.0-dev"
+        versionName = System.getenv("VERSION_NAME") ?: "2.6.1-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -201,7 +201,12 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kadb.android)
+    implementation(libs.hidden.api.bypass)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
+    // JVM-only TLS exporter for protocol fixtures; never packaged into the APK.
+    testImplementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
+    testImplementation("com.github.Flyfish233:spake2-java:1.1.1")
+    testImplementation("org.bouncycastle:bcprov-jdk18on:1.84")
 }

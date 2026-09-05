@@ -39,9 +39,13 @@ venv/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
+!.env.sample
 
 # Локальные заметки и исследования: только на машине разработчика
 docs/
+/research/
 
 # Runtime data and secrets
 keys/
@@ -65,5 +69,12 @@ android/.gradle/
 *.iml
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+key.properties
+keystore.properties
+signing.properties
 captures/
 .cxx/

@@ -20,6 +20,10 @@ fun ConnectionError.messageRes(): Int = when (this) {
     ConnectionError.PAIRING_REQUIRED -> R.string.error_pairing_required
     ConnectionError.NOT_AUTHORIZED -> R.string.error_not_authorized
     ConnectionError.PAIRING_REJECTED -> R.string.error_pairing_rejected
+    ConnectionError.PAIRING_TIMEOUT -> R.string.error_pairing_timeout
+    ConnectionError.PAIRING_FAILED -> R.string.error_pairing_failed
+    ConnectionError.TLS_FAILED -> R.string.error_tls_failed
+    ConnectionError.WIRELESS_UNSUPPORTED -> R.string.error_wireless_unsupported
     ConnectionError.UNKNOWN -> R.string.error_unknown
 }
 

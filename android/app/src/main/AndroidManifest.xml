@@ -4,13 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <!-- Обнаружение устройств по mDNS в локальной сети.
-         Android 13-16 требует NEARBY_WIFI_DEVICES, Android 17 (API 37) вводит
-         обязательное ACCESS_LOCAL_NETWORK: без него все сокеты в 192.168.x.x
-         блокируются, а всё приложение построено на локальной сети. -->
-    <uses-permission
-        android:name="android.permission.NEARBY_WIFI_DEVICES"
-        android:usesPermissionFlags="neverForLocation" />
+    <!-- Required on Android 17 only when targeting SDK 37 or newer. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <!-- Одно приложение ставится и на телефон, и на телевизор. Ни одна из этих
@@ -23,6 +17,7 @@
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
 
     <application
+        android:name=".TimeFixerApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/ic_banner"

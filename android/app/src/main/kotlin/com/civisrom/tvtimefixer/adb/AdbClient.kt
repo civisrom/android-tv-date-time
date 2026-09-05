@@ -41,6 +41,18 @@ enum class ConnectionError {
     /** Код спаривания не из шести цифр либо отвергнут устройством. */
     PAIRING_REJECTED,
 
+    /** Pairing did not finish within its network/overall time limit. */
+    PAIRING_TIMEOUT,
+
+    /** The pairing exchange was interrupted or used the wrong endpoint. */
+    PAIRING_FAILED,
+
+    /** TLS negotiation or the Android key exporter failed. */
+    TLS_FAILED,
+
+    /** This client Android version lacks the required TLS provider. */
+    WIRELESS_UNSUPPORTED,
+
     UNKNOWN,
 }
 
