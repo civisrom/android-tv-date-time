@@ -20,7 +20,7 @@ Many televisions and Android TV boxes, particularly in regions with network rest
 
 **Android TV Time Fixer** is a cross-platform utility for Windows, Linux, and macOS, designed to manage NTP server settings on Android TV devices via ADB (Android Debug Bridge).
 
-As of version 2.5.0 the project has two halves:
+As of version 2.6.0 the project has two halves:
 
 *   **The desktop program** — the full-featured console utility described
     below. Windows, Linux, macOS.
@@ -170,15 +170,15 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.5.0.apk` from [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+1.  Download `AndroidTVTimeFixer-2.6.1.apk` from [Releases](https://github.com/civisrom/android-tv-date-time/releases).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.5.0.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.1.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.5.0.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.1.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
@@ -314,17 +314,10 @@ alike: it works out what the device supports and shows it in the list of found
 devices. Details are in
 [Android application](#android-application).
 
-### Honestly, about what has been verified
+### Android App Status
 
-Both halves target this scenario, and the code is written, builds and is covered
-by tests. But **working on a device where only wireless debugging is available
-has not been confirmed by an actual run**: the hardware at hand was Android 11
-with classic network debugging, and everything else was verified on it — network
-discovery, connecting, reading device details, changing the time server.
-
-If you have a Google TV Streamer or a Chromecast on Android 14, you will be the
-first to find out. If something does not work, attach the text the app shows on
-the next launch after a crash to your bug report.
+**The Android app operates in test mode.** When reporting an issue, include
+the device model, Android version and error message.
 
 ## Main Menu
 
@@ -584,8 +577,8 @@ Each row shows the name, the address and the kind of device:
 
 *   **"Network debugging"** — the classic debugging on port 5555. The
     **Connect** button works right away.
-*   **"Ready to connect"** — Android 11+ wireless debugging, already paired.
-    **Connect** works right away too.
+*   **"Ready to connect"** — a wireless ADB TLS endpoint is advertised.
+    This does not prove that this app is paired; a new client may still need a code.
 *   **"Waiting to be paired"** — the pairing dialog is open on the TV. You
     cannot connect until a code is entered, so the button here is **Pair**: it
     puts the address into the pairing form below.
@@ -599,13 +592,11 @@ connecting. Confirm it on the TV screen; ticking "Always allow" saves you from
 repeating it. Until it is confirmed, the app answers "Confirm the debugging
 prompt on the device screen".
 
-**About the permission.** On first launch the app asks for access to nearby
-devices. This is not about location: since Android 13 the system's network
-discovery returns an **empty list without reporting an error** when this
-permission is missing, and since Android 17 connections to `192.168.x.x`
-addresses are cut. Refuse and the app keeps working — the list just stays
-empty and you type the address yourself. Change your mind and a **Grant
-permission** button is waiting on the screen.
+**Permissions.** The system mDNS APIs used here do not require
+`NEARBY_WIFI_DEVICES` on Android 13-16. With the current `targetSdk = 36`,
+Android 17 does not need an extra prompt either. A future target SDK 37
+build must request `ACCESS_LOCAL_NETWORK`; denial affects direct connections
+as well as discovery. See [Android's local-network permission rules](https://developer.android.com/privacy-and-security/local-network-permission).
 
 #### 4. "Pair a device" — the code, for Android 11 and newer
 
@@ -617,15 +608,20 @@ Pairing is only required where developer settings offer **Wireless debugging**.
 If, as on an Nvidia Shield, you only have "Network debugging", pairing is not
 needed at all — connect directly.
 
+TLS pairing requires **Android 10+ on the device running the APK**, independently
+of the TV version. Android 6-9 can still use legacy ADB. The controlled device
+must offer wireless debugging: officially Android 11+ for phones and Android
+13+ for TVs, subject to firmware support. See the [official ADB documentation](https://developer.android.com/tools/adb#connect-to-a-device-over-wi-fi).
+
 **Step by step:**
 
-1. On the TV: **Settings → System → About → Developer options → Wireless
-   debugging → Pair device with pairing code**.
-2. The TV shows a **six-digit code** and a line like `192.168.0.112:41234`.
+1. On the main **Wireless debugging** screen, note the connection address,
+   for example `192.168.0.112:37105`, or discover it through mDNS.
+2. Open **Pair device with pairing code**. The TV shows a **six-digit code**
+   and a line like `192.168.0.112:41234`.
    **That is the pairing address.**
-3. Without closing that dialog, look at the main wireless debugging screen on
-   the TV: it shows a **different address**, for example `192.168.0.112:37105`.
-   **That is the connection address.**
+3. Keep the code dialog open until pairing completes. Closing it may stop the
+   pairing server; do not go back just to read the other port.
 4. Fill in three fields in the app:
 
 | Field | What to enter | Example |
@@ -641,12 +637,23 @@ port are **different**, even though both are shown on the same TV screen and
 both start with the same IP. Put the pairing port in both fields and nothing
 will work.
 
-**The code expires quickly** — about a minute. If the app answers "The device
+**Use the code from the currently open dialog.** If the app answers "The device
 rejected the pairing code", close the dialog on the TV, open it again and take
 a fresh code: the port changes too.
 
 The **Pair** button on a discovered device fills the first field for you — the
 app already knows the pairing address from the network search.
+
+The APK now persists its ADB key in private, non-backed-up storage. Restarting
+the app no longer changes the key. Upgrading from the old in-memory identity
+requires pairing once more. Clearing app data, reinstalling, revoked access or
+expired TV authorization can also require a new code. The pairing code is not
+saved to disk. Deadlines are 10 seconds for TCP, 15 seconds for TLS/read
+inactivity and 60 seconds for the overall pairing operation. App addresses
+currently support IPv4 only.
+
+See the [Android 14 audit](research/wireless-debugging-android14.md) for protocol
+details, source references, fixes and regression tests.
 
 #### 5. "Time server"
 
@@ -734,17 +741,11 @@ Unlike the desktop version there is no subnet scanning, no batch update across
 several TVs, no terminal mode, no favourite servers and no settings export. Use
 the desktop program for those.
 
-### Not verified on real hardware yet
+### TV Mode
 
-*   **TV mode.** Installed on an Android TV itself, the app tries to reach its
-    own debugging service at `127.0.0.1:5555`. Whether a firmware accepts such
-    a connection has not been verified on any device.
-*   **Code pairing** on a real TV.
-*   **Remote control (D-pad) navigation** on a TV: whether focus reaches every
-    button.
-
-Verified on real hardware: network discovery, connecting, reading device
-details, changing the time server.
+When installed on Android TV itself, the APK offers `127.0.0.1:5555` for
+legacy debugging. Whether this connection is accepted depends on the firmware.
+For wireless debugging, use pairing and the current TLS connection port.
 
 
 ## Compatibility
@@ -764,8 +765,9 @@ menu item 11.
 *   Linux (Ubuntu, Debian, Fedora, etc.)
 *   macOS
 
-**Android application:** Android 6.0 and newer; code pairing additionally
-requires Android 11 or newer on the controlled device.
+**Android application:** Android 6.0+ for legacy ADB; TLS pairing requires
+Android 10+ on the client and wireless debugging on the controlled device
+(Android 11+ phones, Android 13+ TVs).
 
 ## License
 

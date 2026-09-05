@@ -39,6 +39,16 @@ work** from the desktop executables and is subject to a different licence — se
 | `org.bouncycastle:bcprov-jdk18on`, `bcpkix-jdk18on`, `bcutil-jdk18on` | MIT |
 | AndroidX, Jetpack Compose, `androidx.tv:tv-material` | Apache-2.0 |
 | Kotlin standard library, `kotlinx-coroutines` | Apache-2.0 |
+| `org.lsposed.hiddenapibypass:hiddenapibypass` 6.1 | Apache-2.0 |
+
+`adb/PairingSession.kt` adapts the framing/socket portion of Kadb 2.1.3's
+`PairingConnectionCtx.kt`, Copyright (c) 2024 Flyfish-Xu, Apache-2.0.
+Changes add socket deadlines, cancellation and typed errors; SPAKE2 and
+authenticated encryption remain in the pinned Kadb dependency.
+`org.conscrypt:conscrypt-openjdk-uber:2.5.2` (Apache-2.0) is used only by JVM
+tests and is not included in the APK. Build and run those tests with JDK 21:
+the published Kadb AAR contains Java 21 class files. App bytecode targets
+Java 17 and the Android minimum version is unchanged.
 
 ## The APK and the GPL
 

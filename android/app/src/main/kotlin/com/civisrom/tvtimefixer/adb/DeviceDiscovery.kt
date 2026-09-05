@@ -13,7 +13,7 @@ data class DiscoveredDevice(
         /** На экране устройства открыт диалог спаривания — нужен код. */
         AWAITING_PAIRING,
 
-        /** Устройство уже спарено и готово к подключению. */
+        /** TLS endpoint is advertised; authorization of this client is not implied. */
         READY_TO_CONNECT,
 
         /** Классическая «отладка по сети» на открытом порту. */

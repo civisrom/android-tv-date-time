@@ -195,11 +195,11 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.confirm != 'YES'
         run: exit 1
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4
@@ -227,6 +227,7 @@ jobs:
             echo "signed=false" >> $GITHUB_OUTPUT
             echo "::warning::ANDROID_KEYSTORE_BASE64 is not set - the APK will be unsigned and will not be attached to the release"
           else
+            umask 077
             printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "signed=true" >> $GITHUB_OUTPUT
           fi
@@ -249,7 +250,12 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew --no-daemon assembleRelease
+        # Do not serialize the signing configuration/passwords into a configuration cache.
+        run: ./gradlew --no-daemon --no-configuration-cache assembleRelease
+
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Package APK
         run: |
@@ -305,6 +311,9 @@ jobs:
       contents: write
     
     steps:
+      - name: Checkout release notes
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
       - name: Download artifacts
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
@@ -319,6 +328,35 @@ jobs:
           else
             echo "tag=v${{ github.run_number }}" >> $GITHUB_OUTPUT
           fi
+
+      - name: Prepare bilingual release notes
+        id: notes
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          DEFAULT_PRERELEASE: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          BODY="$RUNNER_TEMP/release-notes.md"
+          RU="release-notes/$RELEASE_TAG-ru.md"
+          EN="release-notes/$RELEASE_TAG-en.md"
+          if [[ -f "$RU" && -f "$EN" ]]; then
+            cat "$RU" > "$BODY"
+            printf '\n\n---\n\n' >> "$BODY"
+            cat "$EN" >> "$BODY"
+          else
+            printf '%s\n\n' \
+              '**Приложение для Android работает в тестовом режиме.**' \
+              '**The Android app operates in test mode.**' > "$BODY"
+          fi
+          printf '\n\n%s\n\n%s\n' \
+            'APK: GPL-3.0 (LICENSE-GPL-3.0.txt); исходный код проекта и desktop: Apache-2.0.' \
+            'APK: GPL-3.0 (LICENSE-GPL-3.0.txt); project sources and desktop: Apache-2.0.' >> "$BODY"
+          PRERELEASE="$DEFAULT_PRERELEASE"
+          METADATA="release-notes/$RELEASE_TAG.json"
+          if [[ -f "$METADATA" ]]; then
+            PRERELEASE=$(jq -er '.prerelease | select(type == "boolean") | tostring' "$METADATA")
+          fi
+          echo "body=$BODY" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
 
       - name: Create release
         uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
@@ -335,22 +373,7 @@ jobs:
             dist/THIRD-PARTY-NOTICES.md
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
-          body: |
-            **Android APK — экспериментальный.** Приложение ни разу не
-            запускалось на живом телевизоре: собирается, проходит тесты и
-            подписано, но интерфейс и подключение никто не видел в работе.
-            Десктопных сборок это не касается.
-
-            APK распространяется под **GPL-3.0** (`LICENSE-GPL-3.0.txt`):
-            в него линкуется `spake2-java` под этой лицензией, без которого
-            невозможно спаривание по коду на Android 11+. Исходный код проекта
-            остаётся под Apache-2.0, десктопные сборки — тоже.
-
-            ---
-            **The Android APK is experimental** — it has never been run on a
-            real TV. It is distributed under the **GPL-3.0** (see
-            `LICENSE-GPL-3.0.txt`) because it links `spake2-java`; the project
-            sources and the desktop builds stay under Apache-2.0.
+          body_path: ${{ steps.notes.outputs.body }}
           draft: false
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          prerelease: ${{ steps.notes.outputs.prerelease == 'true' }}
           generate_release_notes: true

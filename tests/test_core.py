@@ -491,13 +491,51 @@ class ReliabilityTests(unittest.TestCase):
         fixer._detect_adb_protocol = lambda host, port: 'tls'
 
         connected = subprocess.CompletedProcess(['adb'], 0, stdout='connected to 192.168.1.20:37105')
-        with mock.patch('src.android_time_fixer.subprocess.run', return_value=connected), \
+        probe = subprocess.CompletedProcess(['adb'], 0, stdout='androidtvtimefixer\n')
+        with mock.patch('src.android_time_fixer.subprocess.run', side_effect=[connected, probe]), \
                 contextlib.redirect_stdout(io.StringIO()):
             fixer.connect('192.168.1.20:37105')
 
         self.assertIsInstance(fixer.device, PlatformToolsTransport)
         self.assertEqual(fixer.connected_ip, '192.168.1.20:37105')
         self.assertEqual(fixer.process_manager.device_ip, '192.168.1.20:37105')
+
+    def _platform_tools_fixer(self):
+        fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+        fixer.logger = logging.getLogger('test')
+        fixer.connection_timeout = 30
+        fixer.get_adb_path = lambda: 'adb'
+        fixer.adb_env = adb_env(None, DEFAULT_ADB_SERVER_PORT)
+        return fixer
+
+    def test_platform_tools_rejects_zero_exit_without_connection_confirmation(self) -> None:
+        for output in ('failed to authenticate to 192.168.1.20:37105', '', 'unexpected output',
+                       'connected to 192.168.1.21:37105'):
+            with self.subTest(output=output):
+                result = subprocess.CompletedProcess(['adb'], 0, stdout=output)
+                with mock.patch('src.android_time_fixer.subprocess.run', return_value=result) as run:
+                    with self.assertRaises(AndroidTVTimeFixerError):
+                        self._platform_tools_fixer()._connect_via_platform_tools('192.168.1.20', 37105)
+                    self.assertEqual(run.call_count, 1)
+
+    def test_platform_tools_accepts_daemon_banner_and_existing_connection(self) -> None:
+        for status in ('connected to', 'already connected to'):
+            output = '* daemon started successfully *\n' + status + ' 192.168.1.20:37105\n'
+            results = [subprocess.CompletedProcess(['adb'], 0, stdout=output),
+                       subprocess.CompletedProcess(['adb'], 0, stdout='androidtvtimefixer\n')]
+            with mock.patch('src.android_time_fixer.subprocess.run', side_effect=results) as run:
+                transport = self._platform_tools_fixer()._connect_via_platform_tools('192.168.1.20', 37105)
+                self.assertIsInstance(transport, PlatformToolsTransport)
+                self.assertIn('shell', run.call_args.args[0])
+
+    def test_platform_tools_failed_shell_probe_disconnects(self) -> None:
+        results = [subprocess.CompletedProcess(['adb'], 0, stdout='connected to 192.168.1.20:37105'),
+                   subprocess.CompletedProcess(['adb'], 1, stdout='error: device offline'),
+                   subprocess.CompletedProcess(['adb'], 0, stdout='')]
+        with mock.patch('src.android_time_fixer.subprocess.run', side_effect=results) as run:
+            with self.assertRaises(AndroidTVTimeFixerError):
+                self._platform_tools_fixer()._connect_via_platform_tools('192.168.1.20', 37105)
+            self.assertEqual(run.call_args.args[0], ['adb', 'disconnect', '192.168.1.20:37105'])
 
     # ──────────────────────────────────────────────────────────
     # Порт больше не подразумевается

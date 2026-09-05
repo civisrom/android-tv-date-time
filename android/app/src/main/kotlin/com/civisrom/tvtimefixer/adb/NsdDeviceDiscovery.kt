@@ -9,6 +9,7 @@ import com.civisrom.tvtimefixer.data.DeviceAddress
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -41,12 +42,14 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
     private val lock = Any()
     private val devices = LinkedHashMap<String, DiscoveredDevice>()
     private val listeners = mutableListOf<NsdManager.DiscoveryListener>()
-    private val callbacks = mutableListOf<Pair<String, Any>>()
+    private val callbacks = mutableMapOf<String, Any>()
+    private val services = mutableMapOf<String, Any>()
     private val pending = ArrayDeque<Pair<NsdServiceInfo, DiscoveredDevice.Kind>>()
     private var resolving = false
     private var running = false
     private var closed = false
     private var failures = 0
+    private var generation = 0L
 
     private val flow = MutableStateFlow(
         DiscoveryState(available = true, searching = false, devices = emptyList()),
@@ -55,33 +58,42 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
     override val state: StateFlow<DiscoveryState> = flow
 
     override fun start() {
-        synchronized(lock) {
+        val epoch = synchronized(lock) {
             if (closed || running) return
             running = true
             failures = 0
+            ++generation
         }
         publish()
         SERVICE_TYPES.forEach { (type, kind) ->
-            val listener = discoveryListener(kind)
-            synchronized(lock) { listeners += listener }
-            // Отказ одного типа не должен мешать остальным двум
-            runCatching { nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, listener) }
-                .onFailure { discoveryFailed() }
+            synchronized(lock) {
+                if (!active(epoch)) return
+                val listener = discoveryListener(kind, epoch)
+                listeners += listener
+                runCatching { nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, listener) }
+                    .onFailure { discoveryFailed(epoch) }
+            }
         }
     }
 
     override fun stop() {
         val stopping: List<NsdManager.DiscoveryListener>
+        val unregistering: List<Any>
         synchronized(lock) {
             if (!running) return
             running = false
+            generation++
             stopping = listeners.toList()
             listeners.clear()
             devices.clear()
             pending.clear()
+            resolving = false
+            services.clear()
+            unregistering = callbacks.values.toList()
+            callbacks.clear()
         }
         stopping.forEach { runCatching { nsd.stopServiceDiscovery(it) } }
-        unregisterCallbacks()
+        unregistering.forEach(::unregisterCallback)
         publish()
     }
 
@@ -96,12 +108,14 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
 
     // ── Обнаружение ──────────────────────────────────────────────────────
 
-    private fun discoveryListener(kind: DiscoveredDevice.Kind) =
+    private fun active(epoch: Long) = running && !closed && generation == epoch
+
+    private fun discoveryListener(kind: DiscoveredDevice.Kind, epoch: Long) =
         object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) = Unit
 
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) =
-                discoveryFailed()
+                discoveryFailed(epoch)
 
             override fun onDiscoveryStopped(serviceType: String) = Unit
 
@@ -112,61 +126,90 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
                 // прошивки отдают его в разном виде, и только он разделяет
                 // порт спаривания и порт подключения
                 val found = serviceKindOf(info.serviceType) ?: kind
-                enqueue(info, found)
+                enqueue(info, found, epoch)
             }
 
             override fun onServiceLost(info: NsdServiceInfo) {
-                synchronized(lock) { devices.remove(keyOf(info.serviceName, kind)) }
+                val found = serviceKindOf(info.serviceType) ?: kind
+                val callback = synchronized(lock) {
+                    if (!active(epoch)) return
+                    val key = keyOf(info.serviceName, found)
+                    devices.remove(key)
+                    services.remove(key)
+                    pending.removeAll { keyOf(it.first.serviceName, it.second) == key }
+                    callbacks.remove(key)
+                }
+                callback?.let(::unregisterCallback)
                 publish()
             }
         }
 
     /** Все три типа могут не запуститься — тогда обнаружения нет вовсе. */
-    private fun discoveryFailed() {
-        synchronized(lock) { failures += 1 }
+    private fun discoveryFailed(epoch: Long) {
+        synchronized(lock) {
+            if (!active(epoch)) return
+            failures += 1
+        }
         publish()
     }
 
     // ── Резолв: по одному за раз ─────────────────────────────────────────
 
-    private fun enqueue(info: NsdServiceInfo, kind: DiscoveredDevice.Kind) {
+    @SuppressLint("NewApi")
+    private fun enqueue(info: NsdServiceInfo, kind: DiscoveredDevice.Kind, epoch: Long) {
         synchronized(lock) {
-            if (!running) return
+            if (!active(epoch)) return
+            val key = keyOf(info.serviceName, kind)
+            if (services.containsKey(key)) return
+            val token = Any()
+            services[key] = token
+            // API 34 subscriptions are continuous; an initial update is not guaranteed.
+            // Never put them behind the pre-34 one-shot resolver queue.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                registerInfoCallback(info, kind, epoch, token)
+                return
+            }
             pending.addLast(info to kind)
             if (resolving) return
             resolving = true
         }
-        resolveNext()
+        resolveNext(epoch)
     }
 
-    private fun resolveNext() {
-        val next = synchronized(lock) {
+    @Suppress("DEPRECATION")
+    private fun resolveNext(epoch: Long) {
+        synchronized(lock) {
+            if (!active(epoch)) return
             val item = pending.removeFirstOrNull()
-            if (item == null) resolving = false
-            item
-        } ?: return
-        val (info, kind) = next
-        runCatching { resolve(info, kind) }.onFailure { resolveNext() }
-    }
-
-    @SuppressLint("NewApi")
-    private fun resolve(info: NsdServiceInfo, kind: DiscoveredDevice.Kind) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            registerInfoCallback(info, kind)
-        } else {
-            @Suppress("DEPRECATION")
-            nsd.resolveService(info, resolveListener(kind))
+            if (item == null) {
+                resolving = false
+                return
+            }
+            val (info, kind) = item
+            val key = keyOf(info.serviceName, kind)
+            val token = services[key] ?: return resolveNext(epoch)
+            runCatching { nsd.resolveService(info, resolveListener(kind, epoch, key, token)) }
+                .onFailure {
+                    services.remove(key)
+                    resolveNext(epoch)
+                }
         }
     }
 
     @Suppress("DEPRECATION")
-    private fun resolveListener(kind: DiscoveredDevice.Kind) =
+    private fun resolveListener(kind: DiscoveredDevice.Kind, epoch: Long, key: String, token: Any) =
         object : NsdManager.ResolveListener {
-            override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = resolveNext()
+            override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) {
+                synchronized(lock) {
+                    if (!active(epoch)) return
+                    if (services[key] === token) services.remove(key)
+                }
+                resolveNext(epoch)
+            }
 
             override fun onServiceResolved(info: NsdServiceInfo) {
-                remember(info, kind)
-                resolveNext()
+                remember(info, kind, epoch, key, token)
+                resolveNext(epoch)
             }
         }
 
@@ -175,39 +218,55 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
      * `registerServiceInfoCallback` вдобавок присылает обновления адреса.
      */
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    private fun registerInfoCallback(info: NsdServiceInfo, kind: DiscoveredDevice.Kind) {
-        val name = info.serviceName
+    private fun registerInfoCallback(info: NsdServiceInfo, kind: DiscoveredDevice.Kind, epoch: Long, token: Any) {
+        val key = keyOf(info.serviceName, kind)
         val callback = object : NsdManager.ServiceInfoCallback {
-            override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) = resolveNext()
+            override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
+                synchronized(lock) {
+                    if (!active(epoch) || services[key] !== token) return
+                    services.remove(key)
+                    callbacks.remove(key)
+                }
+            }
 
             override fun onServiceUpdated(info: NsdServiceInfo) {
-                remember(info, kind)
-                resolveNext()
+                remember(info, kind, epoch, key, token)
             }
 
             override fun onServiceLost() {
-                synchronized(lock) { devices.remove(keyOf(name, kind)) }
+                synchronized(lock) {
+                    if (!active(epoch) || services[key] !== token) return
+                    devices.remove(key)
+                }
                 publish()
             }
 
             override fun onServiceInfoCallbackUnregistered() = Unit
         }
-        synchronized(lock) { callbacks += name to callback }
-        nsd.registerServiceInfoCallback(info, resolver, callback)
+        callbacks[key] = callback
+        runCatching {
+            nsd.registerServiceInfoCallback(info, { task ->
+                try {
+                    resolver.execute(task)
+                } catch (_: RejectedExecutionException) {
+                    // Late framework delivery after close; the session is already invalid.
+                }
+            }, callback)
+        }.onFailure {
+            callbacks.remove(key)
+            services.remove(key)
+        }
     }
 
     @SuppressLint("NewApi")
-    private fun unregisterCallbacks() {
+    private fun unregisterCallback(callback: Any) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
-        val current = synchronized(lock) { callbacks.toList().also { callbacks.clear() } }
-        current.forEach { (_, callback) ->
-            runCatching { nsd.unregisterServiceInfoCallback(callback as NsdManager.ServiceInfoCallback) }
-        }
+        runCatching { nsd.unregisterServiceInfoCallback(callback as NsdManager.ServiceInfoCallback) }
     }
 
     // ── Состояние ────────────────────────────────────────────────────────
 
-    private fun remember(info: NsdServiceInfo, kind: DiscoveredDevice.Kind) {
+    private fun remember(info: NsdServiceInfo, kind: DiscoveredDevice.Kind, epoch: Long, key: String, token: Any) {
         val host = hostOf(info) ?: return
         val port = info.port
         if (port !in 1..65535) return
@@ -216,19 +275,21 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
             address = DeviceAddress(host, port),
             kind = kind,
         )
-        synchronized(lock) { devices[keyOf(info.serviceName, kind)] = device }
+        synchronized(lock) {
+            if (!active(epoch) || services[key] !== token) return
+            devices[key] = device
+        }
         publish()
     }
 
     private fun publish() {
-        val snapshot = synchronized(lock) {
-            DiscoveryState(
+        synchronized(lock) {
+            flow.value = DiscoveryState(
                 available = failures < SERVICE_TYPES.size,
                 searching = running,
                 devices = devices.values.toList(),
             )
         }
-        flow.value = snapshot
     }
 
     private companion object {
@@ -240,7 +301,7 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
 
         fun keyOf(name: String?, kind: DiscoveredDevice.Kind) = kind.name + "|" + name.orEmpty()
 
-        /** IPv4 предпочтительнее: adb по сети живёт именно там. */
+        /** The address input/parser currently supports IPv4 only, unlike ADB itself. */
         @SuppressLint("NewApi")
         fun hostOf(info: NsdServiceInfo): String? {
             val addresses: List<InetAddress> =
@@ -250,8 +311,7 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
                     @Suppress("DEPRECATION")
                     listOfNotNull(info.host)
                 }
-            val chosen = addresses.firstOrNull { it is Inet4Address } ?: addresses.firstOrNull()
-            return chosen?.hostAddress?.substringBefore('%')
+            return addresses.firstOrNull { it is Inet4Address }?.hostAddress
         }
     }
 }

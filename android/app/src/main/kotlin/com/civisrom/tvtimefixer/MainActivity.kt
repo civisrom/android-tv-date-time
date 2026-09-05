@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
         if (results.values.all { it }) {
             startDiscovery()
         } else {
-            // Отказ не ломает приложение: адрес всегда можно ввести руками
+            // LAN denial on target 37+ also blocks direct connections.
             state = state.copy(discoveryPermissionNeeded = true)
         }
     }
@@ -75,20 +75,22 @@ class MainActivity : ComponentActivity() {
         private fun run(block: suspend () -> AppState) {
             state = state.copy(busy = true)
             lifecycleScope.launch {
-                state = try {
-                    block()
+                try {
+                    state = block()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     // Молчаливое исчезновение ошибки хуже некрасивого текста:
                     // человек иначе не поймёт, почему ничего не произошло
-                    state.copy(
+                    state = state.copy(
                         message = UiMessage(
                             R.string.action_failed,
                             listOf(e.message ?: e.javaClass.simpleName),
                         ),
                     )
-                }.copy(busy = false)
+                } finally {
+                    state = state.copy(busy = false)
+                }
             }
         }
 
@@ -273,7 +275,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun missingDiscoveryPermissions(): List<String> =
-        discoveryPermissions(Build.VERSION.SDK_INT).filter {
+        discoveryPermissions(Build.VERSION.SDK_INT, applicationInfo.targetSdkVersion).filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
 
