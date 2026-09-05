@@ -235,9 +235,21 @@ automatically on first launch.
 Look for **one** of these entries under Developer options. Which one you get
 depends on the firmware, not on the Android version.
 
-**Option A — "Network debugging" (classic).** Present on most TVs and boxes:
-Xiaomi, TCL, Nvidia Shield, Fire TV. Just turn the switch on. The device starts
-listening on port **5555**, and the program only needs its IP address.
+**Option A — classic network debugging.** Firmware may label its switch
+**Network debugging**, **ADB debugging**, or even **USB debugging**. If the
+device exposes legacy ADB on port **5555**, the program only needs its IP
+address regardless of the label used in Settings.
+
+> **Xiaomi Mi TV and Mi Box.** Some Xiaomi models and firmware versions have no
+> separate Network debugging entry. Xiaomi itself documents a single **ADB
+> debugging** control under Account & Security for these devices. On some
+> models, enabling that control (labelled USB debugging in certain translations)
+> also exposes ADB over the local network on port **5555**. Enter the TV's IP
+> address manually and the program will supply port 5555. This is not guaranteed
+> for every Xiaomi TV and can change with firmware; if the port remains closed,
+> use a separate network/wireless debugging option or configure ADB over USB by
+> the standard method. See [Xiaomi's official instructions](https://www.mi.com/sg/support/article/KA-06513/)
+> and [a model-specific owner report for Mi TV 4A/4S](https://4pda.to/forum/index.php?showtopic=957045&st=6200).
 
 **Option B — "Wireless debugging" (Android 11+).** The only option on Google TV
 Streamer and Chromecast with Google TV after the Android 14 update. Turn the
