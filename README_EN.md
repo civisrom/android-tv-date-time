@@ -108,8 +108,12 @@ As of version 2.6.0 the project has two halves:
     *   A separate APK: change the NTP server straight from a phone, no computer
     *   One file for two scenarios — from a phone to the TV over the network,
         or installed on the Android TV itself
-    *   Pairing with a 6-digit code for Android 11+ wireless debugging
-    *   mDNS discovery on the local network: no need to know the IP or the port
+    *   Full modern Wireless debugging support: 6-digit code pairing,
+        persistent ADB identity and subsequent TLS connections
+    *   mDNS discovery of separate pairing and connection services, with the
+        correct dynamic port selected for each operation
+    *   A guided "find TV → pair → connect → check NTP → apply → read back"
+        workflow without a terminal or manually assembled ADB commands
     *   The same NTP server reference as the desktop version — both are
         generated from one shared file, so they cannot drift apart:
         77 countries and 45 alternative servers
@@ -257,36 +261,57 @@ For enhanced security, it is recommended to disable developer mode once the NTP
 server is configured. The NTP server you set is stored in the system and
 survives reboots — debugging is only needed while you configure it.
 
-## Devices where only wireless debugging is left
+## Modern wireless debugging on Android TV
 
-This section explains why the new versions of both programs exist. If your TV or
-box still has the familiar **Network debugging** entry in developer options, you
-do not need it — everything works the old way.
+This section explains why both programs support modern, paired **Wireless
+debugging** in addition to classic network ADB.
+
+The protocol version and the TV's Android version are not the same thing.
+Modern Wireless debugging was introduced for phones in Android 11, with official
+TV support starting at Android 13. It matters particularly on Android TV /
+Google TV 14 devices whose firmware exposes it as the only network ADB mode.
+Android 14 did not introduce another incompatible protocol; it is the update
+after which many TV users first encounter this mode instead of classic Network
+debugging.
 
 ### The problem
 
-On the **Google TV Streamer** and **Chromecast with Google TV**, updating to
-Android 14 **removed Network debugging from developer options**. Only the
-**Wireless debugging** screen with code pairing is left.
+On some current Google TV devices, including **Google TV Streamer** and updated
+**Chromecast with Google TV** units, developer options offer the paired
+**Wireless debugging** screen instead of classic **Network debugging**.
 
 That breaks every older instruction you will find online: `adb tcpip 5555`,
 connecting on port 5555, "turn on network debugging and connect by IP". People
 reach the step "turn on network debugging", find no such entry, and are stuck.
 This is exactly the case both programs were updated for.
 
-### Why you cannot simply write the port down
+### How the modern mode differs
 
-Android 11+ wireless debugging works differently from the old mode:
+| | Classic Network debugging | Modern Wireless debugging |
+|---|---|---|
+| First access | RSA confirmation or an already authorized client | mandatory pairing with a 6-digit code |
+| Port | usually fixed at `5555` | separate, dynamic pairing and connection ports |
+| Discovery | IP and port are commonly entered by hand | services are advertised on the LAN through mDNS |
+| Transport | plain ADB TCP | authenticated TLS connection after pairing |
+| Reuse | a saved address often works again | trust persists, but the current port can change |
 
-*   **Pairing is required.** The device refuses connections until you enter a
-    six-digit code from its screen once.
+This creates three important rules:
+
+*   **Pairing is required.** A new client is refused until you enter the
+    six-digit code from the currently open dialog. The key remains trusted
+    until authorization is revoked, app data is cleared, or the app is reinstalled.
 *   **The ports are random.** Pairing and connecting use **different** ports,
     and both change every time wireless debugging is switched on. There is
     nothing to write down and reuse.
 *   **The connection is encrypted.** Older ADB clients simply do not speak it.
 
-That is why mDNS discovery is not a convenience here but a necessity: it is the
-only thing that saves you from copying changing ports off the TV screen.
+mDNS therefore solves a real usability problem: the program obtains the current
+pairing and connection endpoints from the device's own advertisements instead
+of making you copy changing ports from the TV. Both addresses can still be
+entered manually when a router blocks multicast.
+
+See the [official Android Debug Bridge documentation](https://developer.android.com/tools/adb#connect-to-a-device-over-wi-fi)
+for platform requirements and the standard pairing procedure.
 
 ### What the new desktop version gives you
 
@@ -296,22 +321,39 @@ only thing that saves you from copying changing ports off the TV screen.
     finds the TV itself and offers it by number, with the correct port.
 *   **Automatic protocol detection.** A device may speak the old protocol or the
     encrypted one — the program probes and picks the right path by itself.
+*   **A verified connection.** The program runs a short shell probe instead of
+    trusting `adb connect`, so an advertised endpoint that has not accepted the
+    key is not presented as connected.
 *   **Its own ADB server.** It does not disturb your `adb` or kill Android
     Studio sessions.
+*   **The complete task in one interface.** Once connected, NTP selection and
+    validation, reading the current value, device details, batch operations and
+    the terminal are immediately available.
 
 Step-by-step instructions are in
 [Item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 
 ### What the Android application gives you
 
-The same thing, **with no computer at all**. The scenario this was built for
-looks like this: the power went out, the TV clock is wrong, apps stopped
-opening. With the app you just pick up the phone that is already in your hand —
-no sitting down at a computer, no cable, no installing ADB.
+The same thing, **with no computer at all**. A power interruption can leave the
+TV with a wrong clock and break HTTPS or internet apps. With the APK you use a
+phone on the same Wi-Fi network: no USB cable, Android SDK, command line or
+manual `adb` installation is required.
 
-The app handles code pairing, mDNS discovery and the old network debugging
-alike: it works out what the device supports and shows it in the list of found
-devices. Details are in
+This is more than a remote command prompt. It guides the user through the whole
+task and handles the protocol details itself:
+
+*   discovers pairing and ready-to-connect services separately;
+*   accepts the one-time six-digit code and creates a persistent ADB identity;
+*   opens the encrypted connection and verifies it with a real command;
+*   reports an actionable failure reason instead of raw shell output;
+*   validates the selected server with a real SNTP request before changing it;
+*   applies the NTP setting and reads it back from the TV as confirmation;
+*   still supports classic Network debugging where no pairing is required.
+
+The same APK can run on a phone/tablet as a setup remote or on the Android TV
+itself. In the latter case it can connect back to that TV, so changing NTP does
+not require a second device. Details are in
 [Android application](#android-application).
 
 ### Android App Status
@@ -510,8 +552,16 @@ Closes the program.
 
 ## Android application
 
-A separate APK that does what the desktop program does, but from a phone — or
-straight from the TV it is installed on. No computer involved.
+The APK turns a phone, tablet or the TV itself into a purpose-built NTP setup
+tool over ADB. It supports classic port 5555 as well as modern Wireless
+debugging with pairing, dynamic ports, mDNS discovery and an encrypted
+connection. Users get guided actions and result verification instead of having
+to know ADB commands.
+
+The main workflow is straightforward: discover the TV, pair once with the code,
+connect through the current connection port, validate the selected time server,
+apply it, and read the value back from the device. This can all be done from a
+phone or directly on the TV, without a computer.
 
 ### Before you start
 
