@@ -30,7 +30,17 @@
 
 ## Скриншоты
 
+### Программа для компьютера
+
 ![Главное меню](screenshots/ru.png)
+
+### Приложение для Android
+
+<p align="center">
+  <img src="screenshots/photo_apk_ru1.jpg" alt="Подключение к Android TV" width="30%">
+  <img src="screenshots/photo_apk_ru2.jpg" alt="Поиск NTP-сервера" width="30%">
+  <img src="screenshots/photo_apk_ru3.jpg" alt="Настройка NTP-сервера" width="30%">
+</p>
 
 ## Основные возможности
 
