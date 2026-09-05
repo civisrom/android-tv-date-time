@@ -315,20 +315,44 @@ for platform requirements and the standard pairing procedure.
 
 ### What the new desktop version gives you
 
-*   **Code pairing from inside the program** — no separate `adb` from the
-    Android SDK to install, it is bundled.
-*   **mDNS discovery in every menu item** that asks for an address: the program
-    finds the TV itself and offers it by number, with the correct port.
-*   **Automatic protocol detection.** A device may speak the old protocol or the
-    encrypted one — the program probes and picks the right path by itself.
+The desktop version for **Windows, Linux and macOS** fully supports modern
+Wireless debugging. This is not exclusive to the Android APK: the desktop build
+can discover the new ADB services, pair with a code and connect through the
+protected connection endpoint. Android Studio, SDK Platform Tools and a separate
+system `adb` installation are not required.
+
+*   **The same workflow on all three operating systems.** Discovery, pairing,
+    reconnecting and every NTP operation are available on Windows, Linux and
+    macOS. Only ADB file isolation differs: Linux and macOS keep those files next
+    to the program, while on Windows the `adb` process selects its profile path.
+*   **Code pairing inside the program.** Open "Pair device with pairing code" on
+    the TV, select the discovered entry or enter its pairing address, then enter
+    the six digits. The bundled `adb` performs pairing and keeps the trusted
+    identity for later connections.
+*   **Separate mDNS service discovery.** The program distinguishes an endpoint
+    waiting for pairing from an endpoint ready for an encrypted connection. It
+    therefore does not mistake the pairing port for the connection port.
+*   **The current dynamic port throughout the interface.** Every menu item that
+    needs an address can discover the TV and offer it as a numbered choice. This
+    remains useful after Wireless debugging restarts and assigns another port.
+    Manual address entry remains available when a router blocks mDNS.
+*   **Automatic classic/modern ADB selection.** Classic Network debugging on
+    port 5555 remains supported. Modern Wireless debugging uses code pairing and
+    a protected TLS connection without asking the user to choose a transport.
 *   **A verified connection.** The program runs a short shell probe instead of
     trusting `adb connect`, so an advertised endpoint that has not accepted the
     key is not presented as connected.
 *   **Its own ADB server.** It does not disturb your `adb` or kill Android
     Studio sessions.
-*   **The complete task in one interface.** Once connected, NTP selection and
-    validation, reading the current value, device details, batch operations and
-    the terminal are immediately available.
+*   **Every feature remains available after Wireless pairing.** The protected
+    connection supports NTP selection and validation, reading the current value,
+    device details, batch operations and the terminal just like classic ADB.
+    Pairing is the access method, not a separate limited application mode.
+
+For the user, this means that an Android 14 TV remains manageable even when its
+firmware no longer offers classic Network debugging. The desktop program handles
+the complete path from the six-digit code and changing ports to a verified
+connection and the final NTP update.
 
 Step-by-step instructions are in
 [Item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
