@@ -111,8 +111,8 @@ jobs:
         run: |
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
-          sdkmanager "emulator" "system-images;android-${UI_TEST_API};google_apis;x86_64"
-          echo no | avdmanager create avd --force --name ui-test \
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "system-images;android-${UI_TEST_API};google_apis;x86_64"
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
             --package "system-images;android-${UI_TEST_API};google_apis;x86_64" --device pixel_2
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
             -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 \
