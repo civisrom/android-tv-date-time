@@ -718,7 +718,7 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
  * `primary` на светлой теме фиолетовый и о состоянии ничего не говорит.
  * Отказ при этом берёт `error` из темы — там подходящая роль есть.
  */
-private val ConnectedColor = Color(0xFF1B7F3B)
+private val ConnectedColor = Color(0xFF166534)
 
 /**
  * Название страны на языке интерфейса.
