@@ -34,6 +34,10 @@ As of version 2.6.0 the project has two halves:
 
 ## Key Features
 
+*   **USB connections:** Windows, Linux, macOS and Android devices with USB
+    host/OTG. Select a specific device and manage NTP without an IP address.
+    See [USB debugging](#usb-debugging).
+
 *   **Multilingual Interface:**
     *   Support for English and Russian languages
     *   Language selection at program startup
@@ -230,7 +234,10 @@ automatically on first launch.
 2.  Click on the **"Build"** item 7 times to unlock developer mode.
 3.  Go to: **Device Preferences** > **Developer options**.
 
-### Step 2. Enable debugging — one of two ways
+### Step 2. Enable debugging — USB or one of the network options
+
+For a cable connection, enable **USB debugging** and follow
+[USB debugging](#usb-debugging). The options below apply to network connections.
 
 Look for **one** of these entries under Developer options. Which one you get
 depends on the firmware, not on the Android version.
@@ -251,7 +258,7 @@ address regardless of the label used in Settings.
 > the standard method. See [Xiaomi's official instructions](https://www.mi.com/sg/support/article/KA-06513/)
 > and [a model-specific owner report for Mi TV 4A/4S](https://4pda.to/forum/index.php?showtopic=957045&st=6200).
 
-**Option B — "Wireless debugging" (Android 11+).** The only option on Google TV
+**Option B — "Wireless debugging" (Android 11+).** The network option on Google TV
 Streamer and Chromecast with Google TV after the Android 14 update. Turn the
 switch on and **leave the screen open** — the ports shown there are random and
 change. Then use **item 11** of the main menu (see the "Wireless debugging"
@@ -411,6 +418,7 @@ the device model, Android version and error message.
  9. Auto-setup NTP server (experimental mode)
 10. Terminal mode (ADB and system commands)
 11. Android 11+ wireless debugging (pairing and mDNS discovery)
+12. Connect over USB
  0. Exit
 ```
 
@@ -586,6 +594,58 @@ device information, terminal.
 
 Closes the program.
 
+## USB debugging
+
+The current application version appears in the Windows, Linux and macOS
+main menu and below the application title on Android’s main screen.
+
+Use a **data cable**, enable **USB debugging** on the target Android device,
+and accept its RSA authorization prompt. The target TV/box must expose ADB
+through a supported device/OTG port. A host-only port intended for USB drives
+cannot provide this connection; check the manufacturer’s port documentation.
+An Android phone controlling the target must support USB host/OTG.
+[Android USB host model](https://developer.android.com/develop/connectivity/usb/host).
+
+**Windows, Linux and macOS:**
+
+1. Connect the target to the computer and enable USB debugging on the target.
+2. Choose **12. Connect over USB**, then select the device. You can also enter
+   `u` in the address prompts for menu items 1, 2 and 5.
+3. If authorization is needed, accept the RSA prompt on the target, press `r`
+   to refresh the list, and select it again.
+4. Once the connection is verified, use the usual NTP and device-information
+   menu items. Press Enter at the next address prompt to reuse the selected USB device.
+
+Windows may require an [OEM ADB driver](https://developer.android.com/studio/run/oem-usb).
+On Ubuntu/Debian, install the `android-sdk-platform-tools-common` udev rules
+and check `plugdev` membership if USB access is denied; log in again after
+changing groups. macOS normally needs no separate ADB driver.
+[Official workstation setup](https://developer.android.com/studio/run/device).
+
+Releases bundle ADB 37.0.1. When running from source, install Platform Tools
+and put `adb` on `PATH`, or put the binary in the project’s `resources/`
+directory (Windows also needs `AdbWinApi.dll` and `AdbWinUsbApi.dll`). The
+application uses its own ADB server. Another server may already own the USB
+interface: close that session and reconnect the cable. Other processes are
+not terminated automatically. Terminal mode accepts regular commands such as
+`adb devices -l`, `adb -d shell ...` and `adb -s SERIAL shell ...`.
+
+**Android application:**
+
+1. Connect the controlling phone/tablet to the target using OTG and a data cable.
+2. In **USB debugging**, refresh the list and choose **Connect via USB**.
+3. Allow USB access in the phone’s system dialog, then accept the separate
+   RSA prompt on the target. These are two different permissions.
+4. After the connection probe succeeds, NTP settings and device information
+   are available. Unplugging closes the session; select the device again to
+   reconnect. Root and a six-digit pairing code are not required for USB.
+
+USB ADB does not require a shared Wi-Fi network. NTP probing still uses the
+controller’s Internet connection, and the TV needs access to the selected NTP
+server for subsequent synchronization. The application does not enable
+debugging automatically or switch the target to `adb tcpip`. Network scanning
+and batch network operations continue to use IP addresses.
+
 ## Android application
 
 The APK turns a phone, tablet or the TV itself into a purpose-built NTP setup
@@ -601,11 +661,13 @@ phone or directly on the TV, without a computer.
 
 ### Before you start
 
-1. **The phone and the TV must be on the same Wi-Fi network.** Not "home" and
+1. **For network ADB, the phone and TV must be on the same Wi-Fi network.** Not "home" and
    "guest" — the same one, or they will not see each other.
 2. **Developer mode and debugging must be on** on the TV. How to do that is in
    [Android TV Setup](#android-tv-setup) above; it is the same for both programs.
-3. Turn mobile data off on the phone: otherwise some requests may leave through
+   USB uses OTG and a data cable instead of the shared network; see
+   [USB debugging](#usb-debugging).
+3. For network ADB, turn mobile data off on the phone: otherwise some requests may leave through
    the cellular network instead of Wi-Fi.
 
 ### The screen, top to bottom
@@ -616,7 +678,7 @@ them.
 #### 1. Title and mode
 
 One line under the name: "Running on a phone: it will connect to a TV over the
-network" or "Running on a TV". The app works this out by itself; nothing to set.
+network or USB" or "Running on a TV". The app works this out by itself; nothing to set.
 
 #### 2. "Connect to a device"
 
@@ -838,20 +900,22 @@ For wireless debugging, use pairing and the current TLS connection port.
 
 The program has been tested and should work on Android TV devices (including Nvidia Shield) that meet the following requirements:
 
-*   ADB over the network — in either flavour: the classic "Network debugging"
+*   ADB over USB through a supported port, or over the network: classic "Network debugging"
     (port 5555) or Android 11+ "Wireless debugging" with a pairing code.
 *   Support for NTP server management via `adb shell` commands.
 
-Verified on devices from Android 9 to 16. On Google TV Streamer and Chromecast
-with Google TV updated to Android 14 only wireless debugging is available — use
-menu item 11.
+Network mode was verified on devices from Android 9 to 16. For network
+connections to Google TV Streamer and Chromecast with Google TV updated to
+Android 14, use wireless debugging in menu item 11. USB availability depends
+on the individual device’s port and firmware.
 
 **Supported Operating Systems:**
 *   Windows 10/11
 *   Linux (Ubuntu, Debian, Fedora, etc.)
 *   macOS
 
-**Android application:** Android 6.0+ for legacy ADB; TLS pairing requires
+**Android application:** Android 6.0+ for legacy ADB and USB host/OTG; USB host
+hardware support is required. TLS pairing requires
 Android 10+ on the client and wireless debugging on the controlled device
 (Android 11+ phones, Android 13+ TVs).
 

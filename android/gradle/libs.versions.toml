@@ -9,7 +9,8 @@ composeBom = "2026.08.00"
 # AndroidResolveListener вызывают сами себя вместо переданной лямбды и роняют
 # процесс StackOverflowError на первом же найденном устройстве. Обнаружение
 # написано поверх системного NsdManager — см. adb/NsdDeviceDiscovery.kt
-# PairingSession reuses internal crypto APIs: rerun protocol tests before upgrading.
+# PairingSession и UsbAdbIdentity используют internal crypto API:
+# перед обновлением повторить pairing/USB protocol tests.
 kadb = "2.1.3"
 hiddenApiBypass = "6.1"
 coreKtx = "1.19.0"

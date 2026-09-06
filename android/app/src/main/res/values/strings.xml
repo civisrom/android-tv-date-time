@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="usb_title">USB debugging</string>
+    <string name="usb_setup_hint">Connect this phone/tablet as a USB host (OTG) to the target device’s supported device/OTG port using a data cable. Enable USB debugging on the target. A host-only TV USB port cannot be used for this connection.</string>
+    <string name="usb_authorize_hint">Allow USB access on this device, then unlock the target and confirm its RSA debugging prompt. Authorization may take up to a minute.</string>
+    <string name="usb_refresh">Refresh USB devices</string>
+    <string name="usb_empty">No USB ADB devices found. Check the cable, USB roles and debugging setting.</string>
+    <string name="usb_connect">Connect via USB</string>
+    <string name="usb_connected">Connected via USB</string>
+    <string name="error_usb_unsupported">This device does not support USB host mode. Use a compatible phone/tablet with OTG or a desktop computer.</string>
+    <string name="error_usb_permission">USB access was denied, cancelled or timed out. Press Connect and allow access in the system dialog.</string>
+    <string name="error_usb_disconnected">The USB device was disconnected. Reconnect the cable, refresh the list and select the device again.</string>
+    <string name="error_usb_busy">Cannot open the ADB USB interface. Close other USB/ADB applications and reconnect the cable.</string>
+    <string name="error_usb_io">USB ADB communication failed. Check the data cable, USB debugging and authorization on the target, then reconnect.</string>
     <string name="app_name">Android TV Time Fixer</string>
+    <string name="app_version">Version %1$s</string>
 
     <!-- Режимы работы -->
     <string name="mode_television">Running on a TV: it will connect to this device itself.</string>
-    <string name="mode_handheld">Running on a phone: it will connect to a TV over the network.</string>
+    <string name="mode_handheld">Running on a phone: connect to a TV over the network or USB.</string>
 
     <!-- Подключение -->
     <string name="connect_title">Connect to a device</string>

@@ -32,12 +32,20 @@ jobs:
         include:
           - os: ubuntu-22.04
             python: '3.11'
+            adb_platform: linux
+            adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
           - os: ubuntu-22.04
             python: '3.12'
+            adb_platform: linux
+            adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
           - os: windows-latest
             python: '3.11'
+            adb_platform: win
+            adb_sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
           - os: macos-latest
             python: '3.11'
+            adb_platform: darwin
+            adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
 
@@ -68,3 +76,45 @@ jobs:
 
       - name: Run regression tests
         run: poetry run python -m unittest discover -s tests -v
+
+      # Проверяем native ADB: моки не обнаруживают различия его ОС-бэкендов
+      # и правил автозапуска сервера. Никакие устройства CI не изменяет.
+      - name: Prepare verified Platform Tools for USB tests and packaging
+        shell: bash
+        env:
+          ADB_PLATFORM: ${{ matrix.adb_platform }}
+          ADB_SHA256: ${{ matrix.adb_sha256 }}
+        run: |
+          curl --fail --show-error --location --retry 3 \
+            "https://dl.google.com/android/repository/platform-tools_r37.0.1-${ADB_PLATFORM}.zip" \
+            -o "$RUNNER_TEMP/usb-platform-tools.zip"
+          python - <<'PY'
+          import hashlib, os, pathlib, zipfile
+          archive = pathlib.Path(os.environ['RUNNER_TEMP']) / 'usb-platform-tools.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == os.environ['ADB_SHA256'], 'ADB SHA256 mismatch'
+          destination = pathlib.Path('resources')
+          destination.mkdir(exist_ok=True)
+          names = ['adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll'] if os.name == 'nt' else ['adb']
+          with zipfile.ZipFile(archive) as source:
+              for name in names:
+                  target = destination / name
+                  target.write_bytes(source.read('platform-tools/' + name))
+                  target.chmod(0o755)
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('USB_TEST_ADB=' + str(destination / names[0]) + '\n')
+          PY
+
+      - name: Probe native USB discovery
+        shell: bash
+        run: poetry run python scripts/probe_usb_adb.py --adb "$USB_TEST_ADB"
+
+      - name: Build and smoke-test desktop executable
+        shell: bash
+        run: |
+          poetry run python scripts/generate_icon.py
+          poetry run pyinstaller --clean --noconfirm pyinstaller.spec
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            ./dist/AndroidTVTimeFixer.exe --version
+          else
+            ./dist/AndroidTVTimeFixer --version
+          fi

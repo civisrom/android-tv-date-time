@@ -18,6 +18,8 @@ import signal
 import threading
 import tempfile
 import subprocess
+import ast
+from dataclasses import dataclass
 from subprocess import Popen, PIPE
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, Tuple, List
@@ -111,7 +113,13 @@ def adb_env(adb_home: Optional[Path], server_port: int) -> dict:
     поехали бы Path.home() и platformdirs у самой программы.
     """
     env = os.environ.copy()
+    # Эти переменные имеют приоритет над портом и могут увести команды к
+    # чужому/удалённому серверу или неявно выбрать другое устройство.
+    for name in ('ADB_SERVER_SOCKET', 'ANDROID_ADB_SERVER_ADDRESS', 'ANDROID_SERIAL'):
+        env.pop(name, None)
     env['ANDROID_ADB_SERVER_PORT'] = str(server_port)
+    # Адрес должен отсутствовать: даже 127.0.0.1 ADB считает явно заданным
+    # remote host и отказывается автоматически запускать сервер.
     if adb_home is not None and os.name != 'nt':
         env['HOME'] = str(adb_home)
         env['USERPROFILE'] = str(adb_home)
@@ -190,7 +198,8 @@ class PlatformToolsTransport:
             serial: str,
             timeout: int = 30,
             runner: Any = None,
-            env: Optional[dict] = None
+            env: Optional[dict] = None,
+            transport_id: Optional[int] = None,
     ) -> None:
         # adb_path и runner передаются снаружи, чтобы транспорт можно было
         # проверить без собранных resources/ и без живого устройства
@@ -199,6 +208,8 @@ class PlatformToolsTransport:
         self.timeout = timeout
         self._runner = subprocess.run if runner is None else runner
         self.env = env
+        self.transport_id = transport_id
+        self._closed = False
 
     def _run(self, args: List[str]) -> Tuple[int, str]:
         result = self._runner(
@@ -214,8 +225,18 @@ class PlatformToolsTransport:
         return result.returncode, result.stdout or ''
 
     def shell(self, command: str) -> str:
+        if self._closed:
+            raise AndroidTVTimeFixerError(locales.get('no_device_connected'))
         try:
-            _returncode, output = self._run(['-s', self.serial, 'shell', command])
+            selector = ['-s', self.serial]
+            if self.transport_id is not None:
+                selector = ['-t', str(self.transport_id)]
+                # ID не сохраняется на диск. При внешнем перезапуске сервера
+                # его могли выдать заново: проверяем серийный номер до команды.
+                code, actual = self._run(selector + ['get-serialno'])
+                if code or actual.strip() != self.serial:
+                    raise AndroidTVTimeFixerError(locales.get('usb_disconnected'))
+            _returncode, output = self._run(selector + ['shell', command])
         except Exception as e:
             raise AndroidTVTimeFixerError(
                 locales.get('adb_shell_command_failed', error=str(e))
@@ -225,7 +246,9 @@ class PlatformToolsTransport:
         # пробрасывает), а не ошибка связи: `grep`, вернувший пусто, не повод
         # ронять получение информации об устройстве.
         lowered = output.lower()
-        if any(error in lowered for error in ADB_CONNECTION_ERRORS):
+        if (any(error in lowered for error in ADB_CONNECTION_ERRORS)
+                or (self.transport_id is not None and _returncode != 0
+                    and lowered.lstrip().startswith(('adb:', 'error:')))):
             raise AndroidTVTimeFixerError(
                 locales.get('adb_shell_command_failed', error=output.strip())
             )
@@ -235,10 +258,85 @@ class PlatformToolsTransport:
         return output.replace('\r\n', '\n').replace('\r', '\n')
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        # disconnect относится только к TCP. USB освобождает собственный
+        # сервер при cleanup; здесь не сбрасываем устройство и не включаем tcpip.
+        if self.transport_id is not None:
+            return
         try:
             self._run(['disconnect', self.serial])
         except Exception:
             pass
+
+
+@dataclass(frozen=True)
+class UsbAdbDevice:
+    serial: str
+    transport_id: int
+    state: str
+    model: str = ''
+
+    @property
+    def target(self) -> str:
+        return f'usb:{self.transport_id}'
+
+
+def parse_usb_devices(output: str) -> List[UsbAdbDevice]:
+    """Читает TextFormat host:track-devices-proto-text (ADB 34+).
+
+    AOSP явно отдаёт connection_type: USB даже на Windows, где devices -l
+    может не содержать usb: вообще. Серийный номер не определяет транспорт.
+    Поля Device плоские; строки TextFormat экранируются как C-литералы.
+    """
+    devices = []
+    records = re.compile(r'(?m)^device \{\n((?:[ \t]+[^\n]*\n)*)\}\n?')
+    if records.sub('', output).strip():
+        raise ValueError('Invalid ADB device list')
+    for match in records.finditer(output):
+        fields = dict(line.strip().split(':', 1) for line in match[1].splitlines())
+        if fields.get('connection_type', '').strip() != 'USB':
+            continue
+        # TextFormat экранирует байты UTF-8 через octal escapes. Декодирование
+        # сразу в str исказило бы не-ASCII модель и serial перед get-serialno.
+        serial = ast.literal_eval('b' + fields.get('serial', '""').strip()).decode('utf-8')
+        model = ast.literal_eval('b' + fields.get('model', '""').strip()).decode('utf-8')
+        transport_id = int(fields.get('transport_id', '0'))
+        state = fields.get('state', 'ANY').strip()
+        if transport_id <= 0:
+            raise ValueError('Invalid USB device identity')
+        devices.append(UsbAdbDevice(serial, transport_id, state, model))
+    return devices
+
+
+def read_adb_device_list(server_port: int, timeout: float = 5.0) -> str:
+    """Получает первый снимок и закрывает tracking-сокет, не ожидая событий."""
+    deadline = time.monotonic() + timeout
+    with socket.create_connection(('127.0.0.1', server_port), timeout=timeout) as stream:
+        def read_exact(size: int) -> bytes:
+            result = bytearray()
+            while len(result) < size:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError('ADB device list timeout')
+                stream.settimeout(remaining)
+                chunk = stream.recv(size - len(result))
+                if not chunk:
+                    raise ConnectionError('ADB server closed the device list')
+                result.extend(chunk)
+            return bytes(result)
+
+        request = b'host:track-devices-proto-text'
+        stream.sendall(f'{len(request):04x}'.encode('ascii') + request)
+        status = read_exact(4)
+        if status not in (b'OKAY', b'FAIL'):
+            raise ValueError('Invalid ADB server response')
+        size = int(read_exact(4), 16)
+        payload = read_exact(size).decode('utf-8')
+        if status == b'FAIL':
+            raise RuntimeError(payload)
+        return payload
 
 
 # ──────────────────────────────────────────────────────────
@@ -808,6 +906,14 @@ class AndroidTVTimeFixer:
                 'resources', 
                 'adb.exe' if sys.platform == 'win32' else 'adb'
             )
+
+            if not getattr(sys, 'frozen', False):
+                bundled = Path(__file__).resolve().parent.parent / 'resources' / (
+                    'adb.exe' if sys.platform == 'win32' else 'adb'
+                )
+                self._adb_path = str(bundled) if bundled.is_file() else (
+                    shutil.which('adb') or self._adb_path
+                )
 
         if not os.path.exists(self._adb_path):
             raise FileNotFoundError(f"ADB не найден по пути: {self._adb_path}")
@@ -1389,7 +1495,9 @@ class AndroidTVTimeFixer:
             port = int(raw)
         except ValueError:
             return DEFAULT_ADB_SERVER_PORT
-        return port if 1 <= port <= 65535 else DEFAULT_ADB_SERVER_PORT
+        # 5037 принадлежит обычному ADB/Android Studio: cleanup не должен
+        # останавливать этот сервер даже при ошибке в settings.json.
+        return port if 1 <= port <= 65535 and port != 5037 else DEFAULT_ADB_SERVER_PORT
 
     def prompt_adb_port(self, default: Optional[int] = None, persist: bool = True) -> Optional[int]:
         """Спрашивает ADB-порт. Enter — значение по умолчанию, 'q' — отмена.
@@ -1438,6 +1546,14 @@ class AndroidTVTimeFixer:
         беспроводной отладки, который меняется при каждом включении. Результат
         не кешируется по той же причине.
         """
+        # Уже выбранное USB-устройство предлагается без сетевого поиска.
+        if self.device and str(self.connected_ip).startswith('usb:'):
+            answer = input(Fore.GREEN + locales.get('usb_reuse_prompt') + Fore.WHITE).strip()
+            if not answer:
+                return self.connected_ip
+            if answer.lower() == 'q':
+                return ''
+        print(Fore.CYAN + locales.get('usb_select_hint'))
         discovered = self._announce_mdns_devices()
 
         while True:
@@ -1463,6 +1579,12 @@ class AndroidTVTimeFixer:
             # 'q' → выход в меню
             if ip.lower() == 'q':
                 return ''
+
+            if ip.lower() == 'u':
+                selected = self.select_usb_device()
+                if selected:
+                    return selected
+                continue
 
             # 'm' → искать по mDNS заново: порт беспроводной отладки меняется
             # при каждом включении, и устройство могло появиться только что
@@ -1796,12 +1918,16 @@ class AndroidTVTimeFixer:
     
     def connect_or_reuse(self, ip: str) -> None:
         """Подключается к устройству или переиспользует существующее соединение"""
-        host, port = self.parse_ip_port(ip)
-        normalized = f"{host}:{port}"
+        if ip.startswith('usb:'):
+            normalized = ip
+        else:
+            host, port = self.parse_ip_port(ip)
+            normalized = f"{host}:{port}"
         if self.device and self.connected_ip == normalized:
             try:
                 # Проверяем, что соединение ещё активно
-                self.device.shell('echo ok')
+                if self.device.shell('echo ok').strip() != 'ok':
+                    raise AndroidTVTimeFixerError(locales.get('no_device_connected'))
                 self.logger.info(f"Reusing existing connection to {normalized}")
                 print(Fore.GREEN + locales.get("connection_reused", ip=normalized))
                 return
@@ -1811,6 +1937,71 @@ class AndroidTVTimeFixer:
         elif self.device:
             self._close_device()
         self.connect(ip)
+
+    @classmethod
+    def validate_device_target(cls, value: str) -> bool:
+        return cls.validate_ip(value) or bool(re.fullmatch(r'usb:[1-9][0-9]*', value))
+
+    def usb_devices(self) -> List[UsbAdbDevice]:
+        try:
+            code, output = self._run_adb(['start-server'])
+            if code:
+                raise RuntimeError(output.strip())
+            return parse_usb_devices(read_adb_device_list(self.adb_server_port))
+        except Exception as e:
+            raise AndroidTVTimeFixerError(locales.get('usb_list_failed', error=str(e))) from e
+
+    def select_usb_device(self) -> str:
+        print(Fore.CYAN + locales.get('usb_setup_hint'))
+        while True:
+            try:
+                devices = self.usb_devices()
+            except AndroidTVTimeFixerError as e:
+                print(Fore.RED + str(e))
+                return ''
+            if not devices:
+                print(Fore.YELLOW + locales.get('usb_no_devices'))
+            for index, device in enumerate(devices, 1):
+                label = device.model or device.serial or str(device.transport_id)
+                # Не печатаем управляющие символы, полученные от устройства.
+                label = ''.join(c for c in label if c.isprintable())
+                serial = ''.join(c for c in device.serial if c.isprintable())
+                print(Fore.WHITE + f'  {index}. {label} — {serial} (USB {device.transport_id}) [{device.state}]')
+            answer = input(Fore.GREEN + locales.get('usb_pick_prompt') + Fore.WHITE).strip()
+            if not answer or answer.lower() == 'q':
+                return ''
+            if answer.lower() == 'r':
+                continue
+            if answer.isdigit() and 1 <= int(answer) <= len(devices):
+                return devices[int(answer) - 1].target
+            print(Fore.RED + locales.get('enter_valid_number'))
+
+    def connect_usb(self, target: str) -> None:
+        if not re.fullmatch(r'usb:[1-9][0-9]*', target):
+            raise AndroidTVTimeFixerError(locales.get('usb_disconnected'))
+        device = next((d for d in self.usb_devices() if d.target == target), None)
+        if device is None:
+            raise AndroidTVTimeFixerError(locales.get('usb_disconnected'))
+        if device.state in ('UNAUTHORIZED', 'AUTHORIZING', 'CONNECTING'):
+            raise AndroidTVTimeFixerError(locales.get('usb_authorize'))
+        if device.state == 'NOPERMISSION':
+            raise AndroidTVTimeFixerError(locales.get('usb_no_permissions'))
+        if device.state != 'DEVICE':
+            raise AndroidTVTimeFixerError(locales.get('usb_not_ready', state=device.state))
+        transport = PlatformToolsTransport(
+            self.get_adb_path(), device.serial, env=self.adb_env, transport_id=device.transport_id,
+        )
+        try:
+            if transport.shell('echo androidtvtimefixer').strip() != 'androidtvtimefixer':
+                raise AndroidTVTimeFixerError(locales.get('usb_disconnected'))
+        except BaseException:
+            transport.close()
+            raise
+        self._close_device()
+        self.device = transport
+        self.connected_ip = target
+        # process_manager.device_ip остаётся пустым: adb disconnect — TCP-only.
+        print(Fore.GREEN + locales.get('usb_connected'))
 
     def verify_ntp_server(self, server: str, count: int = 3, timeout: int = 3) -> bool:
         """Проверяет что NTP-сервер действительно синхронизирует время (не просто доступен)"""
@@ -1847,6 +2038,9 @@ class AndroidTVTimeFixer:
 
     def connect(self, ip: str) -> None:
         """Улучшенная версия метода подключения с ожиданием разрешения"""
+        if ip.startswith('usb:'):
+            self.connect_usb(ip)
+            return
         if not self.validate_ip(ip):
             raise AndroidTVTimeFixerError(locales.get("invalid_ip_format", port=DEFAULT_ADB_PORT))
 
@@ -3280,7 +3474,7 @@ class AndroidTVTimeFixer:
                     ip = self.get_device_ip_input()
                     if not ip:      # отмена по 'q'
                         continue
-                    if not self.validate_ip(ip):
+                    if not self.validate_device_target(ip):
                         print(Fore.RED + locales.get("invalid_ip_format", port=DEFAULT_ADB_PORT))
                         continue
                     try:
@@ -3915,6 +4109,7 @@ def main():
 
         while True:
             print(Fore.GREEN + locales.get("main_menu"))
+            print(Fore.CYAN + locales.get("app_version", version=APP_VERSION))
             print(Fore.YELLOW + locales.get("menu_item_1"))
             print(Fore.YELLOW + locales.get("menu_item_2"))
             print(Fore.YELLOW + locales.get("menu_item_3"))
@@ -3926,6 +4121,7 @@ def main():
             print(Fore.YELLOW + locales.get("menu_item_9"))
             print(Fore.YELLOW + locales.get("menu_item_10"))
             print(Fore.YELLOW + locales.get("menu_item_wireless"))
+            print(Fore.YELLOW + locales.get("menu_item_usb"))
             print(Fore.YELLOW + locales.get("menu_item_11"))
 
             choice = input(Fore.GREEN + locales.get("menu_prompt")).strip()
@@ -3937,7 +4133,7 @@ def main():
                 if not ip:          # отмена по 'q'
                     continue
                 fixer.logger.info(f"User entered IP: {ip}")
-                if fixer.validate_ip(ip):
+                if fixer.validate_device_target(ip):
                     try:
                         fixer.connect_or_reuse(ip)
                         fixer.save_last_ip(ip)
@@ -3990,7 +4186,7 @@ def main():
                 if not ip:          # отмена по 'q'
                     continue
                 fixer.logger.info(f"User entered IP: {ip}")
-                if fixer.validate_ip(ip):
+                if fixer.validate_device_target(ip):
                     try:
                         fixer.connect_or_reuse(ip)
                         fixer.save_last_ip(ip)
@@ -4017,7 +4213,7 @@ def main():
                 if not ip:          # отмена по 'q'
                     continue
                 fixer.logger.info(f"User entered IP: {ip}")
-                if fixer.validate_ip(ip):
+                if fixer.validate_device_target(ip):
                     try:
                         fixer.connect_or_reuse(ip)
                         fixer.save_last_ip(ip)
@@ -4054,6 +4250,14 @@ def main():
             elif choice == '11':
                 fixer.logger.info("Menu: Wireless debugging menu")
                 fixer.wireless_menu()
+
+            elif choice == '12':
+                target = fixer.select_usb_device()
+                if target:
+                    try:
+                        fixer.connect_or_reuse(target)
+                    except AndroidTVTimeFixerError as e:
+                        print(Fore.RED + str(e))
 
             elif choice == '0':
                 fixer.logger.info("User selected exit")

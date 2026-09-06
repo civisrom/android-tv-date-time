@@ -28,10 +28,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlin.math.abs
+import com.civisrom.tvtimefixer.BuildConfig
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
@@ -50,6 +52,8 @@ interface AppActions {
     fun cancelNtpScan()
     fun refreshDeviceInfo()
     fun requestDiscoveryPermission()
+    fun refreshUsbDevices()
+    fun connectUsb(address: UsbDeviceAddress)
 }
 
 @Composable
@@ -70,6 +74,10 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.app_version, BuildConfig.VERSION_NAME),
+            style = MaterialTheme.typography.bodySmall,
+        )
         Text(
             when (mode) {
                 DeviceMode.TELEVISION -> stringResource(R.string.mode_television)
@@ -94,6 +102,8 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
 
         ConnectionSection(mode, state, actions)
         HorizontalDivider()
+        UsbSection(state, actions)
+        HorizontalDivider()
         DiscoverySection(state, actions, onPair = { pairingAddress = it })
 
         if (state.connected) {
@@ -109,6 +119,38 @@ fun MainScreen(mode: DeviceMode, state: AppState, actions: AppActions) {
                 pairingAddress = pairingAddress,
                 onPairingAddressChange = { pairingAddress = it },
             )
+        }
+    }
+}
+
+@Composable
+private fun UsbSection(state: AppState, actions: AppActions) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.usb_title), style = MaterialTheme.typography.titleMedium)
+        if (!state.usbSupported) {
+            Text(stringResource(R.string.error_usb_unsupported))
+        } else {
+            Text(stringResource(R.string.usb_setup_hint), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = actions::refreshUsbDevices, enabled = !state.busy) {
+                Text(stringResource(R.string.usb_refresh))
+            }
+            if (state.usbDevices.isEmpty()) Text(stringResource(R.string.usb_empty))
+            state.usbDevices.forEach { device ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(device.label, style = MaterialTheme.typography.titleSmall)
+                        // USB bus address distinguishes identical devices without reading serialNumber.
+                        Text(device.deviceName, style = MaterialTheme.typography.bodySmall)
+                        if (state.connectedUsb?.deviceName == device.deviceName) {
+                            Text(stringResource(R.string.usb_connected), color = ConnectedColor)
+                        } else {
+                            Button(onClick = { actions.connectUsb(device) }, enabled = !state.busy) {
+                                Text(stringResource(R.string.usb_connect))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

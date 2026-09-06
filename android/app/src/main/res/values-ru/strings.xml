@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="usb_title">Отладка по USB</string>
+    <string name="usb_setup_hint">Подключите этот телефон или планшет в роли USB host (OTG) к поддерживаемому порту device/OTG целевого устройства кабелем передачи данных. Включите USB-отладку на целевом устройстве. Порт телевизора, работающий только как USB host, для этого не подходит.</string>
+    <string name="usb_authorize_hint">Разрешите доступ к USB на этом устройстве, затем разблокируйте целевое устройство и подтвердите на нём запрос RSA для отладки. Авторизация может занять до минуты.</string>
+    <string name="usb_refresh">Обновить USB-устройства</string>
+    <string name="usb_empty">USB ADB-устройства не найдены. Проверьте кабель, роли USB и настройку отладки.</string>
+    <string name="usb_connect">Подключиться по USB</string>
+    <string name="usb_connected">Подключено по USB</string>
+    <string name="error_usb_unsupported">Это устройство не поддерживает USB host. Используйте совместимый телефон или планшет с OTG либо компьютер.</string>
+    <string name="error_usb_permission">Доступ к USB отклонён, отменён или истекло время ожидания. Нажмите «Подключиться» и разрешите доступ в системном диалоге.</string>
+    <string name="error_usb_disconnected">USB-устройство отключено. Подключите кабель, обновите список и выберите устройство заново.</string>
+    <string name="error_usb_busy">Не удалось открыть USB-интерфейс ADB. Закройте другие приложения USB/ADB и переподключите кабель.</string>
+    <string name="error_usb_io">Ошибка обмена ADB по USB. Проверьте кабель передачи данных, USB-отладку и авторизацию на целевом устройстве, затем подключитесь заново.</string>
     <string name="app_name">Android TV Time Fixer</string>
+    <string name="app_version">Версия %1$s</string>
 
     <!-- Режимы работы -->
     <string name="mode_television">Запущено на телевизоре: подключение к этому же устройству.</string>
-    <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети.</string>
+    <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети или USB.</string>
 
     <!-- Подключение -->
     <string name="connect_title">Подключение к устройству</string>

@@ -2,6 +2,7 @@ package com.civisrom.tvtimefixer.ui
 
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
@@ -20,6 +21,8 @@ data class AppState(
     val discoverySearching: Boolean = false,
     val discoveryPermissionNeeded: Boolean = false,
     val discovered: List<DiscoveredDevice> = emptyList(),
+    val usbSupported: Boolean = false,
+    val usbDevices: List<UsbDeviceAddress> = emptyList(),
     val deviceInfo: DeviceInfo? = null,
     val currentNtpServer: String = "",
     val message: UiMessage? = null,
@@ -58,5 +61,8 @@ data class AppState(
      * теряло кнопку, то есть повторить попытку было нечем.
      */
     val connectedAddress: DeviceAddress?
-        get() = (connection as? ConnectionState.Connected)?.address
+        get() = (connection as? ConnectionState.Connected)?.address as? DeviceAddress
+
+    val connectedUsb: UsbDeviceAddress?
+        get() = (connection as? ConnectionState.Connected)?.address as? UsbDeviceAddress
 }

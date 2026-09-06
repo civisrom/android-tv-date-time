@@ -2,6 +2,9 @@ package com.civisrom.tvtimefixer.adb
 
 import com.civisrom.tvtimefixer.data.DeviceAddress
 
+/** Сетевой адрес или эфемерное USB-устройство. */
+interface DeviceTarget
+
 /** Результат выполнения команды на устройстве. */
 data class ShellResult(
     val output: String,
@@ -52,6 +55,12 @@ enum class ConnectionError {
 
     /** This client Android version lacks the required TLS provider. */
     WIRELESS_UNSUPPORTED,
+
+    USB_UNSUPPORTED,
+    USB_PERMISSION_DENIED,
+    USB_DISCONNECTED,
+    USB_BUSY,
+    USB_IO,
 
     UNKNOWN,
 }
