@@ -21,6 +21,26 @@ class Locales:
 
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
+            "menu_item_usb": Translation(en="12. Connect over USB", ru="12. Подключиться по USB"),
+            "usb_select_hint": Translation(
+                en="Enter u to select a USB device (no IP needed). USB is also available in main menu item 12.",
+                ru="Введите u для выбора USB-устройства (IP не нужен). USB также доступен в пункте 12 главного меню.",
+            ),
+            "usb_setup_hint": Translation(
+                en="Enable USB debugging on the target and connect a data cable to its supported device/OTG port. Confirm the RSA prompt on the target. Windows may need an OEM ADB driver; Linux may need udev rules. Another ADB server may already own USB: close its session before retrying.",
+                ru="Включите USB-отладку на целевом устройстве и подключите кабель передачи данных к его порту device/OTG. Подтвердите запрос RSA на устройстве. Windows может требовать ADB-драйвер производителя, Linux — правила udev. Другой ADB-сервер может уже занимать USB: закройте его сессию перед повторной попыткой.",
+            ),
+            "usb_no_devices": Translation(en="No USB ADB devices found. Check the cable, USB role, debugging and drivers.", ru="USB ADB-устройства не найдены. Проверьте кабель, роль USB, отладку и драйверы."),
+            "usb_pick_prompt": Translation(en="Enter a device number from the list and press Enter to connect (r to refresh, q to cancel): ", ru="Введите номер устройства из списка и нажмите Enter для подключения (r — обновить список, q — отмена): "),
+            "usb_reuse_prompt": Translation(en="USB is selected. Enter to reuse, n for another device, q to cancel: ", ru="Выбрано USB-подключение. Enter — использовать, n — другое устройство, q — отмена: "),
+            "usb_list_failed": Translation(en="Cannot list USB devices: {error}. Use the bundled Platform Tools 37.0.1 or newer.", ru="Не удалось получить USB-устройства: {error}. Используйте встроенные Platform Tools 37.0.1 или новее."),
+            "usb_disconnected": Translation(en="The selected USB device is disconnected or has changed. Refresh the list and select it again.", ru="Выбранное USB-устройство отключено или изменилось. Обновите список и выберите его заново."),
+            "usb_authorize": Translation(en="Unlock the target and allow USB debugging in the RSA prompt, then refresh and reconnect.", ru="Разблокируйте целевое устройство и разрешите USB-отладку в запросе RSA, затем обновите список и подключитесь снова."),
+            "usb_no_permissions": Translation(en="No USB access. On Linux install the distribution's Android udev rules and check group access; reconnect the cable. Do not run the application as root.", ru="Нет доступа к USB. В Linux установите правила Android udev из вашего дистрибутива и проверьте группы доступа; переподключите кабель. Запуск приложения от root не требуется."),
+            "usb_not_ready": Translation(en="USB device is not ready ({state}). Boot Android normally and reconnect the cable.", ru="USB-устройство не готово ({state}). Загрузите Android в обычном режиме и переподключите кабель."),
+            "usb_connected": Translation(en='Device "{device}" successfully connected over USB.', ru='Устройство «{device}» успешно подключено по USB.'),
+            "usb_connection_reused": Translation(en='Device "{device}" is already connected over USB. The connection has been checked and is ready to use.', ru='Устройство «{device}» уже подключено по USB. Связь проверена, подключение готово к работе.'),
+            "usb_next_steps": Translation(en='In the main menu, choose 5 for device information, or 1 / 2 to change the NTP server. When asked to use the selected USB connection, press Enter.', ru='В главном меню выберите 5 для просмотра сведений об устройстве или 1 / 2 для изменения NTP-сервера. Когда программа предложит использовать выбранное USB-подключение, нажмите Enter.'),
             # Disclaimer text
             "disclaimer": Translation(
                 en="""
@@ -42,6 +62,10 @@ arising from the use of this program.
                 en="\nAndroid TV Time Server Correction",
                 ru="\nКорректировка сервера времени для Android TV"
             ),
+            "app_version": Translation(
+                en="Version {version}",
+                ru="Версия {version}"
+            ),
             "please_ensure": Translation(
                 en="\nPlease ensure the following is done:",
                 ru="\nПожалуйста, убедитесь, что следующее сделано:"
@@ -55,16 +79,16 @@ arising from the use of this program.
                 ru="   Настройки > Настройки устройства > Об устройстве > Сборка (нажмите 7 раз или более)"
             ),
             "adb_network": Translation(
-                en="   Then: Device Preferences > Developer options > Network debugging (Enable)",
-                ru="   Затем: Настройки устройства > Для разработчиков > Отладка по сети (Включить)"
+                en="   Then: Developer options > USB debugging (cable), Network debugging or Wireless debugging (Wi-Fi)",
+                ru="   Затем: Для разработчиков > Отладка по USB (кабель), Отладка по сети или Беспроводная отладка (Wi-Fi)"
             ),
             "auto_time_date": Translation(
                 en="2. Set time and date to automatic mode:",
                 ru="2. Установите время и дату в автоматический режим: Настройки > Настройки устройства > Дата и Время > Автонастройка даты и времени > Использовать время сети"
             ),
             "network_requirement": Translation(
-                en="3. Your TV, Nvidia Shield, and PC must be connected to the same network.",
-                ru="3. Ваш ТВ, Nvidia Shield и ПК должны быть подключены к одной сети"
+                en="3. Network ADB requires the same network. USB ADB uses a data cable; checking NTP servers still requires Internet access.",
+                ru="3. Для сетевого ADB нужна общая сеть. Для USB ADB используется кабель передачи данных; проверка NTP-серверов по-прежнему требует доступа в интернет."
             ),
             "reboot_device": Translation(
                 en="4. Reboot your TV or Nvidia Shield before using this program.",
@@ -979,12 +1003,12 @@ arising from the use of this program.
                 ru="5. Назад в главное меню"
             ),
             "enter_device_ip_scan": Translation(
-                en="Enter a number, IP, IP:port, CIDR subnet, 's' to scan, 'm' to search again, 'q' to cancel (Enter for saved: {saved_ip}): ",
-                ru="Введите номер, IP, IP:порт, CIDR-подсеть, 's' для сканирования, 'm' — искать снова, 'q' для отмены (Enter для сохранённого: {saved_ip}): "
+                en="Enter a number, IP, IP:port, CIDR subnet, 'u' for USB, 's' to scan, 'm' to search again, 'q' to cancel (Enter for saved: {saved_ip}): ",
+                ru="Введите номер, IP, IP:порт, CIDR-подсеть, 'u' — USB, 's' для сканирования, 'm' — искать снова, 'q' для отмены (Enter для сохранённого: {saved_ip}): "
             ),
             "enter_device_ip_scan_no_saved": Translation(
-                en="Enter a number, IP, IP:port, CIDR subnet, 's' to scan network, 'm' to search again, or 'q' to cancel: ",
-                ru="Введите номер, IP, IP:порт, CIDR-подсеть, 's' для сканирования сети, 'm' — искать снова или 'q' для отмены: "
+                en="Enter a number, IP, IP:port, CIDR subnet, 'u' for USB, 's' to scan network, 'm' to search again, or 'q' to cancel: ",
+                ru="Введите номер, IP, IP:порт, CIDR-подсеть, 'u' — USB, 's' для сканирования сети, 'm' — искать снова или 'q' для отмены: "
             ),
             "scan_select_device": Translation(
                 en="Select device number (or Enter to cancel): ",

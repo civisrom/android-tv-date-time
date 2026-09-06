@@ -19,7 +19,7 @@ android {
 
         // CI подставляет github.run_number: Android требует монотонного роста
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: "2.6.1-dev"
+        versionName = System.getenv("VERSION_NAME") ?: "2.6.2-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -68,6 +68,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -198,6 +199,12 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.androidx.tv.material)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kadb.android)

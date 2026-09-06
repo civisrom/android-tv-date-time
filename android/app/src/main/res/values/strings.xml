@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="usb_title">USB debugging</string>
+    <string name="usb_setup_hint">Connect this phone/tablet as a USB host (OTG) to the target device’s supported device/OTG port using a data cable. Enable USB debugging on the target. A host-only TV USB port cannot be used for this connection.</string>
+    <string name="usb_authorize_hint">Allow USB access on this device, then unlock the target and confirm its RSA debugging prompt. Authorization may take up to a minute.</string>
+    <string name="usb_refresh">Refresh USB devices</string>
+    <string name="usb_connect">Connect via USB</string>
+    <string name="usb_connected">Connected via USB</string>
+    <string name="error_usb_unsupported">This device does not support USB host mode. Use a compatible phone/tablet with OTG or a desktop computer.</string>
+    <string name="error_usb_permission">USB access was denied, cancelled or timed out. Press Connect and allow access in the system dialog.</string>
+    <string name="error_usb_disconnected">The USB device was disconnected. Reconnect the cable, refresh the list and select the device again.</string>
+    <string name="error_usb_busy">Cannot open the ADB USB interface. Close other USB/ADB applications and reconnect the cable.</string>
+    <string name="error_usb_io">USB ADB communication failed. Check the data cable, USB debugging and authorization on the target, then reconnect.</string>
     <string name="app_name">Android TV Time Fixer</string>
+    <string name="app_version">Version %1$s</string>
 
     <!-- Режимы работы -->
     <string name="mode_television">Running on a TV: it will connect to this device itself.</string>
-    <string name="mode_handheld">Running on a phone: it will connect to a TV over the network.</string>
+    <string name="mode_handheld">Running on a phone: connect to a TV over the network or USB.</string>
 
     <!-- Подключение -->
     <string name="connect_title">Connect to a device</string>
@@ -29,8 +41,8 @@
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
     <!-- Спаривание -->
-    <string name="pairing_title">Pair a device</string>
-    <string name="pairing_hint">On the TV open Developer options → Wireless debugging → Pair device with pairing code.</string>
+    <string name="pairing_title">Pairing · wireless debugging on Android 11+</string>
+    <string name="pairing_hint">Pairing codes are used by the newer wireless debugging mode on Android 11 and later, when supported by the target device firmware. On that device, open Developer options → Wireless debugging → Pair device with pairing code.</string>
     <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-digit code</string>
     <string name="pairing_connect_address_hint">Connection address (a different port)</string>
@@ -39,13 +51,14 @@
 
     <!-- Обнаружение по mDNS -->
     <string name="discovery_title">Devices found automatically on the network</string>
+    <string name="discovery_found">Device found</string>
     <string name="discovery_searching">Searching…</string>
     <string name="discovery_empty">No devices found. Make sure wireless debugging is on and its screen is open.</string>
     <string name="discovery_unavailable">Network discovery is unavailable on this device. Enter the address manually.</string>
     <string name="discovery_kind_awaiting_pairing">Waiting to be paired</string>
     <string name="discovery_kind_ready">Ready to connect</string>
     <string name="discovery_kind_legacy">Network debugging</string>
-    <string name="discovery_failed">Network discovery could not start on this device: %1$s. Enter the address manually — everything else works.</string>
+    <string name="discovery_failed">Network discovery is unavailable. Enter an address manually; error details are available in Diagnostics.</string>
     <string name="discovery_permission_needed">Allow local network access to discover TVs and connect to their addresses.</string>
     <string name="discovery_grant_permission">Grant permission</string>
 
@@ -106,6 +119,72 @@
     <string name="info_kernel">Kernel</string>
     <string name="info_ntp">Time server</string>
     <string name="info_refresh">Refresh</string>
-    <string name="last_crash">The app closed unexpectedly last time. Details:\n%1$s</string>
-    <string name="action_failed">Something went wrong: %1$s</string>
+
+    <!-- Компактный интерфейс и локальная диагностика -->
+    <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_hint">Up to 200 events from the last 7 days, stored only on this device.</string>
+    <string name="diagnostics_all">All</string>
+    <string name="diagnostics_errors">Errors</string>
+    <string name="diagnostics_copy">Copy report</string>
+    <string name="diagnostics_copied">Report copied</string>
+    <string name="diagnostics_copy_failed">Could not copy report</string>
+    <string name="diagnostics_clear">Clear history</string>
+    <string name="diagnostics_clear_confirm">Delete saved events and the last crash details?</string>
+    <string name="diagnostics_empty">No events yet</string>
+    <string name="diagnostics_no_errors">No errors in the journal</string>
+    <string name="diagnostics_storage_failed">History cannot be saved. Connection and time settings remain available.</string>
+    <string name="diagnostics_dropped">Events skipped because the queue was full: %1$d</string>
+    <string name="diagnostics_entry_expired">This event has expired or the journal was cleared.</string>
+    <string name="diagnostics_details">Details</string>
+    <string name="diagnostics_previous_crash">The app closed unexpectedly last time. Details are available in diagnostics.</string>
+    <string name="diagnostics_no_details">No additional technical details.</string>
+    <string name="diagnostics_duration">Duration: %1$d ms</string>
+    <string name="diagnostics_back">Back</string>
+    <string name="diagnostics_cancel">Cancel</string>
+    <string name="diagnostics_started">Started</string>
+    <string name="diagnostics_success">Successful</string>
+    <string name="diagnostics_failed">Failed</string>
+    <string name="diagnostics_cancelled">Cancelled</string>
+    <string name="diagnostics_transport_network">Network</string>
+    <string name="diagnostics_transport_usb">Via USB</string>
+    <string name="operation_app_start">App started</string>
+    <string name="operation_connect_network">Network connection</string>
+    <string name="operation_connect_usb">USB connection</string>
+    <string name="operation_pair">Code pairing</string>
+    <string name="operation_disconnect">Disconnecting device</string>
+    <string name="operation_usb_permission">USB access permission</string>
+    <string name="operation_usb_scan">USB device search</string>
+    <string name="diagnostics_usb_none">No USB devices detected</string>
+    <string name="diagnostics_usb_no_adb">USB detected, ADB interface not found</string>
+    <string name="diagnostics_usb_unsupported">USB host mode is not supported</string>
+    <string name="diagnostics_usb_found">ADB device found; connection has not been checked</string>
+    <string name="operation_usb_detached">USB cable disconnected</string>
+    <string name="operation_read_device">Reading device details</string>
+    <string name="operation_check_ntp">Checking NTP server</string>
+    <string name="operation_apply_ntp">Applying NTP server</string>
+    <string name="operation_scan_ntp">Finding NTP servers</string>
+    <string name="operation_discovery">Network device discovery</string>
+    <string name="operation_crash">App crash</string>
+    <string name="operation_storage">Recovering damaged history</string>
+    <string name="operation_working">In progress: %1$s</string>
+    <string name="operation_failed_hint">The operation did not complete. See diagnostics for details.</string>
+    <string name="connection_other">Connect another device</string>
+    <string name="connection_network">Over the network</string>
+    <string name="ntp_choose_server">Choose a server</string>
+    <string name="info_more">All device details</string>
+    <string name="section_expanded">Expanded</string>
+    <string name="section_collapsed">Collapsed</string>
+    <string name="usb_none">The Android USB service returned an empty device list. The cause has not been determined; ADB access cannot be requested yet. Open USB connection help or Diagnostics for system details.</string>
+    <string name="usb_system_host">The system reports USB host mode. An empty device list means enumeration has not completed or the USB service is not exposing the device.</string>
+    <string name="usb_system_device">The system reports a connection in USB device mode, with host mode inactive. To control the TV, this phone/tablet needs to act as the USB host.</string>
+    <string name="usb_system_disconnected">The system reports no USB connection in host or device mode. This status alone does not establish the cause.</string>
+    <string name="usb_system_unknown">The firmware did not provide enough USB role information. The role cannot be determined from an empty device list.</string>
+    <string name="usb_system_diagnostics">Refresh the list, then open the latest USB search in Diagnostics → Details. It includes device counts and system USB flags without device identifiers. System flags may be unavailable or delayed on some firmware.</string>
+    <string name="usb_no_adb">Android sees a USB device but no ADB interface. Enable USB debugging on the target and reconnect the cable. If using a hub, the detected device may be only the hub.</string>
+    <string name="usb_scan_failed">Could not read the USB device list. Refresh it; error details are available in Diagnostics.</string>
+    <string name="usb_detected">Devices with ADB found: %1$d. Select a device below to request access.</string>
+    <string name="usb_shield_hint">SHIELD without micro-USB: use port 1, furthest from HDMI. The phone must be the USB host; a regular USB-A to USB-C cable may select the opposite role. Enabling OTG alone does not guarantee a suitable connection.</string>
+    <string name="diagnostics_ntp_unreachable">The time server did not respond to the check.</string>
+    <string name="diagnostics_ntp_not_confirmed">The device did not confirm the time server setting.</string>
+    <string name="usb_connection_help">If USB is not detected</string>
 </resources>

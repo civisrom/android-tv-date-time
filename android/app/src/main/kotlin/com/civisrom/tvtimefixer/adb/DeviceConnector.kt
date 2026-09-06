@@ -9,9 +9,9 @@ import com.civisrom.tvtimefixer.data.parseDeviceAddress
 /** Состояние подключения к устройству. */
 sealed interface ConnectionState {
     data object Disconnected : ConnectionState
-    data class Connecting(val address: DeviceAddress) : ConnectionState
-    data class Connected(val address: DeviceAddress) : ConnectionState
-    data class Failed(val address: DeviceAddress?, val reason: ConnectionError) : ConnectionState
+    data class Connecting(val address: DeviceTarget) : ConnectionState
+    data class Connected(val address: DeviceTarget) : ConnectionState
+    data class Failed(val address: DeviceTarget?, val reason: ConnectionError, val diagnosticId: Long? = null) : ConnectionState
 }
 
 /** Адрес самого устройства, на котором запущено приложение (режим телевизора). */
@@ -23,11 +23,21 @@ val LOOPBACK_ADDRESS = DeviceAddress("127.0.0.1", DEFAULT_ADB_PORT)
  * Вся работа с сетью спрятана за [AdbClientFactory], поэтому эта логика
  * целиком проверяется на JVM — без телевизора и без эмулятора.
  */
-class DeviceConnector(private val factory: AdbClientFactory) {
+class DeviceConnector(
+    private val factory: AdbClientFactory,
+    private val onFailure: (DeviceTarget?, AdbConnectionException) -> Long? = { _, _ -> null },
+    private val usbConnect: (UsbDeviceAddress) -> AdbClient = {
+        throw AdbConnectionException(ConnectionError.USB_UNSUPPORTED)
+    },
+) {
 
+    @Volatile
     var state: ConnectionState = ConnectionState.Disconnected
         private set
 
+    private val lock = Any()
+    private var generation = 0
+    @Volatile
     private var client: AdbClient? = null
 
     /** Текущее соединение, если оно живое. */
@@ -50,22 +60,40 @@ class DeviceConnector(private val factory: AdbClientFactory) {
         return connect(address)
     }
 
-    fun connect(address: DeviceAddress): ConnectionState {
-        val existing = client
-        if (existing != null && state.addressOrNull() == address && existing.isAlive()) {
-            state = ConnectionState.Connected(address)
-            return state
-        }
+    fun connect(address: DeviceAddress): ConnectionState = connectTarget(address) { factory.connect(address) }
 
-        disconnect()
-        state = ConnectionState.Connecting(address)
+    fun connectUsb(address: UsbDeviceAddress): ConnectionState = connectTarget(address) { usbConnect(address) }
+
+    private fun connectTarget(address: DeviceTarget, open: () -> AdbClient): ConnectionState {
+        val (previous, attempt) = synchronized(lock) {
+            val existing = client
+            if (existing != null && state.targetOrNull() == address && existing.isAlive()) {
+                state = ConnectionState.Connected(address)
+                return state
+            }
+            client = null
+            generation++
+            state = ConnectionState.Connecting(address)
+            existing to generation
+        }
+        previous?.close()
         return try {
-            client = factory.connect(address)
-            state = ConnectionState.Connected(address)
+            val opened = open()
+            val accepted = synchronized(lock) {
+                if (generation != attempt) false else {
+                    client = opened
+                    state = ConnectionState.Connected(address)
+                    true
+                }
+            }
+            // Кабель/Activity могли исчезнуть, пока шли AUTH и проверка связи.
+            if (!accepted) opened.close()
             state
         } catch (e: AdbConnectionException) {
-            client = null
-            state = ConnectionState.Failed(address, e.reason)
+            val diagnosticId = runCatching { onFailure(address, e) }.getOrNull()
+            synchronized(lock) {
+                if (generation == attempt) state = ConnectionState.Failed(address, e.reason, diagnosticId)
+            }
             state
         }
     }
@@ -97,7 +125,8 @@ class DeviceConnector(private val factory: AdbClientFactory) {
             factory.pair(pairingAddress, pairingCode.trim())
             connect(connectAddress)
         } catch (e: AdbConnectionException) {
-            state = ConnectionState.Failed(pairingAddress, e.reason)
+            val diagnosticId = runCatching { onFailure(pairingAddress, e) }.getOrNull()
+            state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
             state
         }
     }
@@ -120,16 +149,23 @@ class DeviceConnector(private val factory: AdbClientFactory) {
     }
 
     fun disconnect() {
-        client?.close()
-        client = null
-        state = ConnectionState.Disconnected
+        val previous = synchronized(lock) {
+            generation++
+            val previous = client
+            client = null
+            state = ConnectionState.Disconnected
+            previous
+        }
+        previous?.close()
     }
 }
 
 /** Адрес из состояния, если он там есть. */
-fun ConnectionState.addressOrNull(): DeviceAddress? = when (this) {
+fun ConnectionState.targetOrNull(): DeviceTarget? = when (this) {
     is ConnectionState.Connected -> address
     is ConnectionState.Connecting -> address
     is ConnectionState.Failed -> address
     ConnectionState.Disconnected -> null
 }
+
+fun ConnectionState.addressOrNull(): DeviceAddress? = targetOrNull() as? DeviceAddress

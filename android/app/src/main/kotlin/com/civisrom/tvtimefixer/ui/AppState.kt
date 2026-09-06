@@ -2,10 +2,13 @@ package com.civisrom.tvtimefixer.ui
 
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
+import com.civisrom.tvtimefixer.diagnostics.Operation
+import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 
 /**
  * Всё, что показывает экран.
@@ -16,10 +19,18 @@ import com.civisrom.tvtimefixer.device.DeviceInfo
 data class AppState(
     val connection: ConnectionState = ConnectionState.Disconnected,
     val busy: Boolean = false,
+    val operation: Operation? = null,
+    val diagnosticEventId: Long? = null,
+    val ntpDiagnosticEventId: Long? = null,
     val discoveryAvailable: Boolean = true,
     val discoverySearching: Boolean = false,
     val discoveryPermissionNeeded: Boolean = false,
     val discovered: List<DiscoveredDevice> = emptyList(),
+    val usbSupported: Boolean = false,
+    val usbDevices: List<UsbDeviceAddress> = emptyList(),
+    val usbAttachedCount: Int = 0,
+    val usbScanFailed: Boolean = false,
+    val usbSystemState: UsbSystemState = UsbSystemState(),
     val deviceInfo: DeviceInfo? = null,
     val currentNtpServer: String = "",
     val message: UiMessage? = null,
@@ -46,6 +57,13 @@ data class AppState(
      */
     val ntpRejected: String? = null,
 ) {
+    /** Команда ADB не должна перезаписывать USB-события, полученные за время её выполнения. */
+    fun withLatestUsb(latest: AppState): AppState = copy(
+        usbSupported = latest.usbSupported, usbDevices = latest.usbDevices,
+        usbAttachedCount = latest.usbAttachedCount, usbScanFailed = latest.usbScanFailed,
+        usbSystemState = latest.usbSystemState,
+    )
+
     val connected: Boolean get() = connection is ConnectionState.Connected
 
     /**
@@ -58,5 +76,8 @@ data class AppState(
      * теряло кнопку, то есть повторить попытку было нечем.
      */
     val connectedAddress: DeviceAddress?
-        get() = (connection as? ConnectionState.Connected)?.address
+        get() = (connection as? ConnectionState.Connected)?.address as? DeviceAddress
+
+    val connectedUsb: UsbDeviceAddress?
+        get() = (connection as? ConnectionState.Connected)?.address as? UsbDeviceAddress
 }

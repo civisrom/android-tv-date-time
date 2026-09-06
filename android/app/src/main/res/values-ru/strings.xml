@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="usb_title">Отладка по USB</string>
+    <string name="usb_setup_hint">Подключите этот телефон или планшет в роли USB host (OTG) к поддерживаемому порту device/OTG целевого устройства кабелем передачи данных. Включите USB-отладку на целевом устройстве. Порт телевизора, работающий только как USB host, для этого не подходит.</string>
+    <string name="usb_authorize_hint">Разрешите доступ к USB на этом устройстве, затем разблокируйте целевое устройство и подтвердите на нём запрос RSA для отладки. Авторизация может занять до минуты.</string>
+    <string name="usb_refresh">Обновить USB-устройства</string>
+    <string name="usb_connect">Подключиться по USB</string>
+    <string name="usb_connected">Подключено по USB</string>
+    <string name="error_usb_unsupported">Это устройство не поддерживает USB host. Используйте совместимый телефон или планшет с OTG либо компьютер.</string>
+    <string name="error_usb_permission">Доступ к USB отклонён, отменён или истекло время ожидания. Нажмите «Подключиться» и разрешите доступ в системном диалоге.</string>
+    <string name="error_usb_disconnected">USB-устройство отключено. Подключите кабель, обновите список и выберите устройство заново.</string>
+    <string name="error_usb_busy">Не удалось открыть USB-интерфейс ADB. Закройте другие приложения USB/ADB и переподключите кабель.</string>
+    <string name="error_usb_io">Ошибка обмена ADB по USB. Проверьте кабель передачи данных, USB-отладку и авторизацию на целевом устройстве, затем подключитесь заново.</string>
     <string name="app_name">Android TV Time Fixer</string>
+    <string name="app_version">Версия %1$s</string>
 
     <!-- Режимы работы -->
     <string name="mode_television">Запущено на телевизоре: подключение к этому же устройству.</string>
-    <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети.</string>
+    <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети или USB.</string>
 
     <!-- Подключение -->
     <string name="connect_title">Подключение к устройству</string>
@@ -29,8 +41,8 @@
     <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
 
     <!-- Спаривание -->
-    <string name="pairing_title">Спаривание устройства</string>
-    <string name="pairing_hint">На телевизоре откройте «Для разработчиков» → «Беспроводная отладка» → «Подключение с помощью кода».</string>
+    <string name="pairing_title">Спаривание · беспроводная отладка Android 11+</string>
+    <string name="pairing_hint">Спаривание по коду используется в новом режиме беспроводной отладки на Android 11 и новее, если он доступен в прошивке подключаемого устройства. На нём откройте «Для разработчиков» → «Беспроводная отладка» → «Подключение с помощью кода».</string>
     <string name="pairing_address_hint">Адрес спаривания, например 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-значный код</string>
     <string name="pairing_connect_address_hint">Адрес подключения (другой порт)</string>
@@ -39,13 +51,14 @@
 
     <!-- Обнаружение по mDNS -->
     <string name="discovery_title">Автоматически обнаруженные устройства в сети</string>
+    <string name="discovery_found">Найдено устройство</string>
     <string name="discovery_searching">Идёт поиск…</string>
     <string name="discovery_empty">Устройства не найдены. Убедитесь, что беспроводная отладка включена и её экран открыт.</string>
     <string name="discovery_unavailable">Обнаружение в сети недоступно на этом устройстве. Введите адрес вручную.</string>
     <string name="discovery_kind_awaiting_pairing">Ожидает спаривания</string>
     <string name="discovery_kind_ready">Готово к подключению</string>
     <string name="discovery_kind_legacy">Отладка по сети</string>
-    <string name="discovery_failed">Поиск устройств в сети не запустился: %1$s. Введите адрес вручную — остальное работает.</string>
+    <string name="discovery_failed">Поиск устройств по сети недоступен. Введите адрес вручную; сведения об ошибке доступны в диагностике.</string>
     <string name="discovery_permission_needed">Разрешите доступ к локальной сети для поиска телевизоров и подключения по их адресам.</string>
     <string name="discovery_grant_permission">Разрешить</string>
 
@@ -106,6 +119,72 @@
     <string name="info_kernel">Ядро</string>
     <string name="info_ntp">Сервер времени</string>
     <string name="info_refresh">Обновить</string>
-    <string name="last_crash">В прошлый раз приложение аварийно закрылось. Подробности:\n%1$s</string>
-    <string name="action_failed">Не удалось выполнить действие: %1$s</string>
+
+    <!-- Компактный интерфейс и локальная диагностика -->
+    <string name="diagnostics_title">Диагностика</string>
+    <string name="diagnostics_hint">Последние 200 событий, не более 7 дней. Журнал хранится только на этом устройстве.</string>
+    <string name="diagnostics_all">Все</string>
+    <string name="diagnostics_errors">Ошибки</string>
+    <string name="diagnostics_copy">Скопировать отчёт</string>
+    <string name="diagnostics_copied">Отчёт скопирован</string>
+    <string name="diagnostics_copy_failed">Не удалось скопировать отчёт</string>
+    <string name="diagnostics_clear">Очистить журнал</string>
+    <string name="diagnostics_clear_confirm">Удалить сохранённые события и сведения о последнем сбое?</string>
+    <string name="diagnostics_empty">Событий пока нет</string>
+    <string name="diagnostics_no_errors">Ошибок в журнале нет</string>
+    <string name="diagnostics_storage_failed">Сохранение журнала недоступно. Подключение и настройка времени продолжают работать.</string>
+    <string name="diagnostics_dropped">Пропущено записей из-за нагрузки: %1$d</string>
+    <string name="diagnostics_entry_expired">Эта запись уже удалена по сроку хранения или при очистке журнала.</string>
+    <string name="diagnostics_details">Подробнее</string>
+    <string name="diagnostics_previous_crash">В прошлый раз приложение аварийно закрылось. Сведения сохранены в диагностике.</string>
+    <string name="diagnostics_no_details">Дополнительных технических сведений нет.</string>
+    <string name="diagnostics_duration">Длительность: %1$d мс</string>
+    <string name="diagnostics_back">Назад</string>
+    <string name="diagnostics_cancel">Отмена</string>
+    <string name="diagnostics_started">Начато</string>
+    <string name="diagnostics_success">Успешно</string>
+    <string name="diagnostics_failed">Ошибка</string>
+    <string name="diagnostics_cancelled">Отменено</string>
+    <string name="diagnostics_transport_network">Сеть</string>
+    <string name="diagnostics_transport_usb">По USB</string>
+    <string name="operation_app_start">Запуск приложения</string>
+    <string name="operation_connect_network">Подключение по сети</string>
+    <string name="operation_connect_usb">Подключение по USB</string>
+    <string name="operation_pair">Сопряжение по коду</string>
+    <string name="operation_disconnect">Отключение устройства</string>
+    <string name="operation_usb_permission">Разрешение доступа к USB</string>
+    <string name="operation_usb_scan">Поиск USB-устройств</string>
+    <string name="diagnostics_usb_none">USB-устройства не обнаружены</string>
+    <string name="diagnostics_usb_no_adb">USB обнаружено, интерфейс ADB не найден</string>
+    <string name="diagnostics_usb_unsupported">Режим USB-хоста не поддерживается</string>
+    <string name="diagnostics_usb_found">Устройство с ADB найдено; соединение не проверялось</string>
+    <string name="operation_usb_detached">Отключён USB-кабель</string>
+    <string name="operation_read_device">Чтение сведений устройства</string>
+    <string name="operation_check_ntp">Проверка NTP-сервера</string>
+    <string name="operation_apply_ntp">Применение NTP-сервера</string>
+    <string name="operation_scan_ntp">Подбор NTP-сервера</string>
+    <string name="operation_discovery">Поиск устройств в сети</string>
+    <string name="operation_crash">Аварийное завершение</string>
+    <string name="operation_storage">Восстановление повреждённого журнала</string>
+    <string name="operation_working">Выполняется: %1$s</string>
+    <string name="operation_failed_hint">Операция не завершена. Подробности доступны в диагностике.</string>
+    <string name="connection_other">Подключить другое устройство</string>
+    <string name="connection_network">По сети</string>
+    <string name="ntp_choose_server">Подобрать сервер</string>
+    <string name="info_more">Все характеристики</string>
+    <string name="section_expanded">Развёрнуто</string>
+    <string name="section_collapsed">Свёрнуто</string>
+    <string name="usb_none">USB-служба Android вернула пустой список устройств. Причина пока не установлена; запросить доступ к ADB невозможно. Системные сведения доступны в справке по USB и в диагностике.</string>
+    <string name="usb_system_host">Система сообщает режим USB-хоста. Пустой список означает, что обнаружение ещё не завершилось или USB-служба не предоставляет устройство приложению.</string>
+    <string name="usb_system_device">Система сообщает подключение в режиме USB-устройства, режим хоста не активен. Для управления телевизором этот телефон или планшет должен работать USB-хостом.</string>
+    <string name="usb_system_disconnected">Система не сообщает USB-подключения ни в режиме хоста, ни в режиме устройства. Само по себе это ещё не устанавливает причину.</string>
+    <string name="usb_system_unknown">Прошивка не предоставила достаточно сведений о роли USB. По пустому списку устройств определить роль нельзя.</string>
+    <string name="usb_system_diagnostics">Обновите список, затем откройте последний поиск USB в «Диагностика → Подробнее». Там сохранены счётчики устройств и системные флаги USB без идентификаторов устройств. На некоторых прошивках эти флаги недоступны или обновляются с задержкой.</string>
+    <string name="usb_no_adb">Android видит USB-устройство, но интерфейс ADB не найден. Включите USB-отладку на целевом устройстве и переподключите кабель. Если подключён хаб, это сообщение может относиться только к нему.</string>
+    <string name="usb_scan_failed">Не удалось прочитать список USB-устройств. Обновите список; сведения об ошибке доступны в диагностике.</string>
+    <string name="usb_detected">Найдено устройств с ADB: %1$d. Выберите устройство ниже, чтобы запросить доступ.</string>
+    <string name="usb_shield_hint">SHIELD без micro-USB: используйте порт 1, дальний от HDMI. Телефон должен быть USB-хостом; обычный кабель USB-A → USB-C может задавать обратную роль. Само включение OTG не гарантирует подходящее соединение.</string>
+    <string name="diagnostics_ntp_unreachable">Сервер времени не ответил на проверку.</string>
+    <string name="diagnostics_ntp_not_confirmed">Устройство не подтвердило сохранение сервера времени.</string>
+    <string name="usb_connection_help">Если USB не обнаружено</string>
 </resources>

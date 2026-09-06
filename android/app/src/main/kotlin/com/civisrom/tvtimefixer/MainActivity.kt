@@ -1,6 +1,12 @@
 package com.civisrom.tvtimefixer
 
 import android.content.pm.PackageManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,17 +14,24 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import com.civisrom.tvtimefixer.adb.AdbClientFactory
 import com.civisrom.tvtimefixer.adb.ConnectionState
+import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.DeviceConnector
 import com.civisrom.tvtimefixer.adb.DeviceDiscovery
 import com.civisrom.tvtimefixer.adb.KadbAdbClientFactory
 import com.civisrom.tvtimefixer.adb.NsdDeviceDiscovery
+import com.civisrom.tvtimefixer.adb.UsbDevices
+import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
+import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
+import com.civisrom.tvtimefixer.adb.targetOrNull
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbe
 import com.civisrom.tvtimefixer.data.NtpScanner
@@ -30,9 +43,12 @@ import com.civisrom.tvtimefixer.ui.AppState
 import com.civisrom.tvtimefixer.ui.MainScreen
 import com.civisrom.tvtimefixer.ui.UiMessage
 import com.civisrom.tvtimefixer.ui.toUiMessage
-import java.io.File
-import java.io.PrintWriter
-import java.io.StringWriter
+import com.civisrom.tvtimefixer.diagnostics.Operation
+import com.civisrom.tvtimefixer.diagnostics.Outcome
+import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
+import com.civisrom.tvtimefixer.diagnostics.DiagnosticTransport
+import com.civisrom.tvtimefixer.adb.DeviceTarget
+import com.civisrom.tvtimefixer.device.NtpUpdateResult
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -44,9 +60,54 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
 
     private val factory: AdbClientFactory = KadbAdbClientFactory()
-    private val connector = DeviceConnector(factory)
+    private val usb by lazy { UsbDevices(this) }
+    private val journal get() = (application as TimeFixerApplication).diagnostics
+    private val connector by lazy {
+        DeviceConnector(factory, usbConnect = usb::connect, onFailure = { target, error ->
+            val operation = when {
+                error.reason.name.startsWith("PAIRING") || error.reason == ConnectionError.TLS_FAILED -> Operation.PAIR
+                target is UsbDeviceAddress -> Operation.CONNECT_USB
+                else -> Operation.CONNECT_NETWORK
+            }
+            journal.record(operation, Outcome.FAILED, diagnosticTransport(target), reason = error.reason, error = error)
+        })
+    }
     private var discovery: DeviceDiscovery? = null
     private var permissionsRequested = false
+    private var actionJob: Job? = null
+    private var actionGeneration = 0
+    private var usbReceiverRegistered = false
+
+    private val usbReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val device = IntentCompat.getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+            if (intent.action == UsbManager.ACTION_USB_DEVICE_DETACHED && device != null) {
+                val selected = state.connection.targetOrNull() as? UsbDeviceAddress
+                if (selected?.deviceName == device.deviceName) {
+                    val generation = ++actionGeneration
+                    actionJob?.cancel()
+                    val event = journal.record(Operation.USB_DETACHED, Outcome.FAILED,
+                        DiagnosticTransport.USB, reason = ConnectionError.USB_DISCONNECTED)
+                    state = state.copy(connection = ConnectionState.Disconnected, busy = true,
+                        operation = Operation.DISCONNECT, diagnosticEventId = event,
+                        deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
+                        message = UiMessage(R.string.error_usb_disconnected))
+                    lifecycleScope.launch {
+                        // Даже releaseInterface/close могут ждать kernel I/O.
+                        // Освобождаем USB вне UI, до следующего подключения.
+                        withContext(Dispatchers.IO) {
+                            usb.detached(device.deviceName)
+                            connector.disconnect()
+                        }
+                        if (generation == actionGeneration) state = state.copy(busy = false, operation = null)
+                    }
+                } else {
+                    lifecycleScope.launch(Dispatchers.IO) { usb.detached(device.deviceName) }
+                }
+            }
+            refreshUsbList()
+        }
+    }
 
     private val ntpProbe = NtpProbe(UdpSntpClient())
     private val ntpScanner = NtpScanner(ntpProbe)
@@ -72,53 +133,120 @@ class MainActivity : ComponentActivity() {
 
     private val actions = object : AppActions {
 
-        private fun run(block: suspend () -> AppState) {
-            state = state.copy(busy = true)
-            lifecycleScope.launch {
+        private fun run(operation: Operation, block: suspend () -> AppState) {
+            if (state.busy) return
+            val generation = ++actionGeneration
+            val started = System.nanoTime()
+            val transport = when (operation) {
+                Operation.CONNECT_USB -> DiagnosticTransport.USB
+                Operation.CONNECT_NETWORK, Operation.PAIR -> DiagnosticTransport.NETWORK
+                else -> diagnosticTransport(state.connection.targetOrNull())
+            }
+            val ntpAction = operation == Operation.CHECK_NTP || operation == Operation.APPLY_NTP
+            state = state.copy(busy = true, operation = operation, diagnosticEventId = null,
+                ntpDiagnosticEventId = if (ntpAction) null else state.ntpDiagnosticEventId)
+            journal.record(operation, Outcome.STARTED, transport)
+            actionJob = lifecycleScope.launch {
                 try {
-                    state = block()
+                    val result = block()
+                    val failure = result.connection as? ConnectionState.Failed
+                    val failed = when (operation) {
+                        Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
+                        Operation.CHECK_NTP -> result.ntpCheck?.isUsable() != true
+                        Operation.APPLY_NTP -> result.ntpMessage?.res != R.string.ntp_applied
+                        Operation.READ_DEVICE -> result.diagnosticEventId != null || !result.connected || result.deviceInfo == null
+                        else -> false
+                    }
+                    val existing = if (ntpAction) result.ntpDiagnosticEventId else failure?.diagnosticId ?: result.diagnosticEventId
+                    val event = if (failed && existing != null) existing else journal.record(operation,
+                        if (failed) Outcome.FAILED else Outcome.SUCCESS, transport,
+                        durationMs = (System.nanoTime() - started) / 1_000_000,
+                        reason = failure?.reason ?: ConnectionError.UNREACHABLE.takeIf {
+                            failed && !result.connected && operation == Operation.READ_DEVICE
+                        }, issue = if (!failed) null else when {
+                            ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
+                            ntpAction && result.ntpCheck?.isUsable() == false -> DiagnosticIssue.NTP_UNUSABLE
+                            result.ntpMessage?.res == R.string.ntp_not_confirmed -> DiagnosticIssue.NTP_NOT_CONFIRMED
+                            result.ntpMessage?.res == R.string.ntp_invalid -> DiagnosticIssue.INVALID_NTP
+                            else -> null
+                        })
+                    if (generation == actionGeneration) state = result.copy(
+                        diagnosticEventId = if (!ntpAction && failed) event else result.diagnosticEventId,
+                        ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
+                    ).withLatestUsb(state)
                 } catch (e: CancellationException) {
+                    journal.record(operation, Outcome.CANCELLED, transport)
                     throw e
                 } catch (e: Exception) {
-                    // Молчаливое исчезновение ошибки хуже некрасивого текста:
-                    // человек иначе не поймёт, почему ничего не произошло
-                    state = state.copy(
-                        message = UiMessage(
-                            R.string.action_failed,
-                            listOf(e.message ?: e.javaClass.simpleName),
-                        ),
-                    )
+                    val event = journal.record(operation, Outcome.FAILED, transport,
+                        durationMs = (System.nanoTime() - started) / 1_000_000, error = e)
+                    if (generation == actionGeneration) state = if (ntpAction) state.copy(
+                        ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
+                    ) else state.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
                 } finally {
-                    state = state.copy(busy = false)
+                    if (generation == actionGeneration) state = state.copy(busy = false, operation = null)
                 }
             }
         }
 
-        override fun connect(address: String) = run {
+        override fun connect(address: String) = run(Operation.CONNECT_NETWORK) {
             val result = withContext(Dispatchers.IO) { connector.connect(address) }
             state.copy(connection = result, message = null).withDeviceData()
         }
 
-        override fun connectLoopback() = run {
+        override fun connectLoopback() = run(Operation.CONNECT_NETWORK) {
             val result = withContext(Dispatchers.IO) { connector.connectLoopback() }
             state.copy(connection = result, message = null).withDeviceData()
         }
 
-        override fun disconnect() = run {
+        override fun disconnect() = run(Operation.DISCONNECT) {
             withContext(Dispatchers.IO) { connector.disconnect() }
             AppState(
                 discovered = state.discovered,
                 discoveryAvailable = state.discoveryAvailable,
                 discoverySearching = state.discoverySearching,
                 discoveryPermissionNeeded = state.discoveryPermissionNeeded,
+                usbSupported = state.usbSupported,
+                usbDevices = state.usbDevices,
+                usbAttachedCount = state.usbAttachedCount,
+                usbScanFailed = state.usbScanFailed,
+                usbSystemState = state.usbSystemState,
             )
+        }
+
+        override fun refreshUsbDevices() = refreshUsbList(report = true)
+
+        override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) {
+            withContext(Dispatchers.IO) { connector.disconnect() }
+            state = state.copy(connection = ConnectionState.Connecting(address),
+                deviceInfo = null, currentNtpServer = "", ntpMessage = null,
+                ntpCheck = null, ntpRejected = null,
+                message = UiMessage(R.string.usb_authorize_hint))
+            state = state.copy(operation = Operation.USB_PERMISSION)
+            journal.record(Operation.USB_PERMISSION, Outcome.STARTED, DiagnosticTransport.USB)
+            val permissionStarted = System.nanoTime()
+            val granted = try { usb.requestPermission(address) } catch (e: CancellationException) {
+                journal.record(Operation.USB_PERMISSION, Outcome.CANCELLED, DiagnosticTransport.USB)
+                throw e
+            }
+            val reason = if (granted) null else if (usb.list().any { it.deviceName == address.deviceName })
+                ConnectionError.USB_PERMISSION_DENIED else ConnectionError.USB_DISCONNECTED
+            val permissionEvent = journal.record(Operation.USB_PERMISSION,
+                if (granted) Outcome.SUCCESS else Outcome.FAILED, DiagnosticTransport.USB,
+                durationMs = (System.nanoTime() - permissionStarted) / 1_000_000, reason = reason)
+            state = state.copy(operation = Operation.CONNECT_USB)
+            if (reason != null) {
+                return@run state.copy(connection = ConnectionState.Failed(address, reason, permissionEvent), message = null)
+            }
+            val result = withContext(Dispatchers.IO) { connector.connectUsb(address) }
+            state.copy(connection = result, message = null).withDeviceData()
         }
 
         override fun pairAndConnect(
             pairingAddress: String,
             code: String,
             connectAddress: String,
-        ) = run {
+        ) = run(Operation.PAIR) {
             // Спаривание и следующее за ним подключение оба ходят в сеть, а
             // connect внутри блокирующий: на главном потоке это NetworkOnMainThread
             val result = withContext(Dispatchers.IO) {
@@ -127,7 +255,7 @@ class MainActivity : ComponentActivity() {
             state.copy(connection = result, message = null).withDeviceData()
         }
 
-        override fun checkNtpServer(server: String) = run {
+        override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) {
             state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null)
             val result = withContext(Dispatchers.IO) { ntpProbe.test(server) }
             state.copy(ntpCheck = result, ntpRejected = server.takeUnless { result.isUsable() })
@@ -138,7 +266,7 @@ class MainActivity : ComponentActivity() {
          * сервер времени. Десктопная половина ведёт себя так же: адрес, не
          * прошедший проверку, до устройства не доходит.
          */
-        override fun applyNtpServer(server: String, force: Boolean) = run {
+        override fun applyNtpServer(server: String, force: Boolean) = run(Operation.APPLY_NTP) {
             state = state.copy(ntpMessage = null, ntpRejected = null)
             withContext(Dispatchers.IO) {
                 val check = if (force) null else ntpProbe.test(server)
@@ -156,13 +284,18 @@ class MainActivity : ComponentActivity() {
                     connection = ConnectionState.Disconnected,
                     message = UiMessage(R.string.error_unreachable),
                 )
-                val repository = DeviceRepository(client)
+                var failureId: Long? = null
+                val repository = DeviceRepository(client) { error ->
+                    failureId = journal.record(Operation.APPLY_NTP, Outcome.FAILED,
+                        diagnosticTransport(state.connection.targetOrNull()), error = error)
+                }
                 val result = repository.setNtpServer(server)
                 // Значение перечитывается всегда: `settings put` рапортует об
                 // успехе и тогда, когда записи не произошло
                 state.copy(
                     ntpCheck = check,
-                    ntpMessage = result.toUiMessage(),
+                    ntpMessage = if (result is NtpUpdateResult.Failed) UiMessage(R.string.operation_failed_hint) else result.toUiMessage(),
+                    ntpDiagnosticEventId = failureId,
                     currentNtpServer = repository.currentNtpServer(),
                 )
             }
@@ -170,19 +303,23 @@ class MainActivity : ComponentActivity() {
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
-            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null)
+            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null, ntpDiagnosticEventId = null)
+            journal.record(Operation.SCAN_NTP, Outcome.STARTED)
+            val started = System.nanoTime()
             scanJob = lifecycleScope.launch {
                 try {
                     ntpScanner.scan(NtpData.allServers).collect { progress ->
                         state = state.copy(ntpScan = progress)
                     }
+                    journal.record(Operation.SCAN_NTP, Outcome.SUCCESS,
+                        durationMs = (System.nanoTime() - started) / 1_000_000)
                 } catch (e: CancellationException) {
+                    journal.record(Operation.SCAN_NTP, Outcome.CANCELLED)
                     throw e
                 } catch (e: Exception) {
-                    state = state.copy(
-                        ntpScan = null,
-                        ntpMessage = UiMessage(R.string.action_failed, listOf(reasonOf(e))),
-                    )
+                    val event = journal.record(Operation.SCAN_NTP, Outcome.FAILED, error = e)
+                    state = state.copy(ntpScan = null, ntpDiagnosticEventId = event,
+                        ntpMessage = UiMessage(R.string.operation_failed_hint))
                 }
             }
         }
@@ -195,28 +332,44 @@ class MainActivity : ComponentActivity() {
             state = state.copy(ntpScan = state.ntpScan?.let { it.copy(checked = it.total) })
         }
 
-        override fun refreshDeviceInfo() = run { state.withDeviceData() }
+        override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { state.withDeviceData() }
 
         override fun requestDiscoveryPermission() = requestDiscoveryPermissions()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        recordUncaughtExceptions()
+        val usbFilter = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+            addAction(ACTION_USB_SYSTEM_STATE)
+        }
+        ContextCompat.registerReceiver(this, usbReceiver, usbFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        usbReceiverRegistered = true
+        refreshUsbList()
         val mode = detectDeviceMode(this)
-        lastCrash()?.let { state = state.copy(message = UiMessage(R.string.last_crash, listOf(it))) }
 
         setContent {
             MaterialTheme {
                 Surface {
-                    MainScreen(mode = mode, state = state, actions = actions)
+                    val diagnostics by journal.snapshot.collectAsState()
+                    MainScreen(mode = mode, state = state, actions = actions, diagnostics = diagnostics,
+                        onRefreshDiagnostics = journal::refresh, onClearDiagnostics = journal::clear)
                 }
             }
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // Системный USB intent только обновляет список. ADB запускается кнопкой.
+        if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) refreshUsbList(report = true)
+    }
+
     override fun onStart() {
         super.onStart()
+        refreshUsbList()
         if (missingDiscoveryPermissions().isEmpty()) {
             startDiscovery()
         } else if (!permissionsRequested) {
@@ -236,42 +389,41 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        actionGeneration++
+        actionJob?.cancel()
+        if (usbReceiverRegistered) unregisterReceiver(usbReceiver)
         scanJob?.cancel()
         runCatching { discovery?.close() }
         // Закрытие тоже идёт по сокету, а lifecycleScope здесь уже отменён:
         // на главном потоке соединение осталось бы полузакрытым
-        thread { connector.disconnect() }
+        thread { usb.close(); connector.disconnect() }
         super.onDestroy()
     }
 
-    /**
-     * Сохраняет трассировку падения, чтобы показать её при следующем запуске.
-     *
-     * Обнаружение по mDNS отвечает колбэками NsdManager, которые приходят на
-     * главный поток уже после возврата из start(): исключение оттуда не ловится
-     * никаким try/catch вокруг вызова и убивает процесс молча, не оставляя
-     * пользователю ни окна, ни следа. Единственное место, где такое ещё можно
-     * перехватить, — обработчик по умолчанию.
-     */
-    private fun recordUncaughtExceptions() {
-        val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching {
-                val writer = StringWriter()
-                PrintWriter(writer).use { error.printStackTrace(it) }
-                File(filesDir, CRASH_FILE).writeText(thread.name + "\n" + writer)
-            }
-            previous?.uncaughtException(thread, error)
-        }
-    }
-
-    /** Трассировка прошлого падения, если она есть. Читается один раз. */
-    private fun lastCrash(): String? {
-        val file = File(filesDir, CRASH_FILE)
-        if (!file.isFile) return null
-        val text = runCatching { file.readText() }.getOrNull()
-        file.delete()
-        return text?.take(1200)
+    private fun refreshUsbList(report: Boolean = false) {
+        runCatching { usb.scan() }.fold(onSuccess = { listing ->
+            val observation = usb.observation(listing)
+            val changed = state.usbSupported != usb.supported || state.usbDevices != listing.devices ||
+                state.usbAttachedCount != listing.attachedCount || state.usbScanFailed ||
+                state.usbSystemState != observation.system
+            state = state.copy(usbSupported = usb.supported, usbDevices = listing.devices,
+                usbAttachedCount = listing.attachedCount, usbScanFailed = false, usbSystemState = observation.system)
+            if (changed || report) journal.record(Operation.USB_SCAN, Outcome.SUCCESS, DiagnosticTransport.USB,
+                usb = observation,
+                issue = when {
+                    !usb.supported -> DiagnosticIssue.USB_HOST_UNSUPPORTED
+                    listing.attachedCount == 0 -> DiagnosticIssue.USB_NONE
+                    listing.devices.isEmpty() -> DiagnosticIssue.USB_NO_ADB
+                    else -> null
+                })
+        }, onFailure = { error ->
+            val observation = usb.observation(null)
+            val event = journal.record(Operation.USB_SCAN, Outcome.FAILED, DiagnosticTransport.USB,
+                issue = DiagnosticIssue.USB_ENUMERATION, error = error, usb = observation)
+            state = state.copy(usbSupported = usb.supported, usbDevices = emptyList(), usbScanFailed = true,
+                usbSystemState = observation.system,
+                message = UiMessage(R.string.usb_scan_failed), diagnosticEventId = event)
+        })
     }
 
     private fun missingDiscoveryPermissions(): List<String> =
@@ -329,15 +481,12 @@ class MainActivity : ComponentActivity() {
 
     /** Обнаружение не работает: экран предлагает ввести адрес и называет причину. */
     private fun discoveryFailed(error: Throwable) {
+        val event = journal.record(Operation.DISCOVERY, Outcome.FAILED, DiagnosticTransport.NETWORK, error = error)
         state = state.copy(
             discoveryAvailable = false,
             discoverySearching = false,
-            message = UiMessage(R.string.discovery_failed, listOf(reasonOf(error))),
+            message = UiMessage(R.string.discovery_failed), diagnosticEventId = event,
         )
-    }
-
-    private companion object {
-        const val CRASH_FILE = "last-crash.txt"
     }
 
     /**
@@ -348,20 +497,27 @@ class MainActivity : ComponentActivity() {
      * ненажатой — отличить одно от другого было нечем.
      */
     private suspend fun AppState.withDeviceData(): AppState {
-        if (connection !is ConnectionState.Connected) return this
+        val clean = copy(deviceInfo = null, currentNtpServer = "")
+        if (connection !is ConnectionState.Connected) return clean
         return withContext(Dispatchers.IO) {
-            val client = connector.activeClient ?: return@withContext copy(
+            val client = connector.activeClient ?: return@withContext clean.copy(
                 connection = ConnectionState.Disconnected,
                 message = UiMessage(R.string.error_unreachable),
             )
             runCatching { DeviceRepository(client).readDeviceInfo() }.fold(
-                onSuccess = { copy(deviceInfo = it, currentNtpServer = it.currentNtpServer) },
-                onFailure = { copy(message = UiMessage(R.string.action_failed, listOf(reasonOf(it)))) },
+                onSuccess = { clean.copy(deviceInfo = it, currentNtpServer = it.currentNtpServer) },
+                onFailure = {
+                    val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,
+                        diagnosticTransport(connection.targetOrNull()), error = it)
+                    clean.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
+                },
             )
         }
     }
 
-    /** Причина сбоя в виде, пригодном для показа человеку. */
-    private fun reasonOf(error: Throwable): String =
-        error.javaClass.simpleName + ": " + (error.message ?: "")
+    private fun diagnosticTransport(target: DeviceTarget?): DiagnosticTransport = when (target) {
+        is UsbDeviceAddress -> DiagnosticTransport.USB
+        null -> DiagnosticTransport.NONE
+        else -> DiagnosticTransport.NETWORK
+    }
 }

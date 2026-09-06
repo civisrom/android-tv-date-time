@@ -1,5 +1,7 @@
 package com.civisrom.tvtimefixer.data
 
+import com.civisrom.tvtimefixer.adb.DeviceTarget
+
 /** Порт adbd для «отладки по сети». Беспроводная отладка использует случайный. */
 const val DEFAULT_ADB_PORT = 5555
 
@@ -29,7 +31,7 @@ fun isValidNtpServer(server: String): Boolean {
 }
 
 /** Разобранный адрес устройства. */
-data class DeviceAddress(val host: String, val port: Int) {
+data class DeviceAddress(val host: String, val port: Int) : DeviceTarget {
     override fun toString(): String = "$host:$port"
 }
 

@@ -34,6 +34,10 @@ As of version 2.6.0 the project has two halves:
 
 ## Key Features
 
+*   **USB connections:** Windows, Linux, macOS and Android devices with USB
+    host/OTG. Select a specific device and manage NTP without an IP address.
+    See [USB debugging](#usb-debugging).
+
 *   **Multilingual Interface:**
     *   Support for English and Russian languages
     *   Language selection at program startup
@@ -174,15 +178,15 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.1.apk` from [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+1.  Download `AndroidTVTimeFixer-2.6.2.apk` from the [2.6.2 prerelease](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.2). [What's new](release-notes/v2.6.2-en.md).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.1.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.2.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.1.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.2.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
@@ -230,7 +234,10 @@ automatically on first launch.
 2.  Click on the **"Build"** item 7 times to unlock developer mode.
 3.  Go to: **Device Preferences** > **Developer options**.
 
-### Step 2. Enable debugging — one of two ways
+### Step 2. Enable debugging — USB or one of the network options
+
+For a cable connection, enable **USB debugging** and follow
+[USB debugging](#usb-debugging). The options below apply to network connections.
 
 Look for **one** of these entries under Developer options. Which one you get
 depends on the firmware, not on the Android version.
@@ -251,7 +258,7 @@ address regardless of the label used in Settings.
 > the standard method. See [Xiaomi's official instructions](https://www.mi.com/sg/support/article/KA-06513/)
 > and [a model-specific owner report for Mi TV 4A/4S](https://4pda.to/forum/index.php?showtopic=957045&st=6200).
 
-**Option B — "Wireless debugging" (Android 11+).** The only option on Google TV
+**Option B — "Wireless debugging" (Android 11+).** The network option on Google TV
 Streamer and Chromecast with Google TV after the Android 14 update. Turn the
 switch on and **leave the screen open** — the ports shown there are random and
 change. Then use **item 11** of the main menu (see the "Wireless debugging"
@@ -411,6 +418,7 @@ the device model, Android version and error message.
  9. Auto-setup NTP server (experimental mode)
 10. Terminal mode (ADB and system commands)
 11. Android 11+ wireless debugging (pairing and mDNS discovery)
+12. Connect over USB
  0. Exit
 ```
 
@@ -586,6 +594,75 @@ device information, terminal.
 
 Closes the program.
 
+## USB debugging
+
+The current application version appears in the Windows, Linux and macOS
+main menu and below the application title on Android’s main screen.
+
+Use a **data cable**, enable **USB debugging** on the target Android device,
+and accept its RSA authorization prompt. The target TV/box must expose ADB
+through a supported device/OTG port. A host-only port intended for USB drives
+cannot provide this connection; check the manufacturer’s port documentation.
+An Android phone controlling the target must support USB host/OTG.
+[Android USB host model](https://developer.android.com/develop/connectivity/usb/host).
+
+**Windows, Linux and macOS:**
+
+1. Connect the target to the computer and enable USB debugging on the target.
+2. Choose **12. Connect over USB**, then select the device. You can also enter
+   `u` in the address prompts for menu items 1, 2 and 5.
+3. If authorization is needed, accept the RSA prompt on the target, press `r`
+   to refresh the list, and select it again.
+4. Once the connection is verified, use the usual NTP and device-information
+   menu items. Press Enter at the next address prompt to reuse the selected USB device.
+
+After selecting a USB device, **9. Auto-setup NTP** also uses that device,
+without searching the network for another target.
+
+Windows may require an [OEM ADB driver](https://developer.android.com/studio/run/oem-usb).
+On Ubuntu/Debian, install the `android-sdk-platform-tools-common` udev rules
+and check `plugdev` membership if USB access is denied; log in again after
+changing groups. macOS normally needs no separate ADB driver.
+[Official workstation setup](https://developer.android.com/studio/run/device).
+
+Releases bundle ADB 37.0.1. When running from source, install Platform Tools
+and put `adb` on `PATH`, or put the binary in the project’s `resources/`
+directory (Windows also needs `AdbWinApi.dll` and `AdbWinUsbApi.dll`). The
+application uses its own ADB server. Another server may already own the USB
+interface: close that session and reconnect the cable. Other processes are
+not terminated automatically. Terminal mode accepts regular commands such as
+`adb devices -l`, `adb -d shell ...` and `adb -s SERIAL shell ...`.
+
+**Android application:**
+
+1. Connect the controlling phone/tablet to the target using OTG and a data cable.
+2. In **USB debugging**, refresh the list and choose **Connect via USB**.
+3. Allow USB access in the phone’s system dialog, then accept the separate
+   RSA prompt on the target. These are two different permissions.
+4. After the connection probe succeeds, NTP settings and device information
+   are available. Unplugging closes the session; select the device again to
+   reconnect. Root and a six-digit pairing code are not required for USB.
+
+An empty list distinguishes Android seeing no USB devices from USB being present
+without an ADB interface. Press **Refresh USB devices**; Diagnostics also records
+the result. Android may offer to open the app when an ADB device is attached;
+connecting still requires pressing the button.
+An empty list alone does not establish the cause. **Diagnostics → Details** for
+a USB search includes device counts and system USB role flags. Role information
+is optional and may be unavailable or delayed by firmware; a missing flag appears
+as `unknown`, not as OTG being disabled.
+
+For **SHIELD without micro-USB**, use port 1, furthest from HDMI, in PC connection
+mode. The phone must be the USB host. A regular USB-A to USB-C cable may select
+the opposite role; use an appropriate OTG data connection. See [NVIDIA instructions](https://nvidia.custhelp.com/app/answers/detail/a_id/4344/kw/10)
+and [Chromium USB-C cable guidance](https://www.chromium.org/chromium-os/developer-library/reference/hardware/cable-and-adapter-tips-and-tricks/).
+
+USB ADB does not require a shared Wi-Fi network. NTP probing still uses the
+controller’s Internet connection, and the TV needs access to the selected NTP
+server for subsequent synchronization. The application does not enable
+debugging automatically or switch the target to `adb tcpip`. Network scanning
+and batch network operations continue to use IP addresses.
+
 ## Android application
 
 The APK turns a phone, tablet or the TV itself into a purpose-built NTP setup
@@ -601,11 +678,13 @@ phone or directly on the TV, without a computer.
 
 ### Before you start
 
-1. **The phone and the TV must be on the same Wi-Fi network.** Not "home" and
+1. **For network ADB, the phone and TV must be on the same Wi-Fi network.** Not "home" and
    "guest" — the same one, or they will not see each other.
 2. **Developer mode and debugging must be on** on the TV. How to do that is in
    [Android TV Setup](#android-tv-setup) above; it is the same for both programs.
-3. Turn mobile data off on the phone: otherwise some requests may leave through
+   USB uses OTG and a data cable instead of the shared network; see
+   [USB debugging](#usb-debugging).
+3. For network ADB, turn mobile data off on the phone: otherwise some requests may leave through
    the cellular network instead of Wi-Fi.
 
 ### The screen, top to bottom
@@ -616,7 +695,7 @@ them.
 #### 1. Title and mode
 
 One line under the name: "Running on a phone: it will connect to a TV over the
-network" or "Running on a TV". The app works this out by itself; nothing to set.
+network or USB" or "Running on a TV". The app works this out by itself; nothing to set.
 
 #### 2. "Connect to a device"
 
@@ -686,9 +765,10 @@ as well as discovery. See [Android's local-network permission rules](https://dev
 
 #### 4. "Pair a device" — the code, for Android 11 and newer
 
-The pairing form is shown **while there is no connection**. Once you connect it
-disappears, because it is no longer needed. To pair another device, press
-Disconnect.
+Expand the pairing form inside **Over the network**. **Pair** on a discovered
+device expands it and fills the address. Once connected, connection options
+collapse into **Connect another device**; expanding them does not disconnect
+the current device.
 
 Pairing is only required where developer settings offer **Wireless debugging**.
 If, as on an Nvidia Shield, you only have "Network debugging", pairing is not
@@ -743,7 +823,10 @@ regression tests.
 
 #### 5. "Time server"
 
-This section appears only after you connect.
+After connecting, this section appears directly below the connection card.
+Address input, checking and applying are immediately available. Search, lists
+and scanning are inside **Choose a server**. An ongoing scan and its Stop button
+remain visible when the picker is collapsed.
 
 The first line — **"Current:"** — is the value **read back from the TV**, not
 what you typed. When a server is set the line is **green**; "No time server is
@@ -753,11 +836,11 @@ The outcome is marked the same way: **green** for "Time server set to …",
 **red** for any failure. The Check button follows suit — a usable server is
 green, a rejected one red.
 
-**Three ways to choose a server:**
+**Choosing a server:**
 
 *   **Search.** Start typing a country code, a country name, or part of an
     address: `ru`, `by`, `kz`, `Russia`, `cloudflare`. Tapping a result **puts
-    the address into the field below** — nothing is changed yet.
+    the address into the input field** — nothing is changed yet.
 *   **The country list.** With the search empty there is a **Show countries and
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
@@ -812,14 +895,24 @@ number, CPU and core count, memory, screen resolution and density, time zone,
 locale, battery, kernel version, uptime and the current time server. The
 **Refresh** button reads it all again.
 
-Empty rows are not shown: if the firmware does not answer one command, only
-that row disappears rather than the whole section.
+Model, Android version and time zone are visible immediately; expand **All device
+details** for the rest. Empty rows are hidden: if the firmware does not answer one
+command, only that row disappears.
 
 ### If the app misbehaves
 
-When the app closes unexpectedly it stores the reason and shows it **on the
-next launch**, in a card at the top of the screen. That text is worth attaching
-to a bug report — it names the cause outright.
+**Diagnostics** opens a local history of operations and errors. Returning preserves
+entered addresses and expanded sections. **Details** beside an error opens its
+matching record. After an unexpected closure, the next launch offers a link to
+the saved crash details.
+
+The private, non-backed-up store keeps up to **200 events for 7 days**, with a
+combined **256 KiB** disk budget. It excludes pairing codes, keys, serial numbers,
+entered addresses and ADB output. Technical details contain exception types and
+bounded stack frames without exception messages. Nothing is sent automatically.
+**Copy report** explicitly copies the history to the clipboard; **Clear** requires
+confirmation. A storage failure is shown in Diagnostics without stopping device
+operations.
 
 ### What the app does not do
 
@@ -838,20 +931,22 @@ For wireless debugging, use pairing and the current TLS connection port.
 
 The program has been tested and should work on Android TV devices (including Nvidia Shield) that meet the following requirements:
 
-*   ADB over the network — in either flavour: the classic "Network debugging"
+*   ADB over USB through a supported port, or over the network: classic "Network debugging"
     (port 5555) or Android 11+ "Wireless debugging" with a pairing code.
 *   Support for NTP server management via `adb shell` commands.
 
-Verified on devices from Android 9 to 16. On Google TV Streamer and Chromecast
-with Google TV updated to Android 14 only wireless debugging is available — use
-menu item 11.
+Network mode was verified on devices from Android 9 to 16. For network
+connections to Google TV Streamer and Chromecast with Google TV updated to
+Android 14, use wireless debugging in menu item 11. USB availability depends
+on the individual device’s port and firmware.
 
 **Supported Operating Systems:**
 *   Windows 10/11
 *   Linux (Ubuntu, Debian, Fedora, etc.)
 *   macOS
 
-**Android application:** Android 6.0+ for legacy ADB; TLS pairing requires
+**Android application:** Android 6.0+ for legacy ADB and USB host/OTG; USB host
+hardware support is required. TLS pairing requires
 Android 10+ on the client and wireless debugging on the controlled device
 (Android 11+ phones, Android 13+ TVs).
 

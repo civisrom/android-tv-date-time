@@ -90,7 +90,9 @@ class StringResourcesTest {
             "ntp_applied", "ntp_invalid", "ntp_not_confirmed", "ntp_failed",
             "discovery_kind_awaiting_pairing", "discovery_kind_ready", "discovery_kind_legacy",
             "discovery_permission_needed", "discovery_grant_permission",
-            "pairing_port_warning", "action_failed",
+            "pairing_port_warning", "operation_failed_hint", "diagnostics_title",
+            "diagnostics_storage_failed", "diagnostics_clear_confirm", "diagnostics_dropped",
+            "usb_none", "usb_no_adb", "usb_scan_failed", "usb_detected",
         )
         assertEquals("не хватает строк", emptyList<String>(), required - english.keys)
     }

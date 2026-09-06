@@ -24,6 +24,11 @@ fun ConnectionError.messageRes(): Int = when (this) {
     ConnectionError.PAIRING_FAILED -> R.string.error_pairing_failed
     ConnectionError.TLS_FAILED -> R.string.error_tls_failed
     ConnectionError.WIRELESS_UNSUPPORTED -> R.string.error_wireless_unsupported
+    ConnectionError.USB_UNSUPPORTED -> R.string.error_usb_unsupported
+    ConnectionError.USB_PERMISSION_DENIED -> R.string.error_usb_permission
+    ConnectionError.USB_DISCONNECTED -> R.string.error_usb_disconnected
+    ConnectionError.USB_BUSY -> R.string.error_usb_busy
+    ConnectionError.USB_IO -> R.string.error_usb_io
     ConnectionError.UNKNOWN -> R.string.error_unknown
 }
 

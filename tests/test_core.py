@@ -707,6 +707,9 @@ class ReliabilityTests(unittest.TestCase):
             fixer.settings_file.write_text('{"adb_server_port": "70000"}', encoding='utf-8')
             self.assertEqual(fixer.load_adb_server_port(), DEFAULT_ADB_SERVER_PORT)
 
+            fixer.settings_file.write_text('{"adb_server_port": "5037"}', encoding='utf-8')
+            self.assertEqual(fixer.load_adb_server_port(), DEFAULT_ADB_SERVER_PORT)
+
             fixer.settings_file.write_text('{"adb_server_port": "5039"}', encoding='utf-8')
             self.assertEqual(fixer.load_adb_server_port(), 5039)
 
