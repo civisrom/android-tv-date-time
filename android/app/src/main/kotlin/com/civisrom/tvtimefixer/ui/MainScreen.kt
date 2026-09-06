@@ -93,7 +93,7 @@ fun MainScreen(
                     "crash-details" -> diagnostics.previousCrashId != null
                     "action-details" -> state.message != null && state.diagnosticEventId != null
                     "connection-details" -> state.connection is ConnectionState.Failed && state.diagnosticEventId != null
-                    "ntp-details" -> state.connected && state.ntpDiagnosticEventId != null
+                    "ntp-details" -> state.ntpDiagnosticEventId != null
                     else -> true
                 }
                 showDiagnostics = false; returnFocus = if (available) origin else "diagnostics-open"
@@ -137,7 +137,12 @@ private fun MainContent(
     onFocusRestored: () -> Unit,
 ) {
     var pairingAddress by rememberSaveable { mutableStateOf("") }
-    var pairingExpanded by rememberSaveable { mutableStateOf(false) }
+    var discoveryExpanded by rememberSaveable { mutableStateOf(state.discovered.isNotEmpty()) }
+    var lastDiscoveredCount by rememberSaveable { mutableIntStateOf(state.discovered.size) }
+    LaunchedEffect(state.discovered.size, state.discoveryPermissionNeeded) {
+        if (state.discovered.size > lastDiscoveredCount || state.discoveryPermissionNeeded) discoveryExpanded = true
+        lastDiscoveredCount = state.discovered.size
+    }
     var usbExpanded by rememberSaveable { mutableStateOf(state.usbAttachedCount > 0 || state.usbDevices.isNotEmpty()) }
     var lastUsbCount by rememberSaveable { mutableIntStateOf(state.usbAttachedCount) }
     var lastAdbCount by rememberSaveable { mutableIntStateOf(state.usbDevices.size) }
@@ -171,7 +176,7 @@ private fun MainContent(
                 }
             }
         }
-        ConnectionStatus(state, actions)
+        ConnectionStatus(mode, state, actions)
         if (state.busy) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
             state.operation?.let { Text(stringResource(R.string.operation_working, stringResource(it.labelRes()))) }
@@ -191,28 +196,20 @@ private fun MainContent(
                 DiagnosticLink(id, "connection-details", onDiagnostics, returnFocus, onFocusRestored)
             }
         }
-        if (state.connected) {
-            NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
-            DeviceInfoSection(state, actions)
+        NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
+        PairingSection(state, actions, pairingAddress, { pairingAddress = it },
+            pairingCode, onPairingCode, pairingRequester)
+        ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
+            onExpanded = { discoveryExpanded = it }) {
+            DiscoverySection(state, actions, onPair = {
+                pairingAddress = it; focusPairing = true
+            })
         }
-        ExpandableSection(stringResource(R.string.connection_other), "other-connection", initiallyExpanded = true,
-            collapsible = state.connected, initiallyCollapsedWhenEnabled = true) {
-            ExpandableSection(stringResource(R.string.connection_network), "network", initiallyExpanded = true) {
-                NetworkAddressSection(mode, state, actions)
-                DiscoverySection(state, actions, onPair = {
-                    pairingAddress = it; pairingExpanded = true; focusPairing = true
-                })
-                ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
-                    onExpanded = { pairingExpanded = it }) {
-                    PairingSection(state, actions, pairingAddress, { pairingAddress = it },
-                        pairingCode, onPairingCode, pairingRequester)
-                }
-            }
-            ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
-                onExpanded = { usbExpanded = it }) {
-                UsbSection(state, actions)
-            }
+        ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
+            onExpanded = { usbExpanded = it }) {
+            UsbSection(state, actions)
         }
+        if (state.connected) DeviceInfoSection(state, actions)
     }
 }
 
@@ -221,21 +218,16 @@ private fun MainContent(
 private fun ExpandableSection(
     title: String,
     key: String,
-    initiallyExpanded: Boolean = false,
-    collapsible: Boolean = true,
-    initiallyCollapsedWhenEnabled: Boolean = false,
     expanded: Boolean? = null,
     onExpanded: ((Boolean) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    var localExpanded by rememberSaveable(collapsible) {
-        mutableStateOf(if (collapsible && initiallyCollapsedWhenEnabled) false else initiallyExpanded)
-    }
-    val open = !collapsible || (expanded ?: localExpanded)
+    var localExpanded by rememberSaveable { mutableStateOf(false) }
+    val open = expanded ?: localExpanded
     val description = stringResource(if (open) R.string.section_expanded else R.string.section_collapsed)
     val holder = rememberSaveableStateHolder()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (collapsible) TextButton(
+        TextButton(
             onClick = { if (onExpanded != null) onExpanded(!open) else localExpanded = !open },
             modifier = Modifier.testTag("section-$key").semantics { stateDescription = description },
         ) { Text((if (open) "− " else "+ ") + title, style = MaterialTheme.typography.titleMedium) }
@@ -291,7 +283,7 @@ private fun UsbSection(state: AppState, actions: AppActions) {
 }
 
 @Composable
-private fun ConnectionStatus(state: AppState, actions: AppActions) {
+private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActions) {
     Card(Modifier.fillMaxWidth().testTag("connection-status")) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.connect_title), style = MaterialTheme.typography.titleMedium)
@@ -308,6 +300,7 @@ private fun ConnectionStatus(state: AppState, actions: AppActions) {
             if (state.connected) Button(onClick = actions::disconnect, enabled = !state.busy) {
                 Text(stringResource(R.string.connect_disconnect))
             }
+            NetworkAddressSection(mode, state, actions)
         }
     }
 }
@@ -331,7 +324,6 @@ private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: Ap
 @Composable
 private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.discovery_title), style = MaterialTheme.typography.titleMedium)
         when {
             // Без разрешения системный mDNS не вернёт ничего и не пожалуется:
             // отличить это от «в сети пусто» человек сам не сможет
@@ -423,6 +415,7 @@ private fun PairingSection(
     val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.pairing_title), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.pairing_hint), style = MaterialTheme.typography.bodySmall)
         if (!pairingSupported) {
             Text(stringResource(R.string.error_wireless_unsupported), style = MaterialTheme.typography.bodySmall)
@@ -436,7 +429,7 @@ private fun PairingSection(
             onValueChange = onPairingAddressChange,
             label = { Text(stringResource(R.string.pairing_address_hint)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("pairing-address"),
         )
         OutlinedTextField(
             value = code,
@@ -450,11 +443,12 @@ private fun PairingSection(
             onValueChange = { connectAddress = it },
             label = { Text(stringResource(R.string.pairing_connect_address_hint)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("pairing-connect-address"),
         )
         Button(
             onClick = { actions.pairAndConnect(pairingAddress, code, connectAddress) },
             enabled = !state.busy && pairingSupported,
+            modifier = Modifier.testTag("pairing-connect"),
         ) {
             Text(stringResource(R.string.pairing_action))
         }
@@ -481,12 +475,12 @@ private fun NtpSection(state: AppState, actions: AppActions,
         Text(stringResource(R.string.ntp_title), style = MaterialTheme.typography.titleMedium)
         // Заданный сервер выделен так же, как установленная связь: это второе
         // состояние, ради которого на экран смотрят
-        val ntpIsSet = state.currentNtpServer.isNotEmpty()
+        val ntpIsSet = state.connected && state.currentNtpServer.isNotEmpty()
         Text(
-            if (ntpIsSet) {
-                stringResource(R.string.ntp_current, state.currentNtpServer)
-            } else {
-                stringResource(R.string.ntp_current_unset)
+            when {
+                !state.connected -> stringResource(R.string.ntp_connect_first)
+                ntpIsSet -> stringResource(R.string.ntp_current, state.currentNtpServer)
+                else -> stringResource(R.string.ntp_current_unset)
             },
             color = if (ntpIsSet) ConnectedColor else MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleSmall,
@@ -506,7 +500,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = { actions.applyNtpServer(custom) },
-                enabled = !state.busy && custom.isNotBlank(),
+                enabled = state.connected && !state.busy && custom.isNotBlank(),
                 modifier = Modifier.testTag("ntp-apply"),
             ) {
                 Text(stringResource(R.string.ntp_apply))
@@ -547,7 +541,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
         state.ntpRejected?.let { rejected ->
             Button(
                 onClick = { actions.applyNtpServer(rejected, force = true) },
-                enabled = !state.busy,
+                enabled = state.connected && !state.busy,
+                modifier = Modifier.testTag("ntp-apply-anyway"),
             ) {
                 Text(stringResource(R.string.ntp_apply_anyway))
             }

@@ -66,6 +66,7 @@
     <string name="ntp_title">Time server</string>
     <string name="ntp_current">Current: %1$s</string>
     <string name="ntp_current_unset">No time server is set</string>
+    <string name="ntp_connect_first">You can choose and check a server address now. Connect to the device to read its settings and apply the server.</string>
     <string name="ntp_by_country">Search by country code, country name or address — for example ru, by, kz. Case does not matter. Tapping a result puts the address into the field below.</string>
     <string name="ntp_custom_hint">Time server address</string>
     <string name="ntp_address_note">A domain name (time.google.com) or an IP address (216.239.35.0) — both work.</string>
@@ -168,8 +169,6 @@
     <string name="operation_storage">Recovering damaged history</string>
     <string name="operation_working">In progress: %1$s</string>
     <string name="operation_failed_hint">The operation did not complete. See diagnostics for details.</string>
-    <string name="connection_other">Connect another device</string>
-    <string name="connection_network">Over the network</string>
     <string name="ntp_choose_server">Choose a server</string>
     <string name="info_more">All device details</string>
     <string name="section_expanded">Expanded</string>
