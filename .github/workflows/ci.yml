@@ -26,6 +26,7 @@ env:
 
 jobs:
   test:
+    name: Тесты (${{ matrix.os }}, Python ${{ matrix.python }})
     strategy:
       fail-fast: false
       matrix:
