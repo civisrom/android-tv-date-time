@@ -404,6 +404,9 @@ not require a second device. Details are in
 **The Android app operates in test mode.** When reporting an issue, include
 the device model, Android version and error message.
 
+**Six-digit code pairing in the newer Wireless debugging mode has been
+tested by a user on a real device and confirmed to work.**
+
 ## Main Menu
 
 ```
@@ -764,6 +767,8 @@ build must request `ACCESS_LOCAL_NETWORK`; denial affects direct connections
 as well as discovery. See [Android's local-network permission rules](https://developer.android.com/privacy-and-security/local-network-permission).
 
 #### 4. "Pair a device" — the code, for Android 11 and newer
+
+**Pairing has been tested by a user on a real device and confirmed to work.**
 
 Expand the pairing form inside **Over the network**. **Pair** on a discovered
 device expands it and fills the address. Once connected, connection options
