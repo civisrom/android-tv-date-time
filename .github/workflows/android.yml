@@ -135,15 +135,27 @@ jobs:
           exit 1
 
       - name: Run Compose UI regression tests
+        timeout-minutes: 10
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 connectedDebugAndroidTest
+        # Явные установка и запуск позволяют отличить сбой ADB от сбоя тестов.
+        # APK остаются установленными до сбора скриншотов.
+        run: |
+          set -o pipefail
+          timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+          timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/ui-instrumentation.log"
+          # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
+          grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-instrumentation.log"
 
       - name: Collect UI screenshots
         if: always()
         run: |
           mkdir -p ui-screenshots
-          "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
-          "$ANDROID_HOME/platform-tools/adb" emu kill || true
+          timeout 30 "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
+          timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true
 
       - name: Upload UI test results
         if: always()
@@ -152,8 +164,8 @@ jobs:
           name: android-ui-api-${{ matrix.api }}
           path: |
             ui-screenshots/
-            android/app/build/reports/androidTests/
-            android/app/build/outputs/androidTest-results/
+            ${{ runner.temp }}/ui-instrumentation.log
             ${{ runner.temp }}/ui-emulator.log
+            ${{ runner.temp }}/ui-logcat.txt
           if-no-files-found: ignore
           retention-days: 7

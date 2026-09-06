@@ -8,6 +8,7 @@ import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
 import com.civisrom.tvtimefixer.diagnostics.Operation
+import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 
 /**
  * Всё, что показывает экран.
@@ -29,6 +30,7 @@ data class AppState(
     val usbDevices: List<UsbDeviceAddress> = emptyList(),
     val usbAttachedCount: Int = 0,
     val usbScanFailed: Boolean = false,
+    val usbSystemState: UsbSystemState = UsbSystemState(),
     val deviceInfo: DeviceInfo? = null,
     val currentNtpServer: String = "",
     val message: UiMessage? = null,
@@ -55,6 +57,13 @@ data class AppState(
      */
     val ntpRejected: String? = null,
 ) {
+    /** Команда ADB не должна перезаписывать USB-события, полученные за время её выполнения. */
+    fun withLatestUsb(latest: AppState): AppState = copy(
+        usbSupported = latest.usbSupported, usbDevices = latest.usbDevices,
+        usbAttachedCount = latest.usbAttachedCount, usbScanFailed = latest.usbScanFailed,
+        usbSystemState = latest.usbSystemState,
+    )
+
     val connected: Boolean get() = connection is ConnectionState.Connected
 
     /**

@@ -260,6 +260,14 @@ private fun UsbSection(state: AppState, actions: AppActions) {
                 else -> Text(stringResource(R.string.usb_detected, state.usbDevices.size))
             }
             if (state.usbDevices.isEmpty()) ExpandableSection(stringResource(R.string.usb_connection_help), "usb-help") {
+                val system = state.usbSystemState
+                Text(stringResource(when {
+                    system.hostConnected == true -> R.string.usb_system_host
+                    system.hostConnected == false && system.deviceConnected == true -> R.string.usb_system_device
+                    system.hostConnected == false && system.deviceConnected == false -> R.string.usb_system_disconnected
+                    else -> R.string.usb_system_unknown
+                }))
+                Text(stringResource(R.string.usb_system_diagnostics), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.usb_shield_hint), style = MaterialTheme.typography.bodySmall)
             }
             state.usbDevices.forEach { device ->

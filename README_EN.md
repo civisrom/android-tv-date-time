@@ -647,6 +647,10 @@ An empty list distinguishes Android seeing no USB devices from USB being present
 without an ADB interface. Press **Refresh USB devices**; Diagnostics also records
 the result. Android may offer to open the app when an ADB device is attached;
 connecting still requires pressing the button.
+An empty list alone does not establish the cause. **Diagnostics → Details** for
+a USB search includes device counts and system USB role flags. Role information
+is optional and may be unavailable or delayed by firmware; a missing flag appears
+as `unknown`, not as OTG being disabled.
 
 For **SHIELD without micro-USB**, use port 1, furthest from HDMI, in PC connection
 mode. The phone must be the USB host. A regular USB-A to USB-C cable may select

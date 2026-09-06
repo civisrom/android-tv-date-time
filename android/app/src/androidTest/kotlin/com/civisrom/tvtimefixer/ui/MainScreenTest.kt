@@ -6,7 +6,6 @@ import android.hardware.usb.UsbManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.view.KeyEvent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -15,6 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -30,6 +30,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
@@ -40,6 +42,9 @@ import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
+import com.civisrom.tvtimefixer.adb.UsbDevices
+import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
+import com.civisrom.tvtimefixer.adb.usbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticEvent
@@ -47,6 +52,7 @@ import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
+import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 import java.io.File
 import java.util.Locale
 import org.junit.Assert.*
@@ -147,14 +153,21 @@ class MainScreenTest {
     }
 
     @Test fun remote_control_can_open_diagnostics_and_focus_returns() {
-        screen(mode = DeviceMode.TELEVISION)
-        compose.onNodeWithTag("diagnostics-open").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
-        compose.onNodeWithTag("diagnostics-back").assertIsFocused()
-        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
-        compose.onNodeWithTag("diagnostics-open").assertIsFocused()
-        assertTrue(actions.calls.isEmpty())
-        screenshot("tv-focus")
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.setInTouchMode(false)
+        try {
+            screen(mode = DeviceMode.TELEVISION)
+            compose.onNodeWithTag("diagnostics-open").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            compose.onNodeWithTag("diagnostics-open").assertIsFocused()
+                .performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("diagnostics-back").assertIsFocused()
+                .performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("diagnostics-open").assertIsFocused()
+            assertTrue(actions.calls.isEmpty())
+            screenshot("tv-focus")
+        } finally {
+            instrumentation.setInTouchMode(true)
+        }
     }
 
     @Test fun narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable() {
@@ -221,11 +234,40 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
+    @Test fun usb_scan_uses_the_same_unfiltered_device_count_as_android() {
+        val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+        UsbDevices(context).use { usb ->
+            val rawCount = manager.deviceList.size
+            val listing = usb.scan()
+            assertEquals(rawCount, listing.attachedCount)
+            assertEquals(rawCount, usb.observation(listing).attachedCount)
+            assertTrue(listing.devices.size <= rawCount)
+        }
+    }
+
+    @Test fun usb_system_state_does_not_turn_missing_flags_into_host_disabled() {
+        assertEquals(UsbSystemState(), usbSystemState(null))
+        assertEquals(UsbSystemState(), usbSystemState(Intent("unrelated")))
+        assertEquals(UsbSystemState(), usbSystemState(Intent(ACTION_USB_SYSTEM_STATE)))
+        val device = Intent(ACTION_USB_SYSTEM_STATE).putExtra("host_connected", false)
+            .putExtra("connected", true).putExtra("configured", true)
+        assertEquals(UsbSystemState(false, true, true), usbSystemState(device))
+        val host = Intent(ACTION_USB_SYSTEM_STATE).putExtra("host_connected", true)
+        assertEquals(UsbSystemState(true, null, null), usbSystemState(host))
+
+        screen(AppState(usbSupported = true, usbSystemState = usbSystemState(device)))
+        compose.onNodeWithTag("section-usb").performScrollTo().performClick()
+        compose.onNodeWithTag("section-usb-help").performScrollTo().performClick()
+        compose.onNodeWithText("Система сообщает подключение в режиме USB-устройства", substring = true)
+            .performScrollTo().assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+    }
+
     @Test fun landscape_keeps_the_main_actions_reachable() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         try {
             automation.setRotation(UiAutomation.ROTATION_FREEZE_90)
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
             screen(connected, width = 640)
             compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
             compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
@@ -233,6 +275,8 @@ class MainScreenTest {
             compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
             compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
         } finally {
+            automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
+            compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }
             automation.setRotation(UiAutomation.ROTATION_UNFREEZE)
         }
         assertTrue(actions.calls.isEmpty())

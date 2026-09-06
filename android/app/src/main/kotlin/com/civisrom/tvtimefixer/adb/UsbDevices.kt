@@ -13,6 +13,8 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import androidx.core.content.ContextCompat
+import com.civisrom.tvtimefixer.diagnostics.UsbObservation
+import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.UUID
@@ -27,6 +29,16 @@ data class UsbDeviceAddress(val deviceName: String, val label: String) : DeviceT
 }
 
 data class UsbDeviceListing(val devices: List<UsbDeviceAddress>, val attachedCount: Int)
+
+// AOSP UsbDeviceManager публикует эти флаги sticky broadcast. Контракт @SystemApi,
+// поэтому используем только как необязательные сведения, без скрытых вызовов/reflection.
+internal const val ACTION_USB_SYSTEM_STATE = "android.hardware.usb.action.USB_STATE"
+
+internal fun usbSystemState(intent: Intent?): UsbSystemState {
+    if (intent?.action != ACTION_USB_SYSTEM_STATE) return UsbSystemState()
+    fun flag(name: String): Boolean? = if (intent.hasExtra(name)) intent.getBooleanExtra(name, false) else null
+    return UsbSystemState(flag("host_connected"), flag("connected"), flag("configured"))
+}
 
 internal data class AdbUsbInterface(
     val usbInterface: UsbInterface,
@@ -74,6 +86,15 @@ class UsbDevices(context: Context) : AutoCloseable {
     }
 
     fun list(): List<UsbDeviceAddress> = scan().devices
+
+    fun observation(listing: UsbDeviceListing?): UsbObservation {
+        val system = runCatching {
+            usbSystemState(context.registerReceiver(null, IntentFilter(ACTION_USB_SYSTEM_STATE)))
+        }.getOrDefault(UsbSystemState())
+        return UsbObservation(manager != null,
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST),
+            listing?.attachedCount, listing?.devices?.size, system)
+    }
 
     suspend fun requestPermission(address: UsbDeviceAddress): Boolean {
         val manager = manager ?: return false

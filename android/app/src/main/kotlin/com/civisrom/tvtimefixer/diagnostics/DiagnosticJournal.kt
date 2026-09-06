@@ -134,9 +134,13 @@ class DiagnosticJournal(
         reason: ConnectionError? = null,
         error: Throwable? = null,
         issue: DiagnosticIssue? = null,
+        usb: UsbObservation? = null,
     ): Long {
+        val details = listOfNotNull(usb?.details(), error?.let {
+            runCatching { safeExceptionDetails(it) }.getOrDefault("")
+        }).joinToString("\n").take(2048)
         val event = DiagnosticEvent(ids.incrementAndGet(), clock(), operation, outcome, transport,
-            durationMs.coerceAtLeast(0), reason, error?.let { runCatching { safeExceptionDetails(it) }.getOrDefault("") }.orEmpty(), issue)
+            durationMs.coerceAtLeast(0), reason, details, issue)
         offer(Command.Append(event, clearEpoch.get()))
         return event.id
     }

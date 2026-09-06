@@ -30,6 +30,7 @@ import com.civisrom.tvtimefixer.adb.KadbAdbClientFactory
 import com.civisrom.tvtimefixer.adb.NsdDeviceDiscovery
 import com.civisrom.tvtimefixer.adb.UsbDevices
 import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
+import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
 import com.civisrom.tvtimefixer.adb.targetOrNull
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbe
@@ -172,7 +173,7 @@ class MainActivity : ComponentActivity() {
                     if (generation == actionGeneration) state = result.copy(
                         diagnosticEventId = if (!ntpAction && failed) event else result.diagnosticEventId,
                         ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
-                    )
+                    ).withLatestUsb(state)
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport)
                     throw e
@@ -209,6 +210,7 @@ class MainActivity : ComponentActivity() {
                 usbDevices = state.usbDevices,
                 usbAttachedCount = state.usbAttachedCount,
                 usbScanFailed = state.usbScanFailed,
+                usbSystemState = state.usbSystemState,
             )
         }
 
@@ -340,6 +342,7 @@ class MainActivity : ComponentActivity() {
         val usbFilter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+            addAction(ACTION_USB_SYSTEM_STATE)
         }
         ContextCompat.registerReceiver(this, usbReceiver, usbFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         usbReceiverRegistered = true
@@ -399,11 +402,14 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshUsbList(report: Boolean = false) {
         runCatching { usb.scan() }.fold(onSuccess = { listing ->
+            val observation = usb.observation(listing)
             val changed = state.usbSupported != usb.supported || state.usbDevices != listing.devices ||
-                state.usbAttachedCount != listing.attachedCount || state.usbScanFailed
+                state.usbAttachedCount != listing.attachedCount || state.usbScanFailed ||
+                state.usbSystemState != observation.system
             state = state.copy(usbSupported = usb.supported, usbDevices = listing.devices,
-                usbAttachedCount = listing.attachedCount, usbScanFailed = false)
+                usbAttachedCount = listing.attachedCount, usbScanFailed = false, usbSystemState = observation.system)
             if (changed || report) journal.record(Operation.USB_SCAN, Outcome.SUCCESS, DiagnosticTransport.USB,
+                usb = observation,
                 issue = when {
                     !usb.supported -> DiagnosticIssue.USB_HOST_UNSUPPORTED
                     listing.attachedCount == 0 -> DiagnosticIssue.USB_NONE
@@ -411,9 +417,11 @@ class MainActivity : ComponentActivity() {
                     else -> null
                 })
         }, onFailure = { error ->
+            val observation = usb.observation(null)
             val event = journal.record(Operation.USB_SCAN, Outcome.FAILED, DiagnosticTransport.USB,
-                issue = DiagnosticIssue.USB_ENUMERATION, error = error)
+                issue = DiagnosticIssue.USB_ENUMERATION, error = error, usb = observation)
             state = state.copy(usbSupported = usb.supported, usbDevices = emptyList(), usbScanFailed = true,
+                usbSystemState = observation.system,
                 message = UiMessage(R.string.usb_scan_failed), diagnosticEventId = event)
         })
     }

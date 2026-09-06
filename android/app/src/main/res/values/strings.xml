@@ -173,7 +173,12 @@
     <string name="info_more">All device details</string>
     <string name="section_expanded">Expanded</string>
     <string name="section_collapsed">Collapsed</string>
-    <string name="usb_none">Android cannot see any attached USB devices. Check the data cable, phone OTG mode and target USB port. ADB access cannot be requested yet.</string>
+    <string name="usb_none">The Android USB service returned an empty device list. The cause has not been determined; ADB access cannot be requested yet. Open USB connection help or Diagnostics for system details.</string>
+    <string name="usb_system_host">The system reports USB host mode. An empty device list means enumeration has not completed or the USB service is not exposing the device.</string>
+    <string name="usb_system_device">The system reports a connection in USB device mode, with host mode inactive. To control the TV, this phone/tablet needs to act as the USB host.</string>
+    <string name="usb_system_disconnected">The system reports no USB connection in host or device mode. This status alone does not establish the cause.</string>
+    <string name="usb_system_unknown">The firmware did not provide enough USB role information. The role cannot be determined from an empty device list.</string>
+    <string name="usb_system_diagnostics">Refresh the list, then open the latest USB search in Diagnostics → Details. It includes device counts and system USB flags without device identifiers. System flags may be unavailable or delayed on some firmware.</string>
     <string name="usb_no_adb">Android sees a USB device but no ADB interface. Enable USB debugging on the target and reconnect the cable. If using a hub, the detected device may be only the hub.</string>
     <string name="usb_scan_failed">Could not read the USB device list. Refresh it; error details are available in Diagnostics.</string>
     <string name="usb_detected">Devices with ADB found: %1$d. Select a device below to request access.</string>

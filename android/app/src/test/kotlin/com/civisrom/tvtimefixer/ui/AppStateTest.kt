@@ -2,6 +2,8 @@ package com.civisrom.tvtimefixer.ui
 
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.ConnectionState
+import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
+import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +22,28 @@ import org.junit.Test
 class AppStateTest {
 
     private val address = DeviceAddress("192.168.0.112", 5555)
+
+    @Test fun `завершение команды сохраняет обнаружение и удаление USB за время чтения`() {
+        val beforeRead = AppState(connection = ConnectionState.Connected(address), usbSupported = true)
+        val device = UsbDeviceAddress("/dev/bus/usb/test", "TV")
+        val attached = beforeRead.copy(usbDevices = listOf(device), usbAttachedCount = 1,
+            usbSystemState = UsbSystemState(hostConnected = true))
+        val lateResult = beforeRead.copy(currentNtpServer = "time.example.org")
+        val completed = lateResult.withLatestUsb(attached)
+        assertEquals(listOf(device), completed.usbDevices)
+        assertEquals(1, completed.usbAttachedCount)
+        assertEquals(true, completed.usbSystemState.hostConnected)
+        assertEquals("time.example.org", completed.currentNtpServer)
+        assertEquals(address, completed.connectedAddress)
+
+        val detached = attached.copy(usbDevices = emptyList(), usbAttachedCount = 0,
+            usbSystemState = UsbSystemState(hostConnected = false))
+        val afterDetach = completed.copy(currentNtpServer = "pool.ntp.org").withLatestUsb(detached)
+        assertTrue(afterDetach.usbDevices.isEmpty())
+        assertEquals(0, afterDetach.usbAttachedCount)
+        assertEquals(false, afterDetach.usbSystemState.hostConnected)
+        assertEquals("pool.ntp.org", afterDetach.currentNtpServer)
+    }
 
     @Test
     fun `подключение считается установленным только в состоянии Connected`() {

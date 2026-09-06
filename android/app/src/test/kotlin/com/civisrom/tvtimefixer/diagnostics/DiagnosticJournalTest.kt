@@ -14,6 +14,30 @@ class DiagnosticJournalTest {
         try { block(root) } finally { root.deleteRecursively() }
     }
 
+    @Test fun `USB system flags retain unknown values and survive journal restart`() = temporary { root ->
+        DiagnosticJournal(root).use { journal ->
+            journal.record(Operation.USB_SCAN, Outcome.SUCCESS, DiagnosticTransport.USB,
+                issue = DiagnosticIssue.USB_NONE,
+                usb = UsbObservation(true, true, 0, 0, UsbSystemState(false, true, null)))
+            journal.record(Operation.USB_SCAN, Outcome.FAILED, DiagnosticTransport.USB,
+                error = IOException("PRIVATE_DEVICE_NAME"),
+                usb = UsbObservation(true, true, null, null, UsbSystemState()))
+            journal.awaitIdle()
+        }
+        DiagnosticJournal(root).use { journal ->
+            journal.awaitIdle()
+            val events = journal.snapshot.value.events
+            assertTrue(events[0].details.contains("usb.devices=0"))
+            assertTrue(events[0].details.contains("usb.host_connected=false"))
+            assertTrue(events[0].details.contains("usb.device_connected=true"))
+            assertTrue(events[0].details.contains("usb.configured=unknown"))
+            assertTrue(events[1].details.contains("usb.devices=unknown"))
+            assertTrue(events[1].details.contains("usb.host_connected=unknown"))
+            assertFalse(events[1].details.contains("PRIVATE_DEVICE_NAME"))
+            assertTrue(events[1].details.contains("java.io.IOException"))
+        }
+    }
+
     @Test fun `history survives restart and drops records after seven days`() = temporary { root ->
         var now = 1_800_000_000_000L
         DiagnosticJournal(root, clock = { now }).use {
