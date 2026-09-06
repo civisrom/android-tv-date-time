@@ -19,7 +19,7 @@ android {
 
         // CI подставляет github.run_number: Android требует монотонного роста
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: "2.6.1-dev"
+        versionName = System.getenv("VERSION_NAME") ?: "2.6.2-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

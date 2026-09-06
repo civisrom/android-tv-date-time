@@ -180,15 +180,15 @@
 
 ### Android (APK)
 
-1.  Скачайте `AndroidTVTimeFixer-2.6.1.apk` из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+1.  Скачайте `AndroidTVTimeFixer-2.6.2.apk` из [предварительного выпуска 2.6.2](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.2). [Что изменилось](release-notes/v2.6.2-ru.md).
 2.  Сверьте контрольную сумму с файлом `.apk.sha256` рядом:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.1.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.2.apk.sha256
     ```
 3.  Установите:
     *   **На телефон** — откройте файл и разрешите установку из неизвестных
         источников для файлового менеджера или браузера.
-    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.1.apk`
+    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.2.apk`
         с компьютера, либо любым файловым менеджером на телевизоре. Иконка
         появится и в обычном лаунчере, и в лаунчере Android TV.
 

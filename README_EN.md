@@ -178,15 +178,15 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.1.apk` from [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+1.  Download `AndroidTVTimeFixer-2.6.2.apk` from the [2.6.2 prerelease](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.2). [What's new](release-notes/v2.6.2-en.md).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.1.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.2.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.1.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.2.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
