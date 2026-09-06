@@ -14,10 +14,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
@@ -79,6 +82,7 @@ private class ScreenActions : AppActions {
 class MainScreenTest {
     @get:Rule val compose = createComposeRule()
     private val actions = ScreenActions()
+    private lateinit var inputModeManager: InputModeManager
     private val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val connected = AppState(connection = ConnectionState.Connected(DeviceAddress("192.168.1.2", 5555)))
 
@@ -87,6 +91,7 @@ class MainScreenTest {
         clear: () -> Unit = {},
     ) {
         compose.setContent {
+            inputModeManager = LocalInputModeManager.current
             val config = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag("ru")) }
             val localized = context.createConfigurationContext(config)
             CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides config,
@@ -155,9 +160,10 @@ class MainScreenTest {
 
     @Test fun remote_control_can_open_diagnostics_and_focus_returns() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.setInTouchMode(false)
         try {
             screen(mode = DeviceMode.TELEVISION)
+            // Переключаем уже созданный Compose view, как в тестах AndroidX.
+            compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
             compose.onNodeWithTag("diagnostics-open").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
             compose.onNodeWithTag("diagnostics-open").assertIsFocused()
                 .performKeyInput { pressKey(Key.DirectionCenter) }
