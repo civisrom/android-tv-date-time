@@ -282,6 +282,11 @@ class UsbAdbDevice:
     def target(self) -> str:
         return f'usb:{self.transport_id}'
 
+    @property
+    def display_name(self) -> str:
+        value = self.model.replace('_', ' ') if self.model else self.serial
+        return ''.join(c for c in value if c.isprintable()).strip() or f'USB {self.transport_id}'
+
 
 def parse_usb_devices(output: str) -> List[UsbAdbDevice]:
     """Читает TextFormat host:track-devices-proto-text (ADB 34+).
@@ -729,6 +734,7 @@ class AndroidTVTimeFixer:
         self.process_manager = ADBProcessManager(self._adb_path, env=self.adb_env)
         self.device: Optional[DeviceTransport] = None
         self.connected_ip = None
+        self.connected_usb_name: Optional[str] = None
         self.connection_timeout = 120  # Таймаут ожидания подключения в секундах
         self.saved_servers = self.load_saved_servers()
         self.last_device_ip = self.load_last_ip()
@@ -1902,6 +1908,7 @@ class AndroidTVTimeFixer:
         device = self.device
         self.device = None
         self.connected_ip = None
+        self.connected_usb_name = None
         process_manager = getattr(self, 'process_manager', None)
         if process_manager is not None:
             process_manager.device_ip = None
@@ -1929,7 +1936,11 @@ class AndroidTVTimeFixer:
                 if self.device.shell('echo ok').strip() != 'ok':
                     raise AndroidTVTimeFixerError(locales.get('no_device_connected'))
                 self.logger.info(f"Reusing existing connection to {normalized}")
-                print(Fore.GREEN + locales.get("connection_reused", ip=normalized))
+                if normalized.startswith('usb:'):
+                    name = getattr(self, 'connected_usb_name', None) or normalized
+                    print(Fore.GREEN + locales.get('usb_connection_reused', device=name))
+                else:
+                    print(Fore.GREEN + locales.get("connection_reused", ip=normalized))
                 return
             except Exception:
                 # Соединение потеряно, переподключаемся
@@ -1962,11 +1973,9 @@ class AndroidTVTimeFixer:
             if not devices:
                 print(Fore.YELLOW + locales.get('usb_no_devices'))
             for index, device in enumerate(devices, 1):
-                label = device.model or device.serial or str(device.transport_id)
                 # Не печатаем управляющие символы, полученные от устройства.
-                label = ''.join(c for c in label if c.isprintable())
                 serial = ''.join(c for c in device.serial if c.isprintable())
-                print(Fore.WHITE + f'  {index}. {label} — {serial} (USB {device.transport_id}) [{device.state}]')
+                print(Fore.WHITE + f'  {index}. {device.display_name} — {serial} (USB {device.transport_id}) [{device.state}]')
             answer = input(Fore.GREEN + locales.get('usb_pick_prompt') + Fore.WHITE).strip()
             if not answer or answer.lower() == 'q':
                 return ''
@@ -2000,8 +2009,9 @@ class AndroidTVTimeFixer:
         self._close_device()
         self.device = transport
         self.connected_ip = target
+        self.connected_usb_name = device.display_name
         # process_manager.device_ip остаётся пустым: adb disconnect — TCP-only.
-        print(Fore.GREEN + locales.get('usb_connected'))
+        print(Fore.GREEN + locales.get('usb_connected', device=self.connected_usb_name))
 
     def verify_ntp_server(self, server: str, count: int = 3, timeout: int = 3) -> bool:
         """Проверяет что NTP-сервер действительно синхронизирует время (не просто доступен)"""
@@ -4260,6 +4270,7 @@ def main():
                 if target:
                     try:
                         fixer.connect_or_reuse(target)
+                        print(Fore.CYAN + locales.get('usb_next_steps'))
                     except AndroidTVTimeFixerError as e:
                         print(Fore.RED + str(e))
 

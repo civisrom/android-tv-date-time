@@ -10,6 +10,7 @@ from unittest import mock
 from src.android_time_fixer import (
     AndroidTVTimeFixer, AndroidTVTimeFixerError, PlatformToolsTransport,
     UsbAdbDevice, adb_env, parse_usb_devices, read_adb_device_list,
+    locales,
 )
 
 
@@ -132,10 +133,30 @@ class UsbConnectionTests(unittest.TestCase):
 
     def test_failed_probe_does_not_publish_connection(self):
         fixer = self.fixer()
-        with mock.patch.object(PlatformToolsTransport, 'shell', return_value='wrong'), self.assertRaises(AndroidTVTimeFixerError):
+        output = io.StringIO()
+        with mock.patch.object(PlatformToolsTransport, 'shell', return_value='wrong'), contextlib.redirect_stdout(output), self.assertRaises(AndroidTVTimeFixerError):
             fixer.connect_usb('usb:7')
         self.assertIsNone(fixer.device)
         self.assertIsNone(fixer.connected_ip)
+        self.assertEqual(output.getvalue(), '')
+
+    def test_connection_and_reuse_identify_any_android_device(self):
+        for model, expected in [('Living_Room_TV', 'Living Room TV'), ('Android_Tablet', 'Android Tablet'), ('', 'TV123')]:
+            with self.subTest(model=model):
+                fixer = self.fixer()
+                fixer.usb_devices.return_value = [UsbAdbDevice('TV123', 7, 'DEVICE', model)]
+                output = io.StringIO()
+                with mock.patch.object(PlatformToolsTransport, 'shell', side_effect=['androidtvtimefixer', 'ok']), contextlib.redirect_stdout(output):
+                    fixer.connect_usb('usb:7')
+                    fixer.connect_or_reuse('usb:7')
+                self.assertIn(locales.get('usb_connected', device=expected), output.getvalue())
+                self.assertIn(locales.get('usb_connection_reused', device=expected), output.getvalue())
+                fixer._close_device()
+                self.assertIsNone(fixer.connected_usb_name)
+
+    def test_usb_display_name_excludes_terminal_controls_and_has_a_fallback(self):
+        self.assertEqual(UsbAdbDevice('serial', 7, 'DEVICE', 'TV\n\x1b').display_name, 'TV')
+        self.assertEqual(UsbAdbDevice('', 7, 'DEVICE', '\n\t').display_name, 'USB 7')
 
     def test_usb_close_never_disconnects_tcp_or_resets_daemon(self):
         runner = mock.Mock()

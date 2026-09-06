@@ -31,14 +31,16 @@ class Locales:
                 ru="Включите USB-отладку на целевом устройстве и подключите кабель передачи данных к его порту device/OTG. Подтвердите запрос RSA на устройстве. Windows может требовать ADB-драйвер производителя, Linux — правила udev. Другой ADB-сервер может уже занимать USB: закройте его сессию перед повторной попыткой.",
             ),
             "usb_no_devices": Translation(en="No USB ADB devices found. Check the cable, USB role, debugging and drivers.", ru="USB ADB-устройства не найдены. Проверьте кабель, роль USB, отладку и драйверы."),
-            "usb_pick_prompt": Translation(en="Device number, r to refresh, q to cancel: ", ru="Номер устройства, r — обновить, q — отмена: "),
+            "usb_pick_prompt": Translation(en="Enter a device number from the list and press Enter to connect (r to refresh, q to cancel): ", ru="Введите номер устройства из списка и нажмите Enter для подключения (r — обновить список, q — отмена): "),
             "usb_reuse_prompt": Translation(en="USB is selected. Enter to reuse, n for another device, q to cancel: ", ru="Выбрано USB-подключение. Enter — использовать, n — другое устройство, q — отмена: "),
             "usb_list_failed": Translation(en="Cannot list USB devices: {error}. Use the bundled Platform Tools 37.0.1 or newer.", ru="Не удалось получить USB-устройства: {error}. Используйте встроенные Platform Tools 37.0.1 или новее."),
             "usb_disconnected": Translation(en="The selected USB device is disconnected or has changed. Refresh the list and select it again.", ru="Выбранное USB-устройство отключено или изменилось. Обновите список и выберите его заново."),
             "usb_authorize": Translation(en="Unlock the target and allow USB debugging in the RSA prompt, then refresh and reconnect.", ru="Разблокируйте целевое устройство и разрешите USB-отладку в запросе RSA, затем обновите список и подключитесь снова."),
             "usb_no_permissions": Translation(en="No USB access. On Linux install the distribution's Android udev rules and check group access; reconnect the cable. Do not run the application as root.", ru="Нет доступа к USB. В Linux установите правила Android udev из вашего дистрибутива и проверьте группы доступа; переподключите кабель. Запуск приложения от root не требуется."),
             "usb_not_ready": Translation(en="USB device is not ready ({state}). Boot Android normally and reconnect the cable.", ru="USB-устройство не готово ({state}). Загрузите Android в обычном режиме и переподключите кабель."),
-            "usb_connected": Translation(en="USB connection verified. NTP settings and device information are available in the main menu.", ru="USB-соединение проверено. Настройки NTP и информация об устройстве доступны в главном меню."),
+            "usb_connected": Translation(en='Device "{device}" successfully connected over USB.', ru='Устройство «{device}» успешно подключено по USB.'),
+            "usb_connection_reused": Translation(en='Device "{device}" is already connected over USB. The connection has been checked and is ready to use.', ru='Устройство «{device}» уже подключено по USB. Связь проверена, подключение готово к работе.'),
+            "usb_next_steps": Translation(en='In the main menu, choose 5 for device information, or 1 / 2 to change the NTP server. When asked to use the selected USB connection, press Enter.', ru='В главном меню выберите 5 для просмотра сведений об устройстве или 1 / 2 для изменения NTP-сервера. Когда программа предложит использовать выбранное USB-подключение, нажмите Enter.'),
             # Disclaimer text
             "disclaimer": Translation(
                 en="""
