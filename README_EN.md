@@ -38,6 +38,16 @@ As of version 2.6.0 the project has two halves:
     host/OTG. Select a specific device and manage NTP without an IP address.
     See [USB debugging](#usb-debugging).
 
+*   **Network debugging over Wi-Fi or Ethernet:** connect by IP address and
+    ADB port (usually `5555`) to devices with classic network debugging enabled.
+    Available in both the desktop program and the Android app.
+
+*   **Modern wireless debugging on Android 11+:** support for the newer
+    Wireless debugging mode on devices that offer it. Pair using a six-digit
+    code, discover devices via mDNS and connect securely over TLS without a
+    USB cable — from Windows, Linux, macOS or the Android app.
+    See [Modern wireless debugging](#modern-wireless-debugging-on-android-tv).
+
 *   **Multilingual Interface:**
     *   Support for English and Russian languages
     *   Language selection at program startup
