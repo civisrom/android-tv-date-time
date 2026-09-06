@@ -28,6 +28,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -72,7 +73,9 @@ private class ScreenActions : AppActions {
     override fun connect(address: String) { calls += "connect:$address" }
     override fun connectLoopback() { calls += "loopback" }
     override fun disconnect() { calls += "disconnect" }
-    override fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String) { calls += "pair" }
+    override fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String) {
+        calls += "pair:$pairingAddress:$code:$connectAddress"
+    }
     override fun checkNtpServer(server: String) { calls += "check:$server" }
     override fun applyNtpServer(server: String, force: Boolean) { calls += "apply:$server:$force" }
     override fun scanNtpServers() { calls += "scan" }
@@ -119,6 +122,81 @@ class MainScreenTest {
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostics-back").performClick()
         compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.168.1.10:5555")
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun primary_forms_are_visible_without_expanding_menus() {
+        screen()
+        for (tag in listOf("network-address", "ntp-address", "pairing-address", "pairing-code", "pairing-connect-address")) {
+            compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+        }
+        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-check").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(listOf("check:pool.ntp.org"), actions.calls)
+        compose.onNodeWithTag("network-address").performScrollTo()
+        screenshot("primary-connection")
+    }
+
+    @Test fun connecting_keeps_primary_inputs_and_enables_ntp_writes_only_while_connected() {
+        val state = mutableStateOf(AppState(ntpRejected = "pool.ntp.org"))
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.0.2.10:5555")
+        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.11:37123")
+        compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.11:37124")
+        compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+
+        compose.runOnIdle { state.value = state.value.copy(connection = connected.connection) }
+        compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.0.2.10:5555")
+        compose.onNodeWithTag("pairing-address").performScrollTo().assertTextContains("192.0.2.11:37123")
+        compose.onNodeWithTag("pairing-connect-address").performScrollTo().assertTextContains("192.0.2.11:37124")
+        compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
+        compose.onNodeWithTag("ntp-apply-anyway").assertIsEnabled()
+        compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+
+        compose.runOnIdle { state.value = state.value.copy(busy = true) }
+        compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+        compose.runOnIdle { state.value = state.value.copy(connection = ConnectionState.Disconnected, busy = false) }
+        compose.onNodeWithTag("ntp-address").assertTextContains("pool.ntp.org")
+        compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+    }
+
+    @Test fun narrow_screen_at_double_font_keeps_pairing_fields_and_action_reachable() {
+        screen(scale = 2f, width = 320)
+        compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
+        compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
+        compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
+        waitForKeyboard()
+        compose.onNodeWithTag("pairing-connect").performScrollTo().assertIsDisplayed()
+        screenshot("phone-320-font200-pairing")
+        assertTrue(actions.calls.isEmpty())
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            compose.onNodeWithTag("pairing-connect").assertIsEnabled().performClick()
+            assertEquals(listOf("pair:192.0.2.10:37123:123456:192.0.2.10:37124"), actions.calls)
+        } else {
+            compose.onNodeWithTag("pairing-connect").assertIsNotEnabled()
+        }
+    }
+
+    @Test fun discovered_device_expands_results_without_hiding_primary_forms() {
+        val state = mutableStateOf(AppState())
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.runOnIdle {
+            state.value = state.value.copy(discovered = listOf(DiscoveredDevice("Living room TV",
+                DeviceAddress("192.0.2.10", 37123), DiscoveredDevice.Kind.READY_TO_CONNECT)))
+        }
+        compose.onNodeWithText("Living room TV").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("section-discovery").performScrollTo().performClick()
+        compose.onNodeWithText("Living room TV").assertDoesNotExist()
+        compose.onNodeWithTag("pairing-code").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("ntp-address").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("network-address").performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
     }
 
@@ -221,7 +299,6 @@ class MainScreenTest {
     @Test fun pairing_code_survives_diagnostics_but_not_saved_state_restore() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, AppState(), actions) } }
-        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostics-back").performClick()

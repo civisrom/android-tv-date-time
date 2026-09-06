@@ -66,6 +66,7 @@
     <string name="ntp_title">Сервер времени</string>
     <string name="ntp_current">Текущий: %1$s</string>
     <string name="ntp_current_unset">Сервер времени не задан</string>
+    <string name="ntp_connect_first">Адрес сервера можно выбрать и проверить сейчас. Чтобы прочитать настройки устройства и применить сервер, сначала подключитесь к нему.</string>
     <string name="ntp_by_country">Ищите по коду страны, названию или адресу — например ru, by, kz. Регистр не важен. Нажатие на найденную строку подставит адрес в поле ниже.</string>
     <string name="ntp_custom_hint">Адрес сервера времени</string>
     <string name="ntp_address_note">Можно ввести доменное имя (time.google.com) или IP-адрес (216.239.35.0) — годится и то, и другое.</string>
@@ -168,8 +169,6 @@
     <string name="operation_storage">Восстановление повреждённого журнала</string>
     <string name="operation_working">Выполняется: %1$s</string>
     <string name="operation_failed_hint">Операция не завершена. Подробности доступны в диагностике.</string>
-    <string name="connection_other">Подключить другое устройство</string>
-    <string name="connection_network">По сети</string>
     <string name="ntp_choose_server">Подобрать сервер</string>
     <string name="info_more">Все характеристики</string>
     <string name="section_expanded">Развёрнуто</string>

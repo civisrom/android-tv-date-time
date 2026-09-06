@@ -690,10 +690,11 @@ phone or directly on the TV, without a computer.
 3. For network ADB, turn mobile data off on the phone: otherwise some requests may leave through
    the cellular network instead of Wi-Fi.
 
-### The screen, top to bottom
+### Application screen sections
 
-The app is a single scrolling screen. The sections appear in the order you use
-them.
+The app is a single scrolling screen. The connection IP address, main time
+server settings and pairing form always remain expanded, including after
+connection. Additional lists and help sections can be collapsed.
 
 #### 1. Title and mode
 
@@ -770,10 +771,10 @@ as well as discovery. See [Android's local-network permission rules](https://dev
 
 **Pairing has been tested by a user on a real device and confirmed to work.**
 
-Expand the pairing form inside **Over the network**. **Pair** on a discovered
-device expands it and fills the address. Once connected, connection options
-collapse into **Connect another device**; expanding them does not disconnect
-the current device.
+The pairing form is always visible on the main screen and cannot be collapsed.
+**Pair** on a discovered device fills its address and focuses the code field.
+The pairing form and connection IP address remain available after connecting;
+editing the fields does not disconnect the current device.
 
 Pairing is only required where developer settings offer **Wireless debugging**.
 If, as on an Nvidia Shield, you only have "Network debugging", pairing is not
@@ -828,9 +829,10 @@ regression tests.
 
 #### 5. "Time server"
 
-After connecting, this section appears directly below the connection card.
-Address input, checking and applying are immediately available. Search, lists
-and scanning are inside **Choose a server**. An ongoing scan and its Stop button
+This section is always visible below the connection card. You can choose and
+check a server address before connecting to a device. **Apply** becomes available
+once connected; an explanation is shown until then. Search, lists and scanning
+are inside **Choose a server**. An ongoing scan and its Stop button
 remain visible when the picker is collapsed.
 
 The first line — **"Current:"** — is the value **read back from the TV**, not
