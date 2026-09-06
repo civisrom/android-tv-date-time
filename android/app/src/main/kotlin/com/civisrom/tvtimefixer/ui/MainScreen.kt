@@ -360,8 +360,16 @@ private fun NtpSection(state: AppState, actions: AppActions) {
                 )
             }
             if (showCountries) {
+                // Выбор закрывает список: адрес уже в поле ввода, а открытый
+                // справочник закрывает собой кнопки «Применить» и «Проверить»
                 NtpData.countries.forEach { country ->
-                    TextButton(onClick = { custom = country.server }, enabled = !state.busy) {
+                    TextButton(
+                        onClick = {
+                            custom = country.server
+                            showCountries = false
+                        },
+                        enabled = !state.busy,
+                    ) {
                         Text("${country.code.uppercase()} · ${countryName(country)} · ${country.server}")
                     }
                 }
@@ -378,7 +386,13 @@ private fun NtpSection(state: AppState, actions: AppActions) {
             }
             if (showAll) {
                 NtpData.alternativeServers.forEach { server ->
-                    TextButton(onClick = { custom = server }, enabled = !state.busy) { Text(server) }
+                    TextButton(
+                        onClick = {
+                            custom = server
+                            showAll = false
+                        },
+                        enabled = !state.busy,
+                    ) { Text(server) }
                 }
             }
         }
