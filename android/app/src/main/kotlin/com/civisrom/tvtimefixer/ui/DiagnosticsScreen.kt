@@ -56,7 +56,7 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.PAIR -> R.string.operation_pair
     Operation.DISCONNECT -> R.string.operation_disconnect
     Operation.USB_PERMISSION -> R.string.operation_usb_permission
-    Operation.USB_SCAN -> R.string.usb_refresh
+    Operation.USB_SCAN -> R.string.operation_usb_scan
     Operation.USB_DETACHED -> R.string.operation_usb_detached
     Operation.READ_DEVICE -> R.string.operation_read_device
     Operation.CHECK_NTP -> R.string.operation_check_ntp
@@ -85,8 +85,18 @@ private fun Outcome.labelRes(): Int = when (this) {
     Outcome.CANCELLED -> R.string.diagnostics_cancelled
 }
 
-private fun eventHeading(context: Context, event: DiagnosticEvent): String =
-    "${context.getString(event.operation.labelRes())} — ${context.getString(event.outcome.labelRes())}"
+private fun eventHeading(context: Context, event: DiagnosticEvent): String {
+    val result = if (event.operation == Operation.USB_SCAN && event.outcome == Outcome.SUCCESS) {
+        when (event.issue) {
+            DiagnosticIssue.USB_NONE -> R.string.diagnostics_usb_none
+            DiagnosticIssue.USB_NO_ADB -> R.string.diagnostics_usb_no_adb
+            DiagnosticIssue.USB_HOST_UNSUPPORTED -> R.string.diagnostics_usb_unsupported
+            null -> R.string.diagnostics_usb_found
+            else -> event.outcome.labelRes()
+        }
+    } else event.outcome.labelRes()
+    return "${context.getString(event.operation.labelRes())} — ${context.getString(result)}"
+}
 
 private fun formatTime(time: Long) = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(time))
 

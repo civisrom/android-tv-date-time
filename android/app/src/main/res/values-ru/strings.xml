@@ -152,6 +152,11 @@
     <string name="operation_pair">Сопряжение по коду</string>
     <string name="operation_disconnect">Отключение устройства</string>
     <string name="operation_usb_permission">Разрешение доступа к USB</string>
+    <string name="operation_usb_scan">Поиск USB-устройств</string>
+    <string name="diagnostics_usb_none">USB-устройства не обнаружены</string>
+    <string name="diagnostics_usb_no_adb">USB обнаружено, интерфейс ADB не найден</string>
+    <string name="diagnostics_usb_unsupported">Режим USB-хоста не поддерживается</string>
+    <string name="diagnostics_usb_found">Устройство с ADB найдено; соединение не проверялось</string>
     <string name="operation_usb_detached">Отключён USB-кабель</string>
     <string name="operation_read_device">Чтение сведений устройства</string>
     <string name="operation_check_ntp">Проверка NTP-сервера</string>

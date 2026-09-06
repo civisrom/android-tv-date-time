@@ -152,6 +152,11 @@
     <string name="operation_pair">Code pairing</string>
     <string name="operation_disconnect">Disconnecting device</string>
     <string name="operation_usb_permission">USB access permission</string>
+    <string name="operation_usb_scan">USB device search</string>
+    <string name="diagnostics_usb_none">No USB devices detected</string>
+    <string name="diagnostics_usb_no_adb">USB detected, ADB interface not found</string>
+    <string name="diagnostics_usb_unsupported">USB host mode is not supported</string>
+    <string name="diagnostics_usb_found">ADB device found; connection has not been checked</string>
     <string name="operation_usb_detached">USB cable disconnected</string>
     <string name="operation_read_device">Reading device details</string>
     <string name="operation_check_ntp">Checking NTP server</string>

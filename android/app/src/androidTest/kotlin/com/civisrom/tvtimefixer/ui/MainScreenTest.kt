@@ -43,6 +43,7 @@ import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticEvent
+import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
@@ -205,6 +206,19 @@ class MainScreenTest {
         assertEquals(listOf("usb-list"), actions.calls)
         compose.onNodeWithText("Android видит USB-устройство", substring = true).performScrollTo().assertIsDisplayed()
         screenshot("usb-without-adb")
+    }
+
+    @Test fun empty_usb_search_does_not_claim_successful_connection() {
+        val history = DiagnosticSnapshot(listOf(DiagnosticEvent(1, System.currentTimeMillis(),
+            Operation.USB_SCAN, Outcome.SUCCESS, issue = DiagnosticIssue.USB_NONE)))
+        screen(AppState(usbSupported = true), diagnostics = history)
+        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        compose.onNodeWithText("Поиск USB-устройств — USB-устройства не обнаружены")
+            .performScrollTo().assertIsDisplayed()
+        val report = diagnosticReport(context, history, DeviceMode.HANDHELD)
+        assertFalse(report.contains(context.getString(com.civisrom.tvtimefixer.R.string.diagnostics_success)))
+        assertTrue(report.contains(context.getString(com.civisrom.tvtimefixer.R.string.diagnostics_usb_none)))
+        assertTrue(actions.calls.isEmpty())
     }
 
     @Test fun landscape_keeps_the_main_actions_reachable() {
