@@ -3726,12 +3726,16 @@ class AndroidTVTimeFixer:
 
     def auto_setup_ntp(self) -> None:
         """Полная автоматизация: сканирование → подключение → выбор лучшего NTP → установка"""
-        # Шаг 1: Сканирование сети
-        port = self.prompt_adb_port()
-        if port is None:
-            return
-        print(Fore.CYAN + locales.get("auto_scanning_network"))
-        found = self.scan_network_for_android_devices(port)
+        # USB уже выбран в пункте 12: автоматическая настройка не должна
+        # переключаться на другой телевизор, найденный в сети.
+        if self.device is not None and self.connected_ip and self.connected_ip.startswith('usb:'):
+            found = [self.connected_ip]
+        else:
+            port = self.prompt_adb_port()
+            if port is None:
+                return
+            print(Fore.CYAN + locales.get("auto_scanning_network"))
+            found = self.scan_network_for_android_devices(port)
 
         if not found:
             print(Fore.RED + locales.get("auto_no_devices"))

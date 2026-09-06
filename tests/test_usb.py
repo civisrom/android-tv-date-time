@@ -165,6 +165,24 @@ class UsbConnectionTests(unittest.TestCase):
         self.assertFalse(fixer.save_last_ip('usb:7'))
         fixer._save_setting.assert_not_called()
 
+    def test_auto_ntp_uses_selected_usb_without_scanning_or_changing_target(self):
+        fixer = self.fixer()
+        fixer.device = mock.Mock()
+        fixer.connected_ip = 'usb:7'
+        fixer.prompt_adb_port = mock.Mock(side_effect=AssertionError('USB needs no TCP port'))
+        fixer.scan_network_for_android_devices = mock.Mock(side_effect=AssertionError('USB needs no LAN scan'))
+        fixer.connect_or_reuse = mock.Mock()
+        fixer._save_setting = mock.Mock()
+        fixer._detect_user_region = mock.Mock(return_value=([], None))
+        fixer.ntp_servers = {'test': 'example.com'}
+        fixer.custom_ntp_servers = []
+        fixer._test_ntp_server = mock.Mock(return_value={'status': 'Unreachable'})
+        with contextlib.redirect_stdout(io.StringIO()):
+            fixer.auto_setup_ntp()
+        fixer.connect_or_reuse.assert_called_once_with('usb:7')
+        fixer._test_ntp_server.assert_called_once_with('example.com', 2, 2)
+        fixer._save_setting.assert_not_called()
+
     def test_target_validation_preserves_network_validation(self):
         for value in ('usb:7', '192.168.1.2:5555'):
             self.assertTrue(AndroidTVTimeFixer.validate_device_target(value))

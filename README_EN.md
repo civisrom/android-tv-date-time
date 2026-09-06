@@ -616,6 +616,9 @@ An Android phone controlling the target must support USB host/OTG.
 4. Once the connection is verified, use the usual NTP and device-information
    menu items. Press Enter at the next address prompt to reuse the selected USB device.
 
+After selecting a USB device, **9. Auto-setup NTP** also uses that device,
+without searching the network for another target.
+
 Windows may require an [OEM ADB driver](https://developer.android.com/studio/run/oem-usb).
 On Ubuntu/Debian, install the `android-sdk-platform-tools-common` udev rules
 and check `plugdev` membership if USB access is denied; log in again after
