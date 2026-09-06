@@ -6,6 +6,7 @@ import android.hardware.usb.UsbManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
@@ -41,6 +43,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.ConnectionState
@@ -83,6 +87,7 @@ class MainScreenTest {
     @get:Rule val compose = createComposeRule()
     private val actions = ScreenActions()
     private lateinit var inputModeManager: InputModeManager
+    private lateinit var hostView: View
     private val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val connected = AppState(connection = ConnectionState.Connected(DeviceAddress("192.168.1.2", 5555)))
 
@@ -92,6 +97,7 @@ class MainScreenTest {
     ) {
         compose.setContent {
             inputModeManager = LocalInputModeManager.current
+            hostView = LocalView.current
             val config = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag("ru")) }
             val localized = context.createConfigurationContext(config)
             CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides config,
@@ -180,6 +186,7 @@ class MainScreenTest {
     @Test fun narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable() {
         screen(connected, scale = 2f, width = 320)
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
+        waitForKeyboard()
         compose.onNodeWithTag("ntp-check").performScrollTo().assertIsDisplayed()
         screenshot("phone-320-font200-ntp")
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
@@ -291,6 +298,7 @@ class MainScreenTest {
             compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
             screen(connected, width = 640)
             compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
+            waitForKeyboard()
             compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
             screenshot("landscape-ntp")
             compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
@@ -308,6 +316,13 @@ class MainScreenTest {
             Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED).setPackage(context.packageName), 0)
         assertTrue(matches.any { it.activityInfo.name == "com.civisrom.tvtimefixer.MainActivity" })
         assertTrue(actions.calls.isEmpty())
+    }
+
+    private fun waitForKeyboard() {
+        compose.waitUntil(5_000) {
+            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+        compose.waitForIdle()
     }
 
     private fun screenshot(name: String) {

@@ -5,6 +5,7 @@
         <!-- Compose test host обрабатывает поворот так же, как MainActivity. -->
         <activity android:name="androidx.activity.ComponentActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.TvTimeFixer"
             tools:replace="android:theme" />
     </application>
