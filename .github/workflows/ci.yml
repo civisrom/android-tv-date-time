@@ -119,3 +119,33 @@ jobs:
           else
             ./dist/AndroidTVTimeFixer --version
           fi
+
+      - name: Package Windows test build
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import hashlib
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          archive = Path('dist/AndroidTVTimeFixer-windows.zip')
+          files = ['dist/AndroidTVTimeFixer.exe', 'start.bat', 'start.ps1',
+                   'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']
+          with ZipFile(archive, 'w', compression=ZIP_DEFLATED) as output:
+              for name in files:
+                  source = Path(name)
+                  output.write(source, source.name)
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          Path(str(archive) + '.sha256').write_text(f'{digest}  {archive.name}\n', encoding='ascii')
+          PYCODE
+
+      - name: Upload Windows test build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: AndroidTVTimeFixer-Windows-dev
+          path: |
+            dist/AndroidTVTimeFixer-windows.zip
+            dist/AndroidTVTimeFixer-windows.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
