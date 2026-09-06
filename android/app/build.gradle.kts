@@ -199,6 +199,12 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.androidx.tv.material)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kadb.android)

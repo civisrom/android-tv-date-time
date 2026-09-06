@@ -47,6 +47,21 @@ private class FakeFactory(
 }
 
 class DeviceConnectorTest {
+    @Test fun `diagnostic callback failure does not change connection result`() {
+        val connector = DeviceConnector(FakeFactory(failWith = ConnectionError.NOT_AUTHORIZED),
+            onFailure = { _, _ -> throw java.io.IOException("storage unavailable") })
+        val result = connector.connect("192.168.1.20") as ConnectionState.Failed
+        assertEquals(ConnectionError.NOT_AUTHORIZED, result.reason)
+        assertNull(result.diagnosticId)
+        assertNull(connector.activeClient)
+    }
+
+    @Test fun `diagnostic event remains attached to the failed connection`() {
+        val connector = DeviceConnector(FakeFactory(failWith = ConnectionError.NOT_AUTHORIZED),
+            onFailure = { _, _ -> 42L })
+        assertEquals(42L, (connector.connect("192.168.1.20") as ConnectionState.Failed).diagnosticId)
+    }
+
 
     @Test
     fun `успешное подключение по адресу с портом`() {

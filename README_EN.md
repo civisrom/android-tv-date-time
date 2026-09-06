@@ -643,6 +643,16 @@ not terminated automatically. Terminal mode accepts regular commands such as
    are available. Unplugging closes the session; select the device again to
    reconnect. Root and a six-digit pairing code are not required for USB.
 
+An empty list distinguishes Android seeing no USB devices from USB being present
+without an ADB interface. Press **Refresh USB devices**; Diagnostics also records
+the result. Android may offer to open the app when an ADB device is attached;
+connecting still requires pressing the button.
+
+For **SHIELD without micro-USB**, use port 1, furthest from HDMI, in PC connection
+mode. The phone must be the USB host. A regular USB-A to USB-C cable may select
+the opposite role; use an appropriate OTG data connection. See [NVIDIA instructions](https://nvidia.custhelp.com/app/answers/detail/a_id/4344/kw/10)
+and [Chromium USB-C cable guidance](https://www.chromium.org/chromium-os/developer-library/reference/hardware/cable-and-adapter-tips-and-tricks/).
+
 USB ADB does not require a shared Wi-Fi network. NTP probing still uses the
 controller’s Internet connection, and the TV needs access to the selected NTP
 server for subsequent synchronization. The application does not enable
@@ -751,9 +761,10 @@ as well as discovery. See [Android's local-network permission rules](https://dev
 
 #### 4. "Pair a device" — the code, for Android 11 and newer
 
-The pairing form is shown **while there is no connection**. Once you connect it
-disappears, because it is no longer needed. To pair another device, press
-Disconnect.
+Expand the pairing form inside **Over the network**. **Pair** on a discovered
+device expands it and fills the address. Once connected, connection options
+collapse into **Connect another device**; expanding them does not disconnect
+the current device.
 
 Pairing is only required where developer settings offer **Wireless debugging**.
 If, as on an Nvidia Shield, you only have "Network debugging", pairing is not
@@ -808,7 +819,10 @@ regression tests.
 
 #### 5. "Time server"
 
-This section appears only after you connect.
+After connecting, this section appears directly below the connection card.
+Address input, checking and applying are immediately available. Search, lists
+and scanning are inside **Choose a server**. An ongoing scan and its Stop button
+remain visible when the picker is collapsed.
 
 The first line — **"Current:"** — is the value **read back from the TV**, not
 what you typed. When a server is set the line is **green**; "No time server is
@@ -818,11 +832,11 @@ The outcome is marked the same way: **green** for "Time server set to …",
 **red** for any failure. The Check button follows suit — a usable server is
 green, a rejected one red.
 
-**Three ways to choose a server:**
+**Choosing a server:**
 
 *   **Search.** Start typing a country code, a country name, or part of an
     address: `ru`, `by`, `kz`, `Russia`, `cloudflare`. Tapping a result **puts
-    the address into the field below** — nothing is changed yet.
+    the address into the input field** — nothing is changed yet.
 *   **The country list.** With the search empty there is a **Show countries and
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
@@ -877,14 +891,24 @@ number, CPU and core count, memory, screen resolution and density, time zone,
 locale, battery, kernel version, uptime and the current time server. The
 **Refresh** button reads it all again.
 
-Empty rows are not shown: if the firmware does not answer one command, only
-that row disappears rather than the whole section.
+Model, Android version and time zone are visible immediately; expand **All device
+details** for the rest. Empty rows are hidden: if the firmware does not answer one
+command, only that row disappears.
 
 ### If the app misbehaves
 
-When the app closes unexpectedly it stores the reason and shows it **on the
-next launch**, in a card at the top of the screen. That text is worth attaching
-to a bug report — it names the cause outright.
+**Diagnostics** opens a local history of operations and errors. Returning preserves
+entered addresses and expanded sections. **Details** beside an error opens its
+matching record. After an unexpected closure, the next launch offers a link to
+the saved crash details.
+
+The private, non-backed-up store keeps up to **200 events for 7 days**, with a
+combined **256 KiB** disk budget. It excludes pairing codes, keys, serial numbers,
+entered addresses and ADB output. Technical details contain exception types and
+bounded stack frames without exception messages. Nothing is sent automatically.
+**Copy report** explicitly copies the history to the clipboard; **Clear** requires
+confirmation. A storage failure is shown in Diagnostics without stopping device
+operations.
 
 ### What the app does not do
 

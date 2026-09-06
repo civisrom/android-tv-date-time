@@ -11,7 +11,7 @@ sealed interface ConnectionState {
     data object Disconnected : ConnectionState
     data class Connecting(val address: DeviceTarget) : ConnectionState
     data class Connected(val address: DeviceTarget) : ConnectionState
-    data class Failed(val address: DeviceTarget?, val reason: ConnectionError) : ConnectionState
+    data class Failed(val address: DeviceTarget?, val reason: ConnectionError, val diagnosticId: Long? = null) : ConnectionState
 }
 
 /** Адрес самого устройства, на котором запущено приложение (режим телевизора). */
@@ -25,6 +25,7 @@ val LOOPBACK_ADDRESS = DeviceAddress("127.0.0.1", DEFAULT_ADB_PORT)
  */
 class DeviceConnector(
     private val factory: AdbClientFactory,
+    private val onFailure: (DeviceTarget?, AdbConnectionException) -> Long? = { _, _ -> null },
     private val usbConnect: (UsbDeviceAddress) -> AdbClient = {
         throw AdbConnectionException(ConnectionError.USB_UNSUPPORTED)
     },
@@ -89,8 +90,9 @@ class DeviceConnector(
             if (!accepted) opened.close()
             state
         } catch (e: AdbConnectionException) {
+            val diagnosticId = runCatching { onFailure(address, e) }.getOrNull()
             synchronized(lock) {
-                if (generation == attempt) state = ConnectionState.Failed(address, e.reason)
+                if (generation == attempt) state = ConnectionState.Failed(address, e.reason, diagnosticId)
             }
             state
         }
@@ -123,7 +125,8 @@ class DeviceConnector(
             factory.pair(pairingAddress, pairingCode.trim())
             connect(connectAddress)
         } catch (e: AdbConnectionException) {
-            state = ConnectionState.Failed(pairingAddress, e.reason)
+            val diagnosticId = runCatching { onFailure(pairingAddress, e) }.getOrNull()
+            state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
             state
         }
     }

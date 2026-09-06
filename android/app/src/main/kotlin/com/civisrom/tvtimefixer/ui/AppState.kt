@@ -7,6 +7,7 @@ import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
+import com.civisrom.tvtimefixer.diagnostics.Operation
 
 /**
  * Всё, что показывает экран.
@@ -17,12 +18,17 @@ import com.civisrom.tvtimefixer.device.DeviceInfo
 data class AppState(
     val connection: ConnectionState = ConnectionState.Disconnected,
     val busy: Boolean = false,
+    val operation: Operation? = null,
+    val diagnosticEventId: Long? = null,
+    val ntpDiagnosticEventId: Long? = null,
     val discoveryAvailable: Boolean = true,
     val discoverySearching: Boolean = false,
     val discoveryPermissionNeeded: Boolean = false,
     val discovered: List<DiscoveredDevice> = emptyList(),
     val usbSupported: Boolean = false,
     val usbDevices: List<UsbDeviceAddress> = emptyList(),
+    val usbAttachedCount: Int = 0,
+    val usbScanFailed: Boolean = false,
     val deviceInfo: DeviceInfo? = null,
     val currentNtpServer: String = "",
     val message: UiMessage? = null,

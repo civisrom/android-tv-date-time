@@ -26,6 +26,8 @@ data class UsbDeviceAddress(val deviceName: String, val label: String) : DeviceT
     override fun toString(): String = "USB: $label"
 }
 
+data class UsbDeviceListing(val devices: List<UsbDeviceAddress>, val attachedCount: Int)
+
 internal data class AdbUsbInterface(
     val usbInterface: UsbInterface,
     val input: UsbEndpoint,
@@ -60,12 +62,18 @@ class UsbDevices(context: Context) : AutoCloseable {
     private var closed = false
     private var active: Pair<String, AndroidUsbIo>? = null
 
-    fun list(): List<UsbDeviceAddress> = if (!supported) emptyList() else
-        manager!!.deviceList.values.filter { findAdbInterface(it) != null }.map { device ->
+    fun scan(): UsbDeviceListing {
+        if (!supported) return UsbDeviceListing(emptyList(), 0)
+        val attached = manager!!.deviceList.values.toList()
+        val adbDevices = attached.filter { findAdbInterface(it) != null }.map { device ->
             UsbDeviceAddress(device.deviceName,
                 device.productName?.takeIf { it.isNotBlank() }
                     ?: "%04x:%04x".format(device.vendorId, device.productId))
         }.sortedBy { it.deviceName }
+        return UsbDeviceListing(adbDevices, attached.size)
+    }
+
+    fun list(): List<UsbDeviceAddress> = scan().devices
 
     suspend fun requestPermission(address: UsbDeviceAddress): Boolean {
         val manager = manager ?: return false

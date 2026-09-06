@@ -31,7 +31,7 @@ private const val NTP_SETTING = "global ntp_server"
  * обратно: `settings put` завершается успешно и тогда, когда запись не
  * произошла, поэтому доверять коду возврата нельзя.
  */
-class DeviceRepository(private val client: AdbClient) {
+class DeviceRepository(private val client: AdbClient, private val onFailure: (Exception) -> Unit = {}) {
 
     fun currentNtpServer(): String = client.shell("settings get $NTP_SETTING").trimmedOutput
         .takeUnless { it == "null" }
@@ -50,6 +50,7 @@ class DeviceRepository(private val client: AdbClient) {
                 NtpUpdateResult.NotConfirmed(expected = value, actual = confirmed)
             }
         } catch (e: Exception) {
+            runCatching { onFailure(e) }
             NtpUpdateResult.Failed(e.message ?: e::class.java.simpleName)
         }
     }

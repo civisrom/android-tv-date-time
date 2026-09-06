@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AOSP DeviceFilter проверяет также интерфейсы составных MTP + ADB устройств. -->
+    <usb-device class="255" subclass="66" protocol="1" />
+</resources>

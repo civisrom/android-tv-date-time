@@ -75,6 +75,13 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `diagnostic callback failure cannot replace the NTP result`() {
+        val repository = DeviceRepository(FakeDevice(failOnPut = true)) {
+            throw java.io.IOException("storage unavailable")
+        }
+        assertTrue(repository.setNtpServer("pool.ntp.org") is NtpUpdateResult.Failed)
+    }
+
 
     @Test
     fun `смена сервера применяется и подтверждается чтением`() {
