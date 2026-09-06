@@ -383,6 +383,8 @@ private fun DiscoveredRow(
     val awaitingPairing = device.kind == DiscoveredDevice.Kind.AWAITING_PAIRING
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.discovery_found), color = ConnectedColor,
+                style = MaterialTheme.typography.labelLarge)
             Text(device.name, style = MaterialTheme.typography.bodyLarge)
             Text("${device.address}  ·  ${stringResource(device.kind.labelRes())}")
             if (connected) {

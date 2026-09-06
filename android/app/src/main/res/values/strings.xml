@@ -41,8 +41,8 @@
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
     <!-- Спаривание -->
-    <string name="pairing_title">Pair a device</string>
-    <string name="pairing_hint">On the TV open Developer options → Wireless debugging → Pair device with pairing code.</string>
+    <string name="pairing_title">Pairing · wireless debugging on Android 11+</string>
+    <string name="pairing_hint">Pairing codes are used by the newer wireless debugging mode on Android 11 and later, when supported by the target device firmware. On that device, open Developer options → Wireless debugging → Pair device with pairing code.</string>
     <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-digit code</string>
     <string name="pairing_connect_address_hint">Connection address (a different port)</string>
@@ -51,6 +51,7 @@
 
     <!-- Обнаружение по mDNS -->
     <string name="discovery_title">Devices found automatically on the network</string>
+    <string name="discovery_found">Device found</string>
     <string name="discovery_searching">Searching…</string>
     <string name="discovery_empty">No devices found. Make sure wireless debugging is on and its screen is open.</string>
     <string name="discovery_unavailable">Network discovery is unavailable on this device. Enter the address manually.</string>

@@ -41,6 +41,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.ConnectionState
+import com.civisrom.tvtimefixer.adb.DiscoveredDevice
 import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.adb.UsbDevices
 import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
@@ -187,6 +188,20 @@ class MainScreenTest {
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.168.1.9:5555")
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.168.1.9:5555")
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun discovered_device_identifies_the_pairing_target_without_connecting() {
+        screen(AppState(discovered = listOf(DiscoveredDevice("Android TV в гостиной",
+            DeviceAddress("192.0.2.10", 37123), DiscoveredDevice.Kind.AWAITING_PAIRING))))
+        compose.onNodeWithText("192.0.2.10:37123", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Найдено устройство").assertIsDisplayed()
+        compose.onNodeWithText("Android TV в гостиной").assertIsDisplayed()
+        screenshot("network-device-found")
+        compose.onNodeWithText("Подключено к этому устройству").assertDoesNotExist()
+        compose.onNodeWithText("Спарить").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-code").performScrollTo().assertIsFocused()
+        compose.onNodeWithText("192.0.2.10:37123").performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
     }
 

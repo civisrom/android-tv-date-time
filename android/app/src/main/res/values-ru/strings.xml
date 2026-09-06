@@ -41,8 +41,8 @@
     <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
 
     <!-- Спаривание -->
-    <string name="pairing_title">Спаривание устройства</string>
-    <string name="pairing_hint">На телевизоре откройте «Для разработчиков» → «Беспроводная отладка» → «Подключение с помощью кода».</string>
+    <string name="pairing_title">Спаривание · беспроводная отладка Android 11+</string>
+    <string name="pairing_hint">Спаривание по коду используется в новом режиме беспроводной отладки на Android 11 и новее, если он доступен в прошивке подключаемого устройства. На нём откройте «Для разработчиков» → «Беспроводная отладка» → «Подключение с помощью кода».</string>
     <string name="pairing_address_hint">Адрес спаривания, например 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-значный код</string>
     <string name="pairing_connect_address_hint">Адрес подключения (другой порт)</string>
@@ -51,6 +51,7 @@
 
     <!-- Обнаружение по mDNS -->
     <string name="discovery_title">Автоматически обнаруженные устройства в сети</string>
+    <string name="discovery_found">Найдено устройство</string>
     <string name="discovery_searching">Идёт поиск…</string>
     <string name="discovery_empty">Устройства не найдены. Убедитесь, что беспроводная отладка включена и её экран открыт.</string>
     <string name="discovery_unavailable">Обнаружение в сети недоступно на этом устройстве. Введите адрес вручную.</string>
