@@ -111,19 +111,19 @@ jobs:
         run: |
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "system-images;android-${UI_TEST_API};google_apis;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-${UI_TEST_API};google_apis;x86_64"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
             --package "system-images;android-${UI_TEST_API};google_apis;x86_64" --device pixel_2
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
             -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 \
             > "$RUNNER_TEMP/ui-emulator.log" 2>&1 &
-          timeout 180 adb wait-for-device
+          timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
           for attempt in $(seq 1 120); do
-            if [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
-              adb shell input keyevent 82
-              adb shell settings put global window_animation_scale 0
-              adb shell settings put global transition_animation_scale 0
-              adb shell settings put global animator_duration_scale 0
+            if [[ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
+              "$ANDROID_HOME/platform-tools/adb" shell input keyevent 82
+              "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
+              "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
+              "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
               exit 0
             fi
             sleep 2
@@ -138,8 +138,8 @@ jobs:
         if: always()
         run: |
           mkdir -p ui-screenshots
-          adb pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
-          adb emu kill || true
+          "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
+          "$ANDROID_HOME/platform-tools/adb" emu kill || true
 
       - name: Upload UI test results
         if: always()
