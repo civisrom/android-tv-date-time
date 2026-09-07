@@ -77,6 +77,22 @@
     <string name="ntp_invalid">Это не похоже на адрес сервера.</string>
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
+    <string name="time_check_title">Проверка времени устройства</string>
+    <string name="time_check_action">Проверить время устройства</string>
+    <string name="time_check_working">Проверяется время устройства…</string>
+    <string name="time_check_match">На момент проверки часы устройства совпадают с ответом NTP в пределах 5 секунд.</string>
+    <string name="time_check_mismatch">Часы устройства пока расходятся с ответом NTP более чем на 5 секунд. Android может обновить их позже; повторите проверку.</string>
+    <string name="time_check_uncertain">Точности измерения недостаточно для уверенного результата. Повторите проверку.</string>
+    <string name="time_check_no_server">На устройстве не задан поддерживаемый адрес NTP-сервера. Примените сервер и повторите проверку.</string>
+    <string name="time_check_ntp_unavailable">Не удалось получить ответ NTP для сравнения часов. Проверьте доступность сервера и повторите проверку.</string>
+    <string name="time_check_unavailable">Не удалось прочитать время или настройку NTP с устройства. Проверьте соединение и повторите проверку.</string>
+    <string name="time_check_server">Сервер сравнения: %1$s</string>
+    <string name="time_check_device_time">Время устройства при проверке (UTC): %1$s</string>
+    <string name="time_check_difference">Устройство − NTP: %1$s с; погрешность оценки ±%2$s с.</string>
+    <string name="time_check_auto_on">Автоматическая дата и время включены.</string>
+    <string name="time_check_auto_off">Автоматическая дата и время выключены. Включите их в настройках устройства.</string>
+    <string name="time_check_auto_unknown">Состояние автоматической даты и времени недоступно.</string>
+    <string name="time_check_note">Сравнение выполняется с ответом NTP на устройстве, где запущено приложение. Совпадение часов не подтверждает, что подключённое устройство синхронизировалось именно с этим сервером.</string>
 
     <string name="discovery_authorize_hint">При первом подключении телевизор спросит разрешение на отладку с этого устройства и покажет отпечаток ключа. Подтвердите его на экране ТВ — отметка «Всегда разрешать» избавит от повторов.</string>
     <string name="discovery_connected">Подключено к этому устройству</string>

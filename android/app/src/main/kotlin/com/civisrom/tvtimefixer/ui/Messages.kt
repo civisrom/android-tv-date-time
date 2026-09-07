@@ -5,6 +5,7 @@ import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
+import com.civisrom.tvtimefixer.device.DeviceTimeStatus
 
 /**
  * Сопоставление доменных результатов пользовательским строкам.
@@ -50,4 +51,14 @@ fun NtpUpdateResult.toUiMessage(): UiMessage = when (this) {
         listOf(actual.ifEmpty { "—" }),
     )
     is NtpUpdateResult.Failed -> UiMessage(R.string.ntp_failed, listOf(message))
+}
+
+@StringRes
+fun DeviceTimeStatus.messageRes(): Int = when (this) {
+    DeviceTimeStatus.MATCH -> R.string.time_check_match
+    DeviceTimeStatus.MISMATCH -> R.string.time_check_mismatch
+    DeviceTimeStatus.UNCERTAIN -> R.string.time_check_uncertain
+    DeviceTimeStatus.NO_SERVER -> R.string.time_check_no_server
+    DeviceTimeStatus.NTP_UNAVAILABLE -> R.string.time_check_ntp_unavailable
+    DeviceTimeStatus.DEVICE_UNAVAILABLE -> R.string.time_check_unavailable
 }

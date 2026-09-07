@@ -56,6 +56,8 @@ import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
 import com.civisrom.tvtimefixer.adb.usbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.ScanProgress
+import com.civisrom.tvtimefixer.device.DeviceTimeCheck
+import com.civisrom.tvtimefixer.device.DeviceTimeStatus
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticEvent
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
@@ -78,6 +80,7 @@ private class ScreenActions : AppActions {
     }
     override fun checkNtpServer(server: String) { calls += "check:$server" }
     override fun applyNtpServer(server: String, force: Boolean) { calls += "apply:$server:$force" }
+    override fun verifyDeviceTime() { calls += "verify-time" }
     override fun scanNtpServers() { calls += "scan" }
     override fun cancelNtpScan() { calls += "cancel-scan" }
     override fun refreshDeviceInfo() { calls += "info" }
@@ -92,7 +95,51 @@ class MainScreenTest {
     private lateinit var inputModeManager: InputModeManager
     private lateinit var hostView: View
     private val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
+    private fun russianString(res: Int, vararg args: Any): String {
+        val config = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag("ru")) }
+        return context.createConfigurationContext(config).getString(res, *args)
+    }
     private val connected = AppState(connection = ConnectionState.Connected(DeviceAddress("192.168.1.2", 5555)))
+
+    @Test fun verifying_time_is_a_separate_read_action() {
+        screen(connected.copy(currentNtpServer = "pool.ntp.org"))
+        compose.onNodeWithTag("time-check").performScrollTo().performClick()
+        assertEquals(listOf("verify-time"), actions.calls)
+    }
+
+    @Test fun time_verification_is_disabled_during_an_operation() {
+        screen(connected.copy(busy = true, operation = Operation.CHECK_TIME))
+        compose.onNodeWithTag("time-check").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("time-check-working").performScrollTo().assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun a_disconnected_device_never_shows_an_old_time_confirmation() {
+        screen(AppState(timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH)))
+        compose.onNodeWithTag("time-check").assertDoesNotExist()
+        compose.onNodeWithTag("time-check-result").assertDoesNotExist()
+    }
+
+    @Test fun a_failed_time_check_does_not_hide_the_saved_server() {
+        screen(connected.copy(currentNtpServer = "pool.ntp.org",
+            ntpMessage = UiMessage(com.civisrom.tvtimefixer.R.string.ntp_applied, listOf("pool.ntp.org")),
+            timeCheck = DeviceTimeCheck(DeviceTimeStatus.NTP_UNAVAILABLE, server = "pool.ntp.org")))
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_applied, "pool.ntp.org"))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-check-status").performScrollTo()
+            .assertTextContains(russianString(com.civisrom.tvtimefixer.R.string.time_check_ntp_unavailable))
+    }
+
+    @Test fun time_result_and_disabled_automatic_time_are_readable_at_large_font() {
+        screen(connected.copy(timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH, server = "pool.ntp.org",
+            deviceTimeMillis = 1_800_000_000_000, differenceSeconds = 0.2, uncertaintySeconds = 0.6,
+            automaticTime = false)), mode = DeviceMode.TELEVISION, scale = 2f, width = 320)
+        compose.onNodeWithTag("time-check-status").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_check_auto_off))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-check").performScrollTo().performClick()
+        assertEquals(listOf("verify-time"), actions.calls)
+    }
 
     private fun screen(state: AppState = AppState(), mode: DeviceMode = DeviceMode.HANDHELD,
         scale: Float = 1f, width: Int = 360, diagnostics: DiagnosticSnapshot = DiagnosticSnapshot(),

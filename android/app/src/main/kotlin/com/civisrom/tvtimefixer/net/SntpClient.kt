@@ -1,5 +1,6 @@
 package com.civisrom.tvtimefixer.net
 
+import android.os.SystemClock
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
@@ -16,6 +17,9 @@ data class SntpResult(
     val rttMs: Long,
     val offsetSeconds: Double,
     val address: String = "",
+    /** Сетевое время на момент [referenceElapsedMillis], независимо от часов телефона. */
+    val referenceTimeMillis: Long? = null,
+    val referenceElapsedMillis: Long? = null,
 )
 
 /**
@@ -57,9 +61,10 @@ object SntpPacket {
     private const val INDEX_RECEIVE = 32
     private const val INDEX_TRANSMIT = 40
 
-    /** Запрос клиента: LI = 0, VN = 3, Mode = 3, остальное нули. */
-    fun request(): ByteArray = ByteArray(SIZE).also {
+    /** Запрос клиента: LI = 0, VN = 3, Mode = 3; метка передачи связывает ответ с запросом. */
+    fun request(transmitTimeMillis: Long? = null): ByteArray = ByteArray(SIZE).also {
         it[0] = ((VERSION shl 3) or MODE_CLIENT).toByte()
+        if (transmitTimeMillis != null) writeTimestamp(it, INDEX_TRANSMIT, transmitTimeMillis)
     }
 
     /**
@@ -68,11 +73,16 @@ object SntpPacket {
      * @param t1 момент отправки запроса, мс Unix
      * @param t4 момент получения ответа, мс Unix
      */
-    fun parse(response: ByteArray, t1: Long, t4: Long): SntpResult? {
+    fun parse(response: ByteArray, t1: Long, t4: Long, request: ByteArray? = null): SntpResult? {
         if (response.size < SIZE) return null
 
         val mode = response[0].toInt() and 0x07
         if (mode != MODE_SERVER) return null
+        val version = (response[0].toInt() ushr 3) and 0x07
+        val leap = (response[0].toInt() ushr 6) and 0x03
+        if (version !in 3..4 || leap == 3 || t4 < t1) return null
+        if (request != null && (request.size != SIZE ||
+                !(0 until 8).all { response[INDEX_ORIGINATE + it] == request[INDEX_TRANSMIT + it] })) return null
 
         // Ноль — Kiss-o'-Death: сервер отвечает, но обслуживать отказывается.
         // Всё, что выше 15, протоколом не определено.
@@ -83,13 +93,25 @@ object SntpPacket {
         // бесполезным: настоящий сервер заполняет обе
         val t2 = readTimestamp(response, INDEX_RECEIVE)
         val t3 = readTimestamp(response, INDEX_TRANSMIT)
-        if (t2 == 0L || t3 == 0L) return null
+        if (t2 == 0L || t3 == 0L || t3 < t2) return null
 
         // RFC 4330: смещение = ((t2 - t1) + (t3 - t4)) / 2,
         // задержка = (t4 - t1) - (t3 - t2)
         val offsetMs = ((t2 - t1) + (t3 - t4)) / 2.0
         val rttMs = (t4 - t1) - (t3 - t2)
-        return SntpResult(rttMs = rttMs.coerceAtLeast(0L), offsetSeconds = offsetMs / 1000.0)
+        if (rttMs < -1L) return null // До 1 мс может потеряться при округлении меток.
+        return SntpResult(rttMs = rttMs.coerceAtLeast(0L), offsetSeconds = offsetMs / 1000.0,
+            referenceTimeMillis = t4 + offsetMs.toLong())
+    }
+
+    private fun writeTimestamp(buffer: ByteArray, offset: Int, unixMs: Long) {
+        val millis = ((unixMs % 1000L) + 1000L) % 1000L
+        val seconds = (unixMs - millis) / 1000L + EPOCH_OFFSET_SECONDS
+        val fraction = millis * 0x100000000L / 1000L
+        for (i in 0 until 4) {
+            buffer[offset + i] = (seconds ushr (24 - 8 * i)).toByte()
+            buffer[offset + 4 + i] = (fraction ushr (24 - 8 * i)).toByte()
+        }
     }
 
     /** 64-битная метка времени NTP по смещению в пакете — в миллисекунды Unix. */
@@ -117,19 +139,24 @@ class UdpSntpClient(private val timeoutMs: Int = 2_000) : SntpQuery {
         val resolved = InetAddress.getAllByName(host)
         val address = resolved.firstOrNull { it is Inet4Address } ?: resolved.first()
         DatagramSocket().use { socket ->
+            // Принимаем ответ только от выбранного адреса и UDP-порта.
+            socket.connect(address, SntpPacket.PORT)
             socket.soTimeout = timeoutMs
-            val out = SntpPacket.request()
             val t1 = System.currentTimeMillis()
+            val started = SystemClock.elapsedRealtime()
+            val out = SntpPacket.request(t1)
             socket.send(DatagramPacket(out, out.size, address, SntpPacket.PORT))
 
             val buffer = ByteArray(SntpPacket.SIZE)
             val incoming = DatagramPacket(buffer, buffer.size)
             socket.receive(incoming)
-            val t4 = System.currentTimeMillis()
+            val received = SystemClock.elapsedRealtime()
+            // Автокоррекция часов телефона во время запроса не меняет длительность обмена.
+            val t4 = t1 + (received - started)
 
-            val parsed = SntpPacket.parse(buffer.copyOf(incoming.length), t1, t4)
+            val parsed = SntpPacket.parse(buffer.copyOf(incoming.length), t1, t4, out)
                 ?: throw NotAnNtpServerException("$host отвечает, но не по протоколу NTP")
-            return parsed.copy(address = address.hostAddress.orEmpty())
+            return parsed.copy(address = address.hostAddress.orEmpty(), referenceElapsedMillis = received)
         }
     }
 }

@@ -62,19 +62,24 @@ Thumbs.db
 
 # Android
 android/**/build/
-android/.kotlin/
+.kotlin/
+.cache/
 android/local.properties
 android/.gradle/
 .gradle/
 *.iml
-*.jks
-*.keystore
-*.p12
-*.pfx
+*.jks*
+*.keystore*
+*.p12*
+*.pfx*
 *.pem
 *.key
-key.properties
-keystore.properties
-signing.properties
+key.properties*
+keystore.properties*
+signing.properties*
+secrets.env*
+# JVM crash dumps can contain signing credentials from process memory.
+*.hprof
+hs_err_pid*.log
 captures/
 .cxx/

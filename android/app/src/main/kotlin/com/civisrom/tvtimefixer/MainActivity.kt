@@ -9,6 +9,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +38,9 @@ import com.civisrom.tvtimefixer.data.NtpProbe
 import com.civisrom.tvtimefixer.data.NtpScanner
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceRepository
+import com.civisrom.tvtimefixer.device.DeviceTimeCheck
+import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.DeviceTimeVerifier
 import com.civisrom.tvtimefixer.net.UdpSntpClient
 import com.civisrom.tvtimefixer.ui.AppActions
 import com.civisrom.tvtimefixer.ui.AppState
@@ -91,6 +95,7 @@ class MainActivity : ComponentActivity() {
                     state = state.copy(connection = ConnectionState.Disconnected, busy = true,
                         operation = Operation.DISCONNECT, diagnosticEventId = event,
                         deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
+                        timeCheck = null, timeDiagnosticEventId = null,
                         message = UiMessage(R.string.error_usb_disconnected))
                     lifecycleScope.launch {
                         // Даже releaseInterface/close могут ждать kernel I/O.
@@ -111,6 +116,7 @@ class MainActivity : ComponentActivity() {
 
     private val ntpProbe = NtpProbe(UdpSntpClient())
     private val ntpScanner = NtpScanner(ntpProbe)
+    private val timeVerifier = DeviceTimeVerifier(UdpSntpClient(), SystemClock::elapsedRealtime)
     private var scanJob: Job? = null
 
     /**
@@ -143,7 +149,12 @@ class MainActivity : ComponentActivity() {
                 else -> diagnosticTransport(state.connection.targetOrNull())
             }
             val ntpAction = operation == Operation.CHECK_NTP || operation == Operation.APPLY_NTP
+            val timeAction = operation == Operation.CHECK_TIME
+            val resetTime = operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
+                Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE)
             state = state.copy(busy = true, operation = operation, diagnosticEventId = null,
+                timeCheck = if (resetTime) null else state.timeCheck,
+                timeDiagnosticEventId = if (resetTime) null else state.timeDiagnosticEventId,
                 ntpDiagnosticEventId = if (ntpAction) null else state.ntpDiagnosticEventId)
             journal.record(operation, Outcome.STARTED, transport)
             actionJob = lifecycleScope.launch {
@@ -154,16 +165,19 @@ class MainActivity : ComponentActivity() {
                         Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
                         Operation.CHECK_NTP -> result.ntpCheck?.isUsable() != true
                         Operation.APPLY_NTP -> result.ntpMessage?.res != R.string.ntp_applied
+                        Operation.CHECK_TIME -> result.timeCheck?.status != DeviceTimeStatus.MATCH
                         Operation.READ_DEVICE -> result.diagnosticEventId != null || !result.connected || result.deviceInfo == null
                         else -> false
                     }
-                    val existing = if (ntpAction) result.ntpDiagnosticEventId else failure?.diagnosticId ?: result.diagnosticEventId
+                    val existing = if (timeAction) result.timeDiagnosticEventId else if (ntpAction) result.ntpDiagnosticEventId
+                        else failure?.diagnosticId ?: result.diagnosticEventId
                     val event = if (failed && existing != null) existing else journal.record(operation,
                         if (failed) Outcome.FAILED else Outcome.SUCCESS, transport,
                         durationMs = (System.nanoTime() - started) / 1_000_000,
                         reason = failure?.reason ?: ConnectionError.UNREACHABLE.takeIf {
                             failed && !result.connected && operation == Operation.READ_DEVICE
                         }, issue = if (!failed) null else when {
+                            timeAction -> result.timeCheck?.diagnosticIssue()
                             ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
                             ntpAction && result.ntpCheck?.isUsable() == false -> DiagnosticIssue.NTP_UNUSABLE
                             result.ntpMessage?.res == R.string.ntp_not_confirmed -> DiagnosticIssue.NTP_NOT_CONFIRMED
@@ -171,8 +185,9 @@ class MainActivity : ComponentActivity() {
                             else -> null
                         })
                     if (generation == actionGeneration) state = result.copy(
-                        diagnosticEventId = if (!ntpAction && failed) event else result.diagnosticEventId,
+                        diagnosticEventId = if (!ntpAction && !timeAction && failed) event else result.diagnosticEventId,
                         ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
+                        timeDiagnosticEventId = if (timeAction && failed) event else result.timeDiagnosticEventId,
                     ).withLatestUsb(state)
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport)
@@ -180,7 +195,9 @@ class MainActivity : ComponentActivity() {
                 } catch (e: Exception) {
                     val event = journal.record(operation, Outcome.FAILED, transport,
                         durationMs = (System.nanoTime() - started) / 1_000_000, error = e)
-                    if (generation == actionGeneration) state = if (ntpAction) state.copy(
+                    if (generation == actionGeneration) state = if (timeAction) state.copy(
+                        timeCheck = DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE), timeDiagnosticEventId = event,
+                    ) else if (ntpAction) state.copy(
                         ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
                     ) else state.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
                 } finally {
@@ -268,7 +285,7 @@ class MainActivity : ComponentActivity() {
          */
         override fun applyNtpServer(server: String, force: Boolean) = run(Operation.APPLY_NTP) {
             state = state.copy(ntpMessage = null, ntpRejected = null)
-            withContext(Dispatchers.IO) {
+            val applied = withContext(Dispatchers.IO) {
                 val check = if (force) null else ntpProbe.test(server)
                 if (check != null && !check.isUsable()) {
                     return@withContext state.copy(
@@ -296,10 +313,30 @@ class MainActivity : ComponentActivity() {
                     ntpCheck = check,
                     ntpMessage = if (result is NtpUpdateResult.Failed) UiMessage(R.string.operation_failed_hint) else result.toUiMessage(),
                     ntpDiagnosticEventId = failureId,
-                    currentNtpServer = repository.currentNtpServer(),
+                    currentNtpServer = if (result is NtpUpdateResult.Applied) result.server else repository.currentNtpServer(),
                 )
             }
+            if (applied.ntpMessage?.res != R.string.ntp_applied) return@run applied
+
+            // Сохранение настройки уже подтверждено. Ошибка сравнения часов не отменяет этот факт.
+            state = applied.copy(operation = Operation.CHECK_TIME)
+            val transport = diagnosticTransport(state.connection.targetOrNull())
+            val started = SystemClock.elapsedRealtime()
+            journal.record(Operation.CHECK_TIME, Outcome.STARTED, transport)
+            val verified = try {
+                state.withDeviceTime()
+            } catch (e: CancellationException) {
+                journal.record(Operation.CHECK_TIME, Outcome.CANCELLED, transport)
+                throw e
+            }
+            val failed = verified.timeCheck?.status != DeviceTimeStatus.MATCH
+            val event = journal.record(Operation.CHECK_TIME, if (failed) Outcome.FAILED else Outcome.SUCCESS,
+                transport, durationMs = SystemClock.elapsedRealtime() - started,
+                issue = verified.timeCheck?.diagnosticIssue())
+            verified.copy(timeDiagnosticEventId = event.takeIf { failed })
         }
+
+        override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { state.withDeviceTime() }
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
@@ -513,6 +550,22 @@ class MainActivity : ComponentActivity() {
                 },
             )
         }
+    }
+
+    private suspend fun AppState.withDeviceTime(): AppState = withContext(Dispatchers.IO) {
+        val client = connector.activeClient
+        val check = if (!connected || client == null) DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
+            else timeVerifier.verify(client)
+        copy(timeCheck = check)
+    }
+
+    private fun DeviceTimeCheck.diagnosticIssue(): DiagnosticIssue? = when (status) {
+        DeviceTimeStatus.MATCH -> null
+        DeviceTimeStatus.MISMATCH -> DiagnosticIssue.TIME_MISMATCH
+        DeviceTimeStatus.UNCERTAIN -> DiagnosticIssue.TIME_UNCERTAIN
+        DeviceTimeStatus.NO_SERVER -> DiagnosticIssue.INVALID_NTP
+        DeviceTimeStatus.NTP_UNAVAILABLE -> DiagnosticIssue.NTP_UNREACHABLE
+        DeviceTimeStatus.DEVICE_UNAVAILABLE -> DiagnosticIssue.TIME_UNAVAILABLE
     }
 
     private fun diagnosticTransport(target: DeviceTarget?): DiagnosticTransport = when (target) {

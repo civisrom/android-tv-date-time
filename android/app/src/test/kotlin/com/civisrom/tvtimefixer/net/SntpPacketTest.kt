@@ -16,6 +16,40 @@ import org.junit.Test
  */
 class SntpPacketTest {
 
+    @Test fun `network reference remains correct when local wall clock is far behind`() {
+        val local = 946_684_800_000L
+        val network = 1_800_000_000_000L
+        val result = SntpPacket.parse(serverReply(receiveMs = network + 10, transmitMs = network + 20),
+            local, local + 40)!!
+        assertTrue(kotlin.math.abs(network + 35 - result.referenceTimeMillis!!) <= 2)
+    }
+
+    @Test fun `unsynchronized servers and unsupported NTP versions are rejected`() {
+        val now = 1_800_000_000_000L
+        for (header in listOf(0xDC, 0x14, 0x2C)) {
+            val reply = serverReply(receiveMs = now, transmitMs = now).also { it[0] = header.toByte() }
+            assertNull(SntpPacket.parse(reply, now, now + 10))
+        }
+    }
+
+    @Test fun `reply must echo this request timestamp`() {
+        val now = 1_800_000_000_123L
+        val request = SntpPacket.request(now)
+        val reply = serverReply(receiveMs = now + 10, transmitMs = now + 11)
+        assertNull(SntpPacket.parse(reply, now, now + 20, request))
+        request.copyInto(reply, 24, 40, 48)
+        assertNotNull(SntpPacket.parse(reply, now, now + 20, request))
+        reply[24] = (reply[24].toInt() xor 1).toByte()
+        assertNull(SntpPacket.parse(reply, now, now + 20, request))
+    }
+
+    @Test fun `inconsistent timestamp intervals are rejected`() {
+        val now = 1_800_000_000_000L
+        assertNull(SntpPacket.parse(serverReply(receiveMs = now + 20, transmitMs = now), now, now + 30))
+        assertNull(SntpPacket.parse(serverReply(receiveMs = now, transmitMs = now + 100), now, now + 20))
+        assertNull(SntpPacket.parse(serverReply(receiveMs = now, transmitMs = now), now + 1, now))
+    }
+
     /** Собирает правдоподобный ответ сервера. */
     private fun serverReply(
         mode: Int = 4,
