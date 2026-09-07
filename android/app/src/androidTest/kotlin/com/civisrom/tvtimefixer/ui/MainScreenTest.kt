@@ -250,6 +250,8 @@ class MainScreenTest {
     @Test fun ntp_input_survives_diagnostics_and_only_explicit_apply_executes() {
         screen(connected)
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        // IME changes the viewport; wait before scrolling and injecting a toolbar tap.
+        waitForKeyboard()
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostics-back").performClick()
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
