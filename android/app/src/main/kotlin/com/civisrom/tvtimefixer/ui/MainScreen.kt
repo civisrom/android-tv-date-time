@@ -177,6 +177,12 @@ private fun MainContent(
             }
         }
         ConnectionStatus(mode, state, actions)
+        ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
+            onExpanded = { discoveryExpanded = it }) {
+            DiscoverySection(state, actions, onPair = {
+                pairingAddress = it; focusPairing = true
+            })
+        }
         if (state.busy) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
             state.operation?.let { Text(stringResource(R.string.operation_working, stringResource(it.labelRes()))) }
@@ -199,12 +205,6 @@ private fun MainContent(
         NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
         PairingSection(state, actions, pairingAddress, { pairingAddress = it },
             pairingCode, onPairingCode, pairingRequester)
-        ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
-            onExpanded = { discoveryExpanded = it }) {
-            DiscoverySection(state, actions, onPair = {
-                pairingAddress = it; focusPairing = true
-            })
-        }
         ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
             onExpanded = { usbExpanded = it }) {
             UsbSection(state, actions)
@@ -743,6 +743,7 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
         state.deviceInfo?.let { info ->
             InfoRow(stringResource(R.string.info_model), info.model)
             InfoRow(stringResource(R.string.info_android), info.androidVersion)
+            InfoRow(stringResource(R.string.info_ntp), info.currentNtpServer, color = ConnectedColor)
             InfoRow(stringResource(R.string.info_timezone), info.timezone)
             ExpandableSection(stringResource(R.string.info_more), "device-details") {
                 InfoRow(stringResource(R.string.info_manufacturer), info.manufacturer)
@@ -759,7 +760,6 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
                 InfoRow(stringResource(R.string.info_uptime), info.uptime)
                 InfoRow(stringResource(R.string.info_kernel), info.kernelVersion)
             }
-            InfoRow(stringResource(R.string.info_ntp), info.currentNtpServer)
         }
         Button(onClick = actions::refreshDeviceInfo, enabled = !state.busy) {
             Text(stringResource(R.string.info_refresh))
@@ -768,14 +768,14 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+private fun InfoRow(label: String, value: String, color: Color = Color.Unspecified) {
     if (value.isNotBlank()) BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth < 480.dp) Column {
-            Text(label, style = MaterialTheme.typography.bodySmall)
-            Text(value, style = MaterialTheme.typography.bodyMedium)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = color)
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = color)
         } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(label, Modifier.weight(0.35f), style = MaterialTheme.typography.bodySmall)
-            Text(value, Modifier.weight(0.65f), style = MaterialTheme.typography.bodyMedium)
+            Text(label, Modifier.weight(0.35f), style = MaterialTheme.typography.bodySmall, color = color)
+            Text(value, Modifier.weight(0.65f), style = MaterialTheme.typography.bodyMedium, color = color)
         }
     }
 }
