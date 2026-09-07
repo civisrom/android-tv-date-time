@@ -67,7 +67,7 @@ replace troubleshooting other network faults.
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
     45 alternative servers**, including regional pools, Cloudflare, Google
-    and VNIIFTRI. Development checks keep the two reference lists consistent.
+    and other public NTP servers. Development checks keep the two reference lists consistent.
 *   **Time-server checks:** real NTP requests, round-trip time (RTT), successful
     reply percentage and offset from the controlling device's clock.
     Check before applying a server or find a suitable one from the reference.
@@ -764,8 +764,8 @@ green, a rejected one red.
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
     `KZ · Kazakhstan · kz.pool.ntp.org`, `BY · Belarus · by.pool.ntp.org`.
 *   **The alternative-server list.** **Show alternative time servers (45)** —
-    the same set as the desktop version: regional pools, Cloudflare, Google, the
-    Russian VNIIFTRI servers and others.
+    the same set as the desktop version: regional pools, Cloudflare, Google
+    and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
     (`time.google.com`) or an IP address (`216.239.35.0`) — there is a reminder
     of that under the field.
