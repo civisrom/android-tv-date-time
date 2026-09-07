@@ -401,7 +401,7 @@ Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
 In the APK, use the always-expanded
-[Pair a device form](#4-pair-a-device--the-code-for-android-11-and-newer).
+[Pair a device form](#5-pair-a-device--the-code-for-android-11-and-newer).
 
 Both programs distinguish pairing and connection services in mDNS and verify
 the connection with a command on the device. A listed service does not yet
@@ -705,9 +705,40 @@ connection, not that the address merely looked valid.
 Once connected, a **Disconnect** button appears. The IP field and pairing
 form remain visible; editing an address alone does not change the current connection.
 
-#### 3. "Time server"
+#### 3. "Devices found automatically on the network"
 
-This section is always visible below the connection card. You can choose and
+The app looks for TVs over mDNS — the protocol devices use to announce
+themselves on a local network. **You need neither the address nor the port**: a
+TV that is found shows up here on its own.
+
+The section can be collapsed and opens automatically when new results arrive.
+A green **Device found** label means discovery, not an established connection.
+Each row shows the name, address and service type:
+
+*   **"Network debugging"** — the classic debugging on port 5555. The
+    **Connect** button starts a connection; RSA authorization may be required.
+*   **"Ready to connect"** — a wireless ADB TLS endpoint is advertised.
+    This does not prove that this app is paired; a new client may still need a code.
+*   **"Waiting to be paired"** — the pairing dialog is open on the TV. You
+    cannot connect until a code is entered, so the button here is **Pair**: it
+    puts the address into the pairing form below.
+
+An empty list is not a problem: type the address by hand in the section above.
+
+**Authorization.** For classic ADB, approve the target's RSA prompt showing
+the key fingerprint; **Always allow** saves trust in the client. Modern
+wireless debugging establishes trust through code pairing instead. These
+are different procedures; appearing in mDNS does not replace either one.
+
+**Permissions.** The system mDNS APIs used here do not require
+`NEARBY_WIFI_DEVICES` on Android 13-16. With the current `targetSdk = 36`,
+Android 17 does not need an extra prompt either. A future target SDK 37
+build must request `ACCESS_LOCAL_NETWORK`; denial affects direct connections
+as well as discovery. See [Android's local-network permission rules](https://developer.android.com/privacy-and-security/local-network-permission).
+
+#### 4. "Time server"
+
+This section is always visible below the network discovery menu. You can choose and
 check a server address before connecting to a device. **Apply** becomes available
 once connected; an explanation is shown until then. Search, lists and scanning
 are inside **Choose a server**. An ongoing scan and its Stop button
@@ -777,7 +808,7 @@ Tapping either fills the input field; applying remains a separate action.
 An IP can help with TV-side DNS problems, but a service is not guaranteed
 to keep that resolved address permanently.
 
-#### 4. "Pair a device" — the code, for Android 11 and newer
+#### 5. "Pair a device" — the code, for Android 11 and newer
 
 The pairing form is always visible on the main screen and cannot be collapsed.
 **Pair** on a discovered device fills its address and focuses the code field.
@@ -831,37 +862,6 @@ currently support IPv4 only.
 Change history: [2.6.1](release-notes/v2.6.1-en.md) and
 [2.6.2](release-notes/v2.6.2-en.md).
 
-#### 5. "Devices found automatically on the network"
-
-The app looks for TVs over mDNS — the protocol devices use to announce
-themselves on a local network. **You need neither the address nor the port**: a
-TV that is found shows up here on its own.
-
-The section can be collapsed and opens automatically when new results arrive.
-A green **Device found** label means discovery, not an established connection.
-Each row shows the name, address and service type:
-
-*   **"Network debugging"** — the classic debugging on port 5555. The
-    **Connect** button starts a connection; RSA authorization may be required.
-*   **"Ready to connect"** — a wireless ADB TLS endpoint is advertised.
-    This does not prove that this app is paired; a new client may still need a code.
-*   **"Waiting to be paired"** — the pairing dialog is open on the TV. You
-    cannot connect until a code is entered, so the button here is **Pair**: it
-    puts the address into the pairing form above.
-
-An empty list is not a problem: type the address by hand in the section above.
-
-**Authorization.** For classic ADB, approve the target's RSA prompt showing
-the key fingerprint; **Always allow** saves trust in the client. Modern
-wireless debugging establishes trust through code pairing instead. These
-are different procedures; appearing in mDNS does not replace either one.
-
-**Permissions.** The system mDNS APIs used here do not require
-`NEARBY_WIFI_DEVICES` on Android 13-16. With the current `targetSdk = 36`,
-Android 17 does not need an extra prompt either. A future target SDK 37
-build must request `ACCESS_LOCAL_NETWORK`; denial affects direct connections
-as well as discovery. See [Android's local-network permission rules](https://developer.android.com/privacy-and-security/local-network-permission).
-
 #### 6. USB debugging
 
 Expand this section manually, or it opens automatically when USB ADB is
@@ -877,9 +877,10 @@ number, CPU and core count, memory, screen resolution and density, time zone,
 locale, battery, kernel version, uptime and the current time server. The
 **Refresh** button reads it all again.
 
-Model, Android version and time zone are visible immediately; expand **All device
-details** for the rest. Empty rows are hidden: if the firmware does not answer one
-command, only that row disappears.
+Model, Android version, time server and time zone are visible immediately. The
+time server label and value are green. Expand **All device details** for the rest.
+Empty rows are hidden: if the firmware does not answer one command, only that
+row disappears.
 
 ### If the app misbehaves
 
