@@ -29,6 +29,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
@@ -38,6 +40,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.util.Locale
+import java.util.Date
+import java.util.TimeZone
+import java.text.SimpleDateFormat
 import kotlin.math.abs
 import com.civisrom.tvtimefixer.BuildConfig
 import com.civisrom.tvtimefixer.DeviceMode
@@ -51,6 +56,9 @@ import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.searchNtpServers
 import com.civisrom.tvtimefixer.data.isUsable
+import com.civisrom.tvtimefixer.device.DeviceTimeCheck
+import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.diagnostics.Operation
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
@@ -60,6 +68,7 @@ interface AppActions {
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
     fun checkNtpServer(server: String)
     fun applyNtpServer(server: String, force: Boolean = false)
+    fun verifyDeviceTime()
     fun scanNtpServers()
     fun cancelNtpScan()
     fun refreshDeviceInfo()
@@ -551,6 +560,20 @@ private fun NtpSection(state: AppState, actions: AppActions,
         state.ntpDiagnosticEventId?.let { id ->
             DiagnosticLink(id, "ntp-details", onDiagnostics, returnFocus, onFocusRestored)
         }
+        if (state.connected) {
+            TextButton(onClick = actions::verifyDeviceTime, enabled = !state.busy,
+                modifier = Modifier.testTag("time-check")) {
+                Text(stringResource(R.string.time_check_action))
+            }
+            if (state.operation == Operation.CHECK_TIME) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                Text(stringResource(R.string.time_check_working), modifier = Modifier.testTag("time-check-working"))
+            }
+            state.timeCheck?.let { DeviceTimeCard(it) }
+            state.timeDiagnosticEventId?.let { id ->
+                DiagnosticLink(id, "time-details", onDiagnostics, returnFocus, onFocusRestored)
+            }
+        }
         state.ntpScan?.takeUnless { it.finished }?.let { scan ->
             Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size),
                 modifier = Modifier.testTag("ntp-scan-progress"))
@@ -666,6 +689,39 @@ private fun NtpCheckCard(check: NtpProbeResult) {
     }
 }
 
+@Composable
+private fun DeviceTimeCard(check: DeviceTimeCheck) {
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+    Card(Modifier.fillMaxWidth().testTag("time-check-result")) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.time_check_title), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(check.status.messageRes()), modifier = Modifier.testTag("time-check-status"),
+                color = when (check.status) {
+                    DeviceTimeStatus.MATCH -> ConnectedColor
+                    DeviceTimeStatus.MISMATCH -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                })
+            if (check.server.isNotEmpty()) Text(stringResource(R.string.time_check_server, check.server))
+            check.deviceTimeMillis?.let {
+                val utc = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", locale).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.format(Date(it))
+                Text(stringResource(R.string.time_check_device_time, utc))
+            }
+            if (check.differenceSeconds != null && check.uncertaintySeconds != null) {
+                Text(stringResource(R.string.time_check_difference, formatOffset(check.differenceSeconds, locale),
+                    String.format(locale, "%.1f", check.uncertaintySeconds)))
+            }
+            Text(stringResource(when (check.automaticTime) {
+                true -> R.string.time_check_auto_on
+                false -> R.string.time_check_auto_off
+                null -> R.string.time_check_auto_unknown
+            }), color = if (check.automaticTime == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.time_check_note), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 /** Подбор самого быстрого сервера — аналог автонастройки десктопной версии. */
 @Composable
 private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit) {
@@ -730,10 +786,10 @@ private fun countryName(country: NtpCountry): String =
  * Локаль берётся пользовательская намеренно: это число человек читает глазами,
  * и в русском разделителем должна быть запятая.
  */
-private fun formatOffset(seconds: Double?): String {
+private fun formatOffset(seconds: Double?, locale: Locale = Locale.getDefault()): String {
     val value = seconds ?: return "—"
     val sign = if (value >= 0) "+" else "-"
-    return sign + String.format(Locale.getDefault(), "%.1f", abs(value))
+    return sign + String.format(locale, "%.1f", abs(value))
 }
 
 @Composable

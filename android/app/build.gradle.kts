@@ -33,6 +33,7 @@ android {
         val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
         if (!keystorePath.isNullOrBlank()) {
             create("release") {
+                storeType = "PKCS12"
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")

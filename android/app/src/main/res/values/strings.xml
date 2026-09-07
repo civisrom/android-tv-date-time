@@ -77,6 +77,22 @@
     <string name="ntp_invalid">That is not a valid server address.</string>
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
+    <string name="time_check_title">Device time verification</string>
+    <string name="time_check_action">Verify device time</string>
+    <string name="time_check_working">Verifying device time…</string>
+    <string name="time_check_match">At the time of this check, the device clock agrees with the NTP reply within 5 seconds.</string>
+    <string name="time_check_mismatch">The device clock still differs from the NTP reply by more than 5 seconds. Android may update it later; check again.</string>
+    <string name="time_check_uncertain">The measurement is not precise enough for a conclusive result. Check again.</string>
+    <string name="time_check_no_server">The device has no supported NTP server address set. Apply a server and check again.</string>
+    <string name="time_check_ntp_unavailable">Could not obtain an NTP reply to compare clocks. Check server availability and try again.</string>
+    <string name="time_check_unavailable">Could not read the device time or NTP setting. Check the connection and try again.</string>
+    <string name="time_check_server">Comparison server: %1$s</string>
+    <string name="time_check_device_time">Device time when checked (UTC): %1$s</string>
+    <string name="time_check_difference">Device − NTP: %1$s s; estimated uncertainty ±%2$s s.</string>
+    <string name="time_check_auto_on">Automatic date and time are enabled.</string>
+    <string name="time_check_auto_off">Automatic date and time are disabled. Enable them in the device settings.</string>
+    <string name="time_check_auto_unknown">Automatic date and time status is unavailable.</string>
+    <string name="time_check_note">Comparison uses the NTP reply received by the device running this app. Matching clocks do not confirm that the connected device synchronized with this particular server.</string>
 
     <string name="discovery_authorize_hint">When connecting for the first time, the TV asks to allow debugging from this device and shows a key fingerprint. Confirm it on the TV screen — ticking “Always allow” saves you from repeating it.</string>
     <string name="discovery_connected">Connected to this device</string>

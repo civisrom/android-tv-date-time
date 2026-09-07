@@ -12,6 +12,19 @@ pluginManagement {
     }
 }
 
+// Fail before configuring the app or reading signing passwords, including when
+// command-line options override gradle.properties.
+@Suppress("DEPRECATION")
+val configurationCacheRequested = gradle.startParameter.isConfigurationCacheRequested
+check(!configurationCacheRequested) {
+    "Configuration cache is disabled to protect signing secrets. Use --no-configuration-cache."
+}
+if (!System.getenv("ANDROID_KEYSTORE_PATH").isNullOrBlank()) {
+    check(!gradle.startParameter.isBuildCacheEnabled) {
+        "Signed builds require --no-build-cache to protect signing secrets."
+    }
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

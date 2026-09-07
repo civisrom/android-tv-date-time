@@ -3,12 +3,19 @@ package com.civisrom.tvtimefixer.ui
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
+import com.civisrom.tvtimefixer.device.DeviceTimeStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessagesTest {
+
+    @Test fun `clock agreement mismatch uncertainty and unavailable results have distinct messages`() {
+        val messages = DeviceTimeStatus.entries.map { it.messageRes() }
+        assertTrue(messages.none { it == 0 })
+        assertEquals(DeviceTimeStatus.entries.size, messages.distinct().size)
+    }
 
     @Test
     fun `у каждой причины отказа есть своя строка`() {

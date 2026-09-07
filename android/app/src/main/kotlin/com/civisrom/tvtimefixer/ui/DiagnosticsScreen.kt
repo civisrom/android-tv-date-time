@@ -65,6 +65,7 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.DISCOVERY -> R.string.operation_discovery
     Operation.CRASH -> R.string.operation_crash
     Operation.STORAGE -> R.string.operation_storage
+    Operation.CHECK_TIME -> R.string.time_check_title
 }
 
 private fun DiagnosticIssue.labelRes(): Int = when (this) {
@@ -72,6 +73,9 @@ private fun DiagnosticIssue.labelRes(): Int = when (this) {
     DiagnosticIssue.NTP_UNUSABLE -> R.string.ntp_check_bad_clock
     DiagnosticIssue.NTP_NOT_CONFIRMED -> R.string.diagnostics_ntp_not_confirmed
     DiagnosticIssue.INVALID_NTP -> R.string.ntp_invalid
+    DiagnosticIssue.TIME_MISMATCH -> R.string.time_check_mismatch
+    DiagnosticIssue.TIME_UNCERTAIN -> R.string.time_check_uncertain
+    DiagnosticIssue.TIME_UNAVAILABLE -> R.string.time_check_unavailable
     DiagnosticIssue.USB_NONE -> R.string.usb_none
     DiagnosticIssue.USB_NO_ADB -> R.string.usb_no_adb
     DiagnosticIssue.USB_ENUMERATION -> R.string.usb_scan_failed

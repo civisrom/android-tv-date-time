@@ -789,7 +789,7 @@ The **Apply** button does the same and, if the check passes, writes the address
 to the TV. The result appears **right under the button**, and the "Current:"
 line is updated with the value **read back from the device**.
 
-*   *"Time server set to …"* — done.
+*   *"Time server set to …"* — the address was saved and read back from the device.
 *   *"The device still reports …"* — the command went through but the write did
     not happen. Usually this means the connection lacks permission to change
     secure settings.
@@ -797,6 +797,21 @@ line is updated with the value **read back from the device**.
     button appears next to it: the check runs from the phone's network, and UDP
     port 123 is blocked by some carriers and routers, so refusing outright
     would be wrong.
+
+After a successful write, **device time verification** runs automatically.
+It reads the device clock through ADB and compares it with a fresh reply from
+the configured NTP server. The result appears nearby: agreement within
+**5 seconds**, a remaining difference, insufficient measurement precision,
+or unavailable data. ADB/NTP delays and whole-second clock readings are taken
+into account.
+
+The card shows the sampled device time in UTC, its difference from NTP, and
+automatic date and time status. **Verify device time** repeats only the read
+and comparison; it does not change settings. Android may update its clock later,
+so a difference immediately after the write does not establish a failed setup.
+A failed check does not undo confirmation that the server address was saved.
+The NTP reply is received by the device running the APK: matching clocks do
+not prove that the TV synchronized with this particular server.
 
 The **Find the best one** button checks the 122-address reference and shows
 up to five suitable servers, ordered first by successful reply percentage and

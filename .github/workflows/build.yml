@@ -205,6 +205,8 @@ jobs:
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
           build-scan-publish: false
+          # Never restore or upload Gradle User Home from a signing job.
+          cache-disabled: true
 
       - name: Derive version
         id: version
@@ -228,7 +230,7 @@ jobs:
             echo "::warning::ANDROID_KEYSTORE_BASE64 is not set - the APK will be unsigned and will not be attached to the release"
           else
             umask 077
-            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
             echo "signed=true" >> $GITHUB_OUTPUT
           fi
 
@@ -244,18 +246,18 @@ jobs:
       - name: Assemble release APK
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.signed == 'true' && format('{0}/release.jks', runner.temp) || '' }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.signed == 'true' && format('{0}/release.p12', runner.temp) || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ github.run_number }}
-        # Do not serialize the signing configuration/passwords into a configuration cache.
-        run: ./gradlew --no-daemon --no-configuration-cache assembleRelease
+        # Keep signing configuration and task outputs out of Gradle caches.
+        run: ./gradlew --no-daemon --no-configuration-cache --no-build-cache assembleRelease
 
       - name: Remove temporary signing key
         if: always()
-        run: rm -f "$RUNNER_TEMP/release.jks"
+        run: rm -f "$RUNNER_TEMP/release.p12"
 
       - name: Package APK
         run: |
