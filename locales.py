@@ -66,6 +66,10 @@ arising from the use of this program.
                 en="Version {version}",
                 ru="Версия {version}"
             ),
+            "project_source_code": Translation(
+                en="Project source code:",
+                ru="Исходный код проекта:"
+            ),
             "please_ensure": Translation(
                 en="\nPlease ensure the following is done:",
                 ru="\nПожалуйста, убедитесь, что следующее сделано:"

@@ -42,6 +42,7 @@
     <string name="error_wireless_unsupported">Для спаривания нужен Android 10 или новее на устройстве с этим приложением. Классическая отладка по сети остаётся доступной.</string>
     <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
 
+    <string name="project_source_code">Исходный код проекта:</string>
     <string name="project_repository_open">Открыть репозиторий проекта на GitHub</string>
     <string name="project_repository_unavailable">Не удалось открыть ссылку. На устройстве может отсутствовать браузер.</string>
 

@@ -212,6 +212,7 @@ private fun MainContent(
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.app_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.project_source_code), style = MaterialTheme.typography.bodySmall)
         Text(PROJECT_REPOSITORY_URL,
             modifier = Modifier.testTag("project-repository").clickable(role = Role.Button, onClickLabel = openRepository) {
                 repositoryLinkFailed = runCatching { uriHandler.openUri(PROJECT_REPOSITORY_URL) }.isFailure
