@@ -3799,11 +3799,25 @@ class AndroidTVTimeFixer:
         if self.device is not None and self.connected_ip and self.connected_ip.startswith('usb:'):
             found = [self.connected_ip]
         else:
-            port = self.prompt_adb_port()
-            if port is None:
-                return
-            print(Fore.CYAN + locales.get("auto_scanning_network"))
-            found = self.scan_network_for_android_devices(port)
+            print(Fore.CYAN + locales.get("mdns_searching"))
+            try:
+                services = self.mdns_discover_all()
+            except Exception as error:
+                self.logger.debug("Auto-setup mDNS discovery failed: %s", error)
+                services = {}
+            # Порт спаривания нельзя использовать для ADB-подключения.
+            found = self._sort_addresses(list(dict.fromkeys(
+                services.get('connect', []) + services.get('legacy', [])
+            )))
+            if not found:
+                if services.get('pairing'):
+                    print(Fore.YELLOW + locales.get("mdns_pairing_hint"))
+                print(Fore.YELLOW + locales.get("auto_mdns_fallback"))
+                port = self.prompt_adb_port()
+                if port is None:
+                    return
+                print(Fore.CYAN + locales.get("auto_scanning_network"))
+                found = self.scan_network_for_android_devices(port)
 
         if not found:
             print(Fore.RED + locales.get("auto_no_devices"))
@@ -3812,12 +3826,19 @@ class AndroidTVTimeFixer:
         # Шаг 2: Выбор устройства
         if len(found) == 1:
             target_ip = found[0]
-            print(Fore.GREEN + locales.get("auto_found_device", count=1, ip=target_ip))
+            print(Fore.GREEN + locales.get("auto_found_device", ip=target_ip))
+            if not target_ip.startswith('usb:'):
+                answer = input(Fore.GREEN + locales.get("auto_use_found_device") + Fore.WHITE).strip()
+                if answer:
+                    if answer.lower() != 'q':
+                        print(Fore.RED + locales.get("invalid_input"))
+                    return
         else:
-            print(Fore.GREEN + locales.get("scan_found", count=len(found)))
             for i, ip in enumerate(found, 1):
                 print(Fore.WHITE + f"  {i}. {ip}")
             raw = input(Fore.GREEN + locales.get("auto_select_device") + Fore.WHITE).strip()
+            if raw.lower() == 'q':
+                return
             try:
                 idx = int(raw)
                 if 1 <= idx <= len(found):

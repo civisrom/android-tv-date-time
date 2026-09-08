@@ -562,9 +562,10 @@ Opens a submenu for working with multiple devices:
 
 Helps choose a device and a suitable server:
 
-1. Reuses the selected USB device. If USB is not selected, asks for the ADB
-   port and scans the local network.
-2. Connects to the only device found, or offers a choice when several are found.
+1. Reuses the selected USB device. Otherwise, first discovers debugging addresses
+   and current ports via mDNS. If none are found, offers a network scan on a specified ADB port.
+2. Shows the only address found: press Enter to use it and continue, or q to cancel.
+   When several addresses are found, choose a number.
 3. Detects the region from the computer's timezone and checks the NTP reference.
 4. Sends five NTP requests per server with one-second pauses and requires at least
    four valid replies. Ranking uses reply rate, then median delay plus delay
@@ -572,9 +573,9 @@ Helps choose a device and a suitable server:
 5. Shows up to five best candidates. You can select another numbered result.
 6. Asks for installation confirmation, writes the address and verifies it.
 
-For wireless debugging with different dynamic ports, it is more convenient to
-discover the device through mDNS in item 11 and set NTP in item 1 or 2:
-subnet scanning tests one specified port.
+mDNS finds classic and newer wireless debugging with dynamic ports. If code pairing
+is required, complete it in item 11 first. Discovery does not bypass the TV's debugging
+authorization; the fallback subnet scan checks one specified port.
 
 ### Item 10 — Terminal mode
 

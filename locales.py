@@ -1276,12 +1276,20 @@ arising from the use of this program.
                 ru="\n[Авто] Сканирование сети для поиска Android TV устройств..."
             ),
             "auto_found_device": Translation(
-                en="[Auto] Found {count} device(s). Connecting to {ip}...",
-                ru="[Авто] Найдено {count} устройств. Подключение к {ip}..."
+                en="[Auto] Found device: {ip}",
+                ru="[Авто] Найдено устройство: {ip}"
+            ),
+            "auto_use_found_device": Translation(
+                en="[Auto] Press Enter to use this address and continue, or q to cancel: ",
+                ru="[Авто] Нажмите Enter, чтобы использовать этот адрес и продолжить, или q для отмены: "
+            ),
+            "auto_mdns_fallback": Translation(
+                en="[Auto] No connection addresses found via mDNS. Some devices do not advertise debugging or the network blocks discovery. Choose an ADB port to try a network scan (q to cancel).",
+                ru="[Авто] По mDNS не найдены адреса подключения. Некоторые устройства не объявляют отладку или сеть блокирует обнаружение. Выберите ADB-порт для поиска в сети (q — отмена)."
             ),
             "auto_select_device": Translation(
-                en="[Auto] Multiple devices found. Select device number: ",
-                ru="[Авто] Найдено несколько устройств. Выберите номер устройства: "
+                en="[Auto] Multiple addresses found. Select a number, or q to cancel: ",
+                ru="[Авто] Найдено несколько адресов. Выберите номер или q для отмены: "
             ),
             "auto_no_devices": Translation(
                 en="[Auto] No devices found on network. Check that ADB debugging is enabled.",
