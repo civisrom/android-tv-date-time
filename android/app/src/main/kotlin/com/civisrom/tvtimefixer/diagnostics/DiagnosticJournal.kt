@@ -50,6 +50,15 @@ data class DiagnosticSnapshot(
     val previousCrashId: Long? = null,
 )
 
+/** Одинаковые технические сведения в раскрытой записи и копируемом отчёте. */
+fun diagnosticDetails(event: DiagnosticEvent): String = buildString {
+    appendLine("event.id=${event.id}; operation=${event.operation}; outcome=${event.outcome}")
+    appendLine("transport=${event.transport}; duration_ms=${event.durationMs}")
+    event.reason?.let { appendLine("reason=$it") }
+    event.issue?.let { appendLine("issue=$it") }
+    append(event.details)
+}.trimEnd()
+
 /** Только имена классов/методов и номера строк. Throwable.message не читается. */
 internal fun safeExceptionDetails(error: Throwable): String = buildString {
     val seen = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Throwable, Boolean>())
@@ -71,7 +80,7 @@ private fun safeSymbol(value: String): String =
     value.takeIf { it.length <= 180 && it.matches(Regex("[A-Za-z0-9_.$<>-]+")) } ?: "?"
 
 /**
- * Один писатель, неблокирующая ограниченная очередь, никаких строк от ADB.
+ * Один писатель, неблокирующая ограниченная очередь, без необработанного вывода ADB.
  * Основной файл + его временная копия <= 240 КиБ; crash + копия <= 16 КиБ.
  * JVM-тесты используют тот же код хранения, что и APK.
  */
@@ -138,8 +147,9 @@ class DiagnosticJournal(
         error: Throwable? = null,
         issue: DiagnosticIssue? = null,
         usb: UsbObservation? = null,
+        trace: OperationTrace? = null,
     ): Long {
-        val details = listOfNotNull(usb?.details(), error?.let {
+        val details = listOfNotNull(trace?.details(), usb?.details(), error?.let {
             runCatching { safeExceptionDetails(it) }.getOrDefault("")
         }).joinToString("\n").take(2048)
         val event = DiagnosticEvent(ids.incrementAndGet(), clock(), operation, outcome, transport,

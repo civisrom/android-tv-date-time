@@ -42,9 +42,12 @@
     <string name="error_wireless_unsupported">Pairing requires Android 10 or later on the device running this app. Classic network debugging is still available.</string>
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
+    <string name="project_repository_open">Open the project repository on GitHub</string>
+    <string name="project_repository_unavailable">Could not open the link. This device may not have a browser.</string>
+
     <!-- Спаривание -->
     <string name="pairing_title">Pairing · new wireless debugging on Android 11+</string>
-    <string name="pairing_hint">Pairing codes are used by the newer wireless debugging mode on Android 11 and later, when supported by the target device firmware. On that device, open Developer options → Wireless debugging → Pair device with pairing code.</string>
+    <string name="pairing_hint">Code pairing is officially supported from Android 11 on phones and Android 13 on TVs. Availability depends on the target device firmware. On that device, open Developer options → Wireless debugging → Pair device with pairing code.</string>
     <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-digit code</string>
     <string name="pairing_connect_address_hint">Connection address (a different port)</string>
@@ -135,13 +138,14 @@
     <string name="ntp_check_invalid_response">Received an invalid NTP response. Try another time server.</string>
     <string name="ntp_check_network">Could not check the server from this network. Check the connection and try again.</string>
     <string name="ntp_check_rejected">Not applied: %1$s</string>
-    <string name="ntp_scan_title">Find the fastest server</string>
+    <string name="ntp_scan_title">Find a stable server</string>
+    <string name="ntp_scan_hint">Five NTP requests per server with pauses. Results require at least four valid replies and are ranked by reply rate, median delay and delay variation. Checking may take several minutes.</string>
     <string name="ntp_scan_start">Find the best one</string>
     <string name="ntp_scan_cancel">Stop</string>
     <string name="ntp_scan_progress">Searching… Checked %1$d of %2$d, %3$d usable.</string>
     <string name="ntp_scan_best">Best servers</string>
-    <string name="ntp_scan_entry">%1$s — %2$d ms, %3$d%% of replies</string>
-    <string name="ntp_scan_none">No server answered. The network may be blocking NTP.</string>
+    <string name="ntp_scan_entry">%1$s — median %2$d ms, %3$d%% replies, variation %4$d ms</string>
+    <string name="ntp_scan_none">No server provided enough valid NTP replies. Check your network connection and try again.</string>
 
     <!-- Сведения об устройстве -->
     <string name="info_title">Device</string>

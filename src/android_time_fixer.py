@@ -7,6 +7,8 @@ import shutil
 import stat
 import struct
 import time
+import math
+import statistics
 import datetime
 import ipaddress
 import logging
@@ -23,11 +25,13 @@ from dataclasses import dataclass
 from subprocess import Popen, PIPE
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, Tuple, List
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED, CancelledError
 import ntplib
 import pyperclip
 from platformdirs import user_data_path
 from colorama import Fore, init
+from rich.console import Console
+from rich.text import Text
 from adb_shell import constants as adb_constants
 from adb_shell.adb_message import AdbMessage
 from adb_shell.auth.keygen import keygen, write_public_keyfile
@@ -43,6 +47,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
 APP_VERSION = '2.6.2'
+PROJECT_REPOSITORY_URL = 'https://github.com/civisrom/android-tv-date-time'
 
 #: Порт adbd для «отладки по сети» (adb tcpip). Беспроводная отладка
 #: Android 11+ открывает случайный порт, поэтому порт везде параметризован.
@@ -556,7 +561,14 @@ CUSTOM_NTP_SERVERS = [
     'ntps1-1.cs.tu-berlin.de',
     'ntp.ix.ru',
     'time.google.com',
-    'time.android.com'
+    'time.android.com',
+    'time.aws.com',
+    'ntp.se',
+    'ntppool.time.nl',
+    'ptbtime1.ptb.de',
+    'ptbtime4.ptb.de',
+    'ntp.nic.cz',
+    'ntp.nict.jp'
 ]
 
 
@@ -1264,20 +1276,56 @@ class AndroidTVTimeFixer:
             if previous_codepage:
                 os.system(f'chcp {previous_codepage} >nul')
 	
-    def _test_ntp_server(self, server: str, count: int = 2, timeout: int = 2) -> dict:
+    @staticmethod
+    def _query_ntp_server(server: str, timeout: int) -> ntplib.NTPStats:
+        """Запрос UDP/123 с проверкой источника, заголовка и связи ответа с запросом."""
+        family, _, _, _, address = socket.getaddrinfo(server, 123, type=socket.SOCK_DGRAM)[0]
+        with socket.socket(family, socket.SOCK_DGRAM) as client:
+            client.settimeout(timeout)
+            client.connect(address)
+            started = time.monotonic()
+            query = ntplib.NTPPacket(mode=3, version=4,
+                                     tx_timestamp=ntplib.system_to_ntp_time(time.time()))
+            request = query.to_data()
+            client.send(request)
+            response = client.recv(512)
+            elapsed = time.monotonic() - started
+        if len(response) < 48 or response[24:32] != request[40:48]:
+            raise ntplib.NTPException('Invalid NTP response or origin timestamp')
+        stats = ntplib.NTPStats()
+        stats.from_data(response)
+        stats.dest_timestamp = query.tx_timestamp + elapsed
+        if (stats.version not in (3, 4) or stats.mode != 4 or stats.leap == 3
+                or not 1 <= stats.stratum <= 15
+                or not stats.recv_timestamp or not stats.tx_timestamp
+                or stats.tx_timestamp < stats.recv_timestamp
+                or not math.isfinite(stats.offset) or not math.isfinite(stats.delay)
+                or stats.delay < -0.001):
+            raise ntplib.NTPException('Invalid or unsynchronized NTP response')
+        return stats
+
+    def _test_ntp_server(self, server: str, count: int = 2, timeout: int = 2,
+                         interval: float = 0, stop_event: Optional[threading.Event] = None) -> dict:
         """Проверка NTP-сервера с несколькими попытками и детальной диагностикой ошибок.
         Используется и в ping_ntp_servers (пункт 6), и в auto_setup_ntp (пункт 9).
         Возвращает dict с метриками и статусом."""
         rtts = []
         offsets = []
         last_error = None
-        ntp_client = ntplib.NTPClient()
+        if count < 1:
+            raise ValueError('At least one NTP attempt is required')
 
-        for _ in range(count):
+        for attempt in range(count):
+            if stop_event is not None and stop_event.is_set():
+                raise CancelledError()
+            if attempt and interval > 0:
+                if stop_event is None:
+                    time.sleep(interval)
+                elif stop_event.wait(interval):
+                    raise CancelledError()
             try:
-                start_time = time.time()
-                ntp_response = ntp_client.request(server, version=3, timeout=timeout)
-                rtt = (time.time() - start_time) * 1000
+                ntp_response = self._query_ntp_server(server, timeout)
+                rtt = max(0, ntp_response.delay) * 1000
                 rtts.append(rtt)
                 offsets.append(ntp_response.offset)
             except ntplib.NTPException as e:
@@ -1296,6 +1344,8 @@ class AndroidTVTimeFixer:
                 'avg_rtt': None,
                 'min_rtt': None,
                 'max_rtt': None,
+                'median_rtt': None,
+                'rtt_jitter': None,
                 'success_rate': 0,
                 'offset': None,
                 'error': last_error or 'Unknown',
@@ -1305,6 +1355,8 @@ class AndroidTVTimeFixer:
         success_rate = (len(rtts) / count) * 100
         avg_rtt = sum(rtts) / len(rtts)
         avg_offset = sum(offsets) / len(offsets)
+        median_rtt = statistics.median(rtts)
+        jitter = math.sqrt(sum((rtt - median_rtt) ** 2 for rtt in rtts) / len(rtts))
 
         return {
             'server': server,
@@ -1312,11 +1364,21 @@ class AndroidTVTimeFixer:
             'avg_rtt': avg_rtt,
             'min_rtt': min(rtts),
             'max_rtt': max(rtts),
+            'median_rtt': median_rtt,
+            'rtt_jitter': jitter,
             'success_rate': success_rate,
             'offset': avg_offset,
             'error': None,
             'color': Fore.GREEN if success_rate > 66 else Fore.YELLOW
         }
+
+    @staticmethod
+    def _ntp_rank(result: dict) -> tuple:
+        median = result.get('median_rtt')
+        if median is None:
+            median = result.get('avg_rtt')
+        score = float('inf') if median is None else median + (result.get('rtt_jitter') or 0)
+        return result['status'] != 'Reachable', -result['success_rate'], score
 
     def ping_ntp_servers(self, timeout=2, count=3):
         """
@@ -1357,9 +1419,9 @@ class AndroidTVTimeFixer:
         # Clear progress line
         print("\r" + " " * 60 + "\r", end="")
 
-        # Sort results: reachable servers first, sorted by success rate and avg RTT
+        # Сначала доступность, затем медиана задержки с добавлением её разброса.
         server_ping_results.sort(
-            key=lambda x: (x['status'] != 'Reachable', -x['success_rate'], x['avg_rtt'] or float('inf'))
+            key=self._ntp_rank
         )
 
         # Display summary
@@ -2034,12 +2096,8 @@ class AndroidTVTimeFixer:
             self.logger.warning(f"NTP server {server} rejected: missing offset")
             return False
 
-        if abs(avg_offset) > 60:
-            print(Fore.RED + locales.get("ntp_verify_bad_offset", server=server, offset=avg_offset))
-            self.logger.warning(
-                f"NTP server {server} rejected: bad offset {avg_offset}"
-            )
-            return False
+        # Корректность ответа проверяется по протоколу. Часы компьютера тоже
+        # могут быть сбиты, поэтому величина offset не доказывает отказ сервера.
 
         print(Fore.GREEN + locales.get("ntp_verify_detailed",
                                        server=server, rtt=result['avg_rtt'],
@@ -3798,35 +3856,37 @@ class AndroidTVTimeFixer:
         results: List[dict] = []
         total = len(all_servers)
 
-        with ThreadPoolExecutor(max_workers=50) as executor:
-            futures = {executor.submit(self._test_ntp_server, s, 2, 2): s for s in all_servers}
+        stop_event = threading.Event()
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            futures = {executor.submit(self._test_ntp_server, s, 5, 2, 1.0, stop_event): s for s in all_servers}
             checked = 0
-            for future in as_completed(futures):
-                result = future.result()
-                checked += 1
-                # Фильтруем: только доступные с адекватным offset (<60 сек)
-                if result['status'] == 'Reachable' and abs(result['offset']) <= 60:
-                    results.append(result)
-                if checked % 10 == 0 or checked == total:
-                    print(
-                        Fore.CYAN + "\r" +
-                        locales.get("auto_checking_progress",
-                                    checked=checked, total=total, found=len(results)),
-                        end="", flush=True
-                    )
+            try:
+                for future in as_completed(futures):
+                    result = future.result()
+                    checked += 1
+                    # Четыре корректных ответа из пяти; смещение локальных часов не ограничиваем.
+                    if result['status'] == 'Reachable' and result['success_rate'] >= 80:
+                        results.append(result)
+                    if checked % 10 == 0 or checked == total:
+                        print(
+                            Fore.CYAN + "\r" +
+                            locales.get("auto_checking_progress",
+                                        checked=checked, total=total, found=len(results)),
+                            end="", flush=True
+                        )
+            except BaseException:
+                stop_event.set()
+                for future in futures:
+                    future.cancel()
+                raise
         print()  # новая строка
 
         if not results:
             print(Fore.RED + locales.get("auto_no_reachable_servers"))
             return
 
-        # Сортировка: success_rate (убыв.) → avg_rtt (возр.)
-        # Региональные серверы получают лёгкий бонус: -10% к RTT при равном success_rate
-        priority_set = set(priority_servers)
-        results.sort(key=lambda x: (
-            -x['success_rate'],
-            x['avg_rtt'] * (0.9 if x['server'] in priority_set else 1.0)
-        ))
+        # Регион определяет только порядок проверки; рейтинг основан на измерениях.
+        results.sort(key=self._ntp_rank)
 
         # Шаг 5: Показать топ-5
         print(Fore.GREEN + locales.get("auto_top_servers"))
@@ -3837,7 +3897,7 @@ class AndroidTVTimeFixer:
             print(
                 color +
                 f"  {i}. {r['server']:<40} "
-                f"RTT: {r['avg_rtt']:.1f}ms  "
+                f"Median RTT: {r['median_rtt']:.1f}ms  Jitter: {r['rtt_jitter']:.1f}ms  "
                 f"{locales.get('auto_server_success')}: {r['success_rate']:.0f}%  "
                 f"Offset: {r['offset']:.3f}s{marker}"
             )
@@ -4124,6 +4184,8 @@ def main():
         while True:
             print(Fore.GREEN + locales.get("main_menu"))
             print(Fore.CYAN + locales.get("app_version", version=APP_VERSION))
+            Console().print(Text(PROJECT_REPOSITORY_URL,
+                                 style=f"cyan underline link {PROJECT_REPOSITORY_URL}"), soft_wrap=True)
             print(Fore.YELLOW + locales.get("menu_item_1"))
             print(Fore.YELLOW + locales.get("menu_item_2"))
             print(Fore.YELLOW + locales.get("menu_item_3"))

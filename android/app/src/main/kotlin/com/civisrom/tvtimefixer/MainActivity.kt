@@ -73,6 +73,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.civisrom.tvtimefixer.diagnostics.OperationTrace
 
 class MainActivity : ComponentActivity() {
 
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val ntpProbe = NtpProbe(UdpSntpClient())
-    private val ntpScanner = NtpScanner(ntpProbe)
+    private val ntpScanner = NtpScanner(NtpProbe(UdpSntpClient(), attempts = 5, pause = { Thread.sleep(1000) }))
     private val timeVerifier = DeviceTimeVerifier(UdpSntpClient(), SystemClock::elapsedRealtime)
     private var scanJob: Job? = null
 
@@ -154,7 +155,7 @@ class MainActivity : ComponentActivity() {
 
     private val actions = object : AppActions {
 
-        private fun run(operation: Operation, block: suspend () -> AppState) {
+        private fun run(operation: Operation, block: suspend (OperationTrace) -> AppState) {
             if (state.busy) return
             val generation = ++actionGeneration
             val started = System.nanoTime()
@@ -178,10 +179,11 @@ class MainActivity : ComponentActivity() {
                 ntpDiagnosticEventId = if (ntpAction) null else state.ntpDiagnosticEventId)
             journal.record(operation, Outcome.STARTED, transport)
             actionJob = lifecycleScope.launch {
+                val trace = OperationTrace()
                 try {
                     // Нажатие во время фоновой проверки ждёт её завершения,
                     // не теряется и не читает тот же ADB-транспорт одновременно.
-                    val result = deviceOperations.withLock { block() }
+                    val result = deviceOperations.withLock { block(trace) }
                     val failure = result.connection as? ConnectionState.Failed
                     val failed = when (operation) {
                         Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
@@ -196,7 +198,7 @@ class MainActivity : ComponentActivity() {
                         else failure?.diagnosticId ?: result.diagnosticEventId
                     val event = if (failed && existing != null) existing else journal.record(operation,
                         if (failed) Outcome.FAILED else Outcome.SUCCESS, transport,
-                        durationMs = (System.nanoTime() - started) / 1_000_000,
+                        durationMs = (System.nanoTime() - started) / 1_000_000, trace = trace,
                         reason = failure?.reason ?: ConnectionError.UNREACHABLE.takeIf {
                             failed && !result.connected && operation == Operation.READ_DEVICE
                         }, issue = if (!failed) null else when {
@@ -216,11 +218,11 @@ class MainActivity : ComponentActivity() {
                         timeDiagnosticEventId = if (timeAction && failed) event else result.timeDiagnosticEventId,
                     ).withLatestUsb(state)
                 } catch (e: CancellationException) {
-                    journal.record(operation, Outcome.CANCELLED, transport)
+                    journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
                     throw e
                 } catch (e: Exception) {
                     val event = journal.record(operation, Outcome.FAILED, transport,
-                        durationMs = (System.nanoTime() - started) / 1_000_000, error = e)
+                        durationMs = (System.nanoTime() - started) / 1_000_000, error = e, trace = trace)
                     if (generation == actionGeneration) state = if (zoneAction) state.copy(
                         timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE), timeZoneDiagnosticEventId = event,
                     ) else if (timeAction) state.copy(
@@ -234,14 +236,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        override fun connect(address: String) = run(Operation.CONNECT_NETWORK) {
+        override fun connect(address: String) = run(Operation.CONNECT_NETWORK) { trace ->
             val result = withContext(Dispatchers.IO) { connector.connect(address) }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
-        override fun connectLoopback() = run(Operation.CONNECT_NETWORK) {
+        override fun connectLoopback() = run(Operation.CONNECT_NETWORK) { trace ->
             val result = withContext(Dispatchers.IO) { connector.connectLoopback() }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
         override fun disconnect() = run(Operation.DISCONNECT) {
@@ -261,7 +263,7 @@ class MainActivity : ComponentActivity() {
 
         override fun refreshUsbDevices() = refreshUsbList(report = true)
 
-        override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) {
+        override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) { trace ->
             withContext(Dispatchers.IO) { connector.disconnect() }
             state = state.copy(connection = ConnectionState.Connecting(address),
                 deviceInfo = null, currentNtpServer = "", ntpMessage = null,
@@ -284,25 +286,26 @@ class MainActivity : ComponentActivity() {
                 return@run state.copy(connection = ConnectionState.Failed(address, reason, permissionEvent), message = null)
             }
             val result = withContext(Dispatchers.IO) { connector.connectUsb(address) }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
         override fun pairAndConnect(
             pairingAddress: String,
             code: String,
             connectAddress: String,
-        ) = run(Operation.PAIR) {
+        ) = run(Operation.PAIR) { trace ->
             // Спаривание и следующее за ним подключение оба ходят в сеть, а
             // connect внутри блокирующий: на главном потоке это NetworkOnMainThread
             val result = withContext(Dispatchers.IO) {
                 connector.pairAndConnect(pairingAddress, code, connectAddress)
             }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
-        override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) {
+        override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) { trace ->
             state = state.copy(ntpMessage = null, ntpCheck = null)
             val result = withContext(Dispatchers.IO) { ntpProbe.test(server) }
+            trace.ntp(result)
             state.copy(ntpCheck = result)
         }
 
@@ -311,10 +314,11 @@ class MainActivity : ComponentActivity() {
          * сервер времени. Десктопная половина ведёт себя так же: адрес, не
          * прошедший проверку, до устройства не доходит.
          */
-        override fun applyNtpServer(server: String) = run(Operation.APPLY_NTP) {
+        override fun applyNtpServer(server: String) = run(Operation.APPLY_NTP) { trace ->
             state = state.copy(ntpMessage = null)
             val applied = withContext(Dispatchers.IO) {
                 val check = ntpProbe.test(server)
+                trace.ntp(check)
                 if (!check.isUsable()) {
                     return@withContext state.copy(
                         ntpCheck = check,
@@ -329,11 +333,12 @@ class MainActivity : ComponentActivity() {
                     message = UiMessage(R.string.error_unreachable),
                 )
                 var failureId: Long? = null
-                val repository = DeviceRepository(client) { error ->
+                val repository = DeviceRepository(trace.client(client)) { error ->
                     failureId = journal.record(Operation.APPLY_NTP, Outcome.FAILED,
-                        diagnosticTransport(state.connection.targetOrNull()), error = error)
+                        diagnosticTransport(state.connection.targetOrNull()), error = error, trace = trace)
                 }
                 val result = repository.setNtpServer(server)
+                trace.ntpUpdate(result)
                 // Значение перечитывается всегда: `settings put` рапортует об
                 // успехе и тогда, когда записи не произошло
                 state.copy(
@@ -350,22 +355,23 @@ class MainActivity : ComponentActivity() {
             val transport = diagnosticTransport(state.connection.targetOrNull())
             val started = SystemClock.elapsedRealtime()
             journal.record(Operation.CHECK_TIME, Outcome.STARTED, transport)
+            val clockTrace = OperationTrace()
             val verified = try {
-                state.withDeviceTime()
+                state.withDeviceTime(clockTrace)
             } catch (e: CancellationException) {
-                journal.record(Operation.CHECK_TIME, Outcome.CANCELLED, transport)
+                journal.record(Operation.CHECK_TIME, Outcome.CANCELLED, transport, trace = clockTrace)
                 throw e
             }
             val failed = verified.timeCheck?.status != DeviceTimeStatus.MATCH
             val event = journal.record(Operation.CHECK_TIME, if (failed) Outcome.FAILED else Outcome.SUCCESS,
                 transport, durationMs = SystemClock.elapsedRealtime() - started,
-                issue = verified.timeCheck?.diagnosticIssue())
+                issue = verified.timeCheck?.diagnosticIssue(), trace = clockTrace)
             verified.copy(timeDiagnosticEventId = event.takeIf { failed })
         }
 
-        override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { state.withDeviceTime() }
+        override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { trace -> state.withDeviceTime(trace) }
 
-        override fun applyTimeZone(zoneId: String) = run(Operation.APPLY_TIME_ZONE) {
+        override fun applyTimeZone(zoneId: String) = run(Operation.APPLY_TIME_ZONE) { trace ->
             withContext(Dispatchers.IO) {
                 val client = connector.activeClient
                 if (!state.connected || client == null) return@withContext state.connectionLost().copy(
@@ -373,11 +379,12 @@ class MainActivity : ComponentActivity() {
                     message = UiMessage(R.string.error_unreachable),
                 )
                 var error: Exception? = null
-                val result = TimeZoneRepository(client, onFailure = { error = it }).setTimeZone(zoneId)
+                val result = TimeZoneRepository(trace.client(client), onFailure = { error = it }).setTimeZone(zoneId)
+                trace.timeZone(result)
                 val failure = result as? TimeZoneUpdateResult.Failed
                 val event = failure?.let {
                     journal.record(Operation.APPLY_TIME_ZONE, Outcome.FAILED,
-                        diagnosticTransport(state.connection.targetOrNull()), issue = it.diagnosticIssue(), error = error)
+                        diagnosticTransport(state.connection.targetOrNull()), issue = it.diagnosticIssue(), error = error, trace = trace)
                 }
                 val actual = when (result) {
                     is TimeZoneUpdateResult.Applied -> result.zoneId
@@ -396,14 +403,18 @@ class MainActivity : ComponentActivity() {
             journal.record(Operation.SCAN_NTP, Outcome.STARTED)
             val started = System.nanoTime()
             scanJob = lifecycleScope.launch {
+                var lastProgress = ScanProgress(0, NtpData.allServers.size, emptyList())
                 try {
                     ntpScanner.scan(NtpData.allServers).collect { progress ->
+                        lastProgress = progress
                         state = state.copy(ntpScan = progress)
                     }
                     journal.record(Operation.SCAN_NTP, Outcome.SUCCESS,
-                        durationMs = (System.nanoTime() - started) / 1_000_000)
+                        durationMs = (System.nanoTime() - started) / 1_000_000,
+                        trace = OperationTrace().apply { scan(lastProgress) })
                 } catch (e: CancellationException) {
-                    journal.record(Operation.SCAN_NTP, Outcome.CANCELLED)
+                    journal.record(Operation.SCAN_NTP, Outcome.CANCELLED,
+                        trace = OperationTrace().apply { scan(lastProgress) })
                     throw e
                 } catch (e: Exception) {
                     val event = journal.record(Operation.SCAN_NTP, Outcome.FAILED, error = e)
@@ -429,7 +440,7 @@ class MainActivity : ComponentActivity() {
             state = state.copy(ntpScan = null)
         }
 
-        override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { state.withDeviceData() }
+        override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { trace -> state.withDeviceData(trace) }
 
         override fun requestDiscoveryPermission() = requestDiscoveryPermissions()
     }
@@ -636,7 +647,7 @@ class MainActivity : ComponentActivity() {
      * раздел «Устройство» оставался пустым, а кнопка «Обновить» выглядела
      * ненажатой — отличить одно от другого было нечем.
      */
-    private suspend fun AppState.withDeviceData(): AppState {
+    private suspend fun AppState.withDeviceData(trace: OperationTrace): AppState {
         val clean = copy(deviceInfo = null, currentNtpServer = "", timeZoneResult = null, timeZoneDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
         return withContext(Dispatchers.IO) {
@@ -644,21 +655,22 @@ class MainActivity : ComponentActivity() {
                 connection = ConnectionState.Disconnected,
                 message = UiMessage(R.string.error_unreachable),
             )
-            runCatching { DeviceRepository(client).readDeviceInfo() }.fold(
+            runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
                 onSuccess = { clean.copy(deviceInfo = it, currentNtpServer = it.currentNtpServer) },
                 onFailure = {
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,
-                        diagnosticTransport(connection.targetOrNull()), error = it)
+                        diagnosticTransport(connection.targetOrNull()), error = it, trace = trace)
                     clean.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
                 },
             )
         }
     }
 
-    private suspend fun AppState.withDeviceTime(): AppState = withContext(Dispatchers.IO) {
+    private suspend fun AppState.withDeviceTime(trace: OperationTrace): AppState = withContext(Dispatchers.IO) {
         val client = connector.activeClient
         val check = if (!connected || client == null) DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
-            else timeVerifier.verify(client)
+            else timeVerifier.verify(trace.client(client), onFailure = trace::exception)
+        trace.deviceTime(check)
         copy(timeCheck = check)
     }
 

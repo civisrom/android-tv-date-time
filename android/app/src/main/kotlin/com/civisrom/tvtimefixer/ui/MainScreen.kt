@@ -1,6 +1,7 @@
 package com.civisrom.tvtimefixer.ui
 
 import android.os.Build
+import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -48,10 +50,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import java.util.Date
@@ -79,6 +83,8 @@ import com.civisrom.tvtimefixer.device.TimeZoneRestoration
 import com.civisrom.tvtimefixer.device.availableTimeZoneIds
 import com.civisrom.tvtimefixer.device.isValidTimeZoneId
 import com.civisrom.tvtimefixer.diagnostics.Operation
+
+internal const val PROJECT_REPOSITORY_URL = "https://github.com/civisrom/android-tv-date-time"
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
@@ -173,6 +179,9 @@ private fun MainContent(
     returnFocus: String?,
     onFocusRestored: () -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
+    var repositoryLinkFailed by remember { mutableStateOf(false) }
+    val openRepository = stringResource(R.string.project_repository_open)
     var pairingAddress by rememberSaveable { mutableStateOf("") }
     var pairingExpanded by rememberSaveable { mutableStateOf(false) }
     var discoveryExpanded by rememberSaveable { mutableStateOf(state.discovered.isNotEmpty()) }
@@ -203,6 +212,13 @@ private fun MainContent(
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.app_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodySmall)
+        Text(PROJECT_REPOSITORY_URL,
+            modifier = Modifier.testTag("project-repository").clickable(role = Role.Button, onClickLabel = openRepository) {
+                repositoryLinkFailed = runCatching { uriHandler.openUri(PROJECT_REPOSITORY_URL) }.isFailure
+            }, color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline,
+            style = MaterialTheme.typography.bodySmall)
+        if (repositoryLinkFailed) Text(stringResource(R.string.project_repository_unavailable),
+            style = MaterialTheme.typography.bodySmall)
         Text(stringResource(if (mode == DeviceMode.TELEVISION) R.string.mode_television else R.string.mode_handheld),
             style = MaterialTheme.typography.bodyMedium)
         DiagnosticLink(null, "diagnostics-open", onDiagnostics, returnFocus, onFocusRestored, R.string.diagnostics_title)
@@ -903,7 +919,7 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
     }
 }
 
-/** Подбор самого быстрого сервера — аналог автонастройки десктопной версии. */
+/** Подбор устойчиво отвечающего сервера — аналог автонастройки десктопной версии. */
 @Composable
 private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit, onStart: () -> Unit) {
     val scan = state.ntpScan
@@ -916,6 +932,7 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
         }
     }
     Text(stringResource(R.string.ntp_scan_title), style = MaterialTheme.typography.bodyMedium)
+    Text(stringResource(R.string.ntp_scan_hint), style = MaterialTheme.typography.bodySmall)
 
     if (scan == null || scan.finished) {
         Button(onClick = onStart, enabled = !state.busy, modifier = Modifier.testTag("ntp-scan-start")) {
@@ -936,8 +953,9 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
                     stringResource(
                         R.string.ntp_scan_entry,
                         result.server,
-                        result.avgRttMs ?: 0L,
+                        result.medianRttMs ?: result.avgRttMs ?: 0L,
                         result.successRate,
+                        result.rttJitterMs?.toLong() ?: 0L,
                     ),
                 )
             }

@@ -201,7 +201,7 @@ class UsbConnectionTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             fixer.auto_setup_ntp()
         fixer.connect_or_reuse.assert_called_once_with('usb:7')
-        fixer._test_ntp_server.assert_called_once_with('example.com', 2, 2)
+        fixer._test_ntp_server.assert_called_once_with('example.com', 5, 2, 1.0, mock.ANY)
         fixer._save_setting.assert_not_called()
 
     def test_target_validation_preserves_network_validation(self):

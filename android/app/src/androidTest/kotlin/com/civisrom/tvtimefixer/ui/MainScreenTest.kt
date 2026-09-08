@@ -28,6 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
@@ -255,6 +257,7 @@ class MainScreenTest {
     private fun screen(state: AppState = AppState(), mode: DeviceMode = DeviceMode.HANDHELD,
         scale: Float = 1f, width: Int = 360, diagnostics: DiagnosticSnapshot = DiagnosticSnapshot(),
         clear: () -> Unit = {},
+        uriHandler: UriHandler? = null,
     ) {
         compose.setContent {
             inputModeManager = LocalInputModeManager.current
@@ -262,6 +265,7 @@ class MainScreenTest {
             val config = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag("ru")) }
             val localized = context.createConfigurationContext(config)
             CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides config,
+                LocalUriHandler provides (uriHandler ?: LocalUriHandler.current),
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 MaterialTheme {
                     Surface {
@@ -272,6 +276,47 @@ class MainScreenTest {
                 }
             }
         }
+    }
+
+    @Test fun repository_link_opens_project_without_connecting() {
+        val opened = mutableListOf<String>()
+        screen(uriHandler = object : UriHandler {
+            override fun openUri(uri: String) { opened.add(uri) }
+        })
+        compose.onNodeWithTag("project-repository").assertIsDisplayed().performClick()
+        assertEquals(listOf("https://github.com/civisrom/android-tv-date-time"), opened)
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun repository_link_without_browser_keeps_app_usable() {
+        screen(uriHandler = object : UriHandler {
+            override fun openUri(uri: String) { throw IllegalArgumentException("No browser") }
+        })
+        compose.onNodeWithTag("project-repository").performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.project_repository_unavailable))
+            .assertIsDisplayed()
+        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun expanded_diagnostics_and_report_include_technical_failure_details() {
+        val details = "shell=cmd alarm set-timezone <zone>; exit=1; error=permission_denied\n" +
+            "timezone.failure=WRITE; restoration=RESTORED"
+        val event = DiagnosticEvent(92, 1_800_000_000_000, Operation.APPLY_TIME_ZONE, Outcome.FAILED,
+            details = details, issue = DiagnosticIssue.TIME_ZONE_WRITE_FAILED)
+        val history = DiagnosticSnapshot(events = listOf(event))
+        screen(diagnostics = history)
+        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.diagnostics_details))
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostic-details-92").performScrollTo()
+            .assertTextContains("error=permission_denied", substring = true)
+            .assertTextContains("restoration=RESTORED", substring = true)
+        val report = diagnosticReport(context, history, DeviceMode.HANDHELD)
+        assertTrue(report.contains(details))
+        assertTrue(report.contains("operation=APPLY_TIME_ZONE"))
+        screenshot("technical-diagnostics")
     }
 
     @Test fun opening_diagnostics_preserves_network_input_and_does_not_connect() {

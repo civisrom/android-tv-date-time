@@ -66,7 +66,7 @@ replace troubleshooting other network faults.
 
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
-    45 alternative servers**, including regional pools, Cloudflare, Google
+    52 alternative servers**, including regional pools, Cloudflare, Google
     and other public NTP servers. Development checks keep the two reference lists consistent.
 *   **Time-server checks:** real NTP requests, round-trip time (RTT), successful
     reply percentage and offset from the controlling device's clock.
@@ -402,7 +402,7 @@ Windows, Linux and macOS release builds include the required ADB;
 Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
-In the APK, use the always-expanded
+In the APK, expand the
 [Pair a device form](#6-pair-a-device--the-code-for-android-11-and-newer).
 
 Both programs distinguish pairing and connection services in mDNS and verify
@@ -457,8 +457,8 @@ For mDNS, the program uses the bundled `adb` with a `zeroconf` fallback.
 Unlike subnet scanning, this discovers advertised current ports; a subnet
 scan checks one selected port.
 
-Before writing NTP, the program checks the reply and its offset from the
-computer's clock (at most 60 seconds). Check the computer's time first.
+Before writing NTP, the program validates the server's NTP reply. The offset
+from the computer's clock is informational: an incorrect local clock does not block applying a server.
 A successful write is confirmed by reading the setting back; it does not
 yet confirm that the TV has synchronized its clock.
 
@@ -498,7 +498,7 @@ Connects to the device and displays detailed information: model, manufacturer, A
 
 ### Item 6 — Ping NTP servers
 
-Checks the 122 reference addresses using real NTP requests rather than ICMP ping.
+Checks the 129 reference addresses using real NTP requests rather than ICMP ping.
 Shows round-trip time (RTT) and successful reply percentage, sorting by
 availability, reply percentage and speed. Many unreachable addresses can make
 the check take longer because each request must time out.
@@ -566,9 +566,9 @@ Helps choose a device and a suitable server:
    port and scans the local network.
 2. Connects to the only device found, or offers a choice when several are found.
 3. Detects the region from the computer's timezone and checks the NTP reference.
-4. Keeps responding servers with a clock offset of at most 60 seconds.
-   Successful reply percentage comes first, then RTT; regional servers receive
-   a small preference when the successful reply percentage is equal.
+4. Sends five NTP requests per server with one-second pauses and requires at least
+   four valid replies. Ranking uses reply rate, then median delay plus delay
+   variation. The region only determines the order in which servers are checked.
 5. Shows up to five best candidates. You can select another numbered result.
 6. Asks for installation confirmation, writes the address and verifies it.
 
@@ -662,11 +662,14 @@ the modern wireless mode, not for every connection method.
 
 ### Application screen sections
 
-The app is a single scrolling screen. The connection IP address, main time
-server settings and pairing form always remain expanded, including after
-connection. Additional lists and help sections can be collapsed.
+The app is a single scrolling screen. The connection IP address and main time
+server settings remain expanded, including after connection. Pairing, time zone,
+additional lists and help sections can be collapsed.
 
 #### 1. Title and mode
+
+A clickable project GitHub link appears after the version. The desktop main menu
+also shows it below the version; opening it depends on the terminal's hyperlink support.
 
 One line under the name: "Running on a phone: it will connect to a TV over the
 network or USB" or "Running on a TV". The app works this out by itself; nothing to set.
@@ -816,10 +819,12 @@ The NTP reply is received by the device running the APK: matching clocks do
 not prove that the TV synchronized with this particular server.
 
 The **Find the best one** button collapses the open country and alternative
-lists, checks the 122-address reference, and shows
-up to five suitable servers, ordered first by successful reply percentage and
-then by response time. Duration depends on the network and timeouts. Progress
-shows **Checked N of 122, M usable**; **Stop** keeps results already found.
+lists and checks the 129-address reference with five NTP requests per server,
+separated by one-second pauses. Results require at least four valid replies.
+Up to five candidates are ranked by reply rate, then median delay plus delay
+variation (RMS). This estimates availability and connection stability, not
+absolute clock accuracy. Checking may take several minutes. Progress
+shows **Checked N of 129, M usable**; **Stop** keeps results already found.
 
 Each result shows a name and the IP address obtained during the check.
 Tapping either fills the input field and clears the results list.
@@ -927,8 +932,11 @@ the saved crash details.
 
 The private, non-backed-up store keeps up to **200 events for 7 days**, with a
 combined **256 KiB** disk budget. It excludes pairing codes, keys, serial numbers,
-entered addresses and ADB output. Technical details contain exception types and
-bounded stack frames without exception messages. Nothing is sent automatically.
+entered addresses and raw ADB output. Details include operation stages, error codes,
+command names without user arguments, exit status, duration, recognized system
+responses, NTP metrics and time zone recovery results. Exception types and bounded
+stack frames are included without arbitrary messages. The same details are copied
+into the report. Nothing is sent automatically.
 **Copy report** explicitly copies the history to the clipboard; **Clear** requires
 confirmation. A storage failure is shown in Diagnostics without stopping device
 operations.

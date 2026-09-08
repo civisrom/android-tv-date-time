@@ -509,6 +509,13 @@
     "ntps1-1.cs.tu-berlin.de",
     "ntp.ix.ru",
     "time.google.com",
-    "time.android.com"
+    "time.android.com",
+    "time.aws.com",
+    "ntp.se",
+    "ntppool.time.nl",
+    "ptbtime1.ptb.de",
+    "ptbtime4.ptb.de",
+    "ntp.nic.cz",
+    "ntp.nict.jp"
   ]
 }

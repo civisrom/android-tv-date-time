@@ -25,7 +25,7 @@ class DeviceTimeVerifier(
     private val query: SntpQuery,
     private val elapsedRealtime: () -> Long,
 ) {
-    fun verify(client: AdbClient): DeviceTimeCheck {
+    fun verify(client: AdbClient, onFailure: (Exception) -> Unit = {}): DeviceTimeCheck {
         val server = read(client, "settings get global ntp_server")
             ?: return DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
         val automatic = when (read(client, "settings get global auto_time")) {
@@ -40,7 +40,8 @@ class DeviceTimeVerifier(
             query.query(server)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            runCatching { onFailure(error) }
             return result.copy(status = DeviceTimeStatus.NTP_UNAVAILABLE)
         }
         val reference = network.referenceTimeMillis

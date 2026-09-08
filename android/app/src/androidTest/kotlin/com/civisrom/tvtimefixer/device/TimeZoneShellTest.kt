@@ -6,7 +6,6 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.adb.AdbClient
 import com.civisrom.tvtimefixer.adb.ShellResult
-import java.io.File
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -17,18 +16,19 @@ class TimeZoneShellTest {
         override fun shell(command: String): ShellResult {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             // UiAutomation.exec(String) не разбирает кавычки, а Rw требует API 31.
-            // Временный тестовый скрипт позволяет получить настоящий код выхода и на API 30.
-            val script = File.createTempFile("time-zone-", ".sh", instrumentation.targetContext.getExternalFilesDir(null))
-            val output = try {
-                script.writeText("exec 2>&1\n$command\nzone_status=${'$'}?\nprintf '\\n__tv_zone_exit=%s\\n' \"${'$'}zone_status\"\nexit\n")
-                val pipe = instrumentation.uiAutomation.executeShellCommand("sh ${script.absolutePath}")
-                ParcelFileDescriptor.AutoCloseInputStream(pipe).use { input ->
-                    input.bufferedReader().readText()
-                }
-            } finally { script.delete() }
+            // Передаём sh -c одним аргументом: пробелы команд раскрывает сама оболочка.
+            // Только фиксированные команды теста/репозитория; значения пояса не содержат пробелов.
+            // Это не требует доступа shell к scoped storage тестового приложения на API 30.
+            val script = "(${command.replace(" ", "${'$'}{IFS}")};zone_status=${'$'}?;" +
+                "printf${'$'}{IFS}'\\n__tv_zone_exit=%s\\n'${'$'}{IFS}${'$'}zone_status)2>&1"
+            check(script.none { it.isWhitespace() })
+            val pipe = instrumentation.uiAutomation.executeShellCommand("sh -c $script")
+            val output = ParcelFileDescriptor.AutoCloseInputStream(pipe).use { input ->
+                input.bufferedReader().readText()
+            }
             val marker = "__tv_zone_exit="
             val index = output.lastIndexOf(marker)
-            check(index >= 0) { "Missing shell exit status" }
+            check(index >= 0) { "Missing shell exit status: ${output.take(200)}" }
             return ShellResult(output.substring(0, index).trimEnd(), "", output.substring(index + marker.length).trim().toInt())
         }
         override fun isAlive() = true

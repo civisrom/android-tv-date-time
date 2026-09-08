@@ -49,6 +49,7 @@ import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticTransport
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
+import com.civisrom.tvtimefixer.diagnostics.diagnosticDetails
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -118,17 +119,13 @@ private fun formatTime(time: Long) = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Loc
 /** Отчёт строится только из уже безопасных событий, не из состояния устройства. */
 internal fun diagnosticReport(context: Context, snapshot: DiagnosticSnapshot, mode: DeviceMode): String = buildString {
     appendLine("Android TV Time Fixer ${BuildConfig.VERSION_NAME}")
-    appendLine("Android API ${Build.VERSION.SDK_INT}; $mode")
+    appendLine("Android API ${Build.VERSION.SDK_INT}; $mode; debug=${BuildConfig.DEBUG}")
     appendLine(context.getString(R.string.diagnostics_hint))
     if (!snapshot.storageAvailable) appendLine(context.getString(R.string.diagnostics_storage_failed))
     if (snapshot.dropped > 0) appendLine(context.getString(R.string.diagnostics_dropped, snapshot.dropped))
     snapshot.events.forEach { event ->
         appendLine("${formatTime(event.time)}  ${eventHeading(context, event)}")
-        if (event.transport != DiagnosticTransport.NONE) appendLine(event.transport.name)
-        if (event.durationMs > 0) appendLine(context.getString(R.string.diagnostics_duration, event.durationMs))
-        event.reason?.let { appendLine(it.name) }
-        event.issue?.let { appendLine(it.name) }
-        if (event.details.isNotEmpty()) appendLine(event.details)
+        appendLine(diagnosticDetails(event))
     }
 }
 
@@ -216,7 +213,7 @@ internal fun DiagnosticsScreen(
                         if (expandedId == event.id) {
                             if (event.durationMs > 0) Text(stringResource(R.string.diagnostics_duration, event.durationMs))
                             SelectionContainer {
-                                Text(event.details.ifEmpty { stringResource(R.string.diagnostics_no_details) },
+                                Text(diagnosticDetails(event), modifier = Modifier.testTag("diagnostic-details-${event.id}"),
                                     style = MaterialTheme.typography.bodySmall)
                             }
                         }

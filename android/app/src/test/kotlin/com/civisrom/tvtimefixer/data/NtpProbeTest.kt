@@ -30,6 +30,41 @@ private class FakeSntp(private val answers: Map<String, List<Any>>) : SntpQuery 
 
 class NtpProbeTest {
 
+    @Test fun `five spaced samples retain median jitter and losses without an offset limit`() {
+        var pauses = 0
+        val replies = listOf(SntpResult(10, 31_536_000.0), SntpResult(20, 31_536_000.0),
+            SntpResult(30, 31_536_000.0), SntpResult(100, 31_536_000.0), SocketTimeoutException())
+        val result = NtpProbe(FakeSntp(mapOf("time.example" to replies)), attempts = 5,
+            pause = { pauses++ }).test("time.example")
+        assertEquals(4, pauses)
+        assertEquals(80, result.successRate)
+        assertEquals(25L, result.medianRttMs)
+        assertTrue(result.rttJitterMs!! > 30)
+        assertTrue(result.isUsable())
+    }
+
+    @Test fun `ranking prefers stable delay over an occasional fast sample`() {
+        val steady = NtpProbeResult("steady.example", true, 100, 25, 0.0, null,
+            medianRttMs = 25, rttJitterMs = 2.0)
+        val spiky = steady.copy(server = "spiky.example", medianRttMs = 10, rttJitterMs = 100.0)
+        val lossy = steady.copy(server = "lossy.example", successRate = 80, medianRttMs = 1, rttJitterMs = 0.0)
+        assertEquals(listOf(steady, spiky, lossy), rankNtpServers(listOf(lossy, spiky, steady)))
+    }
+
+    @Test fun `cancelled probe stops before the next network request`() {
+        var calls = 0
+        val query = object : SntpQuery {
+            override fun query(host: String): SntpResult { calls++; return SntpResult(10, 0.0) }
+        }
+        try {
+            NtpProbe(query, attempts = 5).test("time.example") {
+                if (calls > 0) throw kotlinx.coroutines.CancellationException()
+            }
+            org.junit.Assert.fail("Expected cancellation")
+        } catch (_: kotlinx.coroutines.CancellationException) { }
+        assertEquals(1, calls)
+    }
+
     @Test
     fun `отвечающий сервер даёт средний RTT и полную долю успехов`() {
         val probe = NtpProbe(
