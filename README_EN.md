@@ -768,7 +768,7 @@ green, a rejected one red.
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
     `KZ · Kazakhstan · kz.pool.ntp.org`, `BY · Belarus · by.pool.ntp.org`.
-*   **The alternative-server list.** **Show alternative time servers (45)** —
+*   **The alternative-server list.** **Show alternative time servers (52)** —
     the same set as the desktop version: regional pools, Cloudflare, Google
     and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
