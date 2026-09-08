@@ -140,8 +140,12 @@ private fun DiagnosticLink(
     LaunchedEffect(returnFocus) {
         if (returnFocus == key) { requester.requestFocus(); onFocusRestored() }
     }
-    TextButton(onClick = { onOpen(eventId, key) },
-        modifier = Modifier.focusRequester(requester).testTag(key)) { Text(stringResource(title)) }
+    val modifier = Modifier.focusRequester(requester).testTag(key)
+    if (key == "diagnostics-open") {
+        Button(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
+    } else {
+        TextButton(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
+    }
 }
 
 @Composable
@@ -157,6 +161,7 @@ private fun MainContent(
     onFocusRestored: () -> Unit,
 ) {
     var pairingAddress by rememberSaveable { mutableStateOf("") }
+    var pairingExpanded by rememberSaveable { mutableStateOf(false) }
     var discoveryExpanded by rememberSaveable { mutableStateOf(state.discovered.isNotEmpty()) }
     var lastDiscoveredCount by rememberSaveable { mutableIntStateOf(state.discovered.size) }
     LaunchedEffect(state.discovered.size, state.discoveryPermissionNeeded) {
@@ -201,7 +206,7 @@ private fun MainContent(
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {
                 DiscoverySection(state, actions, onPair = {
-                    pairingAddress = it; focusPairing = true
+                    pairingAddress = it; pairingExpanded = true; focusPairing = true
                 })
             }
         }
@@ -225,8 +230,13 @@ private fun MainContent(
             }
         }
         NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
-        PairingSection(state, actions, pairingAddress, { pairingAddress = it },
-            pairingCode, onPairingCode, pairingRequester)
+        FunctionCard("pairing") {
+            ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
+                onExpanded = { pairingExpanded = it }) {
+                PairingSection(state, actions, pairingAddress, { pairingAddress = it },
+                    pairingCode, onPairingCode, pairingRequester)
+            }
+        }
         FunctionCard("usb") {
             ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
                 onExpanded = { usbExpanded = it }) {
@@ -459,8 +469,7 @@ private fun PairingSection(
     var connectAddress by rememberSaveable { mutableStateOf("") }
     val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
 
-    FunctionCard("pairing") {
-        Text(stringResource(R.string.pairing_title), style = MaterialTheme.typography.titleMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CopyableText(stringResource(R.string.pairing_hint), style = MaterialTheme.typography.bodySmall)
         if (!pairingSupported) {
             Text(stringResource(R.string.error_wireless_unsupported), style = MaterialTheme.typography.bodySmall)

@@ -152,7 +152,7 @@ internal fun DiagnosticsScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.headlineSmall)
-        TextButton(onClick = onBack, modifier = Modifier.focusRequester(backFocus).testTag("diagnostics-back")) {
+        Button(onClick = onBack, modifier = Modifier.focusRequester(backFocus).testTag("diagnostics-back")) {
             Text(stringResource(R.string.diagnostics_back))
         }
         LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp),

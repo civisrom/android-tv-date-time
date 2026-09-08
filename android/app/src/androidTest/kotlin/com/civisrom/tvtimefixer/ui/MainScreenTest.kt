@@ -197,7 +197,7 @@ class MainScreenTest {
 
     @Test fun primary_forms_are_visible_without_expanding_menus() {
         screen()
-        for (tag in listOf("network-address", "ntp-address", "pairing-address", "pairing-code", "pairing-connect-address")) {
+        for (tag in listOf("network-address", "ntp-address")) {
             compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
@@ -208,11 +208,28 @@ class MainScreenTest {
         screenshot("primary-connection")
     }
 
+    @Test fun pairing_collapses_without_losing_inputs_or_running_actions() {
+        screen()
+        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
+        compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
+        compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-address").assertTextContains("192.0.2.10:37123")
+        compose.onNodeWithTag("pairing-code").assertTextContains("123456")
+        compose.onNodeWithTag("pairing-connect-address").assertTextContains("192.0.2.10:37124")
+        assertTrue(actions.calls.isEmpty())
+    }
+
     @Test fun connecting_keeps_primary_inputs_and_enables_ntp_writes_only_while_connected() {
         val state = mutableStateOf(AppState(ntpCheck = NtpProbeResult("pool.ntp.org", false, 0, null, null, "timeout")))
         compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.0.2.10:5555")
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.11:37123")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.11:37124")
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
@@ -239,6 +256,7 @@ class MainScreenTest {
 
     @Test fun narrow_screen_at_double_font_keeps_pairing_fields_and_action_reachable() {
         screen(scale = 2f, width = 320)
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
         compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
@@ -264,7 +282,8 @@ class MainScreenTest {
         compose.onNodeWithText("Living room TV").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("section-discovery").performScrollTo().performClick()
         compose.onNodeWithText("Living room TV").assertDoesNotExist()
-        compose.onNodeWithTag("pairing-code").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("section-pairing").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
         compose.onNodeWithTag("ntp-address").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("network-address").performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
@@ -460,6 +479,7 @@ class MainScreenTest {
         screen(AppState(discovered = listOf(DiscoveredDevice("Living room TV",
             DeviceAddress("192.0.2.10", 37123), DiscoveredDevice.Kind.AWAITING_PAIRING))))
         copyDisplayedText(address)
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         for (tag in listOf("network-address", "pairing-address", "pairing-connect-address", "ntp-address")) {
             compose.onNodeWithTag(tag).performScrollTo().performClick()
             compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.PasteText) { it() }
@@ -485,6 +505,7 @@ class MainScreenTest {
     @Test fun pairing_code_survives_diagnostics_but_not_saved_state_restore() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, AppState(), actions) } }
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostics-back").performClick()
