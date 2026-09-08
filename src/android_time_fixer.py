@@ -46,7 +46,7 @@ init(autoreset=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-APP_VERSION = '2.6.2'
+APP_VERSION = '2.6.3'
 PROJECT_REPOSITORY_URL = 'https://github.com/civisrom/android-tv-date-time'
 
 #: Порт adbd для «отладки по сети» (adb tcpip). Беспроводная отладка

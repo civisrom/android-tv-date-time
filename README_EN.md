@@ -8,8 +8,9 @@
 
 - [Key features](#key-features) and [getting started](#getting-started)
 - [Installation](#installation) and [Android TV setup](#android-tv-setup)
-- [USB](#usb-debugging) and [Android 11+ wireless debugging](#modern-wireless-debugging-on-android-tv)
+- [USB](#usb-debugging) and [paired wireless debugging](#modern-wireless-debugging-on-android-tv)
 - [Main menu](#main-menu) and [desktop instructions](#how-to-use-the-program)
+- [Screenshots](#screenshots)
 - [Android application](#android-application)
 - [Compatibility and verified scenarios](#compatibility)
 - [License](#license) and [disclaimer](#disclaimer)
@@ -56,7 +57,8 @@ replace troubleshooting other network faults.
     ADB port (usually `5555`) to devices with classic network debugging enabled.
     Available in both the desktop program and the Android app.
 
-*   **Modern wireless debugging on Android 11+:** support for the newer
+*   **Modern wireless debugging:** Android 11+ for phones and Android 13+ for TVs.
+    Support for the newer
     Wireless debugging mode on devices that offer it. Pair using a six-digit
     code, discover devices via mDNS and connect securely over TLS without a
     USB cable — from Windows, Linux, macOS or the Android app.
@@ -82,7 +84,8 @@ replace troubleshooting other network faults.
     on the device. Revoking access may require authorization or pairing again.
 *   **Russian and English interface:** the desktop program remembers the language
     selected at startup; the APK follows the system language.
-*   **Visible version:** above the desktop main menu and below the Android app title;
+*   **Version and source code:** the version, source code label and GitHub link
+    appear above the desktop main menu and below the Android app title;
     the desktop program also accepts `--version`.
 
 ### Desktop features
@@ -90,7 +93,7 @@ replace troubleshooting other network faults.
 *   Console menus for Windows, Linux and macOS; release builds include ADB.
 *   Local subnet scanning with a selectable ADB port, plus separate mDNS discovery.
 *   Batch NTP updates for discovered or manually entered devices.
-*   Automatic setup: choose a device, detect the region, test
+*   Automatic setup: discover a device via mDNS, detect the region, test
     servers, offer the best five and apply after user confirmation.
 *   Favorite servers, copy/paste, a saved last address, and JSON settings
     export and import.
@@ -102,8 +105,12 @@ replace troubleshooting other network faults.
 ### Android app features
 
 *   A separate APK for phones, tablets or Android TV: configuration without a computer.
-*   Always-expanded connection IP and NTP settings; Android 11+ pairing,
-    additional lists and help can be collapsed.
+*   Always-expanded connection IP and NTP settings; pairing, time zone,
+    additional lists and help can be collapsed. Functions have separate gray panels.
+*   Long-press copying of text and addresses with ports; background connection
+    checks without flickering buttons and fields.
+*   Expanded connected device details in a grouped list that starts collapsed
+    and hides unavailable information.
 *   Manual time zone changes on the connected device with result verification,
     preserving the NTP server and automatic clock synchronization.
 *   Automatic mDNS discovery with separate pairing and connection addresses;
@@ -181,15 +188,15 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.2.apk` from the [2.6.2 prerelease](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.2). [What's new](release-notes/v2.6.2-en.md).
+1.  Download `AndroidTVTimeFixer-2.6.3.apk` from [release 2.6.3](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.3). [What's new](release-notes/v2.6.3-en.md).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.2.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.3.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.2.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.3.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
@@ -403,7 +410,7 @@ Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
 In the APK, expand the
-[Pair a device form](#6-pair-a-device--the-code-for-android-11-and-newer).
+[Pairing section](#6-pairing--new-wireless-debugging-on-android-11).
 
 Both programs distinguish pairing and connection services in mDNS and verify
 the connection with a command on the device. A listed service does not yet
@@ -654,9 +661,9 @@ the modern wireless mode, not for every connection method.
 2. Enable debugging **on the target device**, following
    [Android TV Setup](#android-tv-setup). The controlling phone does not need
    USB debugging enabled: it needs host/OTG for a cable connection.
-3. Check the date and time on the device running the APK: NTP replies are
-   compared with its clock. If the APK runs on the TV whose clock is wrong,
-   first set approximately correct date and time on that TV.
+3. NTP checks require access to the server over UDP/123 from the device running
+   the APK. Large clock differences do not block choosing or applying a server;
+   setting the clock beforehand is not required for this check.
 4. If network connections fail, check VPNs, router client isolation and
    automatic switching to mobile data. Disabling cellular service is not
    required for every connection.
@@ -666,10 +673,13 @@ the modern wireless mode, not for every connection method.
 The app is a single scrolling screen. The connection IP address and main time
 server settings remain expanded, including after connection. Pairing, time zone,
 additional lists and help sections can be collapsed.
+Each function has its own gray panel. Primary and secondary actions use different
+button fills. Long-press text or an address with a port to select and copy it
+through the system menu, then paste it into an input field.
 
 #### 1. Title and mode
 
-A clickable project GitHub link appears after the version. The desktop app shows
+A Project source code label and clickable GitHub link appear after the version. The desktop app shows
 the version, a source code label and the link above the main menu; opening the link depends on the terminal's hyperlink support.
 
 One line under the name: "Running on a phone: it will connect to a TV over the
@@ -677,7 +687,7 @@ network or USB" or "Running on a TV". The app works this out by itself; nothing 
 
 #### 2. "Connect to a device"
 
-Shows the current state, **colour-coded** so it can be read at a glance:
+Shows the current state in **bold, colour-coded text** so it can be read at a glance:
 
 *   **green** — "Connected to 192.168.0.112:5555", the link is up;
 *   **red** — "Not connected", or the reason it failed;
@@ -689,6 +699,9 @@ Shows the current state, **colour-coded** so it can be read at a glance:
 |---|---|
 | `192.168.0.112` | usually; port `5555` is added for you |
 | `192.168.0.112:37105` | when debugging uses a non-standard port |
+
+The four IPv4 numbers must be in the range 0–255 and the port in 1–65535.
+The connection field rejects domains, IPv6, URLs and invalid ports.
 
 Find the TV's address in its settings: **Settings → Network & Internet →** your
 network, or **Settings → About → Status**.
@@ -708,8 +721,10 @@ connection, not that the address merely looked valid.
     typo, or debugging is off.
 *   *"Invalid address"* — what you typed is not an IP address.
 
-Once connected, a **Disconnect** button appears. The IP field and pairing
-form remain visible; editing an address alone does not change the current connection.
+Once connected, a **Disconnect** button appears. The IP field stays visible and
+the pairing form can be expanded; editing an address alone does not change the
+current connection. The link is checked when returning to the app and in the
+background. Regular ten-second checks do not disable buttons or cause flickering.
 
 #### 3. "Devices found automatically on the network"
 
@@ -718,7 +733,7 @@ themselves on a local network. **You need neither the address nor the port**: a
 TV that is found shows up here on its own.
 
 The section can be collapsed and opens automatically when new results arrive.
-A green **Device found** label means discovery, not an established connection.
+A bold green **Device found** label means discovery, not an established connection.
 Each row shows the name, address and service type:
 
 *   **"Network debugging"** — the classic debugging on port 5555. The
@@ -727,7 +742,7 @@ Each row shows the name, address and service type:
     This does not prove that this app is paired; a new client may still need a code.
 *   **"Waiting to be paired"** — the pairing dialog is open on the TV. You
     cannot connect until a code is entered, so the button here is **Pair**: it
-    puts the address into the pairing form below.
+    expands the pairing form below and fills in the address.
 
 An empty list is not a problem: type the address by hand in the section above.
 
@@ -751,7 +766,7 @@ are inside **Choose a server**. An ongoing scan and its Stop button
 remain visible when the picker is collapsed.
 
 After connecting, **Current:** shows the value read from the device.
-A stored address is green. **No time server is set** means the app did not
+The line is bold and green. **No time server is set** means the app did not
 obtain a custom `ntp_server` value; Android normally uses the firmware default.
 If reading the setting is unsupported or fails, an empty field does not
 identify which system server is being used.
@@ -763,7 +778,8 @@ green, a rejected one red.
 **Choosing a server:**
 
 *   **Search.** Start typing a country code, a country name, or part of an
-    address: `ru`, `by`, `kz`, `Russia`, `cloudflare`. Tapping a result **puts
+    address: `us`, `uk`, `de`, `United States`, `United Kingdom`, `Germany`,
+    `cloudflare`. Tapping a result **puts
     the address into the input field** — nothing is changed yet.
 *   **The country list.** With the search empty there is a **Show countries and
     their codes (77)** button. You do not have to remember the codes: each row
@@ -773,11 +789,11 @@ green, a rejected one red.
     the same set as the desktop version: regional pools, Cloudflare, Google
     and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
-    (`time.google.com`) or an IP address (`216.239.35.0`) — there is a reminder
-    of that under the field.
+    (`time.google.com`) or IPv4 (`216.239.35.0`), without a port, spaces, path
+    or `http://`. The standard NTP port, UDP/123, is used.
 
-The **Check** button sends a real NTP request from the device running the
-APK and parses the reply. It checks the address, reachability, and NTP response.
+The **Check** button sends real NTP requests from the device running the
+APK and parses the replies. It checks the address, reachability, and NTP responses.
 The offset from the device's clock is informational and does not block applying a
 server: the TV, box, or phone clock may be wrong. Possible outcomes:
 
@@ -850,7 +866,7 @@ Required commands are checked on the connected device. AOSP includes them from
 Android 9, but firmware restrictions can vary. If unsupported, use the TV’s date
 and time settings. The phone’s Android version alone does not hide this menu.
 
-#### 6. "Pair a device" — the code, for Android 11 and newer
+#### 6. Pairing — new wireless debugging on Android 11+
 
 The pairing section starts collapsed; tap its heading to expand it.
 **Pair** on a discovered device expands the form, fills its address, and focuses the code field.
@@ -901,8 +917,8 @@ saved to disk. Deadlines are 10 seconds for TCP, 15 seconds for TLS/read
 inactivity and 60 seconds for the overall pairing operation. App addresses
 currently support IPv4 only.
 
-Change history: [2.6.1](release-notes/v2.6.1-en.md) and
-[2.6.2](release-notes/v2.6.2-en.md).
+Change history: [2.6.1](release-notes/v2.6.1-en.md),
+[2.6.2](release-notes/v2.6.2-en.md) and [2.6.3](release-notes/v2.6.3-en.md).
 
 #### 7. USB debugging
 
@@ -911,6 +927,8 @@ detected. It contains list refresh, device selection and the connection
 button. If nothing is found, expand the USB troubleshooting help and open
 the search details in Diagnostics. The connection steps and two permissions
 are explained in [USB debugging](#usb-debugging).
+If the mobile app cannot connect over USB, try the desktop version for
+Windows, Linux or macOS.
 
 #### 8. "Device"
 
@@ -983,11 +1001,14 @@ needs a port supporting USB device mode, not only a port for storage devices.
     section gives the procedure.
 *   A Windows → NVIDIA SHIELD USB connection and reading device details have
     been confirmed in user testing.
+*   A user confirmed time zone changes through the APK on NVIDIA SHIELD running
+    Android 11; NTP settings are preserved.
 *   Phone → SHIELD discovery is not yet confirmed: Android returns an empty
     USB list in the tested configuration. Better diagnostics do not establish
     that this hardware scenario has been fixed.
-*   Automated UI checks run on Android 6 and Android 16. They exercise the app
-    but do not replace physical testing of cables, USB roles or each TV model.
+*   Automated UI checks run on Android 6 and Android 16; system commands for
+    device details and time zone changes are also checked on Android 11.
+    These checks do not replace physical testing of cables, USB roles or each TV model.
 
 When reporting a problem, include both device models, Android versions,
 connection method and the error text. In the APK, details are available through Diagnostics.
