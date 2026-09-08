@@ -13,6 +13,7 @@ private class ZoneDevice : AdbClient {
     var auto = "true"
     var alarmAvailable = true
     var modernAvailable = true
+    var helpExitCode = 255
     var telephony = true
     var geo = false
     var ignoreZone = false
@@ -58,7 +59,7 @@ private class ZoneDevice : AdbClient {
             }
         }
         after(command)
-        return ShellResult(output, "", 0)
+        return ShellResult(output, "", if (command.endsWith(" help")) helpExitCode else 0)
     }
 
     override fun isAlive() = true
@@ -89,6 +90,16 @@ class TimeZoneRepositoryTest {
         device.auto = "false"
         assertTrue(apply() is TimeZoneUpdateResult.Applied)
         assertEquals(listOf("cmd alarm set-timezone 'Europe/Moscow'"), device.writes)
+    }
+
+    @Test fun `Android help can return 255 while advertising supported commands`() {
+        device.helpExitCode = 255
+        for (sdk in listOf(30, 36)) {
+            device.sdk = sdk
+            device.auto = if (sdk < 31) "0" else "false"
+            assertEquals(TimeZoneUpdateResult.Applied("Pacific/Honolulu"), apply("Pacific/Honolulu"))
+        }
+        assertTrue(device.writes.all { it == "cmd alarm set-timezone 'Pacific/Honolulu'" })
     }
 
     @Test fun `TV without detection algorithms can change zone despite a true raw auto flag`() {

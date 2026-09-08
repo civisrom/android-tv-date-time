@@ -469,11 +469,14 @@ class MainScreenTest {
     private fun assertSearchSelection(state: AppState) {
         screen(state)
         compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
-        compose.onNodeWithTag("ntp-search").performScrollTo().performTextInput("cloudflare")
-        compose.onNodeWithTag("ntp-search").performTouchInput { click() }
-        waitForKeyboard()
-        compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
         try {
+            // Сначала открываем IME в пустом поле, затем меняем список результатов:
+            // появление списка не должно сдвинуть точку касания во время открытия IME.
+            compose.onNodeWithTag("ntp-search").performScrollTo().performTouchInput { click() }
+            compose.onNodeWithTag("ntp-search").assertIsFocused()
+            waitForKeyboard()
+            compose.onNodeWithTag("ntp-search").performTextInput("cloudflare")
+            compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
             compose.onNodeWithTag("ntp-address").assertTextContains("time.cloudflare.com").assertIsNotFocused()
             compose.onNodeWithTag("ntp-search").assertIsNotFocused()
             compose.waitUntil(5_000) {

@@ -44,7 +44,9 @@ class TimeZoneRepository(
         var reason = TimeZoneFailure.READ_STATE
         try {
             val alarmHelp = client.shell("cmd alarm help")
-            if (alarmHelp.exitCode != 0 || alarmHelp.errorOutput.isNotBlank() ||
+            // AOSP handleDefaultCommands печатает help и возвращает -1 (в shell — 255).
+            // Наличие команды определяем по справке; записи ниже требуют успешного кода.
+            if (alarmHelp.errorOutput.isNotBlank() ||
                 !hasCommand(alarmHelp.output, "set-timezone")) {
                 return TimeZoneUpdateResult.Failed(TimeZoneFailure.UNSUPPORTED)
             }
@@ -89,7 +91,7 @@ class TimeZoneRepository(
     private fun readAutoMode(sdk: Int): AutoMode? {
         if (sdk < 31) return AutoMode(AutoKind.LEGACY, readAutoValue(AutoKind.LEGACY))
         val response = client.shell("cmd time_zone_detector help")
-        if (response.exitCode != 0 || response.errorOutput.isNotBlank()) return null
+        if (response.errorOutput.isNotBlank()) return null
         val help = response.output
         val commands = listOf("is_auto_detection_enabled", "set_auto_detection_enabled",
             "is_telephony_detection_supported", "is_geo_detection_supported")
