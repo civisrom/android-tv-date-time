@@ -1,5 +1,6 @@
 package com.civisrom.tvtimefixer.ui
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.UiAutomation
 import android.content.ClipboardManager
 import android.content.Intent
@@ -579,15 +580,31 @@ class MainScreenTest {
     }
 
     private fun copyDisplayedText(text: String) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        automation.serviceInfo = automation.serviceInfo.apply {
+            flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        }
+        try {
+            copyDisplayedTextFromMenu(text)
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
+    }
+
+    private fun copyDisplayedTextFromMenu(text: String) {
         compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo().performTouchInput {
             longClick(Offset(5f, center.y))
         }
-        compose.waitUntil(5_000) { textSelectionActions(android.R.string.copy).isNotEmpty() }
-        // Домен может сразу выделиться целиком; тогда Android не предлагает «Выделить всё».
-        if (textSelectionActions(android.R.string.selectAll).isNotEmpty()) {
-            clickTextSelectionAction(android.R.string.selectAll)
+        try {
+            compose.waitUntil(5_000) { textSelectionActions(android.R.string.copy).isNotEmpty() }
+            // Домен может сразу выделиться целиком; тогда Android не предлагает «Выделить всё».
+            if (textSelectionActions(android.R.string.selectAll).isNotEmpty()) {
+                clickTextSelectionAction(android.R.string.selectAll)
+            }
+        } finally {
+            screenshot("copy-${text.substringBefore(':')}")
         }
-        screenshot("copy-${text.substringBefore(':')}")
         clickTextSelectionAction(android.R.string.copy)
         compose.runOnIdle {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -603,8 +620,10 @@ class MainScreenTest {
     }
 
     private fun textSelectionActions(label: Int): List<AccessibilityNodeInfo> =
-        InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
-            ?.findAccessibilityNodeInfosByText(context.getString(label)).orEmpty()
+        // Меню использует русскую локаль Compose и может находиться в отдельном окне.
+        InstrumentationRegistry.getInstrumentation().uiAutomation.windows
+            .mapNotNull { it.root }
+            .flatMap { it.findAccessibilityNodeInfosByText(russianString(label)) }
 
     private fun waitForKeyboard() {
         compose.waitUntil(5_000) {
