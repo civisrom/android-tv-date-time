@@ -1025,24 +1025,84 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
             InfoRow(stringResource(R.string.info_ntp), info.currentNtpServer, color = ConnectedColor)
             InfoRow(stringResource(R.string.info_timezone), info.timezone)
             ExpandableSection(stringResource(R.string.info_more), "device-details") {
-                InfoRow(stringResource(R.string.info_manufacturer), info.manufacturer)
-                InfoRow(stringResource(R.string.info_api), info.apiLevel)
-                InfoRow(stringResource(R.string.info_serial), info.serial)
-                InfoRow(stringResource(R.string.info_cpu), info.cpuAbi)
-                InfoRow(stringResource(R.string.info_cores), info.cpuCores)
-                InfoRow(stringResource(R.string.info_locale), info.locale)
-                InfoRow(stringResource(R.string.info_battery), info.batteryLevel)
-                InfoRow(stringResource(R.string.info_ram), info.totalRam)
-                InfoRow(stringResource(R.string.info_ram_free), info.availableRam)
-                InfoRow(stringResource(R.string.info_screen), info.screenResolution)
-                InfoRow(stringResource(R.string.info_density), info.screenDensity)
-                InfoRow(stringResource(R.string.info_uptime), info.uptime)
-                InfoRow(stringResource(R.string.info_kernel), info.kernelVersion)
+                Text(stringResource(R.string.info_availability_note), style = MaterialTheme.typography.bodySmall)
+                InfoGroup(stringResource(R.string.info_group_system), listOf(
+                    stringResource(R.string.info_manufacturer) to info.manufacturer,
+                    stringResource(R.string.info_device_code) to info.deviceCode,
+                    stringResource(R.string.info_api) to info.apiLevel,
+                    stringResource(R.string.info_build) to info.buildDisplay,
+                    stringResource(R.string.info_patch) to info.securityPatch,
+                    stringResource(R.string.info_vendor_patch) to info.vendorSecurityPatch,
+                    stringResource(R.string.info_build_type) to info.buildType,
+                    stringResource(R.string.info_fingerprint) to info.buildFingerprint,
+                    stringResource(R.string.info_bootloader) to info.bootloader,
+                    stringResource(R.string.info_kernel) to info.kernelVersion,
+                    stringResource(R.string.info_serial) to info.serial,
+                ))
+                InfoGroup(stringResource(R.string.info_group_hardware), listOf(
+                    stringResource(R.string.info_soc) to info.socModel,
+                    stringResource(R.string.info_soc_manufacturer) to info.socManufacturer,
+                    stringResource(R.string.info_hardware) to info.hardware,
+                    stringResource(R.string.info_cpu) to info.cpuAbi,
+                    stringResource(R.string.info_cores) to info.cpuCores,
+                    stringResource(R.string.info_gpu) to info.gpu,
+                    stringResource(R.string.info_ram) to info.totalRam,
+                    stringResource(R.string.info_ram_free) to info.availableRam,
+                    stringResource(R.string.info_storage) to info.storageTotal,
+                    stringResource(R.string.info_storage_free) to info.storageAvailable,
+                    stringResource(R.string.info_battery) to info.batteryLevel,
+                ))
+                val hdr = info.display.hdrTypes?.let { types ->
+                    if (types.isEmpty()) stringResource(R.string.info_hdr_none) else types.joinToString(", ") {
+                        when (it) { 1 -> "Dolby Vision"; 2 -> "HDR10"; 3 -> "HLG"; 4 -> "HDR10+"; else -> "HDR #$it" }
+                    }
+                }.orEmpty()
+                InfoGroup(stringResource(R.string.info_group_display), listOf(
+                    stringResource(R.string.info_screen) to info.screenResolution,
+                    stringResource(R.string.info_density) to info.screenDensity,
+                    stringResource(R.string.info_display_mode) to info.display.activeMode,
+                    stringResource(R.string.info_display_modes) to info.display.supportedModes,
+                    stringResource(R.string.info_hdr) to hdr,
+                    stringResource(R.string.info_allm) to infoBoolean(info.display.allm),
+                ))
+                InfoGroup(stringResource(R.string.info_group_audio), listOf(
+                    stringResource(R.string.info_audio_outputs) to info.audioOutputs,
+                    stringResource(R.string.info_audio_formats) to info.audioFormats,
+                ))
+                InfoGroup(stringResource(R.string.info_group_time_network), listOf(
+                    stringResource(R.string.info_locale) to info.locale,
+                    stringResource(R.string.info_auto_time) to infoBoolean(info.automaticTime),
+                    stringResource(R.string.info_auto_zone) to infoBoolean(info.automaticTimeZone),
+                    stringResource(R.string.info_uptime) to info.uptime,
+                    stringResource(R.string.info_addresses) to info.networkAddresses,
+                ))
+                if (info.videoDecoders.isNotEmpty() || info.audioDecoders.isNotEmpty()) {
+                    Text(stringResource(R.string.info_codecs_note), style = MaterialTheme.typography.bodySmall)
+                    InfoGroup(stringResource(R.string.info_group_codecs), listOf(
+                        stringResource(R.string.info_video_decoders) to info.videoDecoders,
+                        stringResource(R.string.info_audio_decoders) to info.audioDecoders,
+                    ))
+                }
             }
         }
         Button(onClick = actions::refreshDeviceInfo, enabled = !state.busy) {
             Text(stringResource(R.string.info_refresh))
         }
+    }
+}
+
+@Composable
+private fun infoBoolean(value: Boolean?): String = when (value) {
+    true -> stringResource(R.string.info_yes)
+    false -> stringResource(R.string.info_no)
+    null -> ""
+}
+
+@Composable
+private fun InfoGroup(title: String, rows: List<Pair<String, String>>) {
+    if (rows.any { it.second.isNotBlank() }) {
+        Text(title, Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall)
+        rows.forEach { (label, value) -> InfoRow(label, value) }
     }
 }
 

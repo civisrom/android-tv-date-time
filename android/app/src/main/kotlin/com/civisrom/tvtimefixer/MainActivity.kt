@@ -391,8 +391,14 @@ class MainActivity : ComponentActivity() {
                     is TimeZoneUpdateResult.Failed -> result.actualZone
                 }
                 state.copy(timeZoneResult = result, timeZoneDiagnosticEventId = event,
-                    deviceInfo = if (actual != null || failure?.restoration == TimeZoneRestoration.UNCONFIRMED)
-                        state.deviceInfo?.copy(timezone = actual.orEmpty()) else state.deviceInfo)
+                    deviceInfo = state.deviceInfo?.let { info ->
+                        info.copy(
+                            timezone = if (actual != null || failure?.restoration == TimeZoneRestoration.UNCONFIRMED)
+                                actual.orEmpty() else info.timezone,
+                            automaticTimeZone = DeviceRepository(trace.client(client))
+                                .automaticTimeZoneEnabled(info.apiLevel.toIntOrNull()),
+                        )
+                    })
             }
         }
 

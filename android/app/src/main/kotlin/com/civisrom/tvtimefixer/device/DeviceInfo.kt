@@ -1,8 +1,8 @@
 package com.civisrom.tvtimefixer.device
 
 /**
- * Сведения об устройстве. Поля намеренно строковые: это то, что показывается
- * пользователю, а не то, по чему принимаются решения.
+ * Сведения именно о подключённом устройстве. Пустые поля означают, что
+ * прошивка не предоставила сведения; интерфейс скрывает такие строки.
  */
 data class DeviceInfo(
     val model: String = "",
@@ -22,6 +22,27 @@ data class DeviceInfo(
     val cpuCores: String = "",
     val kernelVersion: String = "",
     val uptime: String = "",
+    val buildDisplay: String = "",
+    val securityPatch: String = "",
+    val vendorSecurityPatch: String = "",
+    val buildFingerprint: String = "",
+    val buildType: String = "",
+    val bootloader: String = "",
+    val deviceCode: String = "",
+    val socModel: String = "",
+    val socManufacturer: String = "",
+    val hardware: String = "",
+    val gpu: String = "",
+    val storageTotal: String = "",
+    val storageAvailable: String = "",
+    val automaticTime: Boolean? = null,
+    val automaticTimeZone: Boolean? = null,
+    val display: DisplayDetails = DisplayDetails(),
+    val audioOutputs: String = "",
+    val audioFormats: String = "",
+    val videoDecoders: String = "",
+    val audioDecoders: String = "",
+    val networkAddresses: String = "",
 )
 
 /**

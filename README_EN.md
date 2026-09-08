@@ -914,13 +914,17 @@ are explained in [USB debugging](#usb-debugging).
 
 #### 8. "Device"
 
-Details read from the TV: model, manufacturer, Android and API version, serial
-number, CPU and core count, memory, screen resolution and density, time zone,
-locale, battery, kernel version, uptime and the current time server. The
-**Refresh** button reads it all again.
+Details read from the TV include firmware and security patches, chip and app
+architectures, graphics, RAM and data storage, display modes and HDR, audio
+outputs, network addresses and time settings. Serial number, locale, battery,
+kernel version and uptime are also shown when available. **Refresh** reads the
+details again; background connection checks do not poll them. Decoder lists
+come from readable firmware files and may be incomplete or include inactive
+variants; they do not verify hardware acceleration or DRM.
 
 Model, Android version, time server and time zone are visible immediately. The
-time server label and value are green. Expand **All device details** for the rest.
+time server label and value are green. **All device details** starts collapsed;
+expand it for the rest.
 Empty rows are hidden: if the firmware does not answer one command, only that
 row disappears.
 

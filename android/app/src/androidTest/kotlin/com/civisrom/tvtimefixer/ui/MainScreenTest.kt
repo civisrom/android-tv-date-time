@@ -141,6 +141,20 @@ class MainScreenTest {
     }
     private val connected = AppState(connection = ConnectionState.Connected(DeviceAddress("192.168.1.2", 5555)))
 
+    @Test fun extended_device_details_start_collapsed_and_can_be_closed_again() {
+        screen(connected.copy(deviceInfo = DeviceInfo(model = "Target TV", socModel = "Target chip", buildDisplay = "TV build")))
+        compose.onNodeWithText("Target chip").assertDoesNotExist()
+        compose.onNodeWithTag("section-device-details").performScrollTo()
+        screenshot("device-details-collapsed")
+        compose.onNodeWithTag("section-device-details").performClick()
+        compose.onNodeWithText("Target chip").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("TV build").performScrollTo().assertIsDisplayed()
+        screenshot("device-details-expanded")
+        compose.onNodeWithTag("section-device-details").performScrollTo().performClick()
+        compose.onNodeWithText("Target chip").assertDoesNotExist()
+        compose.onNodeWithText("TV build").assertDoesNotExist()
+    }
+
     @Test fun checking_a_previous_connection_hides_connected_status_and_disables_time_changes() {
         val address = DeviceAddress("192.168.1.2", 5555)
         screen(connected.copy(connection = ConnectionState.Checking(address), busy = true,

@@ -52,6 +52,17 @@ class OperationTraceTest {
         assertFalse(trace.details().contains("ro.serialno"))
     }
 
+    @Test fun `capability reads keep command metrics without raw device data`() {
+        val trace = OperationTrace()
+        val delegate = trace.client(client { ShellResult("PRIVATE_DEVICE_DATA 192.168.1.2", "", 0) })
+        listOf("dumpsys display", "dumpsys media.audio_policy", "ip -o addr show scope global",
+            com.civisrom.tvtimefixer.device.READ_CODEC_XML_COMMAND).forEach { delegate.shell(it) }
+        assertTrue(trace.details().contains("shell=read media codec declarations"))
+        assertTrue(trace.details().contains("shell=dumpsys display"))
+        assertFalse(trace.details().contains("PRIVATE_DEVICE_DATA"))
+        assertFalse(trace.details().contains("192.168.1.2"))
+    }
+
     @Test fun `exception keeps identity and class but excludes its message and unknown command`() {
         val trace = OperationTrace()
         val error = IOException("SECRET_MESSAGE")

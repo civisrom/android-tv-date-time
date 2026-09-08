@@ -149,7 +149,7 @@ jobs:
           # Android 11 проверяет системные команды ветки, используемой SHIELD.
           # Полный интерфейс проверяется на минимальной и современной API.
           if [[ "$UI_TEST_API" == 30 ]]; then
-            test_args=(-e class com.civisrom.tvtimefixer.device.TimeZoneShellTest,com.civisrom.tvtimefixer.data.ValidatorsAndroidTest)
+            test_args=(-e class com.civisrom.tvtimefixer.device.TimeZoneShellTest,com.civisrom.tvtimefixer.device.DeviceCapabilitiesShellTest,com.civisrom.tvtimefixer.data.ValidatorsAndroidTest)
           fi
           timeout 300 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
             "${test_args[@]}" \
