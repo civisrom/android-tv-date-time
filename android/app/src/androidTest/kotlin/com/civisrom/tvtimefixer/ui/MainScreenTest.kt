@@ -337,7 +337,15 @@ class MainScreenTest {
     }
 
     @Test fun picking_a_search_result_hides_the_keyboard_and_reveals_the_address() {
-        screen(connected)
+        assertSearchSelection(connected)
+    }
+
+    @Test fun picking_a_search_result_without_a_connection_hides_the_keyboard() {
+        assertSearchSelection(AppState())
+    }
+
+    private fun assertSearchSelection(state: AppState) {
+        screen(state)
         compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
         compose.onNodeWithTag("ntp-search").performScrollTo().performTextInput("cloudflare")
         waitForKeyboard()
@@ -349,10 +357,12 @@ class MainScreenTest {
                 ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
             }
             compose.onNodeWithTag("ntp-address").assertIsDisplayed()
-            compose.onNodeWithTag("ntp-apply").assertIsDisplayed().assertIsEnabled()
-            compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+            compose.onNodeWithTag("ntp-apply").assertIsDisplayed().also {
+                if (state.connected) it.assertIsEnabled() else it.assertIsNotEnabled()
+            }
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed().assertIsFocused()
         } finally {
-            screenshot("search-selection")
+            screenshot(if (state.connected) "search-selection" else "search-selection-disconnected")
         }
         assertTrue(actions.calls.isEmpty())
     }

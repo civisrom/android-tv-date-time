@@ -33,10 +33,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -478,14 +478,10 @@ private fun NtpSection(state: AppState, actions: AppActions,
     var showCountries by rememberSaveable { mutableStateOf(false) }
     var pickerExpanded by rememberSaveable { mutableStateOf(false) }
     val addressView = remember { BringIntoViewRequester() }
-    val focusManager = LocalFocusManager.current
+    val checkFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     var selectionRequest by remember { mutableIntStateOf(0) }
     val onPick: (String) -> Unit = { server ->
-        // Скрываем клавиатуру до снятия фокуса и изменения списка: на API 23
-        // отложенный запрос после завершения ввода может быть проигнорирован.
-        keyboard?.hide()
-        focusManager.clearFocus()
         custom = server
         showCountries = false
         showAll = false
@@ -494,6 +490,10 @@ private fun NtpSection(state: AppState, actions: AppActions,
     LaunchedEffect(selectionRequest) {
         if (selectionRequest > 0) {
             withFrameNanos { }
+            // clearFocus() на API 23 может вернуть фокус в поиск и открыть IME
+            // снова. Переводим его на доступную без подключения кнопку.
+            checkFocus.requestFocus()
+            keyboard?.hide()
             addressView.bringIntoView()
         }
     }
@@ -543,7 +543,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 TextButton(
                     onClick = { actions.checkNtpServer(custom) },
                     enabled = !state.busy && custom.isNotBlank(),
-                    modifier = Modifier.testTag("ntp-check"),
+                    modifier = Modifier.focusRequester(checkFocus)
+                        .focusProperties { canFocus = true }.testTag("ntp-check"),
                 ) {
                     Text(stringResource(R.string.ntp_check))
                 }
