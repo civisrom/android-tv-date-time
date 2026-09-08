@@ -4182,11 +4182,11 @@ def main():
         fixer.gen_keys()
 
         while True:
-            print(Fore.GREEN + locales.get("main_menu"))
             print(Fore.CYAN + locales.get("app_version", version=APP_VERSION))
             print(Fore.CYAN + locales.get("project_source_code"))
             Console().print(Text(PROJECT_REPOSITORY_URL,
                                  style=f"cyan underline link {PROJECT_REPOSITORY_URL}"), soft_wrap=True)
+            print(Fore.GREEN + locales.get("main_menu"))
             print(Fore.YELLOW + locales.get("menu_item_1"))
             print(Fore.YELLOW + locales.get("menu_item_2"))
             print(Fore.YELLOW + locales.get("menu_item_3"))

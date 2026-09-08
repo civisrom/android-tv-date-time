@@ -82,7 +82,7 @@ replace troubleshooting other network faults.
     on the device. Revoking access may require authorization or pairing again.
 *   **Russian and English interface:** the desktop program remembers the language
     selected at startup; the APK follows the system language.
-*   **Visible version:** in the desktop main menu and below the Android app title;
+*   **Visible version:** above the desktop main menu and below the Android app title;
     the desktop program also accepts `--version`.
 
 ### Desktop features
@@ -668,8 +668,8 @@ additional lists and help sections can be collapsed.
 
 #### 1. Title and mode
 
-A clickable project GitHub link appears after the version. The desktop main menu
-also shows it below the version; opening it depends on the terminal's hyperlink support.
+A clickable project GitHub link appears after the version. The desktop app shows
+the version, a source code label and the link above the main menu; opening the link depends on the terminal's hyperlink support.
 
 One line under the name: "Running on a phone: it will connect to a TV over the
 network or USB" or "Running on a TV". The app works this out by itself; nothing to set.
