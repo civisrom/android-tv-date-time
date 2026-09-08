@@ -85,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [23, 36]
+        api: [23, 30, 36]
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -137,13 +137,22 @@ jobs:
       - name: Run Compose UI regression tests
         timeout-minutes: 10
         working-directory: android
+        env:
+          UI_TEST_API: ${{ matrix.api }}
         # Явные установка и запуск позволяют отличить сбой ADB от сбоя тестов.
         # APK остаются установленными до сбора скриншотов.
         run: |
           set -o pipefail
           timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
           timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          test_args=()
+          # Android 11 проверяет системные команды ветки, используемой SHIELD.
+          # Полный интерфейс проверяется на минимальной и современной API.
+          if [[ "$UI_TEST_API" == 30 ]]; then
+            test_args=(-e class com.civisrom.tvtimefixer.device.TimeZoneShellTest,com.civisrom.tvtimefixer.device.DeviceCapabilitiesShellTest,com.civisrom.tvtimefixer.data.ValidatorsAndroidTest)
+          fi
           timeout 300 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+            "${test_args[@]}" \
             com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/ui-instrumentation.log"
           # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
@@ -155,6 +164,7 @@ jobs:
           mkdir -p ui-screenshots
           timeout 30 "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
           timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true
 
       - name: Upload UI test results
@@ -167,5 +177,6 @@ jobs:
             ${{ runner.temp }}/ui-instrumentation.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt
+            ${{ runner.temp }}/ui-crashes.txt
           if-no-files-found: ignore
           retention-days: 7

@@ -8,8 +8,9 @@
 
 - [Key features](#key-features) and [getting started](#getting-started)
 - [Installation](#installation) and [Android TV setup](#android-tv-setup)
-- [USB](#usb-debugging) and [Android 11+ wireless debugging](#modern-wireless-debugging-on-android-tv)
+- [USB](#usb-debugging) and [paired wireless debugging](#modern-wireless-debugging-on-android-tv)
 - [Main menu](#main-menu) and [desktop instructions](#how-to-use-the-program)
+- [Screenshots](#screenshots)
 - [Android application](#android-application)
 - [Compatibility and verified scenarios](#compatibility)
 - [License](#license) and [disclaimer](#disclaimer)
@@ -56,7 +57,8 @@ replace troubleshooting other network faults.
     ADB port (usually `5555`) to devices with classic network debugging enabled.
     Available in both the desktop program and the Android app.
 
-*   **Modern wireless debugging on Android 11+:** support for the newer
+*   **Modern wireless debugging:** Android 11+ for phones and Android 13+ for TVs.
+    Support for the newer
     Wireless debugging mode on devices that offer it. Pair using a six-digit
     code, discover devices via mDNS and connect securely over TLS without a
     USB cable — from Windows, Linux, macOS or the Android app.
@@ -66,7 +68,7 @@ replace troubleshooting other network faults.
 
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
-    45 alternative servers**, including regional pools, Cloudflare, Google
+    52 alternative servers**, including regional pools, Cloudflare, Google
     and other public NTP servers. Development checks keep the two reference lists consistent.
 *   **Time-server checks:** real NTP requests, round-trip time (RTT), successful
     reply percentage and offset from the controlling device's clock.
@@ -82,7 +84,8 @@ replace troubleshooting other network faults.
     on the device. Revoking access may require authorization or pairing again.
 *   **Russian and English interface:** the desktop program remembers the language
     selected at startup; the APK follows the system language.
-*   **Visible version:** in the desktop main menu and below the Android app title;
+*   **Version and source code:** the version, source code label and GitHub link
+    appear above the desktop main menu and below the Android app title;
     the desktop program also accepts `--version`.
 
 ### Desktop features
@@ -90,7 +93,7 @@ replace troubleshooting other network faults.
 *   Console menus for Windows, Linux and macOS; release builds include ADB.
 *   Local subnet scanning with a selectable ADB port, plus separate mDNS discovery.
 *   Batch NTP updates for discovered or manually entered devices.
-*   Experimental automatic setup: choose a device, detect the region, test
+*   Automatic setup: discover a device via mDNS, detect the region, test
     servers, offer the best five and apply after user confirmation.
 *   Favorite servers, copy/paste, a saved last address, and JSON settings
     export and import.
@@ -102,8 +105,14 @@ replace troubleshooting other network faults.
 ### Android app features
 
 *   A separate APK for phones, tablets or Android TV: configuration without a computer.
-*   Always-expanded connection IP, NTP settings and Android 11+ pairing forms;
-    additional lists and help can be collapsed.
+*   Always-expanded connection IP and NTP settings; pairing, time zone,
+    additional lists and help can be collapsed. Functions have separate gray panels.
+*   Long-press copying of text and addresses with ports; background connection
+    checks without flickering buttons and fields.
+*   Expanded connected device details in a grouped list that starts collapsed
+    and hides unavailable information.
+*   Manual time zone changes on the connected device with result verification,
+    preserving the NTP server and automatic clock synchronization.
 *   Automatic mDNS discovery with separate pairing and connection addresses;
     found devices have a green label alongside their name and address.
 *   NTP checks before connecting, a best-five server search with progress and
@@ -179,15 +188,15 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.2.apk` from the [2.6.2 prerelease](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.2). [What's new](release-notes/v2.6.2-en.md).
+1.  Download `AndroidTVTimeFixer-2.6.3.apk` from [release 2.6.3](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.3). [What's new](release-notes/v2.6.3-en.md).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.2.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.3.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.2.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.3.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
@@ -400,8 +409,8 @@ Windows, Linux and macOS release builds include the required ADB;
 Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
-In the APK, use the always-expanded
-[Pair a device form](#5-pair-a-device--the-code-for-android-11-and-newer).
+In the APK, expand the
+[Pairing section](#6-pairing--new-wireless-debugging-on-android-11).
 
 Both programs distinguish pairing and connection services in mDNS and verify
 the connection with a command on the device. A listed service does not yet
@@ -419,7 +428,7 @@ the addresses from the current debugging screens manually.
  6. Ping NTP servers
  7. Server management
  8. Network scan & batch NTP update
- 9. Auto-setup NTP server (experimental mode)
+ 9. Auto-setup NTP server
 10. Terminal mode (ADB and system commands)
 11. Android 11+ wireless debugging (pairing and mDNS discovery)
 12. Connect over USB
@@ -455,8 +464,8 @@ For mDNS, the program uses the bundled `adb` with a `zeroconf` fallback.
 Unlike subnet scanning, this discovers advertised current ports; a subnet
 scan checks one selected port.
 
-Before writing NTP, the program checks the reply and its offset from the
-computer's clock (at most 60 seconds). Check the computer's time first.
+Before writing NTP, the program validates the server's NTP reply. The offset
+from the computer's clock is informational: an incorrect local clock does not block applying a server.
 A successful write is confirmed by reading the setting back; it does not
 yet confirm that the TV has synchronized its clock.
 
@@ -496,7 +505,7 @@ Connects to the device and displays detailed information: model, manufacturer, A
 
 ### Item 6 — Ping NTP servers
 
-Checks the 122 reference addresses using real NTP requests rather than ICMP ping.
+Checks the 129 reference addresses using real NTP requests rather than ICMP ping.
 Shows round-trip time (RTT) and successful reply percentage, sorting by
 availability, reply percentage and speed. Many unreachable addresses can make
 the check take longer because each request must time out.
@@ -556,23 +565,24 @@ Opens a submenu for working with multiple devices:
 
 - **Time sync status** — compare device time with PC time
 
-### Item 9 — Auto-setup NTP server (experimental mode)
+### Item 9 — Auto-setup NTP server
 
 Helps choose a device and a suitable server:
 
-1. Reuses the selected USB device. If USB is not selected, asks for the ADB
-   port and scans the local network.
-2. Connects to the only device found, or offers a choice when several are found.
+1. Reuses the selected USB device. Otherwise, first discovers debugging addresses
+   and current ports via mDNS. If none are found, offers a network scan on a specified ADB port.
+2. Shows the only address found: press Enter to use it and continue, or q to cancel.
+   When several addresses are found, choose a number.
 3. Detects the region from the computer's timezone and checks the NTP reference.
-4. Keeps responding servers with a clock offset of at most 60 seconds.
-   Successful reply percentage comes first, then RTT; regional servers receive
-   a small preference when the successful reply percentage is equal.
+4. Sends five NTP requests per server with one-second pauses and requires at least
+   four valid replies. Ranking uses reply rate, then median delay plus delay
+   variation. The region only determines the order in which servers are checked.
 5. Shows up to five best candidates. You can select another numbered result.
 6. Asks for installation confirmation, writes the address and verifies it.
 
-For wireless debugging with different dynamic ports, it is more convenient to
-discover the device through mDNS in item 11 and set NTP in item 1 or 2:
-subnet scanning tests one specified port.
+mDNS finds classic and newer wireless debugging with dynamic ports. If code pairing
+is required, complete it in item 11 first. Discovery does not bypass the TV's debugging
+authorization; the fallback subnet scan checks one specified port.
 
 ### Item 10 — Terminal mode
 
@@ -651,27 +661,33 @@ the modern wireless mode, not for every connection method.
 2. Enable debugging **on the target device**, following
    [Android TV Setup](#android-tv-setup). The controlling phone does not need
    USB debugging enabled: it needs host/OTG for a cable connection.
-3. Check the date and time on the device running the APK: NTP replies are
-   compared with its clock. If the APK runs on the TV whose clock is wrong,
-   first set approximately correct date and time on that TV.
+3. NTP checks require access to the server over UDP/123 from the device running
+   the APK. Large clock differences do not block choosing or applying a server;
+   setting the clock beforehand is not required for this check.
 4. If network connections fail, check VPNs, router client isolation and
    automatic switching to mobile data. Disabling cellular service is not
    required for every connection.
 
 ### Application screen sections
 
-The app is a single scrolling screen. The connection IP address, main time
-server settings and pairing form always remain expanded, including after
-connection. Additional lists and help sections can be collapsed.
+The app is a single scrolling screen. The connection IP address and main time
+server settings remain expanded, including after connection. Pairing, time zone,
+additional lists and help sections can be collapsed.
+Each function has its own gray panel. Primary and secondary actions use different
+button fills. Long-press text or an address with a port to select and copy it
+through the system menu, then paste it into an input field.
 
 #### 1. Title and mode
+
+A Project source code label and clickable GitHub link appear after the version. The desktop app shows
+the version, a source code label and the link above the main menu; opening the link depends on the terminal's hyperlink support.
 
 One line under the name: "Running on a phone: it will connect to a TV over the
 network or USB" or "Running on a TV". The app works this out by itself; nothing to set.
 
 #### 2. "Connect to a device"
 
-Shows the current state, **colour-coded** so it can be read at a glance:
+Shows the current state in **bold, colour-coded text** so it can be read at a glance:
 
 *   **green** — "Connected to 192.168.0.112:5555", the link is up;
 *   **red** — "Not connected", or the reason it failed;
@@ -683,6 +699,9 @@ Shows the current state, **colour-coded** so it can be read at a glance:
 |---|---|
 | `192.168.0.112` | usually; port `5555` is added for you |
 | `192.168.0.112:37105` | when debugging uses a non-standard port |
+
+The four IPv4 numbers must be in the range 0–255 and the port in 1–65535.
+The connection field rejects domains, IPv6, URLs and invalid ports.
 
 Find the TV's address in its settings: **Settings → Network & Internet →** your
 network, or **Settings → About → Status**.
@@ -702,8 +721,10 @@ connection, not that the address merely looked valid.
     typo, or debugging is off.
 *   *"Invalid address"* — what you typed is not an IP address.
 
-Once connected, a **Disconnect** button appears. The IP field and pairing
-form remain visible; editing an address alone does not change the current connection.
+Once connected, a **Disconnect** button appears. The IP field stays visible and
+the pairing form can be expanded; editing an address alone does not change the
+current connection. The link is checked when returning to the app and in the
+background. Regular ten-second checks do not disable buttons or cause flickering.
 
 #### 3. "Devices found automatically on the network"
 
@@ -712,7 +733,7 @@ themselves on a local network. **You need neither the address nor the port**: a
 TV that is found shows up here on its own.
 
 The section can be collapsed and opens automatically when new results arrive.
-A green **Device found** label means discovery, not an established connection.
+A bold green **Device found** label means discovery, not an established connection.
 Each row shows the name, address and service type:
 
 *   **"Network debugging"** — the classic debugging on port 5555. The
@@ -721,7 +742,7 @@ Each row shows the name, address and service type:
     This does not prove that this app is paired; a new client may still need a code.
 *   **"Waiting to be paired"** — the pairing dialog is open on the TV. You
     cannot connect until a code is entered, so the button here is **Pair**: it
-    puts the address into the pairing form below.
+    expands the pairing form below and fills in the address.
 
 An empty list is not a problem: type the address by hand in the section above.
 
@@ -745,7 +766,7 @@ are inside **Choose a server**. An ongoing scan and its Stop button
 remain visible when the picker is collapsed.
 
 After connecting, **Current:** shows the value read from the device.
-A stored address is green. **No time server is set** means the app did not
+The line is bold and green. **No time server is set** means the app did not
 obtain a custom `ntp_server` value; Android normally uses the firmware default.
 If reading the setting is unsupported or fails, an empty field does not
 identify which system server is being used.
@@ -757,30 +778,29 @@ green, a rejected one red.
 **Choosing a server:**
 
 *   **Search.** Start typing a country code, a country name, or part of an
-    address: `ru`, `by`, `kz`, `Russia`, `cloudflare`. Tapping a result **puts
+    address: `us`, `uk`, `de`, `United States`, `United Kingdom`, `Germany`,
+    `cloudflare`. Tapping a result **puts
     the address into the input field** — nothing is changed yet.
 *   **The country list.** With the search empty there is a **Show countries and
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
     `KZ · Kazakhstan · kz.pool.ntp.org`, `BY · Belarus · by.pool.ntp.org`.
-*   **The alternative-server list.** **Show alternative time servers (45)** —
+*   **The alternative-server list.** **Show alternative time servers (52)** —
     the same set as the desktop version: regional pools, Cloudflare, Google
     and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
-    (`time.google.com`) or an IP address (`216.239.35.0`) — there is a reminder
-    of that under the field.
+    (`time.google.com`) or IPv4 (`216.239.35.0`), without a port, spaces, path
+    or `http://`. The standard NTP port, UDP/123, is used.
 
-The **Check** button sends a real NTP request from the device running the
-APK and parses the reply. It checks reachability and the offset from that
-device's clock, allowing at most **60 seconds**. Possible outcomes:
+The **Check** button sends real NTP requests from the device running the
+APK and parses the replies. It checks the address, reachability, and NTP responses.
+The offset from the device's clock is informational and does not block applying a
+server: the TV, box, or phone clock may be wrong. Possible outcomes:
 
 *   *Answers as a time server: 42 ms, 100% of replies, clock offset +0.3 s* —
     the server passed the check from the current network.
 *   *Does not answer as a time server: …* — no suitable reply was received;
     possible causes include server availability, blocked UDP/123 or DNS failure.
-*   *It answers, but reports a time that is far off* — the offset exceeds the
-    threshold. Check both the server and the phone/tablet clock; this message
-    alone does not establish that the server is faulty.
 
 The phone and TV networks may impose different restrictions, so a successful
 phone-side check does not guarantee that the TV can reach the server.
@@ -793,10 +813,10 @@ line is updated with the value **read back from the device**.
 *   *"The device still reports …"* — the command went through but the write did
     not happen. Usually this means the connection lacks permission to change
     secure settings.
-*   *"Not applied: …"* — the address failed the check. An **Apply anyway**
-    button appears next to it: the check runs from the phone's network, and UDP
-    port 123 is blocked by some carriers and routers, so refusing outright
-    would be wrong.
+*   *"Not applied: …"* — the address failed the check. The app explains why:
+    an invalid address, DNS failure, no response, an invalid NTP reply, or a
+    network error. The TV setting stays unchanged; correct the address,
+    check the network, or choose another server and try again.
 
 After a successful write, **device time verification** runs automatically.
 It reads the device clock through ADB and compares it with a fresh reply from
@@ -805,28 +825,51 @@ the configured NTP server. The result appears nearby: agreement within
 or unavailable data. ADB/NTP delays and whole-second clock readings are taken
 into account.
 
-The card shows the sampled device time in UTC, its difference from NTP, and
-automatic date and time status. **Verify device time** repeats only the read
+The card shows the sampled device time in UTC and, when its time zone is
+recognized, local time with the zone name, its difference from NTP, and
+automatic date and time status. For example, 13:00 UTC and 16:00 in UTC+3
+are the same moment, not a clock discrepancy. **Verify device time** repeats only the read
 and comparison; it does not change settings. Android may update its clock later,
 so a difference immediately after the write does not establish a failed setup.
 A failed check does not undo confirmation that the server address was saved.
 The NTP reply is received by the device running the APK: matching clocks do
 not prove that the TV synchronized with this particular server.
 
-The **Find the best one** button checks the 122-address reference and shows
-up to five suitable servers, ordered first by successful reply percentage and
-then by response time. Duration depends on the network and timeouts. Progress
-shows **Checked N of 122, M usable**; **Stop** keeps results already found.
+The **Find the best one** button collapses the open country and alternative
+lists and checks the 129-address reference with five NTP requests per server,
+separated by one-second pauses. Results require at least four valid replies.
+Up to five candidates are ranked by reply rate, then median delay plus delay
+variation (RMS). This estimates availability and connection stability, not
+absolute clock accuracy. Checking may take several minutes. Progress
+shows **Checked N of 129, M usable**; **Stop** keeps results already found.
 
 Each result shows a name and the IP address obtained during the check.
-Tapping either fills the input field; applying remains a separate action.
+Tapping either fills the input field and clears the results list.
+The address field highlights three times; applying remains a separate action.
 An IP can help with TV-side DNS problems, but a service is not guaranteed
 to keep that resolved address permanently.
 
-#### 5. "Pair a device" — the code, for Android 11 and newer
+#### 5. "Time zone"
 
-The pairing form is always visible on the main screen and cannot be collapsed.
-**Pair** on a discovered device fills its address and focuses the code field.
+This section is visible on phones and TVs, starts collapsed, and follows the NTP
+settings. Connect to the device, expand the section, and search by city or enter
+an exact zone ID, such as `Europe/London` or `UTC`. Selecting a result fills the
+field; only **Apply time zone** changes the setting.
+
+Applying a zone enables manual zone selection so automatic detection does not
+replace it. The NTP server and automatic date and time settings are preserved:
+the zone controls local time display, while NTP synchronizes the clock itself.
+The app reads the setting back to verify it. On failure, it attempts to restore
+the previous settings and reports whether restoration was confirmed.
+
+Required commands are checked on the connected device. AOSP includes them from
+Android 9, but firmware restrictions can vary. If unsupported, use the TV’s date
+and time settings. The phone’s Android version alone does not hide this menu.
+
+#### 6. Pairing — new wireless debugging on Android 11+
+
+The pairing section starts collapsed; tap its heading to expand it.
+**Pair** on a discovered device expands the form, fills its address, and focuses the code field.
 The pairing form and connection IP address remain available after connecting;
 editing the fields does not disconnect the current device.
 
@@ -874,26 +917,32 @@ saved to disk. Deadlines are 10 seconds for TCP, 15 seconds for TLS/read
 inactivity and 60 seconds for the overall pairing operation. App addresses
 currently support IPv4 only.
 
-Change history: [2.6.1](release-notes/v2.6.1-en.md) and
-[2.6.2](release-notes/v2.6.2-en.md).
+Change history: [2.6.1](release-notes/v2.6.1-en.md),
+[2.6.2](release-notes/v2.6.2-en.md) and [2.6.3](release-notes/v2.6.3-en.md).
 
-#### 6. USB debugging
+#### 7. USB debugging
 
 Expand this section manually, or it opens automatically when USB ADB is
 detected. It contains list refresh, device selection and the connection
 button. If nothing is found, expand the USB troubleshooting help and open
 the search details in Diagnostics. The connection steps and two permissions
 are explained in [USB debugging](#usb-debugging).
+If the mobile app cannot connect over USB, try the desktop version for
+Windows, Linux or macOS.
 
-#### 7. "Device"
+#### 8. "Device"
 
-Details read from the TV: model, manufacturer, Android and API version, serial
-number, CPU and core count, memory, screen resolution and density, time zone,
-locale, battery, kernel version, uptime and the current time server. The
-**Refresh** button reads it all again.
+Details read from the TV include firmware and security patches, chip and app
+architectures, graphics, RAM and data storage, display modes and HDR, audio
+outputs, network addresses and time settings. Serial number, locale, battery,
+kernel version and uptime are also shown when available. **Refresh** reads the
+details again; background connection checks do not poll them. Decoder lists
+come from readable firmware files and may be incomplete or include inactive
+variants; they do not verify hardware acceleration or DRM.
 
 Model, Android version, time server and time zone are visible immediately. The
-time server label and value are green. Expand **All device details** for the rest.
+time server label and value are green. **All device details** starts collapsed;
+expand it for the rest.
 Empty rows are hidden: if the firmware does not answer one command, only that
 row disappears.
 
@@ -906,8 +955,11 @@ the saved crash details.
 
 The private, non-backed-up store keeps up to **200 events for 7 days**, with a
 combined **256 KiB** disk budget. It excludes pairing codes, keys, serial numbers,
-entered addresses and ADB output. Technical details contain exception types and
-bounded stack frames without exception messages. Nothing is sent automatically.
+entered addresses and raw ADB output. Details include operation stages, error codes,
+command names without user arguments, exit status, duration, recognized system
+responses, NTP metrics and time zone recovery results. Exception types and bounded
+stack frames are included without arbitrary messages. The same details are copied
+into the report. Nothing is sent automatically.
 **Copy report** explicitly copies the history to the clipboard; **Clear** requires
 confirmation. A storage failure is shown in Diagnostics without stopping device
 operations.
@@ -949,11 +1001,14 @@ needs a port supporting USB device mode, not only a port for storage devices.
     section gives the procedure.
 *   A Windows → NVIDIA SHIELD USB connection and reading device details have
     been confirmed in user testing.
+*   A user confirmed time zone changes through the APK on NVIDIA SHIELD running
+    Android 11; NTP settings are preserved.
 *   Phone → SHIELD discovery is not yet confirmed: Android returns an empty
     USB list in the tested configuration. Better diagnostics do not establish
     that this hardware scenario has been fixed.
-*   Automated UI checks run on Android 6 and Android 16. They exercise the app
-    but do not replace physical testing of cables, USB roles or each TV model.
+*   Automated UI checks run on Android 6 and Android 16; system commands for
+    device details and time zone changes are also checked on Android 11.
+    These checks do not replace physical testing of cables, USB roles or each TV model.
 
 When reporting a problem, include both device models, Android versions,
 connection method and the error text. In the APK, details are available through Diagnostics.

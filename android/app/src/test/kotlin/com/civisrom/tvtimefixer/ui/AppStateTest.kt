@@ -5,6 +5,11 @@ import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
+import com.civisrom.tvtimefixer.device.DeviceInfo
+import com.civisrom.tvtimefixer.device.DeviceTimeCheck
+import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -22,6 +27,36 @@ import org.junit.Test
 class AppStateTest {
 
     private val address = DeviceAddress("192.168.0.112", 5555)
+
+    @Test fun `связь на проверке не показывает подключение по сети или USB`() {
+        for (target in listOf(address, UsbDeviceAddress("/dev/bus/usb/test", "TV"))) {
+            val checking = AppState(connection = ConnectionState.Checking(target))
+            assertFalse(checking.connected)
+            assertNull(checking.connectedAddress)
+            assertNull(checking.connectedUsb)
+        }
+    }
+
+    @Test fun `потеря связи убирает прежние сведения об устройстве и подтверждения времени`() {
+        val usb = UsbDeviceAddress("/dev/bus/usb/test", "TV")
+        val connected = AppState(connection = ConnectionState.Connected(address),
+            deviceInfo = DeviceInfo(model = "TV"), currentNtpServer = "pool.ntp.org",
+            ntpMessage = UiMessage(R.string.ntp_applied), ntpDiagnosticEventId = 1L,
+            timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH), timeDiagnosticEventId = 2L,
+            timeZoneResult = TimeZoneUpdateResult.Applied("Europe/Moscow"), timeZoneDiagnosticEventId = 3L,
+            usbDevices = listOf(usb))
+        val lost = connected.connectionLost()
+        assertFalse(lost.connected)
+        assertNull(lost.deviceInfo)
+        assertEquals("", lost.currentNtpServer)
+        assertNull(lost.ntpMessage)
+        assertNull(lost.ntpDiagnosticEventId)
+        assertNull(lost.timeCheck)
+        assertNull(lost.timeDiagnosticEventId)
+        assertNull(lost.timeZoneResult)
+        assertNull(lost.timeZoneDiagnosticEventId)
+        assertEquals(listOf(usb), lost.usbDevices)
+    }
 
     @Test fun `завершение команды сохраняет обнаружение и удаление USB за время чтения`() {
         val beforeRead = AppState(connection = ConnectionState.Connected(address), usbSupported = true)

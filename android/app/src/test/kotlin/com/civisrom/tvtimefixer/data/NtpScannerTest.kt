@@ -11,6 +11,24 @@ import org.junit.Test
 
 class NtpScannerTest {
 
+    @Test fun `selection requires four of five replies and checks duplicate names only once`() = runBlocking {
+        val calls = mutableMapOf<String, Int>()
+        val query = object : SntpQuery {
+            override fun query(host: String): SntpResult {
+                val count = (calls[host] ?: 0) + 1
+                calls[host] = count
+                if (count > if (host == "stable.example") 4 else 3) throw SocketTimeoutException()
+                return SntpResult(20, 31_536_000.0)
+            }
+        }
+        val result = NtpScanner(NtpProbe(query, attempts = 5), concurrency = 1)
+            .scan(listOf("stable.example", "flaky.example", "stable.example")).toList().last()
+        assertEquals(2, result.total)
+        assertEquals(listOf("stable.example"), result.best.map { it.server })
+        assertEquals(80, result.best.single().successRate)
+        assertEquals(mapOf("stable.example" to 5, "flaky.example" to 5), calls)
+    }
+
     /** Отвечают только серверы с чётным номером, и тем быстрее, чем меньше номер. */
     private val everyOtherAnswers = object : SntpQuery {
         override fun query(host: String): SntpResult {

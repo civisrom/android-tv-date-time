@@ -3,6 +3,7 @@ package com.civisrom.tvtimefixer.device
 import com.civisrom.tvtimefixer.adb.AdbClient
 import com.civisrom.tvtimefixer.adb.ShellResult
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -75,6 +76,102 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `Android 6 storage falls back when df rejects the k option`() {
+        val target = object : AdbClient {
+            override fun isAlive() = true
+            override fun close() = Unit
+            override fun shell(command: String) = when (command) {
+                "getprop" -> ShellResult("[ro.product.model]: [Old TV]\n[ro.build.version.sdk]: [23]", "", 0)
+                "df -k /data" -> ShellResult("", "Could not stat -k", 1)
+                "df /data" -> ShellResult("Filesystem Size Used Free Blksize\n/data 8.0G 6.0G 2.0G 4096", "", 0)
+                else -> ShellResult("", "", 0)
+            }
+        }
+        val info = DeviceRepository(target).readDeviceInfo()
+        assertEquals("8.00 GiB", info.storageTotal)
+        assertEquals("2.00 GiB", info.storageAvailable)
+    }
+
+    @Test fun `automatic zone reflects detection support rather than a stale TV setting`() {
+        fun read(api: Int, telephony: String, geo: String, enabled: String): Boolean? {
+            val client = object : AdbClient {
+                override fun isAlive() = true
+                override fun close() = Unit
+                override fun shell(command: String) = ShellResult(when (command) {
+                    "cmd time_zone_detector is_telephony_detection_supported" -> telephony
+                    "cmd time_zone_detector is_geo_detection_supported" -> geo
+                    "cmd time_zone_detector is_auto_detection_enabled" -> enabled
+                    "settings get global auto_time_zone" -> "1"
+                    else -> error(command)
+                }, "", 0)
+            }
+            return DeviceRepository(client).automaticTimeZoneEnabled(api)
+        }
+        assertEquals(false, read(31, "false", "false", "true"))
+        assertEquals(true, read(31, "true", "false", "true"))
+        assertEquals(false, read(36, "false", "true", "false"))
+        assertNull(read(36, "false", "unknown command", "true"))
+        assertNull(read(36, "true", "true", "unknown command"))
+        assertEquals(true, read(30, "", "", ""))
+    }
+
+    @Test fun `new properties come from the connected target and all reads are optional`() {
+        val target = object : AdbClient {
+            override fun isAlive() = true
+            override fun close() = Unit
+            override fun shell(command: String) = when (command) {
+                "getprop" -> ShellResult("""
+                    [ro.product.model]: [Target TV]
+                    [ro.soc.model]: [Target chip]
+                    [ro.soc.manufacturer]: [Target vendor]
+                    [ro.build.display.id]: [TV 11 build]
+                    [ro.build.version.security_patch]: [2026-08-01]
+                    [ro.product.cpu.abi]: [armeabi-v7a]
+                    [ro.product.cpu.abilist]: [arm64-v8a,armeabi-v7a]
+                    [ro.bootloader]: [unknown]
+                """.trimIndent(), "", 0)
+                "settings get global auto_time" -> ShellResult("1", "", 0)
+                "settings get global auto_time_zone" -> ShellResult("null", "", 0)
+                else -> ShellResult("permission denied", "permission denied", 1)
+            }
+        }
+        val info = DeviceRepository(target).readDeviceInfo()
+        assertEquals("Target TV", info.model)
+        assertEquals("Target chip", info.socModel)
+        assertEquals("Target vendor", info.socManufacturer)
+        assertEquals("TV 11 build", info.buildDisplay)
+        assertEquals("2026-08-01", info.securityPatch)
+        assertEquals("arm64-v8a,armeabi-v7a", info.cpuAbi)
+        assertEquals("", info.bootloader)
+        assertEquals("", info.screenResolution)
+        assertEquals("", info.kernelVersion)
+        assertEquals(true, info.automaticTime)
+        assertEquals(null, info.automaticTimeZone)
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun `getprop failure exit cannot become successful empty device information`() {
+        val target = object : AdbClient {
+            override fun isAlive() = true
+            override fun close() = Unit
+            override fun shell(command: String) = ShellResult("Permission Denial", "", 1)
+        }
+        DeviceRepository(target).readDeviceInfo()
+    }
+
+    @Test(expected = java.util.concurrent.CancellationException::class)
+    fun `cancellation stops further optional reads`() {
+        val target = object : AdbClient {
+            override fun isAlive() = true
+            override fun close() = Unit
+            override fun shell(command: String): ShellResult {
+                if (command == "getprop") return ShellResult("[ro.product.model]: [TV]", "", 0)
+                throw java.util.concurrent.CancellationException()
+            }
+        }
+        DeviceRepository(target).readDeviceInfo()
+    }
+
     @Test fun `diagnostic callback failure cannot replace the NTP result`() {
         val repository = DeviceRepository(FakeDevice(failOnPut = true)) {
             throw java.io.IOException("storage unavailable")
@@ -111,9 +208,10 @@ class DeviceRepositoryTest {
     @Test
     fun `некорректный адрес не доходит до устройства`() {
         val device = FakeDevice()
-        val result = DeviceRepository(device).setNtpServer("не сервер")
-
-        assertEquals(NtpUpdateResult.InvalidServer, result)
+        for (server in listOf("не сервер", "time.-pool.org", "time.pool-.org", "time.google.com:123",
+            "https://time.google.com", "999.0.0.1", "192.168.1.1:123")) {
+            assertEquals(server, NtpUpdateResult.InvalidServer, DeviceRepository(device).setNtpServer(server))
+        }
         assertTrue("команд быть не должно", device.commands.isEmpty())
     }
 

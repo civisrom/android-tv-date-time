@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.civisrom.tvtimefixer.adb.AdbClientFactory
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.ConnectionError
@@ -35,7 +37,9 @@ import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
 import com.civisrom.tvtimefixer.adb.targetOrNull
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbe
+import com.civisrom.tvtimefixer.data.NtpProbeFailure
 import com.civisrom.tvtimefixer.data.NtpScanner
+import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceRepository
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
@@ -47,19 +51,29 @@ import com.civisrom.tvtimefixer.ui.AppState
 import com.civisrom.tvtimefixer.ui.MainScreen
 import com.civisrom.tvtimefixer.ui.UiMessage
 import com.civisrom.tvtimefixer.ui.toUiMessage
+import com.civisrom.tvtimefixer.ui.rejectionMessageRes
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticTransport
 import com.civisrom.tvtimefixer.adb.DeviceTarget
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
+import com.civisrom.tvtimefixer.device.TimeZoneRepository
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.device.TimeZoneFailure
+import com.civisrom.tvtimefixer.device.TimeZoneRestoration
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.civisrom.tvtimefixer.diagnostics.OperationTrace
 
 class MainActivity : ComponentActivity() {
 
@@ -80,6 +94,7 @@ class MainActivity : ComponentActivity() {
     private var permissionsRequested = false
     private var actionJob: Job? = null
     private var actionGeneration = 0
+    private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
 
     private val usbReceiver = object : BroadcastReceiver() {
@@ -96,6 +111,7 @@ class MainActivity : ComponentActivity() {
                         operation = Operation.DISCONNECT, diagnosticEventId = event,
                         deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
                         timeCheck = null, timeDiagnosticEventId = null,
+                        timeZoneResult = null, timeZoneDiagnosticEventId = null,
                         message = UiMessage(R.string.error_usb_disconnected))
                     lifecycleScope.launch {
                         // Даже releaseInterface/close могут ждать kernel I/O.
@@ -115,7 +131,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val ntpProbe = NtpProbe(UdpSntpClient())
-    private val ntpScanner = NtpScanner(ntpProbe)
+    private val ntpScanner = NtpScanner(NtpProbe(UdpSntpClient(), attempts = 5, pause = { Thread.sleep(1000) }))
     private val timeVerifier = DeviceTimeVerifier(UdpSntpClient(), SystemClock::elapsedRealtime)
     private var scanJob: Job? = null
 
@@ -139,7 +155,7 @@ class MainActivity : ComponentActivity() {
 
     private val actions = object : AppActions {
 
-        private fun run(operation: Operation, block: suspend () -> AppState) {
+        private fun run(operation: Operation, block: suspend (OperationTrace) -> AppState) {
             if (state.busy) return
             val generation = ++actionGeneration
             val started = System.nanoTime()
@@ -150,34 +166,45 @@ class MainActivity : ComponentActivity() {
             }
             val ntpAction = operation == Operation.CHECK_NTP || operation == Operation.APPLY_NTP
             val timeAction = operation == Operation.CHECK_TIME
+            val zoneAction = operation == Operation.APPLY_TIME_ZONE
             val resetTime = operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
-                Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE)
+                Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE)
+            val resetZone = zoneAction || operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
+                Operation.PAIR, Operation.READ_DEVICE)
             state = state.copy(busy = true, operation = operation, diagnosticEventId = null,
+                timeZoneResult = if (resetZone) null else state.timeZoneResult,
+                timeZoneDiagnosticEventId = if (resetZone) null else state.timeZoneDiagnosticEventId,
                 timeCheck = if (resetTime) null else state.timeCheck,
                 timeDiagnosticEventId = if (resetTime) null else state.timeDiagnosticEventId,
                 ntpDiagnosticEventId = if (ntpAction) null else state.ntpDiagnosticEventId)
             journal.record(operation, Outcome.STARTED, transport)
             actionJob = lifecycleScope.launch {
+                val trace = OperationTrace()
                 try {
-                    val result = block()
+                    // Нажатие во время фоновой проверки ждёт её завершения,
+                    // не теряется и не читает тот же ADB-транспорт одновременно.
+                    val result = deviceOperations.withLock { block(trace) }
                     val failure = result.connection as? ConnectionState.Failed
                     val failed = when (operation) {
                         Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
                         Operation.CHECK_NTP -> result.ntpCheck?.isUsable() != true
                         Operation.APPLY_NTP -> result.ntpMessage?.res != R.string.ntp_applied
                         Operation.CHECK_TIME -> result.timeCheck?.status != DeviceTimeStatus.MATCH
+                        Operation.APPLY_TIME_ZONE -> result.timeZoneResult !is TimeZoneUpdateResult.Applied
                         Operation.READ_DEVICE -> result.diagnosticEventId != null || !result.connected || result.deviceInfo == null
                         else -> false
                     }
-                    val existing = if (timeAction) result.timeDiagnosticEventId else if (ntpAction) result.ntpDiagnosticEventId
+                    val existing = if (zoneAction) result.timeZoneDiagnosticEventId else if (timeAction) result.timeDiagnosticEventId else if (ntpAction) result.ntpDiagnosticEventId
                         else failure?.diagnosticId ?: result.diagnosticEventId
                     val event = if (failed && existing != null) existing else journal.record(operation,
                         if (failed) Outcome.FAILED else Outcome.SUCCESS, transport,
-                        durationMs = (System.nanoTime() - started) / 1_000_000,
+                        durationMs = (System.nanoTime() - started) / 1_000_000, trace = trace,
                         reason = failure?.reason ?: ConnectionError.UNREACHABLE.takeIf {
                             failed && !result.connected && operation == Operation.READ_DEVICE
                         }, issue = if (!failed) null else when {
+                            zoneAction -> (result.timeZoneResult as? TimeZoneUpdateResult.Failed)?.diagnosticIssue()
                             timeAction -> result.timeCheck?.diagnosticIssue()
+                            ntpAction && result.ntpCheck?.failure == NtpProbeFailure.INVALID_ADDRESS -> DiagnosticIssue.INVALID_NTP
                             ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
                             ntpAction && result.ntpCheck?.isUsable() == false -> DiagnosticIssue.NTP_UNUSABLE
                             result.ntpMessage?.res == R.string.ntp_not_confirmed -> DiagnosticIssue.NTP_NOT_CONFIRMED
@@ -185,17 +212,20 @@ class MainActivity : ComponentActivity() {
                             else -> null
                         })
                     if (generation == actionGeneration) state = result.copy(
-                        diagnosticEventId = if (!ntpAction && !timeAction && failed) event else result.diagnosticEventId,
+                        diagnosticEventId = if (!ntpAction && !timeAction && !zoneAction && failed) event else result.diagnosticEventId,
+                        timeZoneDiagnosticEventId = if (zoneAction && failed) event else result.timeZoneDiagnosticEventId,
                         ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
                         timeDiagnosticEventId = if (timeAction && failed) event else result.timeDiagnosticEventId,
                     ).withLatestUsb(state)
                 } catch (e: CancellationException) {
-                    journal.record(operation, Outcome.CANCELLED, transport)
+                    journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
                     throw e
                 } catch (e: Exception) {
                     val event = journal.record(operation, Outcome.FAILED, transport,
-                        durationMs = (System.nanoTime() - started) / 1_000_000, error = e)
-                    if (generation == actionGeneration) state = if (timeAction) state.copy(
+                        durationMs = (System.nanoTime() - started) / 1_000_000, error = e, trace = trace)
+                    if (generation == actionGeneration) state = if (zoneAction) state.copy(
+                        timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE), timeZoneDiagnosticEventId = event,
+                    ) else if (timeAction) state.copy(
                         timeCheck = DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE), timeDiagnosticEventId = event,
                     ) else if (ntpAction) state.copy(
                         ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
@@ -206,14 +236,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        override fun connect(address: String) = run(Operation.CONNECT_NETWORK) {
+        override fun connect(address: String) = run(Operation.CONNECT_NETWORK) { trace ->
             val result = withContext(Dispatchers.IO) { connector.connect(address) }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
-        override fun connectLoopback() = run(Operation.CONNECT_NETWORK) {
+        override fun connectLoopback() = run(Operation.CONNECT_NETWORK) { trace ->
             val result = withContext(Dispatchers.IO) { connector.connectLoopback() }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
         override fun disconnect() = run(Operation.DISCONNECT) {
@@ -233,11 +263,11 @@ class MainActivity : ComponentActivity() {
 
         override fun refreshUsbDevices() = refreshUsbList(report = true)
 
-        override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) {
+        override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) { trace ->
             withContext(Dispatchers.IO) { connector.disconnect() }
             state = state.copy(connection = ConnectionState.Connecting(address),
                 deviceInfo = null, currentNtpServer = "", ntpMessage = null,
-                ntpCheck = null, ntpRejected = null,
+                ntpCheck = null,
                 message = UiMessage(R.string.usb_authorize_hint))
             state = state.copy(operation = Operation.USB_PERMISSION)
             journal.record(Operation.USB_PERMISSION, Outcome.STARTED, DiagnosticTransport.USB)
@@ -256,26 +286,27 @@ class MainActivity : ComponentActivity() {
                 return@run state.copy(connection = ConnectionState.Failed(address, reason, permissionEvent), message = null)
             }
             val result = withContext(Dispatchers.IO) { connector.connectUsb(address) }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
         override fun pairAndConnect(
             pairingAddress: String,
             code: String,
             connectAddress: String,
-        ) = run(Operation.PAIR) {
+        ) = run(Operation.PAIR) { trace ->
             // Спаривание и следующее за ним подключение оба ходят в сеть, а
             // connect внутри блокирующий: на главном потоке это NetworkOnMainThread
             val result = withContext(Dispatchers.IO) {
                 connector.pairAndConnect(pairingAddress, code, connectAddress)
             }
-            state.copy(connection = result, message = null).withDeviceData()
+            state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
-        override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) {
-            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null)
+        override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) { trace ->
+            state = state.copy(ntpMessage = null, ntpCheck = null)
             val result = withContext(Dispatchers.IO) { ntpProbe.test(server) }
-            state.copy(ntpCheck = result, ntpRejected = server.takeUnless { result.isUsable() })
+            trace.ntp(result)
+            state.copy(ntpCheck = result)
         }
 
         /**
@@ -283,17 +314,17 @@ class MainActivity : ComponentActivity() {
          * сервер времени. Десктопная половина ведёт себя так же: адрес, не
          * прошедший проверку, до устройства не доходит.
          */
-        override fun applyNtpServer(server: String, force: Boolean) = run(Operation.APPLY_NTP) {
-            state = state.copy(ntpMessage = null, ntpRejected = null)
+        override fun applyNtpServer(server: String) = run(Operation.APPLY_NTP) { trace ->
+            state = state.copy(ntpMessage = null)
             val applied = withContext(Dispatchers.IO) {
-                val check = if (force) null else ntpProbe.test(server)
-                if (check != null && !check.isUsable()) {
+                val check = ntpProbe.test(server)
+                trace.ntp(check)
+                if (!check.isUsable()) {
                     return@withContext state.copy(
                         ntpCheck = check,
-                        ntpRejected = server,
                         ntpMessage = UiMessage(
                             R.string.ntp_check_rejected,
-                            listOf(check.error ?: getString(R.string.ntp_check_bad_clock)),
+                            listOf(getString(check.rejectionMessageRes())),
                         ),
                     )
                 }
@@ -302,11 +333,12 @@ class MainActivity : ComponentActivity() {
                     message = UiMessage(R.string.error_unreachable),
                 )
                 var failureId: Long? = null
-                val repository = DeviceRepository(client) { error ->
+                val repository = DeviceRepository(trace.client(client)) { error ->
                     failureId = journal.record(Operation.APPLY_NTP, Outcome.FAILED,
-                        diagnosticTransport(state.connection.targetOrNull()), error = error)
+                        diagnosticTransport(state.connection.targetOrNull()), error = error, trace = trace)
                 }
                 val result = repository.setNtpServer(server)
+                trace.ntpUpdate(result)
                 // Значение перечитывается всегда: `settings put` рапортует об
                 // успехе и тогда, когда записи не произошло
                 state.copy(
@@ -323,35 +355,72 @@ class MainActivity : ComponentActivity() {
             val transport = diagnosticTransport(state.connection.targetOrNull())
             val started = SystemClock.elapsedRealtime()
             journal.record(Operation.CHECK_TIME, Outcome.STARTED, transport)
+            val clockTrace = OperationTrace()
             val verified = try {
-                state.withDeviceTime()
+                state.withDeviceTime(clockTrace)
             } catch (e: CancellationException) {
-                journal.record(Operation.CHECK_TIME, Outcome.CANCELLED, transport)
+                journal.record(Operation.CHECK_TIME, Outcome.CANCELLED, transport, trace = clockTrace)
                 throw e
             }
             val failed = verified.timeCheck?.status != DeviceTimeStatus.MATCH
             val event = journal.record(Operation.CHECK_TIME, if (failed) Outcome.FAILED else Outcome.SUCCESS,
                 transport, durationMs = SystemClock.elapsedRealtime() - started,
-                issue = verified.timeCheck?.diagnosticIssue())
+                issue = verified.timeCheck?.diagnosticIssue(), trace = clockTrace)
             verified.copy(timeDiagnosticEventId = event.takeIf { failed })
         }
 
-        override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { state.withDeviceTime() }
+        override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { trace -> state.withDeviceTime(trace) }
+
+        override fun applyTimeZone(zoneId: String) = run(Operation.APPLY_TIME_ZONE) { trace ->
+            withContext(Dispatchers.IO) {
+                val client = connector.activeClient
+                if (!state.connected || client == null) return@withContext state.connectionLost().copy(
+                    timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE),
+                    message = UiMessage(R.string.error_unreachable),
+                )
+                var error: Exception? = null
+                val result = TimeZoneRepository(trace.client(client), onFailure = { error = it }).setTimeZone(zoneId)
+                trace.timeZone(result)
+                val failure = result as? TimeZoneUpdateResult.Failed
+                val event = failure?.let {
+                    journal.record(Operation.APPLY_TIME_ZONE, Outcome.FAILED,
+                        diagnosticTransport(state.connection.targetOrNull()), issue = it.diagnosticIssue(), error = error, trace = trace)
+                }
+                val actual = when (result) {
+                    is TimeZoneUpdateResult.Applied -> result.zoneId
+                    is TimeZoneUpdateResult.Failed -> result.actualZone
+                }
+                state.copy(timeZoneResult = result, timeZoneDiagnosticEventId = event,
+                    deviceInfo = state.deviceInfo?.let { info ->
+                        info.copy(
+                            timezone = if (actual != null || failure?.restoration == TimeZoneRestoration.UNCONFIRMED)
+                                actual.orEmpty() else info.timezone,
+                            automaticTimeZone = DeviceRepository(trace.client(client))
+                                .automaticTimeZoneEnabled(info.apiLevel.toIntOrNull()),
+                        )
+                    })
+            }
+        }
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
-            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null, ntpDiagnosticEventId = null)
+            state = state.copy(ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
+                ntpScan = ScanProgress(0, NtpData.allServers.size, emptyList()))
             journal.record(Operation.SCAN_NTP, Outcome.STARTED)
             val started = System.nanoTime()
             scanJob = lifecycleScope.launch {
+                var lastProgress = ScanProgress(0, NtpData.allServers.size, emptyList())
                 try {
                     ntpScanner.scan(NtpData.allServers).collect { progress ->
+                        lastProgress = progress
                         state = state.copy(ntpScan = progress)
                     }
                     journal.record(Operation.SCAN_NTP, Outcome.SUCCESS,
-                        durationMs = (System.nanoTime() - started) / 1_000_000)
+                        durationMs = (System.nanoTime() - started) / 1_000_000,
+                        trace = OperationTrace().apply { scan(lastProgress) })
                 } catch (e: CancellationException) {
-                    journal.record(Operation.SCAN_NTP, Outcome.CANCELLED)
+                    journal.record(Operation.SCAN_NTP, Outcome.CANCELLED,
+                        trace = OperationTrace().apply { scan(lastProgress) })
                     throw e
                 } catch (e: Exception) {
                     val event = journal.record(Operation.SCAN_NTP, Outcome.FAILED, error = e)
@@ -369,7 +438,15 @@ class MainActivity : ComponentActivity() {
             state = state.copy(ntpScan = state.ntpScan?.let { it.copy(checked = it.total) })
         }
 
-        override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { state.withDeviceData() }
+        override fun clearNtpScanResults() {
+            // Можно выбрать и промежуточный результат. Останавливаем поиск,
+            // чтобы следующий ответ не вернул уже убранный список.
+            scanJob?.cancel()
+            scanJob = null
+            state = state.copy(ntpScan = null)
+        }
+
+        override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { trace -> state.withDeviceData(trace) }
 
         override fun requestDiscoveryPermission() = requestDiscoveryPermissions()
     }
@@ -395,6 +472,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var returning = true
+                while (isActive) {
+                    // Пользовательские команды имеют приоритет перед очередной проверкой.
+                    if (state.busy) {
+                        delay(200)
+                        continue
+                    }
+                    checkDeviceConnection(returning)
+                    returning = false
+                    delay(10_000)
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -406,6 +498,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        val connected = state.connection as? ConnectionState.Connected
+        if (connected != null && !state.busy) {
+            state = state.copy(connection = ConnectionState.Checking(connected.address))
+        }
         refreshUsbList()
         if (missingDiscoveryPermissions().isEmpty()) {
             startDiscovery()
@@ -420,7 +516,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         // Сканирование mDNS держит радио включённым — на время невидимости
-        // приложения оно останавливается, но соединение с устройством живёт
+        // приложения оно останавливается. Сохранённую связь проверяем при возврате.
         runCatching { discovery?.stop() }
         super.onStop()
     }
@@ -435,6 +531,30 @@ class MainActivity : ComponentActivity() {
         // на главном потоке соединение осталось бы полузакрытым
         thread { usb.close(); connector.disconnect() }
         super.onDestroy()
+    }
+
+    private suspend fun checkDeviceConnection(returning: Boolean) = deviceOperations.withLock {
+        if (state.busy) return@withLock
+        val connection = state.connection
+        if (connection !is ConnectionState.Connected && connection !is ConnectionState.Checking) return@withLock
+        val target = connection.targetOrNull() ?: return@withLock
+        val generation = ++actionGeneration
+        // Обычная проверка не меняет busy: иначе каждые 10 секунд мигают
+        // кнопки и появляется полоса загрузки, сдвигающая поля ввода.
+        if (returning) state = state.copy(busy = true, connection = ConnectionState.Checking(target))
+        try {
+            val result = withContext(Dispatchers.IO) { connector.checkConnection() }
+            // Новая команда пока ждёт Mutex. Ей нужен актуальный результат
+            // проверки, но отключённое через USB receiver устройство не восстанавливаем.
+            if (state.connection.targetOrNull() != target) return@withLock
+            state = if (result is ConnectionState.Connected) state.copy(connection = result) else {
+                val event = journal.record(Operation.DISCONNECT, Outcome.FAILED, diagnosticTransport(target),
+                    reason = if (target is UsbDeviceAddress) ConnectionError.USB_DISCONNECTED else ConnectionError.UNREACHABLE)
+                state.connectionLost().copy(message = UiMessage(R.string.connect_connection_lost), diagnosticEventId = event)
+            }
+        } finally {
+            if (returning && generation == actionGeneration) state = state.copy(busy = false)
+        }
     }
 
     private fun refreshUsbList(report: Boolean = false) {
@@ -533,31 +653,41 @@ class MainActivity : ComponentActivity() {
      * раздел «Устройство» оставался пустым, а кнопка «Обновить» выглядела
      * ненажатой — отличить одно от другого было нечем.
      */
-    private suspend fun AppState.withDeviceData(): AppState {
-        val clean = copy(deviceInfo = null, currentNtpServer = "")
+    private suspend fun AppState.withDeviceData(trace: OperationTrace): AppState {
+        val clean = copy(deviceInfo = null, currentNtpServer = "", timeZoneResult = null, timeZoneDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
         return withContext(Dispatchers.IO) {
             val client = connector.activeClient ?: return@withContext clean.copy(
                 connection = ConnectionState.Disconnected,
                 message = UiMessage(R.string.error_unreachable),
             )
-            runCatching { DeviceRepository(client).readDeviceInfo() }.fold(
+            runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
                 onSuccess = { clean.copy(deviceInfo = it, currentNtpServer = it.currentNtpServer) },
                 onFailure = {
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,
-                        diagnosticTransport(connection.targetOrNull()), error = it)
+                        diagnosticTransport(connection.targetOrNull()), error = it, trace = trace)
                     clean.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
                 },
             )
         }
     }
 
-    private suspend fun AppState.withDeviceTime(): AppState = withContext(Dispatchers.IO) {
+    private suspend fun AppState.withDeviceTime(trace: OperationTrace): AppState = withContext(Dispatchers.IO) {
         val client = connector.activeClient
         val check = if (!connected || client == null) DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
-            else timeVerifier.verify(client)
+            else timeVerifier.verify(trace.client(client), onFailure = trace::exception)
+        trace.deviceTime(check)
         copy(timeCheck = check)
     }
+
+    private fun TimeZoneUpdateResult.Failed.diagnosticIssue(): DiagnosticIssue =
+        if (restoration == TimeZoneRestoration.UNCONFIRMED) DiagnosticIssue.TIME_ZONE_RESTORE_FAILED else when (reason) {
+            TimeZoneFailure.INVALID_ZONE -> DiagnosticIssue.INVALID_TIME_ZONE
+            TimeZoneFailure.UNSUPPORTED -> DiagnosticIssue.TIME_ZONE_UNSUPPORTED
+            TimeZoneFailure.READ_STATE -> DiagnosticIssue.TIME_ZONE_READ_FAILED
+            TimeZoneFailure.AUTO_MODE -> DiagnosticIssue.TIME_ZONE_AUTO_FAILED
+            TimeZoneFailure.WRITE -> DiagnosticIssue.TIME_ZONE_WRITE_FAILED
+        }
 
     private fun DeviceTimeCheck.diagnosticIssue(): DiagnosticIssue? = when (status) {
         DeviceTimeStatus.MATCH -> null

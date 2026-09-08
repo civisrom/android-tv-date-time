@@ -19,7 +19,7 @@ class NtpDataTest {
 
     @Test
     fun `альтернативных серверов ровно столько же, сколько в десктопной версии`() {
-        assertEquals(45, NtpData.alternativeServers.size)
+        assertEquals(52, NtpData.alternativeServers.size)
     }
 
     @Test

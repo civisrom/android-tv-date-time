@@ -22,6 +22,20 @@ class ValidatorsTest {
         assertFalse(isValidNtpServer("-bad.example"))
         assertFalse(isValidNtpServer("not a host"))
         assertFalse(isValidNtpServer("999.0.0.1"))
+        for (server in listOf("time.-pool.org", "time.pool-.org", "time..org",
+            "https://time.google.com", "time.google.com:123", "192.168.1.1:123")) {
+            assertFalse(server, isValidNtpServer(server))
+        }
+    }
+
+    @Test
+    fun `домен ограничен 253 символами и 63 символами в каждой метке`() {
+        val longest = List(3) { "a".repeat(63) }.plus("a".repeat(61)).joinToString(".")
+        assertTrue(isValidNtpServer(longest))
+        assertFalse(isValidNtpServer(longest + "a"))
+        assertFalse(isValidNtpServer("a".repeat(64) + ".org"))
+        assertFalse(isValidNtpServer("time." + "a".repeat(64)))
+        assertTrue(isValidNtpServer("time.pool-1.org"))
     }
 
     @Test
@@ -43,6 +57,21 @@ class ValidatorsTest {
         assertNull(parseDeviceAddress("192.168.1.20:abc"))
         assertNull(parseDeviceAddress("999.0.0.1:5555"))
         assertNull(parseDeviceAddress(""))
+        for (port in listOf("+5555", "-5555", "", "55 55", "５５５５")) {
+            assertNull(port, parseDeviceAddress("192.168.1.20:$port"))
+        }
+        assertEquals(DeviceAddress("192.168.1.20", 1), parseDeviceAddress("192.168.1.20:1"))
+        assertEquals(DeviceAddress("192.168.1.20", 65535), parseDeviceAddress("192.168.1.20:65535"))
+    }
+
+    @Test
+    fun `Unicode-цифры не допускаются в IP и коде спаривания`() {
+        for (address in listOf("１９２.１６８.１.２０", "١٩٢.١٦٨.١.٢٠")) {
+            assertFalse(isValidIpv4(address))
+            assertFalse(isValidNtpServer(address))
+            assertNull(parseDeviceAddress("$address:5555"))
+        }
+        for (code in listOf("１２３４５６", "١٢٣٤٥٦")) assertFalse(isValidPairingCode(code))
     }
 
     @Test

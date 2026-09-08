@@ -66,6 +66,10 @@ arising from the use of this program.
                 en="Version {version}",
                 ru="Версия {version}"
             ),
+            "project_source_code": Translation(
+                en="Project source code:",
+                ru="Исходный код проекта:"
+            ),
             "please_ensure": Translation(
                 en="\nPlease ensure the following is done:",
                 ru="\nПожалуйста, убедитесь, что следующее сделано:"
@@ -500,8 +504,8 @@ arising from the use of this program.
                 ru="Введите корректный номер"
             ),
             "menu_item_9": Translation(
-                 en="9. Auto-setup NTP server (experimental mode)",
-                 ru="9. Автоматическая установка NTP-сервера (экспериментальный режим)"
+                 en="9. Auto-setup NTP server",
+                 ru="9. Автоматическая установка NTP-сервера"
             ),
             "menu_item_10": Translation(
                  en="10. Terminal mode (ADB and system commands)",
@@ -1272,12 +1276,20 @@ arising from the use of this program.
                 ru="\n[Авто] Сканирование сети для поиска Android TV устройств..."
             ),
             "auto_found_device": Translation(
-                en="[Auto] Found {count} device(s). Connecting to {ip}...",
-                ru="[Авто] Найдено {count} устройств. Подключение к {ip}..."
+                en="[Auto] Found device: {ip}",
+                ru="[Авто] Найдено устройство: {ip}"
+            ),
+            "auto_use_found_device": Translation(
+                en="[Auto] Press Enter to use this address and continue, or q to cancel: ",
+                ru="[Авто] Нажмите Enter, чтобы использовать этот адрес и продолжить, или q для отмены: "
+            ),
+            "auto_mdns_fallback": Translation(
+                en="[Auto] No connection addresses found via mDNS. Some devices do not advertise debugging or the network blocks discovery. Choose an ADB port to try a network scan (q to cancel).",
+                ru="[Авто] По mDNS не найдены адреса подключения. Некоторые устройства не объявляют отладку или сеть блокирует обнаружение. Выберите ADB-порт для поиска в сети (q — отмена)."
             ),
             "auto_select_device": Translation(
-                en="[Auto] Multiple devices found. Select device number: ",
-                ru="[Авто] Найдено несколько устройств. Выберите номер устройства: "
+                en="[Auto] Multiple addresses found. Select a number, or q to cancel: ",
+                ru="[Авто] Найдено несколько адресов. Выберите номер или q для отмены: "
             ),
             "auto_no_devices": Translation(
                 en="[Auto] No devices found on network. Check that ADB debugging is enabled.",
@@ -1288,8 +1300,8 @@ arising from the use of this program.
                 ru="[Авто] Подтвердите подключение на экране ТВ, если появится запрос..."
             ),
             "auto_checking_ntp": Translation(
-                en="[Auto] Quick-testing NTP servers to find the best one for you...",
-                ru="[Авто] Быстрая проверка NTP-серверов для выбора оптимального..."
+                en="[Auto] Five NTP requests per server with pauses. Ranking considers valid replies, median delay and variation. This may take several minutes...",
+                ru="[Авто] Пять NTP-запросов к каждому серверу с паузами. Учитываются корректные ответы, медиана задержки и её разброс. Проверка может занять несколько минут..."
             ),
             "auto_best_server": Translation(
                 en="[Auto] Recommended server: {server} (RTT: {rtt:.1f}ms)",
@@ -1312,8 +1324,8 @@ arising from the use of this program.
                 ru="[Авто] Установка отменена пользователем."
             ),
             "auto_no_reachable_servers": Translation(
-                en="[Auto] No reachable NTP servers found. Check your internet connection.",
-                ru="[Авто] Не найдено доступных NTP-серверов. Проверьте подключение к интернету."
+                en="[Auto] No NTP server provided at least four valid replies out of five. Check your network and try again.",
+                ru="[Авто] Не найдено NTP-серверов с минимум четырьмя корректными ответами из пяти. Проверьте сеть и повторите поиск."
             ),
             "auto_choose_from_top": Translation(
                 en="[Auto] Enter server number from the list (or Enter for recommended #1): ",

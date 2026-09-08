@@ -1,7 +1,13 @@
 package com.civisrom.tvtimefixer.data
 
 import com.civisrom.tvtimefixer.net.SntpQuery
-import kotlin.math.abs
+import com.civisrom.tvtimefixer.net.NotAnNtpServerException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import kotlinx.coroutines.CancellationException
+import kotlin.math.sqrt
+
+enum class NtpProbeFailure { INVALID_ADDRESS, DNS, TIMEOUT, INVALID_RESPONSE, NETWORK }
 
 /** Итог проверки одного сервера времени. */
 data class NtpProbeResult(
@@ -14,27 +20,18 @@ data class NtpProbeResult(
     val error: String?,
     /** IP, к которому обратились. У адреса, введённого как IP, совпадает с ним. */
     val ipAddress: String? = null,
+    val failure: NtpProbeFailure? = null,
+    val medianRttMs: Long? = null,
+    val rttJitterMs: Double? = null,
 )
 
 /**
- * Предел расхождения часов, при котором сервер считается пригодным.
- *
- * Ровно то же число, что и в десктопной версии (`abs(avg_offset) > 60`
- * отвергает сервер). Расходиться нельзя: адрес, принятый на телефоне, должен
- * приниматься и на компьютере.
- */
-const val MAX_OFFSET_SECONDS = 60.0
-
-/**
- * Годен ли сервер к применению.
- *
- * Недостаточно того, что адрес ответил: сервер обязан сообщить время, близкое
- * к настоящему. Иначе телевизор получит адрес, который «работает», но часы по
- * нему уедут — а заметит это человек очень нескоро.
+ * Получен корректный NTP-ответ. Величина смещения не ограничивается:
+ * локальные часы могут быть сбиты, и сервер выбирают для их исправления.
  */
 fun NtpProbeResult.isUsable(): Boolean {
     val offset = offsetSeconds ?: return false
-    return reachable && abs(offset) <= MAX_OFFSET_SECONDS
+    return reachable && offset.isFinite()
 }
 
 /**
@@ -47,32 +44,55 @@ fun NtpProbeResult.isUsable(): Boolean {
 class NtpProbe(
     private val query: SntpQuery,
     private val attempts: Int = 2,
+    private val pause: () -> Unit = {},
 ) {
-    fun test(server: String): NtpProbeResult {
+    init { require(attempts > 0) }
+
+    fun test(server: String, checkCancelled: () -> Unit = {}): NtpProbeResult {
         val address = server.trim()
         if (!isValidNtpServer(address)) {
-            return NtpProbeResult(address, false, 0, null, null, ERROR_INVALID)
+            return NtpProbeResult(address, false, 0, null, null, ERROR_INVALID,
+                failure = NtpProbeFailure.INVALID_ADDRESS)
         }
 
         val rtts = mutableListOf<Long>()
         val offsets = mutableListOf<Double>()
         var lastError: String? = null
+        var failure: NtpProbeFailure? = null
         var resolved: String? = null
 
-        repeat(attempts) {
+        repeat(attempts) { attempt ->
+            checkCancelled()
+            if (attempt > 0) pause()
+            checkCancelled()
             try {
                 val result = query.query(address)
+                if (result.rttMs < 0 || !result.offsetSeconds.isFinite()) {
+                    throw NotAnNtpServerException("Invalid NTP measurement")
+                }
                 rtts += result.rttMs
                 offsets += result.offsetSeconds
                 if (resolved == null) resolved = result.address.takeIf { it.isNotBlank() }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 lastError = e.message ?: e.javaClass.simpleName
+                failure = when (e) {
+                    is UnknownHostException -> NtpProbeFailure.DNS
+                    is SocketTimeoutException -> NtpProbeFailure.TIMEOUT
+                    is NotAnNtpServerException -> NtpProbeFailure.INVALID_RESPONSE
+                    else -> NtpProbeFailure.NETWORK
+                }
             }
         }
 
         if (rtts.isEmpty()) {
-            return NtpProbeResult(address, false, 0, null, null, lastError ?: ERROR_UNKNOWN)
+            return NtpProbeResult(address, false, 0, null, null, lastError ?: ERROR_UNKNOWN,
+                failure = failure ?: NtpProbeFailure.NETWORK)
         }
+        val sorted = rtts.sorted()
+        val median = sorted[sorted.size / 2] / 2.0 + sorted[(sorted.size - 1) / 2] / 2.0
+        val jitter = sqrt(rtts.map { (it - median) * (it - median) }.average())
         return NtpProbeResult(
             server = address,
             reachable = true,
@@ -81,6 +101,8 @@ class NtpProbe(
             offsetSeconds = offsets.sum() / offsets.size,
             error = null,
             ipAddress = resolved,
+            medianRttMs = median.toLong(),
+            rttJitterMs = jitter,
         )
     }
 
@@ -91,15 +113,14 @@ class NtpProbe(
 }
 
 /**
- * Порядок как в десктопной версии: доля успешных ответов по убыванию, затем
- * средний RTT по возрастанию. Непригодные уходят в конец.
- *
- * Бонус региональным серверам, который есть на десктопе, сюда не перенесён:
- * он опирается на выбранную пользователем страну, а на этом экране её нет.
+ * Сначала доступность, затем медиана задержки с добавлением её разброса (RMS).
+ * Единичный быстрый ответ не делает нестабильный сервер лучшим. Это оценка
+ * качества соединения, а не гарантия абсолютной точности часов сервера.
  */
 fun rankNtpServers(results: List<NtpProbeResult>): List<NtpProbeResult> =
     results.sortedWith(
         compareBy<NtpProbeResult> { !it.isUsable() }
             .thenByDescending { it.successRate }
-            .thenBy { it.avgRttMs ?: Long.MAX_VALUE },
+            .thenBy { (it.medianRttMs ?: it.avgRttMs)?.toDouble()?.plus(it.rttJitterMs ?: 0.0)
+                ?: Double.POSITIVE_INFINITY },
     )

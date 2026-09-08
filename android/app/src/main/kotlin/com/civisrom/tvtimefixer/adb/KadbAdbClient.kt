@@ -55,7 +55,7 @@ class KadbAdbClientFactory(
     override fun connect(address: DeviceAddress): AdbClient {
         val kadb = Kadb.create(address.host, address.port, connectTimeoutMs, socketTimeoutMs)
         val response = try {
-            kadb.shell(PROBE_COMMAND)
+            kadb.shell(ADB_PROBE_COMMAND)
         } catch (e: CancellationException) {
             runCatching { kadb.close() }
             throw e
@@ -63,7 +63,7 @@ class KadbAdbClientFactory(
             runCatching { kadb.close() }
             throw AdbConnectionException(classify(e), e)
         }
-        if (response.output.trim() != PROBE_TOKEN || response.exitCode != 0) {
+        if (response.output.trim() != ADB_PROBE_TOKEN || response.exitCode != 0) {
             runCatching { kadb.close() }
             throw AdbConnectionException(ConnectionError.UNREACHABLE)
         }
@@ -86,10 +86,6 @@ class KadbAdbClientFactory(
     }
 
     private companion object {
-        /** Проба связи: одна команда, которая есть на любой прошивке. */
-        const val PROBE_TOKEN = "tvtimefixer"
-        const val PROBE_COMMAND = "echo $PROBE_TOKEN"
-
         /**
          * Раскладывает исключение на понятную пользователю причину.
          *

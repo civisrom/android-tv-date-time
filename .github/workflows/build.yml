@@ -341,6 +341,7 @@ jobs:
           RU="release-notes/$RELEASE_TAG-ru.md"
           EN="release-notes/$RELEASE_TAG-en.md"
           if [[ -f "$RU" && -f "$EN" ]]; then
+            echo "prepared=true" >> "$GITHUB_OUTPUT"
             cat "$RU" > "$BODY"
             printf '\n\n---\n\n' >> "$BODY"
             cat "$EN" >> "$BODY"
@@ -378,4 +379,4 @@ jobs:
           body_path: ${{ steps.notes.outputs.body }}
           draft: false
           prerelease: ${{ steps.notes.outputs.prerelease == 'true' }}
-          generate_release_notes: true
+          generate_release_notes: ${{ steps.notes.outputs.prepared != 'true' }}

@@ -8,13 +8,12 @@ const val DEFAULT_ADB_PORT = 5555
 /**
  * Проверяет адрес NTP-сервера: либо IPv4, либо доменное имя.
  *
- * Перенесено с той же семантикой, что у validate_ntp_server в десктопной
- * версии, включая её особенность: запрет дефиса по краям действует только для
- * первой метки домена. Расходиться в правилах проверки нельзя — иначе адрес,
- * принятый на телефоне, будет отвергнут на компьютере.
+ * Каждая метка домена проверяется отдельно; адрес отклоняется до сетевого
+ * запроса или записи настройки на устройство.
  */
-private val IPV4 = Regex("""^(\d{1,3}\.){3}\d{1,3}$""")
-private val DOMAIN = Regex("""^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$""")
+// На Android \d включает Unicode-цифры, которые не являются цифрами IPv4/ADB.
+private val IPV4 = Regex("""^([0-9]{1,3}\.){3}[0-9]{1,3}$""")
+private val DOMAIN = Regex("""^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$""")
 
 fun isValidIpv4(value: String): Boolean {
     if (!IPV4.matches(value)) return false
@@ -26,7 +25,7 @@ fun isValidIpv4(value: String): Boolean {
 
 fun isValidNtpServer(server: String): Boolean {
     val value = server.trim()
-    if (value.isEmpty()) return false
+    if (value.isEmpty() || value.length > 253) return false
     return isValidIpv4(value) || DOMAIN.matches(value)
 }
 
@@ -52,11 +51,13 @@ fun parseDeviceAddress(input: String): DeviceAddress? {
     }
 
     val host = value.substring(0, separator)
-    val port = value.substring(separator + 1).toIntOrNull() ?: return null
+    val portText = value.substring(separator + 1)
+    if (portText.isEmpty() || portText.any { it !in '0'..'9' }) return null
+    val port = portText.toIntOrNull() ?: return null
     if (port !in 1..65535) return null
     return if (isValidIpv4(host)) DeviceAddress(host, port) else null
 }
 
 /** Код спаривания Android 11+ — ровно шесть цифр. */
 fun isValidPairingCode(code: String): Boolean =
-    Regex("""^\d{6}$""").matches(code.trim())
+    Regex("""^[0-9]{6}$""").matches(code.trim())

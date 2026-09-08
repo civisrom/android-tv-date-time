@@ -5,11 +5,13 @@ import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.DEFAULT_ADB_PORT
 import com.civisrom.tvtimefixer.data.isValidPairingCode
 import com.civisrom.tvtimefixer.data.parseDeviceAddress
+import kotlinx.coroutines.CancellationException
 
 /** Состояние подключения к устройству. */
 sealed interface ConnectionState {
     data object Disconnected : ConnectionState
     data class Connecting(val address: DeviceTarget) : ConnectionState
+    data class Checking(val address: DeviceTarget) : ConnectionState
     data class Connected(val address: DeviceTarget) : ConnectionState
     data class Failed(val address: DeviceTarget?, val reason: ConnectionError, val diagnosticId: Long? = null) : ConnectionState
 }
@@ -40,9 +42,37 @@ class DeviceConnector(
     @Volatile
     private var client: AdbClient? = null
 
-    /** Текущее соединение, если оно живое. */
+    /** Текущее соединение, если транспорт ещё не сообщил о закрытии. */
     val activeClient: AdbClient?
         get() = client?.takeIf { it.isAlive() }
+
+    /** Проверяет ответ устройства: открытый локальный сокет переживает потерю Wi-Fi. Вызывать вне UI. */
+    fun checkConnection(): ConnectionState {
+        val (checked, attempt) = synchronized(lock) {
+            if (state !is ConnectionState.Connected) return state
+            client to generation
+        }
+        val alive = try {
+            checked != null && checked.isAlive() && checked.shell(ADB_PROBE_COMMAND).let {
+                it.exitCode == 0 && it.trimmedOutput == ADB_PROBE_TOKEN
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
+        }
+        val lost = synchronized(lock) {
+            // Запоздавшая проверка не должна отключить новое соединение или воскресить старое.
+            if (generation != attempt || client !== checked || alive) false else {
+                generation++
+                client = null
+                state = ConnectionState.Disconnected
+                true
+            }
+        }
+        if (lost) runCatching { checked?.close() }
+        return state
+    }
 
     /**
      * Подключается по введённому адресу.
@@ -164,6 +194,7 @@ class DeviceConnector(
 fun ConnectionState.targetOrNull(): DeviceTarget? = when (this) {
     is ConnectionState.Connected -> address
     is ConnectionState.Connecting -> address
+    is ConnectionState.Checking -> address
     is ConnectionState.Failed -> address
     ConnectionState.Disconnected -> null
 }

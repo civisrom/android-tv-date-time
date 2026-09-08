@@ -192,6 +192,7 @@ class UsbConnectionTests(unittest.TestCase):
         fixer.connected_ip = 'usb:7'
         fixer.prompt_adb_port = mock.Mock(side_effect=AssertionError('USB needs no TCP port'))
         fixer.scan_network_for_android_devices = mock.Mock(side_effect=AssertionError('USB needs no LAN scan'))
+        fixer.mdns_discover_all = mock.Mock(side_effect=AssertionError('USB needs no mDNS scan'))
         fixer.connect_or_reuse = mock.Mock()
         fixer._save_setting = mock.Mock()
         fixer._detect_user_region = mock.Mock(return_value=([], None))
@@ -201,7 +202,7 @@ class UsbConnectionTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             fixer.auto_setup_ntp()
         fixer.connect_or_reuse.assert_called_once_with('usb:7')
-        fixer._test_ntp_server.assert_called_once_with('example.com', 2, 2)
+        fixer._test_ntp_server.assert_called_once_with('example.com', 5, 2, 1.0, mock.ANY)
         fixer._save_setting.assert_not_called()
 
     def test_target_validation_preserves_network_validation(self):

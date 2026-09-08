@@ -18,7 +18,7 @@ import com.civisrom.tvtimefixer.adb.ConnectionError
 
 enum class Operation {
     APP_START, CONNECT_NETWORK, CONNECT_USB, PAIR, DISCONNECT, USB_PERMISSION,
-    USB_DETACHED, USB_SCAN, READ_DEVICE, CHECK_NTP, APPLY_NTP, SCAN_NTP, DISCOVERY, CRASH, STORAGE, CHECK_TIME,
+    USB_DETACHED, USB_SCAN, READ_DEVICE, CHECK_NTP, APPLY_NTP, SCAN_NTP, DISCOVERY, CRASH, STORAGE, CHECK_TIME, APPLY_TIME_ZONE,
 }
 
 enum class Outcome { STARTED, SUCCESS, FAILED, CANCELLED }
@@ -27,6 +27,8 @@ enum class DiagnosticIssue {
     NTP_UNREACHABLE, NTP_UNUSABLE, NTP_NOT_CONFIRMED, INVALID_NTP,
     USB_NONE, USB_NO_ADB, USB_ENUMERATION, USB_HOST_UNSUPPORTED,
     TIME_MISMATCH, TIME_UNCERTAIN, TIME_UNAVAILABLE,
+    INVALID_TIME_ZONE, TIME_ZONE_UNSUPPORTED, TIME_ZONE_READ_FAILED, TIME_ZONE_AUTO_FAILED,
+    TIME_ZONE_WRITE_FAILED, TIME_ZONE_RESTORE_FAILED,
 }
 
 data class DiagnosticEvent(
@@ -47,6 +49,15 @@ data class DiagnosticSnapshot(
     val dropped: Long = 0,
     val previousCrashId: Long? = null,
 )
+
+/** Одинаковые технические сведения в раскрытой записи и копируемом отчёте. */
+fun diagnosticDetails(event: DiagnosticEvent): String = buildString {
+    appendLine("event.id=${event.id}; operation=${event.operation}; outcome=${event.outcome}")
+    appendLine("transport=${event.transport}; duration_ms=${event.durationMs}")
+    event.reason?.let { appendLine("reason=$it") }
+    event.issue?.let { appendLine("issue=$it") }
+    append(event.details)
+}.trimEnd()
 
 /** Только имена классов/методов и номера строк. Throwable.message не читается. */
 internal fun safeExceptionDetails(error: Throwable): String = buildString {
@@ -69,7 +80,7 @@ private fun safeSymbol(value: String): String =
     value.takeIf { it.length <= 180 && it.matches(Regex("[A-Za-z0-9_.$<>-]+")) } ?: "?"
 
 /**
- * Один писатель, неблокирующая ограниченная очередь, никаких строк от ADB.
+ * Один писатель, неблокирующая ограниченная очередь, без необработанного вывода ADB.
  * Основной файл + его временная копия <= 240 КиБ; crash + копия <= 16 КиБ.
  * JVM-тесты используют тот же код хранения, что и APK.
  */
@@ -136,8 +147,9 @@ class DiagnosticJournal(
         error: Throwable? = null,
         issue: DiagnosticIssue? = null,
         usb: UsbObservation? = null,
+        trace: OperationTrace? = null,
     ): Long {
-        val details = listOfNotNull(usb?.details(), error?.let {
+        val details = listOfNotNull(trace?.details(), usb?.details(), error?.let {
             runCatching { safeExceptionDetails(it) }.getOrDefault("")
         }).joinToString("\n").take(2048)
         val event = DiagnosticEvent(ids.incrementAndGet(), clock(), operation, outcome, transport,

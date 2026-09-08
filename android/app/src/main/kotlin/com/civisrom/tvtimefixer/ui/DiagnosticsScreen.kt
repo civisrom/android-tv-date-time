@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -31,8 +33,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,6 +49,7 @@ import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticTransport
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
+import com.civisrom.tvtimefixer.diagnostics.diagnosticDetails
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -66,11 +71,12 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.CRASH -> R.string.operation_crash
     Operation.STORAGE -> R.string.operation_storage
     Operation.CHECK_TIME -> R.string.time_check_title
+    Operation.APPLY_TIME_ZONE -> R.string.time_zone_apply
 }
 
 private fun DiagnosticIssue.labelRes(): Int = when (this) {
     DiagnosticIssue.NTP_UNREACHABLE -> R.string.diagnostics_ntp_unreachable
-    DiagnosticIssue.NTP_UNUSABLE -> R.string.ntp_check_bad_clock
+    DiagnosticIssue.NTP_UNUSABLE -> R.string.ntp_check_invalid_response
     DiagnosticIssue.NTP_NOT_CONFIRMED -> R.string.diagnostics_ntp_not_confirmed
     DiagnosticIssue.INVALID_NTP -> R.string.ntp_invalid
     DiagnosticIssue.TIME_MISMATCH -> R.string.time_check_mismatch
@@ -80,6 +86,12 @@ private fun DiagnosticIssue.labelRes(): Int = when (this) {
     DiagnosticIssue.USB_NO_ADB -> R.string.usb_no_adb
     DiagnosticIssue.USB_ENUMERATION -> R.string.usb_scan_failed
     DiagnosticIssue.USB_HOST_UNSUPPORTED -> R.string.error_usb_unsupported
+    DiagnosticIssue.INVALID_TIME_ZONE -> R.string.time_zone_invalid
+    DiagnosticIssue.TIME_ZONE_UNSUPPORTED -> R.string.time_zone_unsupported
+    DiagnosticIssue.TIME_ZONE_READ_FAILED -> R.string.time_zone_read_failed
+    DiagnosticIssue.TIME_ZONE_AUTO_FAILED -> R.string.time_zone_auto_failed
+    DiagnosticIssue.TIME_ZONE_WRITE_FAILED -> R.string.time_zone_write_failed
+    DiagnosticIssue.TIME_ZONE_RESTORE_FAILED -> R.string.time_zone_restore_failed
 }
 
 private fun Outcome.labelRes(): Int = when (this) {
@@ -107,17 +119,13 @@ private fun formatTime(time: Long) = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Loc
 /** Отчёт строится только из уже безопасных событий, не из состояния устройства. */
 internal fun diagnosticReport(context: Context, snapshot: DiagnosticSnapshot, mode: DeviceMode): String = buildString {
     appendLine("Android TV Time Fixer ${BuildConfig.VERSION_NAME}")
-    appendLine("Android API ${Build.VERSION.SDK_INT}; $mode")
+    appendLine("Android API ${Build.VERSION.SDK_INT}; $mode; debug=${BuildConfig.DEBUG}")
     appendLine(context.getString(R.string.diagnostics_hint))
     if (!snapshot.storageAvailable) appendLine(context.getString(R.string.diagnostics_storage_failed))
     if (snapshot.dropped > 0) appendLine(context.getString(R.string.diagnostics_dropped, snapshot.dropped))
     snapshot.events.forEach { event ->
         appendLine("${formatTime(event.time)}  ${eventHeading(context, event)}")
-        if (event.transport != DiagnosticTransport.NONE) appendLine(event.transport.name)
-        if (event.durationMs > 0) appendLine(context.getString(R.string.diagnostics_duration, event.durationMs))
-        event.reason?.let { appendLine(it.name) }
-        event.issue?.let { appendLine(it.name) }
-        if (event.details.isNotEmpty()) appendLine(event.details)
+        appendLine(diagnosticDetails(event))
     }
 }
 
@@ -131,7 +139,11 @@ internal fun DiagnosticsScreen(
 ) {
     BackHandler(onBack = onBack)
     val backFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { if (mode == DeviceMode.TELEVISION) backFocus.requestFocus() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        backFocus.requestFocus()
+        keyboard?.hide()
+    }
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     var copyResult by remember { mutableStateOf<Int?>(null) }
@@ -151,7 +163,8 @@ internal fun DiagnosticsScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.headlineSmall)
-        TextButton(onClick = onBack, modifier = Modifier.focusRequester(backFocus).testTag("diagnostics-back")) {
+        FilledTonalButton(onClick = onBack, modifier = Modifier.focusRequester(backFocus)
+            .focusProperties { canFocus = true }.testTag("diagnostics-back")) {
             Text(stringResource(R.string.diagnostics_back))
         }
         LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -168,13 +181,13 @@ internal fun DiagnosticsScreen(
                             label = { Text(stringResource(R.string.diagnostics_all)) })
                         FilterChip(selected = errorsOnly, onClick = { errorsOnly = true }, modifier = Modifier.testTag("diagnostics-errors"),
                             label = { Text(stringResource(R.string.diagnostics_errors)) })
-                        TextButton(onClick = {
+                        FilledTonalButton(onClick = {
                             copyResult = if (runCatching {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Android TV Time Fixer", diagnosticReport(context, snapshot, mode)))
                             }.isSuccess) R.string.diagnostics_copied else R.string.diagnostics_copy_failed
                         }) { Text(stringResource(R.string.diagnostics_copy)) }
-                        TextButton(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
+                        FilledTonalButton(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
                             modifier = Modifier.testTag("diagnostics-clear")) { Text(stringResource(R.string.diagnostics_clear)) }
                     }
                     copyResult?.let { Text(stringResource(it)) }
@@ -199,8 +212,10 @@ internal fun DiagnosticsScreen(
                         }
                         if (expandedId == event.id) {
                             if (event.durationMs > 0) Text(stringResource(R.string.diagnostics_duration, event.durationMs))
-                            Text(event.details.ifEmpty { stringResource(R.string.diagnostics_no_details) },
-                                style = MaterialTheme.typography.bodySmall)
+                            SelectionContainer {
+                                Text(diagnosticDetails(event), modifier = Modifier.testTag("diagnostic-details-${event.id}"),
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }

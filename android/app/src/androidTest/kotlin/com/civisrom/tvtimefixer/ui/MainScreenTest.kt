@@ -1,12 +1,16 @@
 package com.civisrom.tvtimefixer.ui
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.UiAutomation
+import android.content.ClipboardManager
 import android.content.Intent
 import android.hardware.usb.UsbManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -15,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
@@ -23,16 +28,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -41,6 +52,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
@@ -55,9 +67,14 @@ import com.civisrom.tvtimefixer.adb.UsbDevices
 import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
 import com.civisrom.tvtimefixer.adb.usbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
+import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.DeviceInfo
+import com.civisrom.tvtimefixer.device.TimeZoneFailure
+import com.civisrom.tvtimefixer.device.TimeZoneRestoration
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticEvent
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
@@ -69,9 +86,13 @@ import java.util.Locale
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.BeforeClass
+import org.junit.AfterClass
 
 private class ScreenActions : AppActions {
     val calls = mutableListOf<String>()
+    var onScan: () -> Unit = {}
+    var onClearScan: () -> Unit = {}
     override fun connect(address: String) { calls += "connect:$address" }
     override fun connectLoopback() { calls += "loopback" }
     override fun disconnect() { calls += "disconnect" }
@@ -79,10 +100,12 @@ private class ScreenActions : AppActions {
         calls += "pair:$pairingAddress:$code:$connectAddress"
     }
     override fun checkNtpServer(server: String) { calls += "check:$server" }
-    override fun applyNtpServer(server: String, force: Boolean) { calls += "apply:$server:$force" }
+    override fun applyNtpServer(server: String) { calls += "apply:$server" }
     override fun verifyDeviceTime() { calls += "verify-time" }
-    override fun scanNtpServers() { calls += "scan" }
+    override fun applyTimeZone(zoneId: String) { calls += "zone:$zoneId" }
+    override fun scanNtpServers() { calls += "scan"; onScan() }
     override fun cancelNtpScan() { calls += "cancel-scan" }
+    override fun clearNtpScanResults() { calls += "clear-scan"; onClearScan() }
     override fun refreshDeviceInfo() { calls += "info" }
     override fun requestDiscoveryPermission() { calls += "permission" }
     override fun refreshUsbDevices() { calls += "usb-list" }
@@ -90,6 +113,23 @@ private class ScreenActions : AppActions {
 }
 
 class MainScreenTest {
+    companion object {
+        private var originalAccessibilityFlags = 0
+
+        @JvmStatic @BeforeClass fun inspectTextSelectionWindows() {
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            originalAccessibilityFlags = automation.serviceInfo.flags
+            automation.serviceInfo = automation.serviceInfo.apply {
+                flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            }
+        }
+
+        @JvmStatic @AfterClass fun restoreWindowInspection() {
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalAccessibilityFlags }
+        }
+    }
+
     @get:Rule val compose = createComposeRule()
     private val actions = ScreenActions()
     private lateinit var inputModeManager: InputModeManager
@@ -100,6 +140,33 @@ class MainScreenTest {
         return context.createConfigurationContext(config).getString(res, *args)
     }
     private val connected = AppState(connection = ConnectionState.Connected(DeviceAddress("192.168.1.2", 5555)))
+
+    @Test fun extended_device_details_start_collapsed_and_can_be_closed_again() {
+        screen(connected.copy(deviceInfo = DeviceInfo(model = "Target TV", socModel = "Target chip", buildDisplay = "TV build")))
+        compose.onNodeWithText("Target chip").assertDoesNotExist()
+        compose.onNodeWithTag("section-device-details").performScrollTo()
+        screenshot("device-details-collapsed")
+        compose.onNodeWithTag("section-device-details").performClick()
+        compose.onNodeWithText("Target chip").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("TV build").performScrollTo().assertIsDisplayed()
+        screenshot("device-details-expanded")
+        compose.onNodeWithTag("section-device-details").performScrollTo().performClick()
+        compose.onNodeWithText("Target chip").assertDoesNotExist()
+        compose.onNodeWithText("TV build").assertDoesNotExist()
+    }
+
+    @Test fun checking_a_previous_connection_hides_connected_status_and_disables_time_changes() {
+        val address = DeviceAddress("192.168.1.2", 5555)
+        screen(connected.copy(connection = ConnectionState.Checking(address), busy = true,
+            currentNtpServer = "pool.ntp.org", timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH)))
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.connect_state_checking, address.toString()))
+            .assertIsDisplayed()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.connect_state_connected, address.toString()))
+            .assertDoesNotExist()
+        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+        compose.onNodeWithTag("time-check-result").assertDoesNotExist()
+    }
 
     @Test fun verifying_time_is_a_separate_read_action() {
         screen(connected.copy(currentNtpServer = "pool.ntp.org"))
@@ -141,9 +208,70 @@ class MainScreenTest {
         assertEquals(listOf("verify-time"), actions.calls)
     }
 
+    @Test fun checked_time_shows_device_local_time_and_UTC_for_the_same_instant() {
+        screen(connected.copy(timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH,
+            deviceTimeMillis = 1_788_873_348_000L, timeZoneId = "Europe/Moscow")))
+        compose.onNodeWithText("Местное время устройства при проверке: 2026-09-08 16:15:48 (Europe/Moscow)")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Время устройства при проверке (UTC): 2026-09-08 13:15:48")
+            .performScrollTo().assertIsDisplayed()
+        screenshot("time-check-local-and-utc")
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun time_zone_menu_is_visible_without_connection_and_starts_collapsed() {
+        screen()
+        compose.onNodeWithTag("section-timezone").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-zone-search").assertDoesNotExist()
+        compose.onNodeWithTag("section-timezone").performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_zone_connect_first))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-zone-apply").assertDoesNotExist()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun time_zone_selection_survives_collapsing_and_only_explicit_apply_changes_settings() {
+        screen(connected.copy(deviceInfo = DeviceInfo(timezone = "UTC")), mode = DeviceMode.TELEVISION)
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-search").performScrollTo().performTextInput("Europe/Moscow")
+        waitForKeyboard()
+        compose.onNodeWithTag("time-zone-option-Europe/Moscow").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-apply").assertIsDisplayed().assertIsFocused()
+        compose.waitUntil(5_000) {
+            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+        }
+        screenshot("time-zone-selected")
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-search").assertDoesNotExist()
+        compose.onNodeWithTag("section-timezone").performClick()
+        compose.onNodeWithTag("time-zone-search").performScrollTo().assertTextContains("Europe/Moscow")
+        compose.onNodeWithTag("time-zone-apply").performScrollTo().performClick()
+        assertEquals(listOf("zone:Europe/Moscow"), actions.calls)
+    }
+
+    @Test fun time_zone_changes_are_disabled_while_an_operation_is_running() {
+        screen(connected.copy(busy = true, operation = Operation.APPLY_TIME_ZONE))
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-search").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("time-zone-apply").performScrollTo().assertIsNotEnabled()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun unconfirmed_time_zone_restoration_is_visible_at_large_font() {
+        screen(connected.copy(timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.WRITE,
+            TimeZoneRestoration.UNCONFIRMED)), scale = 2f, width = 320)
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_zone_restore_failed))
+            .performScrollTo().assertIsDisplayed()
+        screenshot("time-zone-restoration-warning")
+        assertTrue(actions.calls.isEmpty())
+    }
+
     private fun screen(state: AppState = AppState(), mode: DeviceMode = DeviceMode.HANDHELD,
         scale: Float = 1f, width: Int = 360, diagnostics: DiagnosticSnapshot = DiagnosticSnapshot(),
         clear: () -> Unit = {},
+        uriHandler: UriHandler? = null,
     ) {
         compose.setContent {
             inputModeManager = LocalInputModeManager.current
@@ -151,6 +279,7 @@ class MainScreenTest {
             val config = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag("ru")) }
             val localized = context.createConfigurationContext(config)
             CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides config,
+                LocalUriHandler provides (uriHandler ?: LocalUriHandler.current),
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 MaterialTheme {
                     Surface {
@@ -163,10 +292,53 @@ class MainScreenTest {
         }
     }
 
+    @Test fun repository_link_opens_project_without_connecting() {
+        val opened = mutableListOf<String>()
+        screen(uriHandler = object : UriHandler {
+            override fun openUri(uri: String) { opened.add(uri) }
+        })
+        compose.onNodeWithTag("project-repository").assertIsDisplayed().performClick()
+        assertEquals(listOf("https://github.com/civisrom/android-tv-date-time"), opened)
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun repository_link_without_browser_keeps_app_usable() {
+        screen(uriHandler = object : UriHandler {
+            override fun openUri(uri: String) { throw IllegalArgumentException("No browser") }
+        })
+        compose.onNodeWithTag("project-repository").performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.project_repository_unavailable))
+            .assertIsDisplayed()
+        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun expanded_diagnostics_and_report_include_technical_failure_details() {
+        val details = "shell=cmd alarm set-timezone <zone>; exit=1; error=permission_denied\n" +
+            "timezone.failure=WRITE; restoration=RESTORED"
+        val event = DiagnosticEvent(92, 1_800_000_000_000, Operation.APPLY_TIME_ZONE, Outcome.FAILED,
+            details = details, issue = DiagnosticIssue.TIME_ZONE_WRITE_FAILED)
+        val history = DiagnosticSnapshot(events = listOf(event))
+        screen(diagnostics = history)
+        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.diagnostics_details))
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("diagnostic-details-92").performScrollTo()
+            .assertTextContains("error=permission_denied", substring = true)
+            .assertTextContains("restoration=RESTORED", substring = true)
+        val report = diagnosticReport(context, history, DeviceMode.HANDHELD)
+        assertTrue(report.contains(details))
+        assertTrue(report.contains("operation=APPLY_TIME_ZONE"))
+        screenshot("technical-diagnostics")
+    }
+
     @Test fun opening_diagnostics_preserves_network_input_and_does_not_connect() {
         screen()
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.168.1.10:5555")
-        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        // Проверяем сохранение формы; появление IME не должно сместить тестовое касание.
+        compose.onNodeWithTag("diagnostics-open").performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("diagnostics-back").performClick()
         compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.168.1.10:5555")
         assertTrue(actions.calls.isEmpty())
@@ -174,10 +346,12 @@ class MainScreenTest {
 
     @Test fun primary_forms_are_visible_without_expanding_menus() {
         screen()
-        for (tag in listOf("network-address", "ntp-address", "pairing-address", "pairing-code", "pairing-connect-address")) {
+        for (tag in listOf("network-address", "ntp-address")) {
             compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        // Дождаться появления IME, чтобы изменение высоты окна не сместило касание.
+        waitForKeyboard()
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
         compose.onNodeWithTag("ntp-check").performScrollTo().assertIsEnabled().performClick()
         assertEquals(listOf("check:pool.ntp.org"), actions.calls)
@@ -185,37 +359,55 @@ class MainScreenTest {
         screenshot("primary-connection")
     }
 
+    @Test fun pairing_collapses_without_losing_inputs_or_running_actions() {
+        screen()
+        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
+        compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
+        compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        compose.onNodeWithTag("pairing-address").assertTextContains("192.0.2.10:37123")
+        compose.onNodeWithTag("pairing-code").assertTextContains("123456")
+        compose.onNodeWithTag("pairing-connect-address").assertTextContains("192.0.2.10:37124")
+        assertTrue(actions.calls.isEmpty())
+    }
+
     @Test fun connecting_keeps_primary_inputs_and_enables_ntp_writes_only_while_connected() {
-        val state = mutableStateOf(AppState(ntpRejected = "pool.ntp.org"))
+        val state = mutableStateOf(AppState(ntpCheck = NtpProbeResult("pool.ntp.org", false, 0, null, null, "timeout")))
         compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.0.2.10:5555")
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
         compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.11:37123")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.11:37124")
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
 
         compose.runOnIdle { state.value = state.value.copy(connection = connected.connection) }
         compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.0.2.10:5555")
         compose.onNodeWithTag("pairing-address").performScrollTo().assertTextContains("192.0.2.11:37123")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().assertTextContains("192.0.2.11:37124")
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
         compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsEnabled().performClick()
-        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+        assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
 
         compose.runOnIdle { state.value = state.value.copy(busy = true) }
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
         compose.runOnIdle { state.value = state.value.copy(connection = ConnectionState.Disconnected, busy = false) }
         compose.onNodeWithTag("ntp-address").assertTextContains("pool.ntp.org")
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
-        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
+        assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
     }
 
     @Test fun narrow_screen_at_double_font_keeps_pairing_fields_and_action_reachable() {
         screen(scale = 2f, width = 320)
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
         compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
@@ -241,7 +433,8 @@ class MainScreenTest {
         compose.onNodeWithText("Living room TV").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("section-discovery").performScrollTo().performClick()
         compose.onNodeWithText("Living room TV").assertDoesNotExist()
-        compose.onNodeWithTag("pairing-code").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("section-pairing").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
         compose.onNodeWithTag("ntp-address").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("network-address").performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
@@ -250,14 +443,17 @@ class MainScreenTest {
     @Test fun ntp_input_survives_diagnostics_and_only_explicit_apply_executes() {
         screen(connected)
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
-        // IME changes the viewport; wait before scrolling and injecting a toolbar tap.
+        // Здесь проверяем сохранение формы; касания с IME проверяются отдельно
+        // в narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable.
         waitForKeyboard()
-        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
-        compose.onNodeWithTag("diagnostics-back").performClick()
+        compose.onNodeWithTag("diagnostics-open").performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.onNodeWithTag("diagnostics-back")
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
         assertTrue(actions.calls.isEmpty())
         compose.onNodeWithTag("ntp-apply").performScrollTo().performClick()
-        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+        assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
     }
 
     @Test fun busy_usb_permission_keeps_diagnostics_accessible() {
@@ -275,6 +471,114 @@ class MainScreenTest {
         compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
         compose.onNodeWithTag("ntp-scan-progress").performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun starting_and_restarting_a_scan_shows_progress_at_the_button() {
+        val state = mutableStateOf(connected)
+        actions.onScan = { state.value = state.value.copy(ntpScan = ScanProgress(0, 20, emptyList())) }
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        repeat(2) {
+            compose.onNodeWithTag("ntp-countries").performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-alternatives").performScrollTo().performClick()
+            compose.onNodeWithText("VN ·", substring = true).assertExists()
+            compose.onNodeWithText("time.cloudflare.com").assertExists()
+            compose.onNodeWithTag("ntp-scan-start").performScrollTo().performClick()
+            compose.onNodeWithText("VN ·", substring = true).assertDoesNotExist()
+            compose.onNodeWithText("time.cloudflare.com").assertDoesNotExist()
+            compose.onNodeWithTag("ntp-scan-progress").assertIsDisplayed().assertTextContains(
+                context.getString(com.civisrom.tvtimefixer.R.string.ntp_scan_progress, 0, 20, 0))
+            compose.onNodeWithTag("ntp-scan-cancel").assertIsDisplayed()
+            compose.onNodeWithTag("ntp-scan-start").assertDoesNotExist()
+            compose.runOnIdle { state.value = state.value.copy(ntpScan = ScanProgress(20, 20, emptyList())) }
+            compose.onNodeWithTag("ntp-scan-progress").assertDoesNotExist()
+        }
+        compose.onNodeWithTag("ntp-scan-start").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-scan-cancel").performClick()
+        assertEquals(listOf("scan", "scan", "scan", "cancel-scan"), actions.calls)
+    }
+
+    @Test fun picking_a_country_reveals_the_address_and_actions_even_when_picked_again() {
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        repeat(2) {
+            compose.onNodeWithTag("ntp-countries").performScrollTo().performClick()
+            compose.onNodeWithText("VN ·", substring = true).performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("vn.pool.ntp.org")
+            compose.onNodeWithTag("ntp-apply").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+        }
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun picking_an_alternative_reveals_the_address_before_applying() {
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-alternatives").performScrollTo().performClick()
+        compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.cloudflare.com")
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithTag("ntp-apply").assertIsDisplayed().performClick()
+        assertEquals(listOf("apply:time.cloudflare.com"), actions.calls)
+    }
+
+    @Test fun picking_a_search_result_hides_the_keyboard_and_reveals_the_address() {
+        assertSearchSelection(connected)
+    }
+
+    @Test fun picking_a_search_result_without_a_connection_hides_the_keyboard() {
+        assertSearchSelection(AppState())
+    }
+
+    private fun assertSearchSelection(state: AppState) {
+        screen(state)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        try {
+            // Сначала открываем IME в пустом поле, затем меняем список результатов:
+            // появление списка не должно сдвинуть точку касания во время открытия IME.
+            compose.onNodeWithTag("ntp-search").performScrollTo().performTouchInput { click() }
+            compose.onNodeWithTag("ntp-search").assertIsFocused()
+            waitForKeyboard()
+            compose.onNodeWithTag("ntp-search").performTextInput("cloudflare")
+            compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-address").assertTextContains("time.cloudflare.com").assertIsNotFocused()
+            compose.onNodeWithTag("ntp-search").assertIsNotFocused()
+            compose.waitUntil(5_000) {
+                ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+            }
+            compose.onNodeWithTag("ntp-address").assertIsDisplayed()
+            compose.onNodeWithTag("ntp-apply").assertIsDisplayed().also {
+                if (state.connected) it.assertIsEnabled() else it.assertIsNotEnabled()
+            }
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed().assertIsFocused()
+        } finally {
+            screenshot(if (state.connected) "search-selection" else "search-selection-disconnected")
+        }
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun picking_a_scan_result_or_its_ip_reveals_the_address_and_clears_results() {
+        val result = NtpProbeResult("time.example.org", true, 100, 10, 0.1, null, "192.0.2.123")
+        val results = listOf(result) + (1..4).map { result.copy(server = "time$it.example.org", ipAddress = null) }
+        val scan = ScanProgress(20, 20, results)
+        val state = mutableStateOf(connected.copy(ntpScan = scan))
+        actions.onClearScan = { state.value = state.value.copy(ntpScan = null) }
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        for (address in listOf(result.server, checkNotNull(result.ipAddress))) {
+            compose.runOnIdle { state.value = state.value.copy(ntpScan = scan) }
+            val label = if (address == result.server) "$address —" else address
+            compose.onNodeWithText(label, substring = true).performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains(address)
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+            for (entry in results) {
+                compose.onNodeWithText("${entry.server} —", substring = true).assertDoesNotExist()
+            }
+            compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+            compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+            compose.onNodeWithText("${result.server} —", substring = true).assertDoesNotExist()
+        }
+        assertEquals(listOf("clear-scan", "clear-scan"), actions.calls)
     }
 
     @Test fun diagnostics_clear_requires_confirmation_and_preserves_connection() {
@@ -341,13 +645,51 @@ class MainScreenTest {
         compose.onNodeWithText("Подключено к этому устройству").assertDoesNotExist()
         compose.onNodeWithText("Спарить").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-code").performScrollTo().assertIsFocused()
-        compose.onNodeWithText("192.0.2.10:37123").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("pairing-address").performScrollTo().assertTextContains("192.0.2.10:37123")
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun a_discovered_address_can_be_copied_with_its_port_and_pasted_into_input_fields() {
+        val address = "192.0.2.10:37123"
+        screen(AppState(discovered = listOf(DiscoveredDevice("Living room TV",
+            DeviceAddress("192.0.2.10", 37123), DiscoveredDevice.Kind.AWAITING_PAIRING))))
+        copyDisplayedText(address)
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+        for (tag in listOf("network-address", "pairing-address", "pairing-connect-address", "ntp-address")) {
+            compose.onNodeWithTag(tag).performScrollTo().performClick()
+            waitForKeyboard()
+            compose.onNodeWithTag(tag).performScrollTo().assertIsFocused()
+            try {
+                compose.onNodeWithTag(tag).performTouchInput { longClick(center) }
+                clickTextSelectionAction(android.R.string.paste)
+                // Проверяем результат единственной вставки через системное меню.
+                compose.waitUntil(5_000) {
+                    compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text == address
+                }
+            } finally {
+                screenshot("paste-$tag")
+            }
+        }
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun long_pressing_an_ntp_server_copies_it_without_selecting_or_applying_it() {
+        val server = "time.cloudflare.com"
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-alternatives").performScrollTo().performClick()
+        copyDisplayedText(server)
+        compose.onNodeWithTag("ntp-address").assert(hasText(server).not())
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithText(server, useUnmergedTree = true).performScrollTo().performTouchInput { click() }
+        compose.onNodeWithTag("ntp-address").assertTextContains(server)
         assertTrue(actions.calls.isEmpty())
     }
 
     @Test fun pairing_code_survives_diagnostics_but_not_saved_state_restore() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, AppState(), actions) } }
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostics-back").performClick()
@@ -412,7 +754,7 @@ class MainScreenTest {
         screen(AppState(usbSupported = true, usbSystemState = usbSystemState(device)))
         compose.onNodeWithTag("section-usb").performScrollTo().performClick()
         compose.onNodeWithTag("section-usb-help").performScrollTo().performClick()
-        compose.onNodeWithText("Система сообщает подключение в режиме USB-устройства", substring = true)
+        compose.onNodeWithText("Устройство с этим приложением должно работать USB-хостом (OTG)", substring = true)
             .performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
     }
@@ -428,7 +770,14 @@ class MainScreenTest {
             compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
             screenshot("landscape-ntp")
             compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
-            compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+            try {
+                compose.waitUntil(5_000) {
+                    ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+                }
+                compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+            } finally {
+                screenshot("landscape-diagnostics")
+            }
         } finally {
             automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
             compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }
@@ -443,6 +792,53 @@ class MainScreenTest {
         assertTrue(matches.any { it.activityInfo.name == "com.civisrom.tvtimefixer.MainActivity" })
         assertTrue(actions.calls.isEmpty())
     }
+
+    private fun copyDisplayedText(text: String) {
+        val node = compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo()
+        val content = compose.onNodeWithTag("main-content")
+        // Оставляем место для маркеров выделения и системного меню, вдали от панели навигации.
+        val scroll = node.fetchSemanticsNode().boundsInRoot.center.y - content.fetchSemanticsNode().boundsInRoot.center.y
+        content.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, scroll) }
+        node.performTouchInput {
+            longClick(Offset(5f, center.y))
+        }
+        try {
+            compose.waitUntil(5_000) { textSelectionActions(android.R.string.copy).isNotEmpty() }
+            screenshot("copy-menu-${text.substringBefore(':')}")
+            // Домен может сразу выделиться целиком; тогда Android не предлагает «Выделить всё».
+            if (textSelectionActions(android.R.string.selectAll).isNotEmpty()) {
+                clickTextSelectionAction(android.R.string.selectAll)
+            }
+        } finally {
+            screenshot("copy-${text.substringBefore(':')}")
+        }
+        clickTextSelectionAction(android.R.string.copy)
+        compose.runOnIdle {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(text, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+        }
+    }
+
+    private fun clickTextSelectionAction(label: Int) {
+        // Дожидаемся доступного действия, затем нажимаем его ровно один раз.
+        // Повторные ACTION_CLICK во время перестройки панели могут убрать выделение.
+        var action: AccessibilityNodeInfo? = null
+        compose.waitUntil(5_000) {
+            action = textSelectionActions(label).firstOrNull { it.isClickable && it.isEnabled }
+            action != null
+        }
+        assertTrue(checkNotNull(action).performAction(AccessibilityNodeInfo.ACTION_CLICK))
+        compose.waitForIdle()
+    }
+
+    private fun textSelectionActions(label: Int): List<AccessibilityNodeInfo> =
+        // Меню использует русскую локаль Compose и может находиться в отдельном окне.
+        InstrumentationRegistry.getInstrumentation().uiAutomation.windows
+            // Ищем меню приложения, а не предложения IME. Поиск текста внутри
+            // клавиатуры AOSP API 23 роняет её AccessibilityNodeProviderCompat.
+            .filter { it.type != AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            .mapNotNull { it.root }
+            .flatMap { it.findAccessibilityNodeInfosByText(russianString(label)) }
 
     private fun waitForKeyboard() {
         compose.waitUntil(5_000) {

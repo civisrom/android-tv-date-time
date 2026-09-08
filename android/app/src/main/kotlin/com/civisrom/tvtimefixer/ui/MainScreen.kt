@@ -1,7 +1,11 @@
 package com.civisrom.tvtimefixer.ui
 
+import android.os.Build
+import androidx.compose.foundation.clickable
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -11,12 +15,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,22 +38,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import java.util.Date
 import java.util.TimeZone
 import java.text.SimpleDateFormat
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import com.civisrom.tvtimefixer.BuildConfig
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
@@ -54,11 +73,18 @@ import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
 import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
+import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.data.searchNtpServers
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.device.TimeZoneRestoration
+import com.civisrom.tvtimefixer.device.availableTimeZoneIds
+import com.civisrom.tvtimefixer.device.isValidTimeZoneId
 import com.civisrom.tvtimefixer.diagnostics.Operation
+
+internal const val PROJECT_REPOSITORY_URL = "https://github.com/civisrom/android-tv-date-time"
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
@@ -67,10 +93,12 @@ interface AppActions {
     fun disconnect()
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
     fun checkNtpServer(server: String)
-    fun applyNtpServer(server: String, force: Boolean = false)
+    fun applyNtpServer(server: String)
     fun verifyDeviceTime()
+    fun applyTimeZone(zoneId: String)
     fun scanNtpServers()
     fun cancelNtpScan()
+    fun clearNtpScanResults()
     fun refreshDeviceInfo()
     fun requestDiscoveryPermission()
     fun refreshUsbDevices()
@@ -103,6 +131,8 @@ fun MainScreen(
                     "action-details" -> state.message != null && state.diagnosticEventId != null
                     "connection-details" -> state.connection is ConnectionState.Failed && state.diagnosticEventId != null
                     "ntp-details" -> state.ntpDiagnosticEventId != null
+                    "time-details" -> state.connected && state.timeDiagnosticEventId != null
+                    "time-zone-details" -> state.timeZoneDiagnosticEventId != null
                     else -> true
                 }
                 showDiagnostics = false; returnFocus = if (available) origin else "diagnostics-open"
@@ -129,8 +159,12 @@ private fun DiagnosticLink(
     LaunchedEffect(returnFocus) {
         if (returnFocus == key) { requester.requestFocus(); onFocusRestored() }
     }
-    TextButton(onClick = { onOpen(eventId, key) },
-        modifier = Modifier.focusRequester(requester).testTag(key)) { Text(stringResource(title)) }
+    val modifier = Modifier.focusRequester(requester).testTag(key)
+    if (key == "diagnostics-open") {
+        FilledTonalButton(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
+    } else {
+        TextButton(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
+    }
 }
 
 @Composable
@@ -145,7 +179,11 @@ private fun MainContent(
     returnFocus: String?,
     onFocusRestored: () -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
+    var repositoryLinkFailed by remember { mutableStateOf(false) }
+    val openRepository = stringResource(R.string.project_repository_open)
     var pairingAddress by rememberSaveable { mutableStateOf("") }
+    var pairingExpanded by rememberSaveable { mutableStateOf(false) }
     var discoveryExpanded by rememberSaveable { mutableStateOf(state.discovered.isNotEmpty()) }
     var lastDiscoveredCount by rememberSaveable { mutableIntStateOf(state.discovered.size) }
     LaunchedEffect(state.discovered.size, state.discoveryPermissionNeeded) {
@@ -174,6 +212,14 @@ private fun MainContent(
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.app_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.project_source_code), style = MaterialTheme.typography.bodySmall)
+        Text(PROJECT_REPOSITORY_URL,
+            modifier = Modifier.testTag("project-repository").clickable(role = Role.Button, onClickLabel = openRepository) {
+                repositoryLinkFailed = runCatching { uriHandler.openUri(PROJECT_REPOSITORY_URL) }.isFailure
+            }, color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline,
+            style = MaterialTheme.typography.bodySmall)
+        if (repositoryLinkFailed) Text(stringResource(R.string.project_repository_unavailable),
+            style = MaterialTheme.typography.bodySmall)
         Text(stringResource(if (mode == DeviceMode.TELEVISION) R.string.mode_television else R.string.mode_handheld),
             style = MaterialTheme.typography.bodyMedium)
         DiagnosticLink(null, "diagnostics-open", onDiagnostics, returnFocus, onFocusRestored, R.string.diagnostics_title)
@@ -186,11 +232,13 @@ private fun MainContent(
             }
         }
         ConnectionStatus(mode, state, actions)
-        ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
-            onExpanded = { discoveryExpanded = it }) {
-            DiscoverySection(state, actions, onPair = {
-                pairingAddress = it; focusPairing = true
-            })
+        FunctionCard("discovery") {
+            ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
+                onExpanded = { discoveryExpanded = it }) {
+                DiscoverySection(state, actions, onPair = {
+                    pairingAddress = it; pairingExpanded = true; focusPairing = true
+                })
+            }
         }
         if (state.busy) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -199,7 +247,7 @@ private fun MainContent(
         state.message?.let { message ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
-                    Text(stringResource(message.res, *message.args.toTypedArray()))
+                    CopyableText(stringResource(message.res, *message.args.toTypedArray()))
                     state.diagnosticEventId?.let { id ->
                         DiagnosticLink(id, "action-details", onDiagnostics, returnFocus, onFocusRestored)
                     }
@@ -212,13 +260,46 @@ private fun MainContent(
             }
         }
         NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
-        PairingSection(state, actions, pairingAddress, { pairingAddress = it },
-            pairingCode, onPairingCode, pairingRequester)
-        ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
-            onExpanded = { usbExpanded = it }) {
-            UsbSection(state, actions)
+        FunctionCard("timezone") {
+            ExpandableSection(stringResource(R.string.time_zone_title), "timezone") {
+                TimeZoneSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
+            }
+        }
+        FunctionCard("pairing") {
+            ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
+                onExpanded = { pairingExpanded = it }) {
+                PairingSection(state, actions, pairingAddress, { pairingAddress = it },
+                    pairingCode, onPairingCode, pairingRequester)
+            }
+        }
+        FunctionCard("usb") {
+            ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
+                onExpanded = { usbExpanded = it }) {
+                UsbSection(state, actions)
+            }
         }
         if (state.connected) DeviceInfoSection(state, actions)
+    }
+}
+
+@Composable
+private fun FunctionCard(key: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(Modifier.fillMaxWidth().testTag("function-$key")) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
+}
+
+/** Отдельное выделение строки не захватывает соседние подписи и адреса. */
+@Composable
+private fun CopyableText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontWeight: FontWeight? = null,
+    style: TextStyle = LocalTextStyle.current,
+) {
+    SelectionContainer {
+        Text(text, modifier, color = color, fontWeight = fontWeight, style = style)
     }
 }
 
@@ -250,8 +331,8 @@ private fun UsbSection(state: AppState, actions: AppActions) {
         if (!state.usbSupported) {
             Text(stringResource(R.string.error_usb_unsupported))
         } else {
-            Text(stringResource(R.string.usb_setup_hint), style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = actions::refreshUsbDevices, enabled = !state.busy, modifier = Modifier.testTag("usb-refresh")) {
+            CopyableText(stringResource(R.string.usb_setup_hint), style = MaterialTheme.typography.bodySmall)
+            Button(onClick = actions::refreshUsbDevices, enabled = !state.busy, modifier = Modifier.testTag("usb-refresh")) {
                 Text(stringResource(R.string.usb_refresh))
             }
             when {
@@ -261,22 +342,20 @@ private fun UsbSection(state: AppState, actions: AppActions) {
                 else -> Text(stringResource(R.string.usb_detected, state.usbDevices.size))
             }
             if (state.usbDevices.isEmpty()) ExpandableSection(stringResource(R.string.usb_connection_help), "usb-help") {
-                val system = state.usbSystemState
-                Text(stringResource(when {
-                    system.hostConnected == true -> R.string.usb_system_host
-                    system.hostConnected == false && system.deviceConnected == true -> R.string.usb_system_device
-                    system.hostConnected == false && system.deviceConnected == false -> R.string.usb_system_disconnected
-                    else -> R.string.usb_system_unknown
-                }))
-                Text(stringResource(R.string.usb_system_diagnostics), style = MaterialTheme.typography.bodySmall)
-                Text(stringResource(R.string.usb_shield_hint), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_help_host), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_help_cable), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_help_port), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_help_debugging), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_help_retry), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_shield_hint), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.usb_help_desktop), style = MaterialTheme.typography.bodySmall)
             }
             state.usbDevices.forEach { device ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(device.label, style = MaterialTheme.typography.titleSmall)
+                        CopyableText(device.label, style = MaterialTheme.typography.titleSmall)
                         // USB bus address distinguishes identical devices without reading serialNumber.
-                        Text(device.deviceName, style = MaterialTheme.typography.bodySmall)
+                        CopyableText(device.deviceName, style = MaterialTheme.typography.bodySmall)
                         if (state.connectedUsb?.deviceName == device.deviceName) {
                             Text(stringResource(R.string.usb_connected), color = ConnectedColor)
                         } else {
@@ -296,14 +375,15 @@ private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActi
     Card(Modifier.fillMaxWidth().testTag("connection-status")) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.connect_title), style = MaterialTheme.typography.titleMedium)
-            Text(when (val connection = state.connection) {
+            CopyableText(when (val connection = state.connection) {
                 is ConnectionState.Connected -> stringResource(R.string.connect_state_connected, connection.address.toString())
                 is ConnectionState.Connecting -> stringResource(R.string.connect_state_connecting, connection.address.toString())
+                is ConnectionState.Checking -> stringResource(R.string.connect_state_checking, connection.address.toString())
                 is ConnectionState.Failed -> stringResource(connection.reason.messageRes())
                 ConnectionState.Disconnected -> stringResource(R.string.connect_state_disconnected)
-            }, color = when (state.connection) {
+            }, fontWeight = FontWeight.Bold, color = when (state.connection) {
                 is ConnectionState.Connected -> ConnectedColor
-                is ConnectionState.Connecting -> MaterialTheme.colorScheme.onSurface
+                is ConnectionState.Connecting, is ConnectionState.Checking -> MaterialTheme.colorScheme.onSurface
                 else -> MaterialTheme.colorScheme.error
             })
             if (state.connected) Button(onClick = actions::disconnect, enabled = !state.busy) {
@@ -328,6 +408,7 @@ private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: Ap
             Text(stringResource(R.string.connect_try_loopback))
         }
     }
+    CopyableText(stringResource(R.string.discovery_authorize_hint), style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
@@ -347,14 +428,6 @@ private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (Stri
                 Text(stringResource(R.string.discovery_searching))
             state.discovered.isEmpty() -> Text(stringResource(R.string.discovery_empty))
         }
-        // Про запрос авторизации сказано здесь, до подключения: увидев на
-        // телевизоре окно с отпечатком ключа, человек должен понимать, что
-        // это нормальный шаг, а не сбой. Формулировка та же, что и в
-        // десктопной версии
-        Text(
-            stringResource(R.string.discovery_authorize_hint),
-            style = MaterialTheme.typography.bodySmall,
-        )
         state.discovered.forEach { device ->
             DiscoveredRow(
                 device = device,
@@ -370,6 +443,9 @@ private fun DiscoverySection(state: AppState, actions: AppActions, onPair: (Stri
                 onPair = onPair,
             )
         }
+        if (state.discovered.isEmpty()) {
+            CopyableText(stringResource(R.string.discovery_authorize_hint), style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
@@ -384,14 +460,18 @@ private fun DiscoveredRow(
     val awaitingPairing = device.kind == DiscoveredDevice.Kind.AWAITING_PAIRING
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.discovery_found), color = ConnectedColor,
+            Text(stringResource(R.string.discovery_found), color = ConnectedColor, fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.labelLarge)
-            Text(device.name, style = MaterialTheme.typography.bodyLarge)
-            Text("${device.address}  ·  ${stringResource(device.kind.labelRes())}")
+            CopyableText(device.name, style = MaterialTheme.typography.bodyLarge)
+            FlowRow {
+                CopyableText(device.address.toString())
+                Text("  ·  ${stringResource(device.kind.labelRes())}")
+            }
             if (connected) {
                 Text(
                     stringResource(R.string.discovery_connected),
                     color = ConnectedColor,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else if (awaitingPairing) {
@@ -406,6 +486,7 @@ private fun DiscoveredRow(
                     Text(stringResource(R.string.connect_action))
                 }
             }
+            CopyableText(stringResource(R.string.discovery_authorize_hint), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -424,14 +505,13 @@ private fun PairingSection(
     val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.pairing_title), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.pairing_hint), style = MaterialTheme.typography.bodySmall)
+        CopyableText(stringResource(R.string.pairing_hint), style = MaterialTheme.typography.bodySmall)
         if (!pairingSupported) {
             Text(stringResource(R.string.error_wireless_unsupported), style = MaterialTheme.typography.bodySmall)
         }
         // Самая частая причина неудачи: люди подставляют порт спаривания
         // в подключение, потому что оба показаны на одном экране телевизора
-        Text(stringResource(R.string.pairing_port_warning), style = MaterialTheme.typography.bodySmall)
+        CopyableText(stringResource(R.string.pairing_port_warning), style = MaterialTheme.typography.bodySmall)
 
         OutlinedTextField(
             value = pairingAddress,
@@ -472,6 +552,36 @@ private fun NtpSection(state: AppState, actions: AppActions,
     var query by rememberSaveable { mutableStateOf("") }
     var showAll by rememberSaveable { mutableStateOf(false) }
     var showCountries by rememberSaveable { mutableStateOf(false) }
+    var pickerExpanded by rememberSaveable { mutableStateOf(false) }
+    val addressView = remember { BringIntoViewRequester() }
+    val checkFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var selectionRequest by remember { mutableIntStateOf(0) }
+    var highlightAddress by remember { mutableStateOf(false) }
+    val onPick: (String) -> Unit = { server ->
+        custom = server
+        showCountries = false
+        showAll = false
+        selectionRequest += 1
+    }
+    LaunchedEffect(selectionRequest) {
+        highlightAddress = false
+        if (selectionRequest > 0) {
+            withFrameNanos { }
+            // clearFocus() на API 23 может вернуть фокус в поиск и открыть IME
+            // снова. Переводим его на доступную без подключения кнопку.
+            checkFocus.requestFocus()
+            keyboard?.hide()
+            addressView.bringIntoView()
+            // Небольшая подсказка после выбора, без изменения размеров и действий.
+            repeat(3) {
+                highlightAddress = true
+                delay(400)
+                highlightAddress = false
+                delay(400)
+            }
+        }
+    }
 
     // Поиск идёт и по странам, и по альтернативным адресам: для человека это
     // один список серверов, а не две разные сущности
@@ -480,46 +590,56 @@ private fun NtpSection(state: AppState, actions: AppActions,
     // от опечатки пользователя без теста невозможно
     val matches = remember(query) { searchNtpServers(query) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    FunctionCard("ntp") {
         Text(stringResource(R.string.ntp_title), style = MaterialTheme.typography.titleMedium)
         // Заданный сервер выделен так же, как установленная связь: это второе
         // состояние, ради которого на экран смотрят
         val ntpIsSet = state.connected && state.currentNtpServer.isNotEmpty()
-        Text(
+        CopyableText(
             when {
                 !state.connected -> stringResource(R.string.ntp_connect_first)
                 ntpIsSet -> stringResource(R.string.ntp_current, state.currentNtpServer)
                 else -> stringResource(R.string.ntp_current_unset)
             },
             color = if (ntpIsSet) ConnectedColor else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (ntpIsSet) FontWeight.Bold else null,
             style = MaterialTheme.typography.titleSmall,
         )
 
-        OutlinedTextField(
-            value = custom,
-            onValueChange = { custom = it },
-            label = { Text(stringResource(R.string.ntp_custom_hint)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
-        )
-        Text(
-            stringResource(R.string.ntp_address_note),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { actions.applyNtpServer(custom) },
-                enabled = state.connected && !state.busy && custom.isNotBlank(),
-                modifier = Modifier.testTag("ntp-apply"),
-            ) {
-                Text(stringResource(R.string.ntp_apply))
-            }
-            TextButton(
-                onClick = { actions.checkNtpServer(custom) },
-                enabled = !state.busy && custom.isNotBlank(),
-                modifier = Modifier.testTag("ntp-check"),
-            ) {
-                Text(stringResource(R.string.ntp_check))
+        Column(Modifier.bringIntoViewRequester(addressView), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = custom,
+                onValueChange = { custom = it },
+                label = { Text(stringResource(R.string.ntp_custom_hint)) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (highlightAddress) ConnectedColor else MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = if (highlightAddress) ConnectedColor else MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
+                    unfocusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
+                ),
+                modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
+            )
+            Text(
+                stringResource(R.string.ntp_address_note),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { actions.applyNtpServer(custom) },
+                    enabled = state.connected && !state.busy && custom.isNotBlank(),
+                    modifier = Modifier.testTag("ntp-apply"),
+                ) {
+                    Text(stringResource(R.string.ntp_apply))
+                }
+                FilledTonalButton(
+                    onClick = { actions.checkNtpServer(custom) },
+                    enabled = !state.busy && custom.isNotBlank(),
+                    modifier = Modifier.focusRequester(checkFocus)
+                        .focusProperties { canFocus = true }.testTag("ntp-check"),
+                ) {
+                    Text(stringResource(R.string.ntp_check))
+                }
             }
         }
 
@@ -529,7 +649,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
         // находится далеко внизу, и подтверждение там не видно
         state.ntpMessage?.let { message ->
             Card(modifier = Modifier.fillMaxWidth()) {
-                Text(
+                CopyableText(
                     text = stringResource(message.res, *message.args.toTypedArray()),
                     // Успешная запись — зелёным, всё остальное здесь неудача:
                     // «не применено», «неверный адрес», «устройство сообщает
@@ -544,24 +664,11 @@ private fun NtpSection(state: AppState, actions: AppActions,
             }
         }
 
-        // Проверка идёт из сети телефона, а UDP-порт 123 закрывают и операторы,
-        // и часть роутеров: полный запрет оставил бы человека вообще без
-        // возможности задать сервер
-        state.ntpRejected?.let { rejected ->
-            Button(
-                onClick = { actions.applyNtpServer(rejected, force = true) },
-                enabled = state.connected && !state.busy,
-                modifier = Modifier.testTag("ntp-apply-anyway"),
-            ) {
-                Text(stringResource(R.string.ntp_apply_anyway))
-            }
-        }
-
         state.ntpDiagnosticEventId?.let { id ->
             DiagnosticLink(id, "ntp-details", onDiagnostics, returnFocus, onFocusRestored)
         }
         if (state.connected) {
-            TextButton(onClick = actions::verifyDeviceTime, enabled = !state.busy,
+            Button(onClick = actions::verifyDeviceTime, enabled = !state.busy,
                 modifier = Modifier.testTag("time-check")) {
                 Text(stringResource(R.string.time_check_action))
             }
@@ -574,19 +681,18 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 DiagnosticLink(id, "time-details", onDiagnostics, returnFocus, onFocusRestored)
             }
         }
-        state.ntpScan?.takeUnless { it.finished }?.let { scan ->
-            Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size),
-                modifier = Modifier.testTag("ntp-scan-progress"))
-            Button(onClick = actions::cancelNtpScan) { Text(stringResource(R.string.ntp_scan_cancel)) }
+        if (!pickerExpanded) state.ntpScan?.takeUnless { it.finished }?.let { scan ->
+            NtpScanProgress(scan, actions)
         }
-        ExpandableSection(stringResource(R.string.ntp_choose_server), "ntp-picker") {
+        ExpandableSection(stringResource(R.string.ntp_choose_server), "ntp-picker", expanded = pickerExpanded,
+            onExpanded = { pickerExpanded = it }) {
             Text(stringResource(R.string.ntp_by_country), style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 label = { Text(stringResource(R.string.ntp_search_country)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("ntp-search"),
             )
             matches.forEach { match ->
                 val country = match.country
@@ -595,13 +701,13 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 } else {
                     "${country.code.uppercase()} · ${countryName(country)} · ${country.server}"
                 }
-                TextButton(onClick = { custom = match.server }, enabled = !state.busy) { Text(label) }
+                TextButton(onClick = { onPick(match.server) }, enabled = !state.busy) { CopyableText(label) }
             }
 
             // Списки раскрываются только при пустом поиске: иначе на экране
             // оказались бы сразу и результаты поиска, и весь справочник
             if (query.isBlank()) {
-                TextButton(onClick = { showCountries = !showCountries }) {
+                Button(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
                     Text(
                         if (showCountries) {
                             stringResource(R.string.ntp_hide_countries)
@@ -615,18 +721,15 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     // справочник закрывает собой кнопки «Применить» и «Проверить»
                     NtpData.countries.forEach { country ->
                         TextButton(
-                            onClick = {
-                                custom = country.server
-                                showCountries = false
-                            },
+                            onClick = { onPick(country.server) },
                             enabled = !state.busy,
                         ) {
-                            Text("${country.code.uppercase()} · ${countryName(country)} · ${country.server}")
+                            CopyableText("${country.code.uppercase()} · ${countryName(country)} · ${country.server}")
                         }
                     }
                 }
 
-                TextButton(onClick = { showAll = !showAll }) {
+                Button(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
                     Text(
                         if (showAll) {
                             stringResource(R.string.ntp_hide_all)
@@ -638,18 +741,111 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 if (showAll) {
                     NtpData.alternativeServers.forEach { server ->
                         TextButton(
-                            onClick = {
-                                custom = server
-                                showAll = false
-                            },
+                            onClick = { onPick(server) },
                             enabled = !state.busy,
-                        ) { Text(server) }
+                        ) { CopyableText(server) }
                     }
                 }
             }
 
-            NtpScanBlock(state, actions, onPick = { custom = it })
+            NtpScanBlock(state, actions, onPick = { address ->
+                actions.clearNtpScanResults()
+                onPick(address)
+            }, onStart = {
+                showCountries = false
+                showAll = false
+                actions.scanNtpServers()
+            })
         }
+    }
+}
+
+/** Ручной выбор пояса подключённого устройства, отдельно от настройки NTP. */
+@Composable
+private fun TimeZoneSection(state: AppState, actions: AppActions,
+    onDiagnostics: (Long?, String) -> Unit, returnFocus: String?, onFocusRestored: () -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var chosen by rememberSaveable { mutableStateOf("") }
+    var showChoices by rememberSaveable { mutableStateOf(false) }
+    var selectionRequest by remember { mutableIntStateOf(0) }
+    val applyFocus = remember { FocusRequester() }
+    val applyView = remember { BringIntoViewRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+    val catalog = remember(locale) {
+        val names = if (Build.VERSION.SDK_INT >= 24) android.icu.text.TimeZoneNames.getInstance(locale) else null
+        availableTimeZoneIds.filter { '/' in it || it == "UTC" }.sorted().map { id ->
+            val city = if (Build.VERSION.SDK_INT >= 24) names?.getExemplarLocationName(id) else null
+            val description = TimeZone.getTimeZone(id).getDisplayName(false, TimeZone.LONG, locale)
+            id to listOfNotNull(city, description, id).distinct().joinToString(" · ")
+        }
+    }
+    val matches = remember(query, catalog) {
+        if (query.isBlank()) emptyList() else catalog.filter { (_, label) -> label.contains(query.trim(), ignoreCase = true) }
+    }
+    LaunchedEffect(selectionRequest, state.connected) {
+        if (selectionRequest > 0 && state.connected) {
+            withFrameNanos { }
+            applyFocus.requestFocus()
+            keyboard?.hide()
+            applyView.bringIntoView()
+        }
+    }
+    CopyableText(stringResource(R.string.time_zone_note), style = MaterialTheme.typography.bodySmall)
+    if (state.connected) {
+        val current = (state.timeZoneResult as? TimeZoneUpdateResult.Applied)?.zoneId
+            ?: state.deviceInfo?.timezone.orEmpty()
+        CopyableText(if (current.isNotBlank()) stringResource(R.string.time_zone_current, current)
+            else stringResource(R.string.time_zone_unknown),
+            color = if (current.isNotBlank()) ConnectedColor else MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Bold, modifier = Modifier.testTag("time-zone-current"))
+        OutlinedTextField(query, onValueChange = {
+            query = it
+            chosen = it.trim().takeIf(::isValidTimeZoneId).orEmpty()
+            showChoices = true
+        }, singleLine = true, enabled = !state.busy,
+            label = { Text(stringResource(R.string.time_zone_search)) },
+            modifier = Modifier.fillMaxWidth().testTag("time-zone-search"))
+        Text(stringResource(R.string.time_zone_search_hint), style = MaterialTheme.typography.bodySmall)
+        Button(onClick = {
+            showChoices = false
+            applyFocus.requestFocus()
+            keyboard?.hide()
+            actions.applyTimeZone(chosen)
+        }, enabled = !state.busy && isValidTimeZoneId(chosen),
+            modifier = Modifier.focusRequester(applyFocus).focusProperties { canFocus = true }
+                .bringIntoViewRequester(applyView).testTag("time-zone-apply")) {
+            Text(stringResource(R.string.time_zone_apply))
+        }
+        if (showChoices && query.isNotBlank()) {
+            matches.take(20).forEach { (id, label) ->
+                TextButton(onClick = {
+                    query = id; chosen = id; showChoices = false; selectionRequest++
+                }, enabled = !state.busy, modifier = Modifier.testTag("time-zone-option-$id")) { CopyableText(label) }
+            }
+            if (matches.isEmpty()) Text(stringResource(R.string.time_zone_no_matches))
+            if (matches.size > 20) Text(stringResource(R.string.time_zone_refine))
+        }
+    } else Text(stringResource(R.string.time_zone_connect_first))
+    if (state.operation == Operation.APPLY_TIME_ZONE) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+        Text(stringResource(R.string.time_zone_working))
+    }
+    when (val result = state.timeZoneResult) {
+        is TimeZoneUpdateResult.Applied -> CopyableText(stringResource(R.string.time_zone_applied, result.zoneId), color = ConnectedColor)
+        is TimeZoneUpdateResult.Failed -> {
+            CopyableText(stringResource(result.reason.messageRes()), color = MaterialTheme.colorScheme.error)
+            CopyableText(stringResource(when (result.restoration) {
+                TimeZoneRestoration.NOT_NEEDED -> R.string.time_zone_unchanged
+                TimeZoneRestoration.RESTORED -> R.string.time_zone_restored
+                TimeZoneRestoration.UNCONFIRMED -> R.string.time_zone_restore_failed
+            }), color = MaterialTheme.colorScheme.error)
+        }
+        null -> Unit
+    }
+    state.timeZoneDiagnosticEventId?.let { id ->
+        DiagnosticLink(id, "time-zone-details", onDiagnostics, returnFocus, onFocusRestored)
     }
 }
 
@@ -658,11 +854,11 @@ private fun NtpSection(state: AppState, actions: AppActions,
 private fun NtpCheckCard(check: NtpProbeResult) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(check.server, style = MaterialTheme.typography.bodyLarge)
+            CopyableText(check.server, style = MaterialTheme.typography.bodyLarge)
             // Здесь строка не нажимается, поэтому и текст другой: обещать
             // нажатие там, где его нет, хуже, чем не показывать вовсе
             check.ipAddress?.takeIf { it != check.server }?.let {
-                Text(stringResource(R.string.ntp_check_ip, it), style = MaterialTheme.typography.bodySmall)
+                CopyableText(stringResource(R.string.ntp_check_ip, it), style = MaterialTheme.typography.bodySmall)
             }
             if (check.isUsable()) {
                 Text(
@@ -674,14 +870,9 @@ private fun NtpCheckCard(check: NtpProbeResult) {
                     ),
                     color = ConnectedColor,
                 )
-            } else if (check.reachable) {
-                Text(
-                    stringResource(R.string.ntp_check_bad_clock),
-                    color = MaterialTheme.colorScheme.error,
-                )
             } else {
                 Text(
-                    stringResource(R.string.ntp_check_failed, check.error.orEmpty()),
+                    stringResource(R.string.ntp_check_failed, stringResource(check.rejectionMessageRes())),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -701,12 +892,19 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
                     DeviceTimeStatus.MISMATCH -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onSurface
                 })
-            if (check.server.isNotEmpty()) Text(stringResource(R.string.time_check_server, check.server))
+            if (check.server.isNotEmpty()) CopyableText(stringResource(R.string.time_check_server, check.server))
             check.deviceTimeMillis?.let {
+                check.timeZoneId?.let { zone ->
+                    val local = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", locale).apply {
+                        timeZone = TimeZone.getTimeZone(zone)
+                    }.format(Date(it))
+                    CopyableText(stringResource(R.string.time_check_device_local_time, local, zone))
+                }
                 val utc = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", locale).apply {
                     timeZone = TimeZone.getTimeZone("UTC")
                 }.format(Date(it))
                 Text(stringResource(R.string.time_check_device_time, utc))
+                Text(stringResource(R.string.time_check_utc_note), style = MaterialTheme.typography.bodySmall)
             }
             if (check.differenceSeconds != null && check.uncertaintySeconds != null) {
                 Text(stringResource(R.string.time_check_difference, formatOffset(check.differenceSeconds, locale),
@@ -722,15 +920,29 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
     }
 }
 
-/** Подбор самого быстрого сервера — аналог автонастройки десктопной версии. */
+/** Подбор устойчиво отвечающего сервера — аналог автонастройки десктопной версии. */
 @Composable
-private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit) {
+private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit, onStart: () -> Unit) {
     val scan = state.ntpScan
+    val progressView = remember { BringIntoViewRequester() }
+    val scanning = scan != null && !scan.finished
+    LaunchedEffect(scanning) {
+        if (scanning) {
+            withFrameNanos { }
+            progressView.bringIntoView()
+        }
+    }
     Text(stringResource(R.string.ntp_scan_title), style = MaterialTheme.typography.bodyMedium)
+    Text(stringResource(R.string.ntp_scan_hint), style = MaterialTheme.typography.bodySmall)
 
     if (scan == null || scan.finished) {
-        Button(onClick = actions::scanNtpServers, enabled = !state.busy) {
+        Button(onClick = onStart, enabled = !state.busy, modifier = Modifier.testTag("ntp-scan-start")) {
             Text(stringResource(R.string.ntp_scan_start))
+        }
+    } else {
+        Column(Modifier.fillMaxWidth().bringIntoViewRequester(progressView),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            NtpScanProgress(scan, actions)
         }
     }
 
@@ -738,12 +950,13 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
         Text(stringResource(R.string.ntp_scan_best), style = MaterialTheme.typography.bodyMedium)
         scan.best.forEach { result ->
             TextButton(onClick = { onPick(result.server) }, enabled = !state.busy) {
-                Text(
+                CopyableText(
                     stringResource(
                         R.string.ntp_scan_entry,
                         result.server,
-                        result.avgRttMs ?: 0L,
+                        result.medianRttMs ?: result.avgRttMs ?: 0L,
                         result.successRate,
+                        result.rttJitterMs?.toLong() ?: 0L,
                     ),
                 )
             }
@@ -753,12 +966,22 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
             val ip = result.ipAddress
             if (ip != null && ip != result.server) {
                 TextButton(onClick = { onPick(ip) }, enabled = !state.busy) {
-                    Text(stringResource(R.string.ntp_scan_entry_ip, ip))
+                    CopyableText(stringResource(R.string.ntp_scan_entry_ip, ip))
                 }
             }
         }
     } else if (scan != null && scan.finished) {
         Text(stringResource(R.string.ntp_scan_none))
+    }
+}
+
+@Composable
+private fun NtpScanProgress(scan: ScanProgress, actions: AppActions) {
+    LinearProgressIndicator(Modifier.fillMaxWidth())
+    Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size),
+        modifier = Modifier.testTag("ntp-scan-progress"))
+    Button(onClick = actions::cancelNtpScan, modifier = Modifier.testTag("ntp-scan-cancel")) {
+        Text(stringResource(R.string.ntp_scan_cancel))
     }
 }
 
@@ -794,7 +1017,7 @@ private fun formatOffset(seconds: Double?, locale: Locale = Locale.getDefault())
 
 @Composable
 private fun DeviceInfoSection(state: AppState, actions: AppActions) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    FunctionCard("device-info") {
         Text(stringResource(R.string.info_title), style = MaterialTheme.typography.titleMedium)
         state.deviceInfo?.let { info ->
             InfoRow(stringResource(R.string.info_model), info.model)
@@ -802,19 +1025,64 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
             InfoRow(stringResource(R.string.info_ntp), info.currentNtpServer, color = ConnectedColor)
             InfoRow(stringResource(R.string.info_timezone), info.timezone)
             ExpandableSection(stringResource(R.string.info_more), "device-details") {
-                InfoRow(stringResource(R.string.info_manufacturer), info.manufacturer)
-                InfoRow(stringResource(R.string.info_api), info.apiLevel)
-                InfoRow(stringResource(R.string.info_serial), info.serial)
-                InfoRow(stringResource(R.string.info_cpu), info.cpuAbi)
-                InfoRow(stringResource(R.string.info_cores), info.cpuCores)
-                InfoRow(stringResource(R.string.info_locale), info.locale)
-                InfoRow(stringResource(R.string.info_battery), info.batteryLevel)
-                InfoRow(stringResource(R.string.info_ram), info.totalRam)
-                InfoRow(stringResource(R.string.info_ram_free), info.availableRam)
-                InfoRow(stringResource(R.string.info_screen), info.screenResolution)
-                InfoRow(stringResource(R.string.info_density), info.screenDensity)
-                InfoRow(stringResource(R.string.info_uptime), info.uptime)
-                InfoRow(stringResource(R.string.info_kernel), info.kernelVersion)
+                Text(stringResource(R.string.info_availability_note), style = MaterialTheme.typography.bodySmall)
+                InfoGroup(stringResource(R.string.info_group_system), listOf(
+                    stringResource(R.string.info_manufacturer) to info.manufacturer,
+                    stringResource(R.string.info_device_code) to info.deviceCode,
+                    stringResource(R.string.info_api) to info.apiLevel,
+                    stringResource(R.string.info_build) to info.buildDisplay,
+                    stringResource(R.string.info_patch) to info.securityPatch,
+                    stringResource(R.string.info_vendor_patch) to info.vendorSecurityPatch,
+                    stringResource(R.string.info_build_type) to info.buildType,
+                    stringResource(R.string.info_fingerprint) to info.buildFingerprint,
+                    stringResource(R.string.info_bootloader) to info.bootloader,
+                    stringResource(R.string.info_kernel) to info.kernelVersion,
+                    stringResource(R.string.info_serial) to info.serial,
+                ))
+                InfoGroup(stringResource(R.string.info_group_hardware), listOf(
+                    stringResource(R.string.info_soc) to info.socModel,
+                    stringResource(R.string.info_soc_manufacturer) to info.socManufacturer,
+                    stringResource(R.string.info_hardware) to info.hardware,
+                    stringResource(R.string.info_cpu) to info.cpuAbi,
+                    stringResource(R.string.info_cores) to info.cpuCores,
+                    stringResource(R.string.info_gpu) to info.gpu,
+                    stringResource(R.string.info_ram) to info.totalRam,
+                    stringResource(R.string.info_ram_free) to info.availableRam,
+                    stringResource(R.string.info_storage) to info.storageTotal,
+                    stringResource(R.string.info_storage_free) to info.storageAvailable,
+                    stringResource(R.string.info_battery) to info.batteryLevel,
+                ))
+                val hdr = info.display.hdrTypes?.let { types ->
+                    if (types.isEmpty()) stringResource(R.string.info_hdr_none) else types.joinToString(", ") {
+                        when (it) { 1 -> "Dolby Vision"; 2 -> "HDR10"; 3 -> "HLG"; 4 -> "HDR10+"; else -> "HDR #$it" }
+                    }
+                }.orEmpty()
+                InfoGroup(stringResource(R.string.info_group_display), listOf(
+                    stringResource(R.string.info_screen) to info.screenResolution,
+                    stringResource(R.string.info_density) to info.screenDensity,
+                    stringResource(R.string.info_display_mode) to info.display.activeMode,
+                    stringResource(R.string.info_display_modes) to info.display.supportedModes,
+                    stringResource(R.string.info_hdr) to hdr,
+                    stringResource(R.string.info_allm) to infoBoolean(info.display.allm),
+                ))
+                InfoGroup(stringResource(R.string.info_group_audio), listOf(
+                    stringResource(R.string.info_audio_outputs) to info.audioOutputs,
+                    stringResource(R.string.info_audio_formats) to info.audioFormats,
+                ))
+                InfoGroup(stringResource(R.string.info_group_time_network), listOf(
+                    stringResource(R.string.info_locale) to info.locale,
+                    stringResource(R.string.info_auto_time) to infoBoolean(info.automaticTime),
+                    stringResource(R.string.info_auto_zone) to infoBoolean(info.automaticTimeZone),
+                    stringResource(R.string.info_uptime) to info.uptime,
+                    stringResource(R.string.info_addresses) to info.networkAddresses,
+                ))
+                if (info.videoDecoders.isNotEmpty() || info.audioDecoders.isNotEmpty()) {
+                    Text(stringResource(R.string.info_codecs_note), style = MaterialTheme.typography.bodySmall)
+                    InfoGroup(stringResource(R.string.info_group_codecs), listOf(
+                        stringResource(R.string.info_video_decoders) to info.videoDecoders,
+                        stringResource(R.string.info_audio_decoders) to info.audioDecoders,
+                    ))
+                }
             }
         }
         Button(onClick = actions::refreshDeviceInfo, enabled = !state.busy) {
@@ -824,14 +1092,31 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
 }
 
 @Composable
+private fun infoBoolean(value: Boolean?): String = when (value) {
+    true -> stringResource(R.string.info_yes)
+    false -> stringResource(R.string.info_no)
+    null -> ""
+}
+
+@Composable
+private fun InfoGroup(title: String, rows: List<Pair<String, String>>) {
+    if (rows.any { it.second.isNotBlank() }) {
+        Text(title, Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleSmall)
+        rows.forEach { (label, value) -> InfoRow(label, value) }
+    }
+}
+
+@Composable
 private fun InfoRow(label: String, value: String, color: Color = Color.Unspecified) {
     if (value.isNotBlank()) BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth < 480.dp) Column {
             Text(label, style = MaterialTheme.typography.bodySmall, color = color)
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = color)
+            CopyableText(value, style = MaterialTheme.typography.bodyMedium, color = color)
         } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(label, Modifier.weight(0.35f), style = MaterialTheme.typography.bodySmall, color = color)
-            Text(value, Modifier.weight(0.65f), style = MaterialTheme.typography.bodyMedium, color = color)
+            SelectionContainer(Modifier.weight(0.65f)) {
+                Text(value, style = MaterialTheme.typography.bodyMedium, color = color)
+            }
         }
     }
 }

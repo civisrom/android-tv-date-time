@@ -2,6 +2,7 @@ package com.civisrom.tvtimefixer.device
 
 import com.civisrom.tvtimefixer.adb.AdbClient
 import com.civisrom.tvtimefixer.data.isValidNtpServer
+import java.util.concurrent.CancellationException
 
 /** Чем закончилась попытка сменить сервер времени. */
 sealed interface NtpUpdateResult {
@@ -56,7 +57,7 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
     }
 
     /**
-     * Собирает сведения об устройстве девятью командами подряд.
+     * Собирает сведения при подключении и ручном обновлении, не в фоновом опросе.
      *
      * Обязательна из них только первая: `getprop` заодно проверяет, что связь
      * жива, и её отказ пробрасывается наружу. Остальные необязательны — на
@@ -67,9 +68,19 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
      * без единого слова о причине.
      */
     fun readDeviceInfo(): DeviceInfo {
-        val props = parseGetProp(client.shell("getprop").output)
+        val result = client.shell("getprop")
+        check(result.exitCode == 0) { "getprop failed (exit ${result.exitCode})" }
+        val props = parseGetProp(result.output)
+        check(props.isNotEmpty()) { "getprop returned no device properties" }
+        fun prop(key: String) = props[key]?.trim()?.takeUnless { it in listOf("unknown", "null") }.orEmpty()
         val uptimeSeconds = parseUptimeSeconds(optional("cat /proc/uptime"))
         val meminfo = optional("cat /proc/meminfo")
+        val storage = parseDataStorage(optional("df -k /data")).let {
+            if (it.first.isEmpty()) parseDataStorage(optional("df /data")) else it
+        }
+        val display = parseDisplayDetails(optional("dumpsys display"))
+        val audio = parseAudioOutputs(optional("dumpsys media.audio_policy"))
+        val decoders = parseDeclaredDecoders(optional(READ_CODEC_XML_COMMAND))
 
         return DeviceInfo(
             model = props["ro.product.model"].orEmpty(),
@@ -77,7 +88,7 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
             androidVersion = props["ro.build.version.release"].orEmpty(),
             apiLevel = props["ro.build.version.sdk"].orEmpty(),
             serial = props["ro.serialno"].orEmpty(),
-            cpuAbi = props["ro.product.cpu.abi"].orEmpty(),
+            cpuAbi = prop("ro.product.cpu.abilist").ifEmpty { prop("ro.product.cpu.abi") },
             timezone = props["persist.sys.timezone"].orEmpty(),
             locale = props["persist.sys.locale"].orEmpty(),
             currentNtpServer = optional("settings get $NTP_SETTING").trim()
@@ -91,12 +102,50 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
             cpuCores = optional("cat /proc/cpuinfo | grep \"^processor\" | wc -l").trim(),
             kernelVersion = optional("uname -r").trim(),
             uptime = uptimeSeconds?.let(::formatUptime).orEmpty(),
+            buildDisplay = prop("ro.build.display.id"),
+            securityPatch = prop("ro.build.version.security_patch"),
+            vendorSecurityPatch = prop("ro.vendor.build.security_patch"),
+            buildFingerprint = prop("ro.build.fingerprint"),
+            buildType = prop("ro.build.type"),
+            bootloader = prop("ro.bootloader"),
+            deviceCode = prop("ro.product.device"),
+            socModel = prop("ro.soc.model"),
+            socManufacturer = prop("ro.soc.manufacturer"),
+            hardware = listOf(prop("ro.hardware"), prop("ro.board.platform")).filter(String::isNotEmpty).distinct().joinToString(" / "),
+            gpu = optional("dumpsys SurfaceFlinger | grep '^GLES:'").lineSequence()
+                .firstOrNull { it.startsWith("GLES:") }?.substringAfter("GLES:")?.trim().orEmpty(),
+            storageTotal = storage.first,
+            storageAvailable = storage.second,
+            automaticTime = parseAutomaticSetting(optional("settings get global auto_time")),
+            automaticTimeZone = automaticTimeZoneEnabled(prop("ro.build.version.sdk").toIntOrNull()),
+            display = display,
+            audioOutputs = audio.first,
+            audioFormats = audio.second,
+            videoDecoders = decoders.first,
+            audioDecoders = decoders.second,
+            networkAddresses = parseNetworkAddresses(optional("ip -o addr show scope global")),
         )
     }
 
+    /** На TV Android 12+ raw auto_time_zone=1 не означает наличия автоопределения. */
+    fun automaticTimeZoneEnabled(apiLevel: Int?): Boolean? {
+        if (apiLevel == null) return null
+        if (apiLevel < 31) return parseAutomaticSetting(optional("settings get global auto_time_zone"))
+        val telephony = optional("cmd time_zone_detector is_telephony_detection_supported").trim().toBooleanStrictOrNull()
+        val geo = optional("cmd time_zone_detector is_geo_detection_supported").trim().toBooleanStrictOrNull()
+        if (telephony == false && geo == false) return false
+        if (telephony != true && geo != true) return null
+        return optional("cmd time_zone_detector is_auto_detection_enabled").trim().toBooleanStrictOrNull()
+    }
+
     /** Вывод необязательной команды: пустая строка вместо исключения. */
-    private fun optional(command: String): String =
-        runCatching { client.shell(command).output }.getOrDefault("")
+    private fun optional(command: String): String = try {
+        client.shell(command).let { if (it.exitCode == 0) it.output else "" }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        ""
+    }
 
     private companion object {
         /**

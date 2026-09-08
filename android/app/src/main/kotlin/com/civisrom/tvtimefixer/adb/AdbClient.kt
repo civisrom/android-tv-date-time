@@ -24,8 +24,12 @@ data class ShellResult(
  */
 interface AdbClient : AutoCloseable {
     fun shell(command: String): ShellResult
+    /** Локальное состояние транспорта; true само по себе не подтверждает ответ устройства. */
     fun isAlive(): Boolean
 }
+
+internal const val ADB_PROBE_TOKEN = "tvtimefixer"
+internal const val ADB_PROBE_COMMAND = "echo $ADB_PROBE_TOKEN"
 
 /** Почему не удалось подключиться. Разделено по тому, что пользователю делать дальше. */
 enum class ConnectionError {

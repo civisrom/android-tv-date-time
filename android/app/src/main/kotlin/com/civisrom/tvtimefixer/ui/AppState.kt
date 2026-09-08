@@ -8,6 +8,7 @@ import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 
@@ -24,6 +25,8 @@ data class AppState(
     val diagnosticEventId: Long? = null,
     val ntpDiagnosticEventId: Long? = null,
     val timeDiagnosticEventId: Long? = null,
+    val timeZoneDiagnosticEventId: Long? = null,
+    val timeZoneResult: TimeZoneUpdateResult? = null,
     val discoveryAvailable: Boolean = true,
     val discoverySearching: Boolean = false,
     val discoveryPermissionNeeded: Boolean = false,
@@ -51,21 +54,20 @@ data class AppState(
     val timeCheck: DeviceTimeCheck? = null,
     /** Идущий или законченный подбор лучшего сервера. */
     val ntpScan: ScanProgress? = null,
-    /**
-     * Адрес, который не прошёл проверку и ждёт решения человека.
-     *
-     * Проверка идёт из сети телефона, а UDP-порт 123 закрывают и мобильные
-     * операторы, и часть домашних роутеров. Запрещать в такой обстановке
-     * наглухо — значит не дать задать вообще ничего, поэтому отказ
-     * сопровождается кнопкой «Применить всё-таки».
-     */
-    val ntpRejected: String? = null,
 ) {
     /** Команда ADB не должна перезаписывать USB-события, полученные за время её выполнения. */
     fun withLatestUsb(latest: AppState): AppState = copy(
         usbSupported = latest.usbSupported, usbDevices = latest.usbDevices,
         usbAttachedCount = latest.usbAttachedCount, usbScanFailed = latest.usbScanFailed,
         usbSystemState = latest.usbSystemState,
+    )
+
+    /** После потери связи сведения и подтверждения от прежнего устройства больше не актуальны. */
+    fun connectionLost(): AppState = copy(
+        connection = ConnectionState.Disconnected,
+        deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
+        timeCheck = null, timeDiagnosticEventId = null,
+        timeZoneResult = null, timeZoneDiagnosticEventId = null,
     )
 
     val connected: Boolean get() = connection is ConnectionState.Connected
