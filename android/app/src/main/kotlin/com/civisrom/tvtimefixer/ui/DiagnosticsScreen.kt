@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -199,8 +200,10 @@ internal fun DiagnosticsScreen(
                         }
                         if (expandedId == event.id) {
                             if (event.durationMs > 0) Text(stringResource(R.string.diagnostics_duration, event.durationMs))
-                            Text(event.details.ifEmpty { stringResource(R.string.diagnostics_no_details) },
-                                style = MaterialTheme.typography.bodySmall)
+                            SelectionContainer {
+                                Text(event.details.ifEmpty { stringResource(R.string.diagnostics_no_details) },
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }

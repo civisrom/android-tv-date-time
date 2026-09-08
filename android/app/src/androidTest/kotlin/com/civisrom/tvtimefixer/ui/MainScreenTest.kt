@@ -1,12 +1,14 @@
 package com.civisrom.tvtimefixer.ui
 
 import android.app.UiAutomation
+import android.content.ClipboardManager
 import android.content.Intent
 import android.hardware.usb.UsbManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -15,6 +17,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
@@ -34,6 +37,7 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -42,6 +46,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
@@ -443,7 +448,34 @@ class MainScreenTest {
         compose.onNodeWithText("Подключено к этому устройству").assertDoesNotExist()
         compose.onNodeWithText("Спарить").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-code").performScrollTo().assertIsFocused()
-        compose.onNodeWithText("192.0.2.10:37123").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("pairing-address").performScrollTo().assertTextContains("192.0.2.10:37123")
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun a_discovered_address_can_be_copied_with_its_port_and_pasted_into_input_fields() {
+        val address = "192.0.2.10:37123"
+        screen(AppState(discovered = listOf(DiscoveredDevice("Living room TV",
+            DeviceAddress("192.0.2.10", 37123), DiscoveredDevice.Kind.AWAITING_PAIRING))))
+        copyDisplayedText(address)
+        for (tag in listOf("network-address", "pairing-address", "pairing-connect-address", "ntp-address")) {
+            compose.onNodeWithTag(tag).performScrollTo().performClick()
+            compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.PasteText) { it() }
+            waitForKeyboard()
+            compose.onNodeWithTag(tag).assertTextContains(address)
+        }
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun long_pressing_an_ntp_server_copies_it_without_selecting_or_applying_it() {
+        val server = "time.cloudflare.com"
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-alternatives").performScrollTo().performClick()
+        copyDisplayedText(server)
+        compose.onNodeWithTag("ntp-address").assert(hasText(server).not())
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithText(server).performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-address").assertTextContains(server)
         assertTrue(actions.calls.isEmpty())
     }
 
@@ -545,6 +577,34 @@ class MainScreenTest {
         assertTrue(matches.any { it.activityInfo.name == "com.civisrom.tvtimefixer.MainActivity" })
         assertTrue(actions.calls.isEmpty())
     }
+
+    private fun copyDisplayedText(text: String) {
+        compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo().performTouchInput {
+            longClick(Offset(5f, center.y))
+        }
+        compose.waitUntil(5_000) { textSelectionActions(android.R.string.copy).isNotEmpty() }
+        // Домен может сразу выделиться целиком; тогда Android не предлагает «Выделить всё».
+        if (textSelectionActions(android.R.string.selectAll).isNotEmpty()) {
+            clickTextSelectionAction(android.R.string.selectAll)
+        }
+        screenshot("copy-${text.substringBefore(':')}")
+        clickTextSelectionAction(android.R.string.copy)
+        compose.runOnIdle {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(text, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+        }
+    }
+
+    private fun clickTextSelectionAction(label: Int) {
+        compose.waitUntil(5_000) {
+            textSelectionActions(label).any { it.performAction(AccessibilityNodeInfo.ACTION_CLICK) }
+        }
+        compose.waitForIdle()
+    }
+
+    private fun textSelectionActions(label: Int): List<AccessibilityNodeInfo> =
+        InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
+            ?.findAccessibilityNodeInfosByText(context.getString(label)).orEmpty()
 
     private fun waitForKeyboard() {
         compose.waitUntil(5_000) {

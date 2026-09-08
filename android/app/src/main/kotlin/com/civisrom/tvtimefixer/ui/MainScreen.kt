@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -114,11 +115,13 @@ fun MainScreen(
                 showDiagnostics = false; returnFocus = if (available) origin else "diagnostics-open"
             }, onClear = onClearDiagnostics)
     } else holder.SaveableStateProvider("main") {
-        MainContent(mode, state, actions, diagnostics, pairingCode, { pairingCode = it },
-            onDiagnostics = { id, key ->
-                selectedEvent = id; origin = key; returnFocus = null
-                onRefreshDiagnostics(); showDiagnostics = true
-            }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null })
+        SelectionContainer {
+            MainContent(mode, state, actions, diagnostics, pairingCode, { pairingCode = it },
+                onDiagnostics = { id, key ->
+                    selectedEvent = id; origin = key; returnFocus = null
+                    onRefreshDiagnostics(); showDiagnostics = true
+                }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null })
+        }
     }
 }
 
@@ -392,7 +395,10 @@ private fun DiscoveredRow(
             Text(stringResource(R.string.discovery_found), color = ConnectedColor,
                 style = MaterialTheme.typography.labelLarge)
             Text(device.name, style = MaterialTheme.typography.bodyLarge)
-            Text("${device.address}  ·  ${stringResource(device.kind.labelRes())}")
+            FlowRow {
+                SelectionContainer { Text(device.address.toString()) }
+                Text("  ·  ${stringResource(device.kind.labelRes())}")
+            }
             if (connected) {
                 Text(
                     stringResource(R.string.discovery_connected),
@@ -665,7 +671,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                         TextButton(
                             onClick = { onPick(server) },
                             enabled = !state.busy,
-                        ) { Text(server) }
+                        ) { SelectionContainer { Text(server) } }
                     }
                 }
             }
