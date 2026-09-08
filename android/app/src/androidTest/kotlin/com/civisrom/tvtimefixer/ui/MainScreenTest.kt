@@ -30,6 +30,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -341,11 +342,18 @@ class MainScreenTest {
         compose.onNodeWithTag("ntp-search").performScrollTo().performTextInput("cloudflare")
         waitForKeyboard()
         compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
-        compose.waitUntil(5_000) {
-            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+        try {
+            compose.onNodeWithTag("ntp-address").assertTextContains("time.cloudflare.com").assertIsNotFocused()
+            compose.onNodeWithTag("ntp-search").assertIsNotFocused()
+            compose.waitUntil(5_000) {
+                ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+            }
+            compose.onNodeWithTag("ntp-address").assertIsDisplayed()
+            compose.onNodeWithTag("ntp-apply").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+        } finally {
+            screenshot("search-selection")
         }
-        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.cloudflare.com")
-        compose.onNodeWithTag("ntp-check").assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
     }
 

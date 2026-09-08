@@ -482,6 +482,10 @@ private fun NtpSection(state: AppState, actions: AppActions,
     val keyboard = LocalSoftwareKeyboardController.current
     var selectionRequest by remember { mutableIntStateOf(0) }
     val onPick: (String) -> Unit = { server ->
+        // Скрываем клавиатуру до снятия фокуса и изменения списка: на API 23
+        // отложенный запрос после завершения ввода может быть проигнорирован.
+        keyboard?.hide()
+        focusManager.clearFocus()
         custom = server
         showCountries = false
         showAll = false
@@ -489,8 +493,6 @@ private fun NtpSection(state: AppState, actions: AppActions,
     }
     LaunchedEffect(selectionRequest) {
         if (selectionRequest > 0) {
-            focusManager.clearFocus()
-            keyboard?.hide()
             withFrameNanos { }
             addressView.bringIntoView()
         }
