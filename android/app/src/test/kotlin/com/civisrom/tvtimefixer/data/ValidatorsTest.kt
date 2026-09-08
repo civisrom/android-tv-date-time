@@ -65,6 +65,16 @@ class ValidatorsTest {
     }
 
     @Test
+    fun `Unicode-цифры не допускаются в IP и коде спаривания`() {
+        for (address in listOf("１９２.１６８.１.２０", "١٩٢.١٦٨.١.٢٠")) {
+            assertFalse(isValidIpv4(address))
+            assertFalse(isValidNtpServer(address))
+            assertNull(parseDeviceAddress("$address:5555"))
+        }
+        for (code in listOf("１２３４５６", "١٢٣٤٥٦")) assertFalse(isValidPairingCode(code))
+    }
+
+    @Test
     fun `код спаривания — ровно шесть цифр`() {
         assertTrue(isValidPairingCode("123456"))
         assertTrue(isValidPairingCode(" 123456 "))

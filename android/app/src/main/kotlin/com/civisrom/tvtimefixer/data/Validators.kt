@@ -11,7 +11,8 @@ const val DEFAULT_ADB_PORT = 5555
  * Каждая метка домена проверяется отдельно; адрес отклоняется до сетевого
  * запроса или записи настройки на устройство.
  */
-private val IPV4 = Regex("""^(\d{1,3}\.){3}\d{1,3}$""")
+// На Android \d включает Unicode-цифры, которые не являются цифрами IPv4/ADB.
+private val IPV4 = Regex("""^([0-9]{1,3}\.){3}[0-9]{1,3}$""")
 private val DOMAIN = Regex("""^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$""")
 
 fun isValidIpv4(value: String): Boolean {
@@ -59,4 +60,4 @@ fun parseDeviceAddress(input: String): DeviceAddress? {
 
 /** Код спаривания Android 11+ — ровно шесть цифр. */
 fun isValidPairingCode(code: String): Boolean =
-    Regex("""^\d{6}$""").matches(code.trim())
+    Regex("""^[0-9]{6}$""").matches(code.trim())
