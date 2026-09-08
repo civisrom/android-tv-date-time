@@ -38,6 +38,7 @@ import com.civisrom.tvtimefixer.adb.targetOrNull
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbe
 import com.civisrom.tvtimefixer.data.NtpScanner
+import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceRepository
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
@@ -344,7 +345,8 @@ class MainActivity : ComponentActivity() {
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
-            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null, ntpDiagnosticEventId = null)
+            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null, ntpDiagnosticEventId = null,
+                ntpScan = ScanProgress(0, NtpData.allServers.size, emptyList()))
             journal.record(Operation.SCAN_NTP, Outcome.STARTED)
             val started = System.nanoTime()
             scanJob = lifecycleScope.launch {

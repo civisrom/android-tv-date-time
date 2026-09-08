@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -28,8 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -54,6 +59,7 @@ import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
 import com.civisrom.tvtimefixer.data.NtpCountry
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbeResult
+import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.data.searchNtpServers
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
@@ -261,14 +267,11 @@ private fun UsbSection(state: AppState, actions: AppActions) {
                 else -> Text(stringResource(R.string.usb_detected, state.usbDevices.size))
             }
             if (state.usbDevices.isEmpty()) ExpandableSection(stringResource(R.string.usb_connection_help), "usb-help") {
-                val system = state.usbSystemState
-                Text(stringResource(when {
-                    system.hostConnected == true -> R.string.usb_system_host
-                    system.hostConnected == false && system.deviceConnected == true -> R.string.usb_system_device
-                    system.hostConnected == false && system.deviceConnected == false -> R.string.usb_system_disconnected
-                    else -> R.string.usb_system_unknown
-                }))
-                Text(stringResource(R.string.usb_system_diagnostics), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.usb_help_host), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.usb_help_cable), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.usb_help_port), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.usb_help_debugging), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.usb_help_retry), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.usb_shield_hint), style = MaterialTheme.typography.bodySmall)
             }
             state.usbDevices.forEach { device ->
@@ -473,6 +476,25 @@ private fun NtpSection(state: AppState, actions: AppActions,
     var query by rememberSaveable { mutableStateOf("") }
     var showAll by rememberSaveable { mutableStateOf(false) }
     var showCountries by rememberSaveable { mutableStateOf(false) }
+    var pickerExpanded by rememberSaveable { mutableStateOf(false) }
+    val addressView = remember { BringIntoViewRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var selectionRequest by remember { mutableIntStateOf(0) }
+    val onPick: (String) -> Unit = { server ->
+        custom = server
+        showCountries = false
+        showAll = false
+        selectionRequest += 1
+    }
+    LaunchedEffect(selectionRequest) {
+        if (selectionRequest > 0) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+            withFrameNanos { }
+            addressView.bringIntoView()
+        }
+    }
 
     // Поиск идёт и по странам, и по альтернативным адресам: для человека это
     // один список серверов, а не две разные сущности
@@ -496,31 +518,33 @@ private fun NtpSection(state: AppState, actions: AppActions,
             style = MaterialTheme.typography.titleSmall,
         )
 
-        OutlinedTextField(
-            value = custom,
-            onValueChange = { custom = it },
-            label = { Text(stringResource(R.string.ntp_custom_hint)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
-        )
-        Text(
-            stringResource(R.string.ntp_address_note),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { actions.applyNtpServer(custom) },
-                enabled = state.connected && !state.busy && custom.isNotBlank(),
-                modifier = Modifier.testTag("ntp-apply"),
-            ) {
-                Text(stringResource(R.string.ntp_apply))
-            }
-            TextButton(
-                onClick = { actions.checkNtpServer(custom) },
-                enabled = !state.busy && custom.isNotBlank(),
-                modifier = Modifier.testTag("ntp-check"),
-            ) {
-                Text(stringResource(R.string.ntp_check))
+        Column(Modifier.bringIntoViewRequester(addressView), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = custom,
+                onValueChange = { custom = it },
+                label = { Text(stringResource(R.string.ntp_custom_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
+            )
+            Text(
+                stringResource(R.string.ntp_address_note),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { actions.applyNtpServer(custom) },
+                    enabled = state.connected && !state.busy && custom.isNotBlank(),
+                    modifier = Modifier.testTag("ntp-apply"),
+                ) {
+                    Text(stringResource(R.string.ntp_apply))
+                }
+                TextButton(
+                    onClick = { actions.checkNtpServer(custom) },
+                    enabled = !state.busy && custom.isNotBlank(),
+                    modifier = Modifier.testTag("ntp-check"),
+                ) {
+                    Text(stringResource(R.string.ntp_check))
+                }
             }
         }
 
@@ -575,19 +599,18 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 DiagnosticLink(id, "time-details", onDiagnostics, returnFocus, onFocusRestored)
             }
         }
-        state.ntpScan?.takeUnless { it.finished }?.let { scan ->
-            Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size),
-                modifier = Modifier.testTag("ntp-scan-progress"))
-            Button(onClick = actions::cancelNtpScan) { Text(stringResource(R.string.ntp_scan_cancel)) }
+        if (!pickerExpanded) state.ntpScan?.takeUnless { it.finished }?.let { scan ->
+            NtpScanProgress(scan, actions)
         }
-        ExpandableSection(stringResource(R.string.ntp_choose_server), "ntp-picker") {
+        ExpandableSection(stringResource(R.string.ntp_choose_server), "ntp-picker", expanded = pickerExpanded,
+            onExpanded = { pickerExpanded = it }) {
             Text(stringResource(R.string.ntp_by_country), style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 label = { Text(stringResource(R.string.ntp_search_country)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("ntp-search"),
             )
             matches.forEach { match ->
                 val country = match.country
@@ -596,13 +619,13 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 } else {
                     "${country.code.uppercase()} · ${countryName(country)} · ${country.server}"
                 }
-                TextButton(onClick = { custom = match.server }, enabled = !state.busy) { Text(label) }
+                TextButton(onClick = { onPick(match.server) }, enabled = !state.busy) { Text(label) }
             }
 
             // Списки раскрываются только при пустом поиске: иначе на экране
             // оказались бы сразу и результаты поиска, и весь справочник
             if (query.isBlank()) {
-                TextButton(onClick = { showCountries = !showCountries }) {
+                TextButton(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
                     Text(
                         if (showCountries) {
                             stringResource(R.string.ntp_hide_countries)
@@ -616,10 +639,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     // справочник закрывает собой кнопки «Применить» и «Проверить»
                     NtpData.countries.forEach { country ->
                         TextButton(
-                            onClick = {
-                                custom = country.server
-                                showCountries = false
-                            },
+                            onClick = { onPick(country.server) },
                             enabled = !state.busy,
                         ) {
                             Text("${country.code.uppercase()} · ${countryName(country)} · ${country.server}")
@@ -627,7 +647,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     }
                 }
 
-                TextButton(onClick = { showAll = !showAll }) {
+                TextButton(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
                     Text(
                         if (showAll) {
                             stringResource(R.string.ntp_hide_all)
@@ -639,17 +659,14 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 if (showAll) {
                     NtpData.alternativeServers.forEach { server ->
                         TextButton(
-                            onClick = {
-                                custom = server
-                                showAll = false
-                            },
+                            onClick = { onPick(server) },
                             enabled = !state.busy,
                         ) { Text(server) }
                     }
                 }
             }
 
-            NtpScanBlock(state, actions, onPick = { custom = it })
+            NtpScanBlock(state, actions, onPick = onPick)
         }
     }
 }
@@ -727,11 +744,24 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
 @Composable
 private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit) {
     val scan = state.ntpScan
+    val progressView = remember { BringIntoViewRequester() }
+    val scanning = scan != null && !scan.finished
+    LaunchedEffect(scanning) {
+        if (scanning) {
+            withFrameNanos { }
+            progressView.bringIntoView()
+        }
+    }
     Text(stringResource(R.string.ntp_scan_title), style = MaterialTheme.typography.bodyMedium)
 
     if (scan == null || scan.finished) {
-        Button(onClick = actions::scanNtpServers, enabled = !state.busy) {
+        Button(onClick = actions::scanNtpServers, enabled = !state.busy, modifier = Modifier.testTag("ntp-scan-start")) {
             Text(stringResource(R.string.ntp_scan_start))
+        }
+    } else {
+        Column(Modifier.fillMaxWidth().bringIntoViewRequester(progressView),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            NtpScanProgress(scan, actions)
         }
     }
 
@@ -760,6 +790,16 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
         }
     } else if (scan != null && scan.finished) {
         Text(stringResource(R.string.ntp_scan_none))
+    }
+}
+
+@Composable
+private fun NtpScanProgress(scan: ScanProgress, actions: AppActions) {
+    LinearProgressIndicator(Modifier.fillMaxWidth())
+    Text(stringResource(R.string.ntp_scan_progress, scan.checked, scan.total, scan.best.size),
+        modifier = Modifier.testTag("ntp-scan-progress"))
+    Button(onClick = actions::cancelNtpScan, modifier = Modifier.testTag("ntp-scan-cancel")) {
+        Text(stringResource(R.string.ntp_scan_cancel))
     }
 }
 

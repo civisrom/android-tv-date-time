@@ -55,6 +55,7 @@ import com.civisrom.tvtimefixer.adb.UsbDevices
 import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
 import com.civisrom.tvtimefixer.adb.usbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
+import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
@@ -72,6 +73,7 @@ import org.junit.Test
 
 private class ScreenActions : AppActions {
     val calls = mutableListOf<String>()
+    var onScan: () -> Unit = {}
     override fun connect(address: String) { calls += "connect:$address" }
     override fun connectLoopback() { calls += "loopback" }
     override fun disconnect() { calls += "disconnect" }
@@ -81,7 +83,7 @@ private class ScreenActions : AppActions {
     override fun checkNtpServer(server: String) { calls += "check:$server" }
     override fun applyNtpServer(server: String, force: Boolean) { calls += "apply:$server:$force" }
     override fun verifyDeviceTime() { calls += "verify-time" }
-    override fun scanNtpServers() { calls += "scan" }
+    override fun scanNtpServers() { calls += "scan"; onScan() }
     override fun cancelNtpScan() { calls += "cancel-scan" }
     override fun refreshDeviceInfo() { calls += "info" }
     override fun requestDiscoveryPermission() { calls += "permission" }
@@ -290,6 +292,75 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
+    @Test fun starting_and_restarting_a_scan_shows_progress_at_the_button() {
+        val state = mutableStateOf(connected)
+        actions.onScan = { state.value = state.value.copy(ntpScan = ScanProgress(0, 20, emptyList())) }
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        repeat(2) {
+            compose.onNodeWithTag("ntp-scan-start").performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-scan-progress").assertIsDisplayed().assertTextContains(
+                context.getString(com.civisrom.tvtimefixer.R.string.ntp_scan_progress, 0, 20, 0))
+            compose.onNodeWithTag("ntp-scan-cancel").assertIsDisplayed()
+            compose.onNodeWithTag("ntp-scan-start").assertDoesNotExist()
+            compose.runOnIdle { state.value = state.value.copy(ntpScan = ScanProgress(20, 20, emptyList())) }
+            compose.onNodeWithTag("ntp-scan-progress").assertDoesNotExist()
+        }
+        compose.onNodeWithTag("ntp-scan-start").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-scan-cancel").performClick()
+        assertEquals(listOf("scan", "scan", "scan", "cancel-scan"), actions.calls)
+    }
+
+    @Test fun picking_a_country_reveals_the_address_and_actions_even_when_picked_again() {
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        repeat(2) {
+            compose.onNodeWithTag("ntp-countries").performScrollTo().performClick()
+            compose.onNodeWithText("VN ·", substring = true).performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("vn.pool.ntp.org")
+            compose.onNodeWithTag("ntp-apply").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+        }
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun picking_an_alternative_reveals_the_address_before_applying() {
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-alternatives").performScrollTo().performClick()
+        compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.cloudflare.com")
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithTag("ntp-apply").assertIsDisplayed().performClick()
+        assertEquals(listOf("apply:time.cloudflare.com:false"), actions.calls)
+    }
+
+    @Test fun picking_a_search_result_hides_the_keyboard_and_reveals_the_address() {
+        screen(connected)
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-search").performScrollTo().performTextInput("cloudflare")
+        waitForKeyboard()
+        compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+        }
+        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.cloudflare.com")
+        compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun picking_a_scan_result_or_its_ip_reveals_the_address() {
+        val result = NtpProbeResult("time.example.org", true, 100, 10, 0.1, null, "192.0.2.123")
+        screen(connected.copy(ntpScan = ScanProgress(20, 20, listOf(result))))
+        compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+        compose.onNodeWithText("time.example.org —", substring = true).performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.example.org")
+        compose.onNodeWithText("192.0.2.123", substring = true).performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("192.0.2.123")
+        compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+    }
+
     @Test fun diagnostics_clear_requires_confirmation_and_preserves_connection() {
         val history = DiagnosticSnapshot(listOf(DiagnosticEvent(1, System.currentTimeMillis(),
             Operation.CONNECT_USB, Outcome.FAILED, reason = ConnectionError.USB_PERMISSION_DENIED)))
@@ -425,7 +496,7 @@ class MainScreenTest {
         screen(AppState(usbSupported = true, usbSystemState = usbSystemState(device)))
         compose.onNodeWithTag("section-usb").performScrollTo().performClick()
         compose.onNodeWithTag("section-usb-help").performScrollTo().performClick()
-        compose.onNodeWithText("Система сообщает подключение в режиме USB-устройства", substring = true)
+        compose.onNodeWithText("Устройство с этим приложением должно работать USB-хостом (OTG)", substring = true)
             .performScrollTo().assertIsDisplayed()
         assertTrue(actions.calls.isEmpty())
     }

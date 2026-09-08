@@ -69,7 +69,7 @@
     <string name="ntp_current">Current: %1$s</string>
     <string name="ntp_current_unset">No time server is set</string>
     <string name="ntp_connect_first">You can choose and check a server address now. Connect to the device to read its settings and apply the server.</string>
-    <string name="ntp_by_country">Search by country code, country name or address — for example ru, by, kz. Case does not matter. Tapping a result puts the address into the field below.</string>
+    <string name="ntp_by_country">Search by country code, name or address — for example ru, by, kz. Case does not matter. Tap a row to fill the field above and scroll to it.</string>
     <string name="ntp_custom_hint">Time server address</string>
     <string name="ntp_address_note">A domain name (time.google.com) or an IP address (216.239.35.0) — both work.</string>
     <string name="ntp_scan_entry_ip">IP: %1$s — tap to use the address instead of the name</string>
@@ -113,7 +113,7 @@
     <string name="ntp_scan_title">Find the fastest server</string>
     <string name="ntp_scan_start">Find the best one</string>
     <string name="ntp_scan_cancel">Stop</string>
-    <string name="ntp_scan_progress">Checked %1$d of %2$d, %3$d usable</string>
+    <string name="ntp_scan_progress">Searching… Checked %1$d of %2$d, %3$d usable.</string>
     <string name="ntp_scan_best">Best servers</string>
     <string name="ntp_scan_entry">%1$s — %2$d ms, %3$d%% of replies</string>
     <string name="ntp_scan_none">No server answered. The network may be blocking NTP.</string>
@@ -191,17 +191,17 @@
     <string name="info_more">All device details</string>
     <string name="section_expanded">Expanded</string>
     <string name="section_collapsed">Collapsed</string>
-    <string name="usb_none">The Android USB service returned an empty device list. The cause has not been determined; ADB access cannot be requested yet. Open USB connection help or Diagnostics for system details.</string>
-    <string name="usb_system_host">The system reports USB host mode. An empty device list means enumeration has not completed or the USB service is not exposing the device.</string>
-    <string name="usb_system_device">The system reports a connection in USB device mode, with host mode inactive. To control the TV, this phone/tablet needs to act as the USB host.</string>
-    <string name="usb_system_disconnected">The system reports no USB connection in host or device mode. This status alone does not establish the cause.</string>
-    <string name="usb_system_unknown">The firmware did not provide enough USB role information. The role cannot be determined from an empty device list.</string>
-    <string name="usb_system_diagnostics">Refresh the list, then open the latest USB search in Diagnostics → Details. It includes device counts and system USB flags without device identifiers. System flags may be unavailable or delayed on some firmware.</string>
+    <string name="usb_none">No USB devices detected. Check the connection using the tips under “If USB is not detected”.</string>
     <string name="usb_no_adb">Android sees a USB device but no ADB interface. Enable USB debugging on the target and reconnect the cable. If using a hub, the detected device may be only the hub.</string>
     <string name="usb_scan_failed">Could not read the USB device list. Refresh it; error details are available in Diagnostics.</string>
     <string name="usb_detected">Devices with ADB found: %1$d. Select a device below to request access.</string>
-    <string name="usb_shield_hint">SHIELD without micro-USB: use port 1, furthest from HDMI. The phone must be the USB host; a regular USB-A to USB-C cable may select the opposite role. Enabling OTG alone does not guarantee a suitable connection.</string>
+    <string name="usb_shield_hint">SHIELD without micro-USB: for ADB, use the USB port furthest from HDMI. The phone must remain the host; a regular USB-A to USB-C cable may select the opposite role.</string>
     <string name="diagnostics_ntp_unreachable">The time server did not respond to the check.</string>
     <string name="diagnostics_ntp_not_confirmed">The device did not confirm the time server setting.</string>
     <string name="usb_connection_help">If USB is not detected</string>
+    <string name="usb_help_host">1. The device running this app must act as the USB host (OTG). Check that it supports OTG and enable it in settings if a switch is available. Connect an OTG adapter to this device if needed.</string>
+    <string name="usb_help_cable">2. Use a working data cable: a charge-only cable will not work. Try another cable and connect without a hub or extension cable.</string>
+    <string name="usb_help_port">3. On the TV or box, use the port intended for connection to a computer (ADB/USB device). A regular USB port for flash drives may not support this role. Check the model’s manual for the correct port and cable.</string>
+    <string name="usb_help_debugging">4. Enable USB debugging in Developer options on the target device. Unlock the screens, allow this app to access USB, and accept the debugging prompt on the target device.</string>
+    <string name="usb_help_retry">5. Reconnect the cable and tap “Refresh USB devices”. If that does not help, restart the devices. If no debugging prompt appears, revoke USB debugging authorizations on the target and reconnect.</string>
 </resources>
