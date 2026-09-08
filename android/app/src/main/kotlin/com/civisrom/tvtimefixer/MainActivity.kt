@@ -64,6 +64,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -85,6 +87,7 @@ class MainActivity : ComponentActivity() {
     private var permissionsRequested = false
     private var actionJob: Job? = null
     private var actionGeneration = 0
+    private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
 
     private val usbReceiver = object : BroadcastReceiver() {
@@ -164,7 +167,9 @@ class MainActivity : ComponentActivity() {
             journal.record(operation, Outcome.STARTED, transport)
             actionJob = lifecycleScope.launch {
                 try {
-                    val result = block()
+                    // Нажатие во время фоновой проверки ждёт её завершения,
+                    // не теряется и не читает тот же ADB-транспорт одновременно.
+                    val result = deviceOperations.withLock { block() }
                     val failure = result.connection as? ConnectionState.Failed
                     val failed = when (operation) {
                         Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
@@ -405,7 +410,7 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var returning = true
                 while (isActive) {
-                    // ADB-команды и проверка не должны одновременно читать один транспорт.
+                    // Пользовательские команды имеют приоритет перед очередной проверкой.
                     if (state.busy) {
                         delay(200)
                         continue
@@ -462,23 +467,27 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private suspend fun checkDeviceConnection(returning: Boolean) {
+    private suspend fun checkDeviceConnection(returning: Boolean) = deviceOperations.withLock {
+        if (state.busy) return@withLock
         val connection = state.connection
-        if (connection !is ConnectionState.Connected && connection !is ConnectionState.Checking) return
-        val target = connection.targetOrNull() ?: return
+        if (connection !is ConnectionState.Connected && connection !is ConnectionState.Checking) return@withLock
+        val target = connection.targetOrNull() ?: return@withLock
         val generation = ++actionGeneration
-        state = state.copy(busy = true,
-            connection = if (returning) ConnectionState.Checking(target) else connection)
+        // Обычная проверка не меняет busy: иначе каждые 10 секунд мигают
+        // кнопки и появляется полоса загрузки, сдвигающая поля ввода.
+        if (returning) state = state.copy(busy = true, connection = ConnectionState.Checking(target))
         try {
             val result = withContext(Dispatchers.IO) { connector.checkConnection() }
-            if (generation != actionGeneration) return
+            // Новая команда пока ждёт Mutex. Ей нужен актуальный результат
+            // проверки, но отключённое через USB receiver устройство не восстанавливаем.
+            if (state.connection.targetOrNull() != target) return@withLock
             state = if (result is ConnectionState.Connected) state.copy(connection = result) else {
                 val event = journal.record(Operation.DISCONNECT, Outcome.FAILED, diagnosticTransport(target),
                     reason = if (target is UsbDeviceAddress) ConnectionError.USB_DISCONNECTED else ConnectionError.UNREACHABLE)
                 state.connectionLost().copy(message = UiMessage(R.string.connect_connection_lost), diagnosticEventId = event)
             }
         } finally {
-            if (generation == actionGeneration) state = state.copy(busy = false)
+            if (returning && generation == actionGeneration) state = state.copy(busy = false)
         }
     }
 

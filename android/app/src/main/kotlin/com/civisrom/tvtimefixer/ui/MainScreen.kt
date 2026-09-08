@@ -273,6 +273,7 @@ private fun UsbSection(state: AppState, actions: AppActions) {
                 Text(stringResource(R.string.usb_help_debugging), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.usb_help_retry), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.usb_shield_hint), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.usb_help_desktop), style = MaterialTheme.typography.bodySmall)
             }
             state.usbDevices.forEach { device ->
                 Card(modifier = Modifier.fillMaxWidth()) {

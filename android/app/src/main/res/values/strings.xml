@@ -204,4 +204,5 @@
     <string name="usb_help_port">3. On the TV or box, use the port intended for connection to a computer (ADB/USB device). A regular USB port for flash drives may not support this role. Check the model’s manual for the correct port and cable.</string>
     <string name="usb_help_debugging">4. Enable USB debugging in Developer options on the target device. Unlock the screens, allow this app to access USB, and accept the debugging prompt on the target device.</string>
     <string name="usb_help_retry">5. Reconnect the cable and tap “Refresh USB devices”. If that does not help, restart the devices. If no debugging prompt appears, revoke USB debugging authorizations on the target and reconnect.</string>
+    <string name="usb_help_desktop">If you cannot connect for USB debugging through the mobile app, try the desktop app for Windows, Linux, or macOS and connect the target device to your computer.</string>
 </resources>
