@@ -76,6 +76,22 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `Android 6 storage falls back when df rejects the k option`() {
+        val target = object : AdbClient {
+            override fun isAlive() = true
+            override fun close() = Unit
+            override fun shell(command: String) = when (command) {
+                "getprop" -> ShellResult("[ro.product.model]: [Old TV]\n[ro.build.version.sdk]: [23]", "", 0)
+                "df -k /data" -> ShellResult("", "Could not stat -k", 1)
+                "df /data" -> ShellResult("Filesystem Size Used Free Blksize\n/data 8.0G 6.0G 2.0G 4096", "", 0)
+                else -> ShellResult("", "", 0)
+            }
+        }
+        val info = DeviceRepository(target).readDeviceInfo()
+        assertEquals("8.00 GiB", info.storageTotal)
+        assertEquals("2.00 GiB", info.storageAvailable)
+    }
+
     @Test fun `automatic zone reflects detection support rather than a stale TV setting`() {
         fun read(api: Int, telephony: String, geo: String, enabled: String): Boolean? {
             val client = object : AdbClient {

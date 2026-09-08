@@ -75,7 +75,9 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
         fun prop(key: String) = props[key]?.trim()?.takeUnless { it in listOf("unknown", "null") }.orEmpty()
         val uptimeSeconds = parseUptimeSeconds(optional("cat /proc/uptime"))
         val meminfo = optional("cat /proc/meminfo")
-        val storage = parseDataStorage(optional("df -k /data"))
+        val storage = parseDataStorage(optional("df -k /data")).let {
+            if (it.first.isEmpty()) parseDataStorage(optional("df /data")) else it
+        }
         val display = parseDisplayDetails(optional("dumpsys display"))
         val audio = parseAudioOutputs(optional("dumpsys media.audio_policy"))
         val decoders = parseDeclaredDecoders(optional(READ_CODEC_XML_COMMAND))

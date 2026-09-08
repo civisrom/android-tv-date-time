@@ -134,7 +134,7 @@ class OperationTrace {
             "settings get global ntp_server", "settings get global auto_time", "settings get global auto_time_zone",
             "cmd alarm help", "cmd time_zone_detector help", "date +%s", "cat /proc/uptime", "cat /proc/meminfo",
             "dumpsys battery", "wm size", "wm density", "uname -r", "cat /proc/cpuinfo | grep \"^processor\" | wc -l",
-            "df -k /data", "dumpsys display", "dumpsys media.audio_policy", "dumpsys SurfaceFlinger | grep '^GLES:'",
+            "df -k /data", "df /data", "dumpsys display", "dumpsys media.audio_policy", "dumpsys SurfaceFlinger | grep '^GLES:'",
             "ip -o addr show scope global") +
             ZONE_COMMANDS.map { "cmd time_zone_detector $it" }
     }

@@ -254,7 +254,7 @@
     <string name="info_hardware">Аппаратная платформа</string>
     <string name="info_gpu">Графика и OpenGL ES</string>
     <string name="info_storage">Объём раздела данных /data</string>
-    <string name="info_storage_free">Доступно в разделе /data</string>
+    <string name="info_storage_free">Свободное место в разделе /data</string>
     <string name="info_display_mode">Текущий режим дисплея</string>
     <string name="info_display_modes">Заявленные режимы дисплея</string>
     <string name="info_hdr">Заявленные форматы HDR</string>

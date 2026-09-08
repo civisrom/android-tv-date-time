@@ -254,7 +254,7 @@
     <string name="info_hardware">Hardware platform</string>
     <string name="info_gpu">Graphics and OpenGL ES</string>
     <string name="info_storage">Data partition /data capacity</string>
-    <string name="info_storage_free">Available on /data</string>
+    <string name="info_storage_free">Free space on /data</string>
     <string name="info_display_mode">Current display mode</string>
     <string name="info_display_modes">Reported display modes</string>
     <string name="info_hdr">Reported HDR formats</string>

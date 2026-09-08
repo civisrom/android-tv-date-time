@@ -45,18 +45,32 @@ internal fun parseDisplayDetails(raw: String): DisplayDetails {
 }
 
 /**
- * Ответ именно на `df -k /data`. Toybox может показать другую точку монтирования
+ * Ответ на `df -k /data`, либо старый `df /data` (toolbox Android 6).
+ * Toybox может показать другую точку монтирования
  * той же файловой системы (например /data/user/0), поэтому не сравниваем её с /data.
  */
 internal fun parseDataStorage(raw: String): Pair<String, String> {
-    val row = raw.lineSequence().map { it.trim().split(Regex("\\s+")) }
+    val rows = raw.lineSequence().map { it.trim().split(Regex("\\s+")) }.toList()
+    fun format(kib: Double) = String.format(Locale.ROOT, "%.2f GiB", kib / 1048576.0)
+    if (rows.any { it == listOf("Filesystem", "Size", "Used", "Free", "Blksize") }) {
+        val row = rows.filter { it.size == 5 && it[0].startsWith('/') }.singleOrNull() ?: return "" to ""
+        fun kib(value: String): Double? {
+            val match = Regex("""([0-9]+(?:\.[0-9]+)?)([KMG])""").matchEntire(value) ?: return null
+            val amount = match.groupValues[1].toDoubleOrNull() ?: return null
+            return amount * when (match.groupValues[2]) { "M" -> 1024.0; "G" -> 1048576.0; else -> 1.0 }
+        }
+        val total = kib(row[1]) ?: return "" to ""
+        val free = kib(row[3]) ?: return "" to ""
+        if (!total.isFinite() || total <= 0 || !free.isFinite() || free !in 0.0..total) return "" to ""
+        return format(total) to format(free)
+    }
+    val row = rows.asSequence()
         .filter { it.size >= 5 && it.last().startsWith('/') && it[it.size - 2].matches(Regex("\\d+%")) }
         .singleOrNull() ?: return "" to ""
     val total = row.getOrNull(row.size - 5)?.toLongOrNull() ?: return "" to ""
     val free = row.getOrNull(row.size - 3)?.toLongOrNull() ?: return "" to ""
     if (total <= 0 || free !in 0..total) return "" to ""
-    fun format(kib: Long) = String.format(Locale.ROOT, "%.2f GiB", kib / 1048576.0)
-    return format(total) to format(free)
+    return format(total.toDouble()) to format(free.toDouble())
 }
 
 internal fun parseAutomaticSetting(raw: String): Boolean? = when (raw.trim()) {
@@ -94,7 +108,7 @@ internal const val CODEC_XML_MARKER = "__TVTF_CODEC_XML__"
 internal val READ_CODEC_XML_COMMAND = """
     tvtf_count=0; for tvtf_file in /odm/etc/media_codecs*.xml /vendor/etc/media_codecs*.xml /system/etc/media_codecs*.xml /system_ext/etc/media_codecs*.xml /product/etc/media_codecs*.xml /apex/com.android.media.swcodec/etc/media_codecs*.xml; do
     if [ -r "${'$'}tvtf_file" ]; then
-    echo $CODEC_XML_MARKER; head -c 131072 "${'$'}tvtf_file"; echo;
+    echo $CODEC_XML_MARKER; dd if="${'$'}tvtf_file" bs=131072 count=1 2>/dev/null; echo;
     tvtf_count=${'$'}((tvtf_count + 1)); if [ "${'$'}tvtf_count" -ge 24 ]; then break; fi;
     fi; done
 """.trimIndent().replace('\n', ' ')

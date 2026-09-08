@@ -46,6 +46,13 @@ class DeviceCapabilitiesTest {
         for (value in listOf("", "null", "2", "Permission Denial")) assertNull(parseAutomaticSetting(value))
     }
 
+    @Test fun `Android 6 toolbox storage uses binary units without percent or mount column`() {
+        val header = "Filesystem               Size     Used     Free   Blksize\n"
+        assertEquals("0.76 GiB" to "0.35 GiB", parseDataStorage(header + "/data 774.9M 414.5M 360.4M 4096"))
+        assertEquals("8.00 GiB" to "2.00 GiB", parseDataStorage(header + "/data 8.0G 6.0G 2.0G 4096"))
+        assertEquals("" to "", parseDataStorage(header + "/data 8.0G 6.0G 9.0G 4096"))
+    }
+
     @Test fun `audio ignores unavailable output profiles and input formats`() {
         val audio = """
             AudioPolicyManager:
