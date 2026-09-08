@@ -299,11 +299,12 @@ private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActi
             Text(when (val connection = state.connection) {
                 is ConnectionState.Connected -> stringResource(R.string.connect_state_connected, connection.address.toString())
                 is ConnectionState.Connecting -> stringResource(R.string.connect_state_connecting, connection.address.toString())
+                is ConnectionState.Checking -> stringResource(R.string.connect_state_checking, connection.address.toString())
                 is ConnectionState.Failed -> stringResource(connection.reason.messageRes())
                 ConnectionState.Disconnected -> stringResource(R.string.connect_state_disconnected)
             }, color = when (state.connection) {
                 is ConnectionState.Connected -> ConnectedColor
-                is ConnectionState.Connecting -> MaterialTheme.colorScheme.onSurface
+                is ConnectionState.Connecting, is ConnectionState.Checking -> MaterialTheme.colorScheme.onSurface
                 else -> MaterialTheme.colorScheme.error
             })
             if (state.connected) Button(onClick = actions::disconnect, enabled = !state.busy) {

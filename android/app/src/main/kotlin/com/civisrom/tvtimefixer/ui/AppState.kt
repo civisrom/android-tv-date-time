@@ -68,6 +68,13 @@ data class AppState(
         usbSystemState = latest.usbSystemState,
     )
 
+    /** После потери связи сведения и подтверждения от прежнего устройства больше не актуальны. */
+    fun connectionLost(): AppState = copy(
+        connection = ConnectionState.Disconnected,
+        deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
+        timeCheck = null, timeDiagnosticEventId = null,
+    )
+
     val connected: Boolean get() = connection is ConnectionState.Connected
 
     /**

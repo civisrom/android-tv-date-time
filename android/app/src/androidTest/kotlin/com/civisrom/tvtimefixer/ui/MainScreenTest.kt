@@ -101,6 +101,19 @@ class MainScreenTest {
     }
     private val connected = AppState(connection = ConnectionState.Connected(DeviceAddress("192.168.1.2", 5555)))
 
+    @Test fun checking_a_previous_connection_hides_connected_status_and_disables_time_changes() {
+        val address = DeviceAddress("192.168.1.2", 5555)
+        screen(connected.copy(connection = ConnectionState.Checking(address), busy = true,
+            currentNtpServer = "pool.ntp.org", timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH)))
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.connect_state_checking, address.toString()))
+            .assertIsDisplayed()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.connect_state_connected, address.toString()))
+            .assertDoesNotExist()
+        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+        compose.onNodeWithTag("time-check-result").assertDoesNotExist()
+    }
+
     @Test fun verifying_time_is_a_separate_read_action() {
         screen(connected.copy(currentNtpServer = "pool.ntp.org"))
         compose.onNodeWithTag("time-check").performScrollTo().performClick()

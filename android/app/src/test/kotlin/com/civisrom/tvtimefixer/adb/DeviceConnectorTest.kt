@@ -2,8 +2,14 @@ package com.civisrom.tvtimefixer.adb
 
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.data.DeviceAddress
+import java.net.SocketTimeoutException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -13,10 +19,15 @@ import org.junit.Test
 private class FakeClient(var alive: Boolean = true) : AdbClient {
     var closed = false
     val commands = mutableListOf<String>()
+    var response = ShellResult("tvtimefixer\n", "", 0)
+    var shellError: Exception? = null
+    var beforeShell: () -> Unit = {}
 
     override fun shell(command: String): ShellResult {
         commands += command
-        return ShellResult(output = "ok", errorOutput = "", exitCode = 0)
+        beforeShell()
+        shellError?.let { throw it }
+        return response
     }
 
     override fun isAlive(): Boolean = alive && !closed
@@ -47,6 +58,103 @@ private class FakeFactory(
 }
 
 class DeviceConnectorTest {
+    @Test fun `открытый сокет без ответа устройства больше не считается подключением`() {
+        val factory = FakeFactory()
+        val connector = DeviceConnector(factory)
+        connector.connect("192.168.1.20")
+        val client = factory.clients.single()
+        // После перехода с Wi-Fi на мобильный интернет локальный флаг ещё true.
+        client.shellError = SocketTimeoutException("device left the network")
+        assertTrue(client.isAlive())
+
+        assertEquals(ConnectionState.Disconnected, connector.checkConnection())
+        assertEquals(listOf("echo tvtimefixer"), client.commands)
+        assertTrue(client.closed)
+        assertNull(connector.activeClient)
+        assertEquals(1, factory.connected.size)
+    }
+
+    @Test fun `проверка сохраняет отвечающее соединение без переподключения`() {
+        val factory = FakeFactory()
+        val connector = DeviceConnector(factory)
+        val connected = connector.connect("192.168.1.20")
+        assertEquals(connected, connector.checkConnection())
+        assertEquals(listOf("echo tvtimefixer"), factory.clients.single().commands)
+        assertFalse(factory.clients.single().closed)
+        assertEquals(1, factory.connected.size)
+    }
+
+    @Test fun `пустой ответ неверный маркер и ненулевой код не подтверждают связь`() {
+        for (response in listOf(ShellResult("", "", 0), ShellResult("other", "", 0), ShellResult("tvtimefixer", "", 1))) {
+            val factory = FakeFactory()
+            val connector = DeviceConnector(factory)
+            connector.connect("192.168.1.20")
+            factory.clients.single().response = response
+            assertEquals(ConnectionState.Disconnected, connector.checkConnection())
+            assertTrue(factory.clients.single().closed)
+        }
+    }
+
+    @Test fun `проверка закрытого транспорта сбрасывает статус без shell команды`() {
+        val factory = FakeFactory()
+        val connector = DeviceConnector(factory)
+        connector.connect("192.168.1.20")
+        factory.clients.single().alive = false
+        assertEquals(ConnectionState.Disconnected, connector.checkConnection())
+        assertTrue(factory.clients.single().commands.isEmpty())
+        assertTrue(factory.clients.single().closed)
+    }
+
+    @Test fun `проверка без подключения не открывает соединение`() {
+        val factory = FakeFactory()
+        val connector = DeviceConnector(factory)
+        assertEquals(ConnectionState.Disconnected, connector.checkConnection())
+        assertTrue(factory.connected.isEmpty())
+    }
+
+    @Test fun `отмена проверки не превращается в потерю связи`() {
+        val factory = FakeFactory()
+        val connector = DeviceConnector(factory)
+        val connected = connector.connect("192.168.1.20")
+        factory.clients.single().shellError = CancellationException()
+        val error = runCatching { connector.checkConnection() }.exceptionOrNull()
+        assertTrue(error is CancellationException)
+        assertEquals(connected, connector.state)
+        assertFalse(factory.clients.single().closed)
+    }
+
+    @Test fun `запоздалая проверка не воскрешает отключённое и не сбрасывает новое соединение`() {
+        for (replace in listOf(false, true)) for (failed in listOf(false, true)) {
+            val factory = FakeFactory()
+            val connector = DeviceConnector(factory)
+            connector.connect("192.168.1.20")
+            val oldClient = factory.clients.single()
+            val entered = CountDownLatch(1)
+            val proceed = CountDownLatch(1)
+            oldClient.beforeShell = {
+                entered.countDown()
+                check(proceed.await(3, TimeUnit.SECONDS))
+            }
+            if (failed) oldClient.shellError = SocketTimeoutException()
+            var result: ConnectionState? = null
+            val worker = thread { result = connector.checkConnection() }
+            try {
+                assertTrue(entered.await(3, TimeUnit.SECONDS))
+                connector.disconnect()
+                if (replace) connector.connect("192.168.1.21")
+            } finally {
+                proceed.countDown()
+                worker.join(3000)
+            }
+            assertFalse(worker.isAlive)
+            val expected = if (replace) ConnectionState.Connected(DeviceAddress("192.168.1.21", 5555))
+                else ConnectionState.Disconnected
+            assertEquals(expected, result)
+            assertEquals(expected, connector.state)
+            if (replace) assertFalse(factory.clients.last().closed)
+        }
+    }
+
     @Test fun `diagnostic callback failure does not change connection result`() {
         val connector = DeviceConnector(FakeFactory(failWith = ConnectionError.NOT_AUTHORIZED),
             onFailure = { _, _ -> throw java.io.IOException("storage unavailable") })

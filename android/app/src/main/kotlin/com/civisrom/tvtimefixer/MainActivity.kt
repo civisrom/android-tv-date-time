@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.civisrom.tvtimefixer.adb.AdbClientFactory
 import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.ConnectionError
@@ -57,6 +59,8 @@ import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -395,6 +399,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var returning = true
+                while (isActive) {
+                    // ADB-команды и проверка не должны одновременно читать один транспорт.
+                    if (state.busy) {
+                        delay(200)
+                        continue
+                    }
+                    checkDeviceConnection(returning)
+                    returning = false
+                    delay(10_000)
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -406,6 +425,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        val connected = state.connection as? ConnectionState.Connected
+        if (connected != null && !state.busy) {
+            state = state.copy(connection = ConnectionState.Checking(connected.address))
+        }
         refreshUsbList()
         if (missingDiscoveryPermissions().isEmpty()) {
             startDiscovery()
@@ -420,7 +443,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         // Сканирование mDNS держит радио включённым — на время невидимости
-        // приложения оно останавливается, но соединение с устройством живёт
+        // приложения оно останавливается. Сохранённую связь проверяем при возврате.
         runCatching { discovery?.stop() }
         super.onStop()
     }
@@ -435,6 +458,26 @@ class MainActivity : ComponentActivity() {
         // на главном потоке соединение осталось бы полузакрытым
         thread { usb.close(); connector.disconnect() }
         super.onDestroy()
+    }
+
+    private suspend fun checkDeviceConnection(returning: Boolean) {
+        val connection = state.connection
+        if (connection !is ConnectionState.Connected && connection !is ConnectionState.Checking) return
+        val target = connection.targetOrNull() ?: return
+        val generation = ++actionGeneration
+        state = state.copy(busy = true,
+            connection = if (returning) ConnectionState.Checking(target) else connection)
+        try {
+            val result = withContext(Dispatchers.IO) { connector.checkConnection() }
+            if (generation != actionGeneration) return
+            state = if (result is ConnectionState.Connected) state.copy(connection = result) else {
+                val event = journal.record(Operation.DISCONNECT, Outcome.FAILED, diagnosticTransport(target),
+                    reason = if (target is UsbDeviceAddress) ConnectionError.USB_DISCONNECTED else ConnectionError.UNREACHABLE)
+                state.connectionLost().copy(message = UiMessage(R.string.connect_connection_lost), diagnosticEventId = event)
+            }
+        } finally {
+            if (generation == actionGeneration) state = state.copy(busy = false)
+        }
     }
 
     private fun refreshUsbList(report: Boolean = false) {

@@ -25,6 +25,8 @@
     <string name="connect_disconnect">Disconnect</string>
     <string name="connect_state_connecting">Connecting to %1$s…</string>
     <string name="connect_state_connected">Connected to %1$s</string>
+    <string name="connect_state_checking">Checking connection to %1$s…</string>
+    <string name="connect_connection_lost">Connection to the device was lost. Connect to it again.</string>
     <string name="connect_state_disconnected">Not connected</string>
     <string name="connect_try_loopback">Connect to this device</string>
 

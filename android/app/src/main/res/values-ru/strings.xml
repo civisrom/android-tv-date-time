@@ -25,6 +25,8 @@
     <string name="connect_disconnect">Отключиться</string>
     <string name="connect_state_connecting">Подключение к %1$s…</string>
     <string name="connect_state_connected">Подключено к %1$s</string>
+    <string name="connect_state_checking">Проверка связи с %1$s…</string>
+    <string name="connect_connection_lost">Связь с устройством потеряна. Подключитесь к нему заново.</string>
     <string name="connect_state_disconnected">Нет подключения</string>
     <string name="connect_try_loopback">Подключиться к этому устройству</string>
 
