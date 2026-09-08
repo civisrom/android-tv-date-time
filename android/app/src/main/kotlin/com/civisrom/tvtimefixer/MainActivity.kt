@@ -58,6 +58,10 @@ import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticTransport
 import com.civisrom.tvtimefixer.adb.DeviceTarget
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
+import com.civisrom.tvtimefixer.device.TimeZoneRepository
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.device.TimeZoneFailure
+import com.civisrom.tvtimefixer.device.TimeZoneRestoration
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +110,7 @@ class MainActivity : ComponentActivity() {
                         operation = Operation.DISCONNECT, diagnosticEventId = event,
                         deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
                         timeCheck = null, timeDiagnosticEventId = null,
+                        timeZoneResult = null, timeZoneDiagnosticEventId = null,
                         message = UiMessage(R.string.error_usb_disconnected))
                     lifecycleScope.launch {
                         // Даже releaseInterface/close могут ждать kernel I/O.
@@ -160,9 +165,14 @@ class MainActivity : ComponentActivity() {
             }
             val ntpAction = operation == Operation.CHECK_NTP || operation == Operation.APPLY_NTP
             val timeAction = operation == Operation.CHECK_TIME
+            val zoneAction = operation == Operation.APPLY_TIME_ZONE
             val resetTime = operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
-                Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE)
+                Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE)
+            val resetZone = zoneAction || operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
+                Operation.PAIR, Operation.READ_DEVICE)
             state = state.copy(busy = true, operation = operation, diagnosticEventId = null,
+                timeZoneResult = if (resetZone) null else state.timeZoneResult,
+                timeZoneDiagnosticEventId = if (resetZone) null else state.timeZoneDiagnosticEventId,
                 timeCheck = if (resetTime) null else state.timeCheck,
                 timeDiagnosticEventId = if (resetTime) null else state.timeDiagnosticEventId,
                 ntpDiagnosticEventId = if (ntpAction) null else state.ntpDiagnosticEventId)
@@ -178,10 +188,11 @@ class MainActivity : ComponentActivity() {
                         Operation.CHECK_NTP -> result.ntpCheck?.isUsable() != true
                         Operation.APPLY_NTP -> result.ntpMessage?.res != R.string.ntp_applied
                         Operation.CHECK_TIME -> result.timeCheck?.status != DeviceTimeStatus.MATCH
+                        Operation.APPLY_TIME_ZONE -> result.timeZoneResult !is TimeZoneUpdateResult.Applied
                         Operation.READ_DEVICE -> result.diagnosticEventId != null || !result.connected || result.deviceInfo == null
                         else -> false
                     }
-                    val existing = if (timeAction) result.timeDiagnosticEventId else if (ntpAction) result.ntpDiagnosticEventId
+                    val existing = if (zoneAction) result.timeZoneDiagnosticEventId else if (timeAction) result.timeDiagnosticEventId else if (ntpAction) result.ntpDiagnosticEventId
                         else failure?.diagnosticId ?: result.diagnosticEventId
                     val event = if (failed && existing != null) existing else journal.record(operation,
                         if (failed) Outcome.FAILED else Outcome.SUCCESS, transport,
@@ -189,6 +200,7 @@ class MainActivity : ComponentActivity() {
                         reason = failure?.reason ?: ConnectionError.UNREACHABLE.takeIf {
                             failed && !result.connected && operation == Operation.READ_DEVICE
                         }, issue = if (!failed) null else when {
+                            zoneAction -> (result.timeZoneResult as? TimeZoneUpdateResult.Failed)?.diagnosticIssue()
                             timeAction -> result.timeCheck?.diagnosticIssue()
                             ntpAction && result.ntpCheck?.failure == NtpProbeFailure.INVALID_ADDRESS -> DiagnosticIssue.INVALID_NTP
                             ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
@@ -198,7 +210,8 @@ class MainActivity : ComponentActivity() {
                             else -> null
                         })
                     if (generation == actionGeneration) state = result.copy(
-                        diagnosticEventId = if (!ntpAction && !timeAction && failed) event else result.diagnosticEventId,
+                        diagnosticEventId = if (!ntpAction && !timeAction && !zoneAction && failed) event else result.diagnosticEventId,
+                        timeZoneDiagnosticEventId = if (zoneAction && failed) event else result.timeZoneDiagnosticEventId,
                         ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
                         timeDiagnosticEventId = if (timeAction && failed) event else result.timeDiagnosticEventId,
                     ).withLatestUsb(state)
@@ -208,7 +221,9 @@ class MainActivity : ComponentActivity() {
                 } catch (e: Exception) {
                     val event = journal.record(operation, Outcome.FAILED, transport,
                         durationMs = (System.nanoTime() - started) / 1_000_000, error = e)
-                    if (generation == actionGeneration) state = if (timeAction) state.copy(
+                    if (generation == actionGeneration) state = if (zoneAction) state.copy(
+                        timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE), timeZoneDiagnosticEventId = event,
+                    ) else if (timeAction) state.copy(
                         timeCheck = DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE), timeDiagnosticEventId = event,
                     ) else if (ntpAction) state.copy(
                         ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
@@ -350,6 +365,30 @@ class MainActivity : ComponentActivity() {
 
         override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { state.withDeviceTime() }
 
+        override fun applyTimeZone(zoneId: String) = run(Operation.APPLY_TIME_ZONE) {
+            withContext(Dispatchers.IO) {
+                val client = connector.activeClient
+                if (!state.connected || client == null) return@withContext state.connectionLost().copy(
+                    timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE),
+                    message = UiMessage(R.string.error_unreachable),
+                )
+                var error: Exception? = null
+                val result = TimeZoneRepository(client, onFailure = { error = it }).setTimeZone(zoneId)
+                val failure = result as? TimeZoneUpdateResult.Failed
+                val event = failure?.let {
+                    journal.record(Operation.APPLY_TIME_ZONE, Outcome.FAILED,
+                        diagnosticTransport(state.connection.targetOrNull()), issue = it.diagnosticIssue(), error = error)
+                }
+                val actual = when (result) {
+                    is TimeZoneUpdateResult.Applied -> result.zoneId
+                    is TimeZoneUpdateResult.Failed -> result.actualZone
+                }
+                state.copy(timeZoneResult = result, timeZoneDiagnosticEventId = event,
+                    deviceInfo = if (actual != null || failure?.restoration == TimeZoneRestoration.UNCONFIRMED)
+                        state.deviceInfo?.copy(timezone = actual.orEmpty()) else state.deviceInfo)
+            }
+        }
+
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
             state = state.copy(ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
@@ -380,6 +419,14 @@ class MainActivity : ComponentActivity() {
             // Найденное не выбрасываем: перебор останавливают обычно именно
             // потому, что подходящий сервер уже виден в списке
             state = state.copy(ntpScan = state.ntpScan?.let { it.copy(checked = it.total) })
+        }
+
+        override fun clearNtpScanResults() {
+            // Можно выбрать и промежуточный результат. Останавливаем поиск,
+            // чтобы следующий ответ не вернул уже убранный список.
+            scanJob?.cancel()
+            scanJob = null
+            state = state.copy(ntpScan = null)
         }
 
         override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { state.withDeviceData() }
@@ -590,7 +637,7 @@ class MainActivity : ComponentActivity() {
      * ненажатой — отличить одно от другого было нечем.
      */
     private suspend fun AppState.withDeviceData(): AppState {
-        val clean = copy(deviceInfo = null, currentNtpServer = "")
+        val clean = copy(deviceInfo = null, currentNtpServer = "", timeZoneResult = null, timeZoneDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
         return withContext(Dispatchers.IO) {
             val client = connector.activeClient ?: return@withContext clean.copy(
@@ -614,6 +661,15 @@ class MainActivity : ComponentActivity() {
             else timeVerifier.verify(client)
         copy(timeCheck = check)
     }
+
+    private fun TimeZoneUpdateResult.Failed.diagnosticIssue(): DiagnosticIssue =
+        if (restoration == TimeZoneRestoration.UNCONFIRMED) DiagnosticIssue.TIME_ZONE_RESTORE_FAILED else when (reason) {
+            TimeZoneFailure.INVALID_ZONE -> DiagnosticIssue.INVALID_TIME_ZONE
+            TimeZoneFailure.UNSUPPORTED -> DiagnosticIssue.TIME_ZONE_UNSUPPORTED
+            TimeZoneFailure.READ_STATE -> DiagnosticIssue.TIME_ZONE_READ_FAILED
+            TimeZoneFailure.AUTO_MODE -> DiagnosticIssue.TIME_ZONE_AUTO_FAILED
+            TimeZoneFailure.WRITE -> DiagnosticIssue.TIME_ZONE_WRITE_FAILED
+        }
 
     private fun DeviceTimeCheck.diagnosticIssue(): DiagnosticIssue? = when (status) {
         DeviceTimeStatus.MATCH -> null

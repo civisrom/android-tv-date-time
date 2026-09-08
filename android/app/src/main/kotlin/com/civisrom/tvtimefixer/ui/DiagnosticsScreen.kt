@@ -70,6 +70,7 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.CRASH -> R.string.operation_crash
     Operation.STORAGE -> R.string.operation_storage
     Operation.CHECK_TIME -> R.string.time_check_title
+    Operation.APPLY_TIME_ZONE -> R.string.time_zone_apply
 }
 
 private fun DiagnosticIssue.labelRes(): Int = when (this) {
@@ -84,6 +85,12 @@ private fun DiagnosticIssue.labelRes(): Int = when (this) {
     DiagnosticIssue.USB_NO_ADB -> R.string.usb_no_adb
     DiagnosticIssue.USB_ENUMERATION -> R.string.usb_scan_failed
     DiagnosticIssue.USB_HOST_UNSUPPORTED -> R.string.error_usb_unsupported
+    DiagnosticIssue.INVALID_TIME_ZONE -> R.string.time_zone_invalid
+    DiagnosticIssue.TIME_ZONE_UNSUPPORTED -> R.string.time_zone_unsupported
+    DiagnosticIssue.TIME_ZONE_READ_FAILED -> R.string.time_zone_read_failed
+    DiagnosticIssue.TIME_ZONE_AUTO_FAILED -> R.string.time_zone_auto_failed
+    DiagnosticIssue.TIME_ZONE_WRITE_FAILED -> R.string.time_zone_write_failed
+    DiagnosticIssue.TIME_ZONE_RESTORE_FAILED -> R.string.time_zone_restore_failed
 }
 
 private fun Outcome.labelRes(): Int = when (this) {

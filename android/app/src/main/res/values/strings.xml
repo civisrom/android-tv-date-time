@@ -69,7 +69,7 @@
     <string name="ntp_current">Current: %1$s</string>
     <string name="ntp_current_unset">No time server is set</string>
     <string name="ntp_connect_first">You can choose and check a server address now. Connect to the device to read its settings and apply the server.</string>
-    <string name="ntp_by_country">Search by country code, name or address — for example ru, by, kz. Case does not matter. Tap a row to fill the field above and scroll to it.</string>
+    <string name="ntp_by_country">Enter a country code (am, ru, us), a country name (Armenia, Russia, United States), or a server address. Case does not matter. Tap a row to fill the field above and scroll to it.</string>
     <string name="ntp_custom_hint">Time server address</string>
     <string name="ntp_address_note">A domain name (time.google.com) or an IP address (216.239.35.0) — both work.</string>
     <string name="ntp_scan_entry_ip">IP: %1$s — tap to use the address instead of the name</string>
@@ -97,6 +97,27 @@
     <string name="time_check_auto_off">Automatic date and time are disabled. Enable them in the device settings.</string>
     <string name="time_check_auto_unknown">Automatic date and time status is unavailable.</string>
     <string name="time_check_note">Comparison uses the NTP reply received by the device running this app. Matching clocks do not confirm that the connected device synchronized with this particular server.</string>
+
+    <string name="time_zone_title">Time zone</string>
+    <string name="time_zone_note">The time zone determines local time on the connected device. Applying a zone enables manual zone selection. The NTP server and automatic date and time settings stay unchanged.</string>
+    <string name="time_zone_current">Current zone: %1$s</string>
+    <string name="time_zone_unknown">The current time zone is unavailable.</string>
+    <string name="time_zone_connect_first">First connect to the device whose time zone you want to change.</string>
+    <string name="time_zone_search">City or time zone ID</string>
+    <string name="time_zone_search_hint">For example, Europe/London or UTC. Select a zone from the results or enter its exact ID.</string>
+    <string name="time_zone_no_matches">No matching zone. Try another query or an exact zone ID.</string>
+    <string name="time_zone_refine">Showing the first 20 matches. Refine your search.</string>
+    <string name="time_zone_apply">Apply time zone</string>
+    <string name="time_zone_working">Changing the time zone and verifying the result…</string>
+    <string name="time_zone_applied">Time zone set to %1$s. Zone selection is manual.</string>
+    <string name="time_zone_invalid">Invalid time zone ID. Select a zone from the list.</string>
+    <string name="time_zone_unsupported">The firmware does not support the required ADB time zone commands. Change the zone in the device’s date and time settings.</string>
+    <string name="time_zone_read_failed">Could not read or verify the current zone settings. Check the connection and try again.</string>
+    <string name="time_zone_auto_failed">The device did not confirm disabling automatic zone detection. Check restrictions in its settings.</string>
+    <string name="time_zone_write_failed">The device did not confirm the selected zone. Its firmware may not include it, changes may be restricted, or the connection may have been lost.</string>
+    <string name="time_zone_unchanged">Settings were not changed.</string>
+    <string name="time_zone_restored">The previous zone and detection mode were restored and verified.</string>
+    <string name="time_zone_restore_failed">Restoring the previous settings could not be confirmed. Reconnect and check the device’s time zone and automatic zone detection.</string>
 
     <string name="discovery_authorize_hint">When connecting for the first time, the TV asks to allow debugging from this device and shows a key fingerprint. Confirm it on the TV screen — ticking “Always allow” saves you from repeating it.</string>
     <string name="discovery_connected">Connected to this device</string>

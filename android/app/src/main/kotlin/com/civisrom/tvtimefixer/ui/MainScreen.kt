@@ -1,5 +1,7 @@
 package com.civisrom.tvtimefixer.ui
 
+import android.os.Build
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -16,9 +18,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.border
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
@@ -74,6 +74,10 @@ import com.civisrom.tvtimefixer.data.searchNtpServers
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.device.TimeZoneRestoration
+import com.civisrom.tvtimefixer.device.availableTimeZoneIds
+import com.civisrom.tvtimefixer.device.isValidTimeZoneId
 import com.civisrom.tvtimefixer.diagnostics.Operation
 
 /** Действия, которые экран запрашивает у владельца состояния. */
@@ -85,8 +89,10 @@ interface AppActions {
     fun checkNtpServer(server: String)
     fun applyNtpServer(server: String)
     fun verifyDeviceTime()
+    fun applyTimeZone(zoneId: String)
     fun scanNtpServers()
     fun cancelNtpScan()
+    fun clearNtpScanResults()
     fun refreshDeviceInfo()
     fun requestDiscoveryPermission()
     fun refreshUsbDevices()
@@ -119,6 +125,8 @@ fun MainScreen(
                     "action-details" -> state.message != null && state.diagnosticEventId != null
                     "connection-details" -> state.connection is ConnectionState.Failed && state.diagnosticEventId != null
                     "ntp-details" -> state.ntpDiagnosticEventId != null
+                    "time-details" -> state.connected && state.timeDiagnosticEventId != null
+                    "time-zone-details" -> state.timeZoneDiagnosticEventId != null
                     else -> true
                 }
                 showDiagnostics = false; returnFocus = if (available) origin else "diagnostics-open"
@@ -235,6 +243,11 @@ private fun MainContent(
             }
         }
         NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
+        FunctionCard("timezone") {
+            ExpandableSection(stringResource(R.string.time_zone_title), "timezone") {
+                TimeZoneSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
+            }
+        }
         FunctionCard("pairing") {
             ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
                 onExpanded = { pairingExpanded = it }) {
@@ -527,7 +540,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
     val checkFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     var selectionRequest by remember { mutableIntStateOf(0) }
-    var selectionPulse by remember { mutableIntStateOf(0) }
+    var highlightAddress by remember { mutableStateOf(false) }
     val onPick: (String) -> Unit = { server ->
         custom = server
         showCountries = false
@@ -535,7 +548,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
         selectionRequest += 1
     }
     LaunchedEffect(selectionRequest) {
-        selectionPulse = 0
+        highlightAddress = false
         if (selectionRequest > 0) {
             withFrameNanos { }
             // clearFocus() на API 23 может вернуть фокус в поиск и открыть IME
@@ -544,11 +557,11 @@ private fun NtpSection(state: AppState, actions: AppActions,
             keyboard?.hide()
             addressView.bringIntoView()
             // Небольшая подсказка после выбора, без изменения размеров и действий.
-            for (step in 1..3) {
-                selectionPulse = step
-                delay(450)
-                selectionPulse = 0
-                if (step < 3) delay(300)
+            repeat(3) {
+                highlightAddress = true
+                delay(400)
+                highlightAddress = false
+                delay(400)
             }
         }
     }
@@ -583,8 +596,10 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 label = { Text(stringResource(R.string.ntp_custom_hint)) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = if (selectionPulse == 1) ConnectedColor else MaterialTheme.colorScheme.outline,
-                    unfocusedContainerColor = if (selectionPulse == 1) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
+                    focusedBorderColor = if (highlightAddress) ConnectedColor else MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = if (highlightAddress) ConnectedColor else MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
+                    unfocusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
                 ),
                 modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
             )
@@ -596,9 +611,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 Button(
                     onClick = { actions.applyNtpServer(custom) },
                     enabled = state.connected && !state.busy && custom.isNotBlank(),
-                    modifier = Modifier.testTag("ntp-apply").border(2.dp,
-                        if (selectionPulse == 3) ConnectedColor else Color.Transparent,
-                        ButtonDefaults.shape),
+                    modifier = Modifier.testTag("ntp-apply"),
                 ) {
                     Text(stringResource(R.string.ntp_apply))
                 }
@@ -606,8 +619,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     onClick = { actions.checkNtpServer(custom) },
                     enabled = !state.busy && custom.isNotBlank(),
                     modifier = Modifier.focusRequester(checkFocus)
-                        .focusProperties { canFocus = true }.testTag("ntp-check").border(2.dp,
-                            if (selectionPulse == 2) ConnectedColor else Color.Transparent, ButtonDefaults.shape),
+                        .focusProperties { canFocus = true }.testTag("ntp-check"),
                 ) {
                     Text(stringResource(R.string.ntp_check))
                 }
@@ -719,12 +731,104 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 }
             }
 
-            NtpScanBlock(state, actions, onPick = onPick, onStart = {
+            NtpScanBlock(state, actions, onPick = { address ->
+                actions.clearNtpScanResults()
+                onPick(address)
+            }, onStart = {
                 showCountries = false
                 showAll = false
                 actions.scanNtpServers()
             })
         }
+    }
+}
+
+/** Ручной выбор пояса подключённого устройства, отдельно от настройки NTP. */
+@Composable
+private fun TimeZoneSection(state: AppState, actions: AppActions,
+    onDiagnostics: (Long?, String) -> Unit, returnFocus: String?, onFocusRestored: () -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var chosen by rememberSaveable { mutableStateOf("") }
+    var showChoices by rememberSaveable { mutableStateOf(false) }
+    var selectionRequest by remember { mutableIntStateOf(0) }
+    val applyFocus = remember { FocusRequester() }
+    val applyView = remember { BringIntoViewRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+    val catalog = remember(locale) {
+        val names = if (Build.VERSION.SDK_INT >= 24) android.icu.text.TimeZoneNames.getInstance(locale) else null
+        availableTimeZoneIds.filter { '/' in it || it == "UTC" }.sorted().map { id ->
+            val city = if (Build.VERSION.SDK_INT >= 24) names?.getExemplarLocationName(id) else null
+            val description = TimeZone.getTimeZone(id).getDisplayName(false, TimeZone.LONG, locale)
+            id to listOfNotNull(city, description, id).distinct().joinToString(" · ")
+        }
+    }
+    val matches = remember(query, catalog) {
+        if (query.isBlank()) emptyList() else catalog.filter { (_, label) -> label.contains(query.trim(), ignoreCase = true) }
+    }
+    LaunchedEffect(selectionRequest, state.connected) {
+        if (selectionRequest > 0 && state.connected) {
+            withFrameNanos { }
+            applyFocus.requestFocus()
+            keyboard?.hide()
+            applyView.bringIntoView()
+        }
+    }
+    CopyableText(stringResource(R.string.time_zone_note), style = MaterialTheme.typography.bodySmall)
+    if (state.connected) {
+        val current = (state.timeZoneResult as? TimeZoneUpdateResult.Applied)?.zoneId
+            ?: state.deviceInfo?.timezone.orEmpty()
+        CopyableText(if (current.isNotBlank()) stringResource(R.string.time_zone_current, current)
+            else stringResource(R.string.time_zone_unknown),
+            color = if (current.isNotBlank()) ConnectedColor else MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Bold, modifier = Modifier.testTag("time-zone-current"))
+        OutlinedTextField(query, onValueChange = {
+            query = it
+            chosen = it.trim().takeIf(::isValidTimeZoneId).orEmpty()
+            showChoices = true
+        }, singleLine = true, enabled = !state.busy,
+            label = { Text(stringResource(R.string.time_zone_search)) },
+            modifier = Modifier.fillMaxWidth().testTag("time-zone-search"))
+        Text(stringResource(R.string.time_zone_search_hint), style = MaterialTheme.typography.bodySmall)
+        Button(onClick = {
+            showChoices = false
+            applyFocus.requestFocus()
+            keyboard?.hide()
+            actions.applyTimeZone(chosen)
+        }, enabled = !state.busy && isValidTimeZoneId(chosen),
+            modifier = Modifier.focusRequester(applyFocus).focusProperties { canFocus = true }
+                .bringIntoViewRequester(applyView).testTag("time-zone-apply")) {
+            Text(stringResource(R.string.time_zone_apply))
+        }
+        if (showChoices && query.isNotBlank()) {
+            matches.take(20).forEach { (id, label) ->
+                TextButton(onClick = {
+                    query = id; chosen = id; showChoices = false; selectionRequest++
+                }, enabled = !state.busy, modifier = Modifier.testTag("time-zone-option-$id")) { CopyableText(label) }
+            }
+            if (matches.isEmpty()) Text(stringResource(R.string.time_zone_no_matches))
+            if (matches.size > 20) Text(stringResource(R.string.time_zone_refine))
+        }
+    } else Text(stringResource(R.string.time_zone_connect_first))
+    if (state.operation == Operation.APPLY_TIME_ZONE) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+        Text(stringResource(R.string.time_zone_working))
+    }
+    when (val result = state.timeZoneResult) {
+        is TimeZoneUpdateResult.Applied -> CopyableText(stringResource(R.string.time_zone_applied, result.zoneId), color = ConnectedColor)
+        is TimeZoneUpdateResult.Failed -> {
+            CopyableText(stringResource(result.reason.messageRes()), color = MaterialTheme.colorScheme.error)
+            CopyableText(stringResource(when (result.restoration) {
+                TimeZoneRestoration.NOT_NEEDED -> R.string.time_zone_unchanged
+                TimeZoneRestoration.RESTORED -> R.string.time_zone_restored
+                TimeZoneRestoration.UNCONFIRMED -> R.string.time_zone_restore_failed
+            }), color = MaterialTheme.colorScheme.error)
+        }
+        null -> Unit
+    }
+    state.timeZoneDiagnosticEventId?.let { id ->
+        DiagnosticLink(id, "time-zone-details", onDiagnostics, returnFocus, onFocusRestored)
     }
 }
 

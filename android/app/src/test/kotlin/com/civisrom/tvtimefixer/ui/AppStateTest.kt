@@ -8,6 +8,7 @@ import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.device.DeviceInfo
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
 import com.civisrom.tvtimefixer.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,6 +43,7 @@ class AppStateTest {
             deviceInfo = DeviceInfo(model = "TV"), currentNtpServer = "pool.ntp.org",
             ntpMessage = UiMessage(R.string.ntp_applied), ntpDiagnosticEventId = 1L,
             timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH), timeDiagnosticEventId = 2L,
+            timeZoneResult = TimeZoneUpdateResult.Applied("Europe/Moscow"), timeZoneDiagnosticEventId = 3L,
             usbDevices = listOf(usb))
         val lost = connected.connectionLost()
         assertFalse(lost.connected)
@@ -51,6 +53,8 @@ class AppStateTest {
         assertNull(lost.ntpDiagnosticEventId)
         assertNull(lost.timeCheck)
         assertNull(lost.timeDiagnosticEventId)
+        assertNull(lost.timeZoneResult)
+        assertNull(lost.timeZoneDiagnosticEventId)
         assertEquals(listOf(usb), lost.usbDevices)
     }
 

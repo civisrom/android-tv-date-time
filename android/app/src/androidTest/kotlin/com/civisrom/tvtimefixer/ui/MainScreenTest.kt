@@ -69,6 +69,10 @@ import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.DeviceInfo
+import com.civisrom.tvtimefixer.device.TimeZoneFailure
+import com.civisrom.tvtimefixer.device.TimeZoneRestoration
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticEvent
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
@@ -86,6 +90,7 @@ import org.junit.AfterClass
 private class ScreenActions : AppActions {
     val calls = mutableListOf<String>()
     var onScan: () -> Unit = {}
+    var onClearScan: () -> Unit = {}
     override fun connect(address: String) { calls += "connect:$address" }
     override fun connectLoopback() { calls += "loopback" }
     override fun disconnect() { calls += "disconnect" }
@@ -95,8 +100,10 @@ private class ScreenActions : AppActions {
     override fun checkNtpServer(server: String) { calls += "check:$server" }
     override fun applyNtpServer(server: String) { calls += "apply:$server" }
     override fun verifyDeviceTime() { calls += "verify-time" }
+    override fun applyTimeZone(zoneId: String) { calls += "zone:$zoneId" }
     override fun scanNtpServers() { calls += "scan"; onScan() }
     override fun cancelNtpScan() { calls += "cancel-scan" }
+    override fun clearNtpScanResults() { calls += "clear-scan"; onClearScan() }
     override fun refreshDeviceInfo() { calls += "info" }
     override fun requestDiscoveryPermission() { calls += "permission" }
     override fun refreshUsbDevices() { calls += "usb-list" }
@@ -193,6 +200,55 @@ class MainScreenTest {
         compose.onNodeWithText("Время устройства при проверке (UTC): 2026-09-08 13:15:48")
             .performScrollTo().assertIsDisplayed()
         screenshot("time-check-local-and-utc")
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun time_zone_menu_is_visible_without_connection_and_starts_collapsed() {
+        screen()
+        compose.onNodeWithTag("section-timezone").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-zone-search").assertDoesNotExist()
+        compose.onNodeWithTag("section-timezone").performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_zone_connect_first))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-zone-apply").assertDoesNotExist()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun time_zone_selection_survives_collapsing_and_only_explicit_apply_changes_settings() {
+        screen(connected.copy(deviceInfo = DeviceInfo(timezone = "UTC")), mode = DeviceMode.TELEVISION)
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-search").performScrollTo().performTextInput("Europe/Moscow")
+        waitForKeyboard()
+        compose.onNodeWithTag("time-zone-option-Europe/Moscow").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-apply").assertIsDisplayed().assertIsFocused()
+        compose.waitUntil(5_000) {
+            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+        }
+        screenshot("time-zone-selected")
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-search").assertDoesNotExist()
+        compose.onNodeWithTag("section-timezone").performClick()
+        compose.onNodeWithTag("time-zone-search").performScrollTo().assertTextContains("Europe/Moscow")
+        compose.onNodeWithTag("time-zone-apply").performScrollTo().performClick()
+        assertEquals(listOf("zone:Europe/Moscow"), actions.calls)
+    }
+
+    @Test fun time_zone_changes_are_disabled_while_an_operation_is_running() {
+        screen(connected.copy(busy = true, operation = Operation.APPLY_TIME_ZONE))
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithTag("time-zone-search").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("time-zone-apply").performScrollTo().assertIsNotEnabled()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun unconfirmed_time_zone_restoration_is_visible_at_large_font() {
+        screen(connected.copy(timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.WRITE,
+            TimeZoneRestoration.UNCONFIRMED)), scale = 2f, width = 320)
+        compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_zone_restore_failed))
+            .performScrollTo().assertIsDisplayed()
+        screenshot("time-zone-restoration-warning")
         assertTrue(actions.calls.isEmpty())
     }
 
@@ -434,16 +490,28 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
-    @Test fun picking_a_scan_result_or_its_ip_reveals_the_address() {
+    @Test fun picking_a_scan_result_or_its_ip_reveals_the_address_and_clears_results() {
         val result = NtpProbeResult("time.example.org", true, 100, 10, 0.1, null, "192.0.2.123")
-        screen(connected.copy(ntpScan = ScanProgress(20, 20, listOf(result))))
+        val results = listOf(result) + (1..4).map { result.copy(server = "time$it.example.org", ipAddress = null) }
+        val scan = ScanProgress(20, 20, results)
+        val state = mutableStateOf(connected.copy(ntpScan = scan))
+        actions.onClearScan = { state.value = state.value.copy(ntpScan = null) }
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
         compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
-        compose.onNodeWithText("time.example.org —", substring = true).performScrollTo().performClick()
-        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.example.org")
-        compose.onNodeWithText("192.0.2.123", substring = true).performScrollTo().performClick()
-        compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("192.0.2.123")
-        compose.onNodeWithTag("ntp-check").assertIsDisplayed()
-        assertTrue(actions.calls.isEmpty())
+        for (address in listOf(result.server, checkNotNull(result.ipAddress))) {
+            compose.runOnIdle { state.value = state.value.copy(ntpScan = scan) }
+            val label = if (address == result.server) "$address —" else address
+            compose.onNodeWithText(label, substring = true).performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains(address)
+            compose.onNodeWithTag("ntp-check").assertIsDisplayed()
+            for (entry in results) {
+                compose.onNodeWithText("${entry.server} —", substring = true).assertDoesNotExist()
+            }
+            compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+            compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
+            compose.onNodeWithText("${result.server} —", substring = true).assertDoesNotExist()
+        }
+        assertEquals(listOf("clear-scan", "clear-scan"), actions.calls)
     }
 
     @Test fun diagnostics_clear_requires_confirmation_and_preserves_connection() {

@@ -8,6 +8,7 @@ import com.civisrom.tvtimefixer.data.NtpProbeFailure
 import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
+import com.civisrom.tvtimefixer.device.TimeZoneFailure
 
 /**
  * Сопоставление доменных результатов пользовательским строкам.
@@ -44,6 +45,15 @@ fun DiscoveredDevice.Kind.labelRes(): Int = when (this) {
 
 /** Строка результата смены сервера вместе с подстановками для неё. */
 data class UiMessage(@StringRes val res: Int, val args: List<String> = emptyList())
+
+@StringRes
+fun TimeZoneFailure.messageRes(): Int = when (this) {
+    TimeZoneFailure.INVALID_ZONE -> R.string.time_zone_invalid
+    TimeZoneFailure.UNSUPPORTED -> R.string.time_zone_unsupported
+    TimeZoneFailure.READ_STATE -> R.string.time_zone_read_failed
+    TimeZoneFailure.AUTO_MODE -> R.string.time_zone_auto_failed
+    TimeZoneFailure.WRITE -> R.string.time_zone_write_failed
+}
 
 @StringRes
 fun NtpProbeResult.rejectionMessageRes(): Int = if (reachable) R.string.ntp_check_invalid_response else when (failure) {

@@ -102,8 +102,10 @@ replace troubleshooting other network faults.
 ### Android app features
 
 *   A separate APK for phones, tablets or Android TV: configuration without a computer.
-*   Always-expanded connection IP, NTP settings and Android 11+ pairing forms;
+*   Always-expanded connection IP and NTP settings; Android 11+ pairing,
     additional lists and help can be collapsed.
+*   Manual time zone changes on the connected device with result verification,
+    preserving the NTP server and automatic clock synchronization.
 *   Automatic mDNS discovery with separate pairing and connection addresses;
     found devices have a green label alongside their name and address.
 *   NTP checks before connecting, a best-five server search with progress and
@@ -401,7 +403,7 @@ Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
 In the APK, use the always-expanded
-[Pair a device form](#5-pair-a-device--the-code-for-android-11-and-newer).
+[Pair a device form](#6-pair-a-device--the-code-for-android-11-and-newer).
 
 Both programs distinguish pairing and connection services in mDNS and verify
 the connection with a command on the device. A listed service does not yet
@@ -820,14 +822,32 @@ then by response time. Duration depends on the network and timeouts. Progress
 shows **Checked N of 122, M usable**; **Stop** keeps results already found.
 
 Each result shows a name and the IP address obtained during the check.
-Tapping either fills the input field; applying remains a separate action.
+Tapping either fills the input field and clears the results list.
+The address field highlights three times; applying remains a separate action.
 An IP can help with TV-side DNS problems, but a service is not guaranteed
 to keep that resolved address permanently.
 
-#### 5. "Pair a device" — the code, for Android 11 and newer
+#### 5. "Time zone"
 
-The pairing form is always visible on the main screen and cannot be collapsed.
-**Pair** on a discovered device fills its address and focuses the code field.
+This section is visible on phones and TVs, starts collapsed, and follows the NTP
+settings. Connect to the device, expand the section, and search by city or enter
+an exact zone ID, such as `Europe/London` or `UTC`. Selecting a result fills the
+field; only **Apply time zone** changes the setting.
+
+Applying a zone enables manual zone selection so automatic detection does not
+replace it. The NTP server and automatic date and time settings are preserved:
+the zone controls local time display, while NTP synchronizes the clock itself.
+The app reads the setting back to verify it. On failure, it attempts to restore
+the previous settings and reports whether restoration was confirmed.
+
+Required commands are checked on the connected device. AOSP includes them from
+Android 9, but firmware restrictions can vary. If unsupported, use the TV’s date
+and time settings. The phone’s Android version alone does not hide this menu.
+
+#### 6. "Pair a device" — the code, for Android 11 and newer
+
+The pairing section starts collapsed; tap its heading to expand it.
+**Pair** on a discovered device expands the form, fills its address, and focuses the code field.
 The pairing form and connection IP address remain available after connecting;
 editing the fields does not disconnect the current device.
 
@@ -878,7 +898,7 @@ currently support IPv4 only.
 Change history: [2.6.1](release-notes/v2.6.1-en.md) and
 [2.6.2](release-notes/v2.6.2-en.md).
 
-#### 6. USB debugging
+#### 7. USB debugging
 
 Expand this section manually, or it opens automatically when USB ADB is
 detected. It contains list refresh, device selection and the connection
@@ -886,7 +906,7 @@ button. If nothing is found, expand the USB troubleshooting help and open
 the search details in Diagnostics. The connection steps and two permissions
 are explained in [USB debugging](#usb-debugging).
 
-#### 7. "Device"
+#### 8. "Device"
 
 Details read from the TV: model, manufacturer, Android and API version, serial
 number, CPU and core count, memory, screen resolution and density, time zone,

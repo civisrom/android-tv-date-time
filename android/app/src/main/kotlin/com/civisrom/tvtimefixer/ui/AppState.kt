@@ -8,6 +8,7 @@ import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
+import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 
@@ -24,6 +25,8 @@ data class AppState(
     val diagnosticEventId: Long? = null,
     val ntpDiagnosticEventId: Long? = null,
     val timeDiagnosticEventId: Long? = null,
+    val timeZoneDiagnosticEventId: Long? = null,
+    val timeZoneResult: TimeZoneUpdateResult? = null,
     val discoveryAvailable: Boolean = true,
     val discoverySearching: Boolean = false,
     val discoveryPermissionNeeded: Boolean = false,
@@ -64,6 +67,7 @@ data class AppState(
         connection = ConnectionState.Disconnected,
         deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
         timeCheck = null, timeDiagnosticEventId = null,
+        timeZoneResult = null, timeZoneDiagnosticEventId = null,
     )
 
     val connected: Boolean get() = connection is ConnectionState.Connected
