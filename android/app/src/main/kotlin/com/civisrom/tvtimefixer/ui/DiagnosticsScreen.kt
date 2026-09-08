@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -32,8 +33,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -132,7 +135,11 @@ internal fun DiagnosticsScreen(
 ) {
     BackHandler(onBack = onBack)
     val backFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { if (mode == DeviceMode.TELEVISION) backFocus.requestFocus() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        backFocus.requestFocus()
+        keyboard?.hide()
+    }
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     var copyResult by remember { mutableStateOf<Int?>(null) }
@@ -152,7 +159,8 @@ internal fun DiagnosticsScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.headlineSmall)
-        Button(onClick = onBack, modifier = Modifier.focusRequester(backFocus).testTag("diagnostics-back")) {
+        FilledTonalButton(onClick = onBack, modifier = Modifier.focusRequester(backFocus)
+            .focusProperties { canFocus = true }.testTag("diagnostics-back")) {
             Text(stringResource(R.string.diagnostics_back))
         }
         LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -169,13 +177,13 @@ internal fun DiagnosticsScreen(
                             label = { Text(stringResource(R.string.diagnostics_all)) })
                         FilterChip(selected = errorsOnly, onClick = { errorsOnly = true }, modifier = Modifier.testTag("diagnostics-errors"),
                             label = { Text(stringResource(R.string.diagnostics_errors)) })
-                        Button(onClick = {
+                        FilledTonalButton(onClick = {
                             copyResult = if (runCatching {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Android TV Time Fixer", diagnosticReport(context, snapshot, mode)))
                             }.isSuccess) R.string.diagnostics_copied else R.string.diagnostics_copy_failed
                         }) { Text(stringResource(R.string.diagnostics_copy)) }
-                        Button(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
+                        FilledTonalButton(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
                             modifier = Modifier.testTag("diagnostics-clear")) { Text(stringResource(R.string.diagnostics_clear)) }
                     }
                     copyResult?.let { Text(stringResource(it)) }

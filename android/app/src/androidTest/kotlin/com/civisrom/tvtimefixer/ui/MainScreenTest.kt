@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
@@ -227,9 +228,9 @@ class MainScreenTest {
     @Test fun connecting_keeps_primary_inputs_and_enables_ntp_writes_only_while_connected() {
         val state = mutableStateOf(AppState(ntpCheck = NtpProbeResult("pool.ntp.org", false, 0, null, null, "timeout")))
         compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
+        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.0.2.10:5555")
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
-        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.11:37123")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.11:37124")
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
@@ -482,9 +483,17 @@ class MainScreenTest {
         compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
         for (tag in listOf("network-address", "pairing-address", "pairing-connect-address", "ntp-address")) {
             compose.onNodeWithTag(tag).performScrollTo().performClick()
-            compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.PasteText) { it() }
             waitForKeyboard()
-            compose.onNodeWithTag(tag).assertTextContains(address)
+            compose.onNodeWithTag(tag).assertIsFocused()
+            compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.PasteText) { assertTrue(it()) }
+            try {
+                // Clipboard читается корутиной; ждём результат единственной вставки.
+                compose.waitUntil(5_000) {
+                    compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text == address
+                }
+            } finally {
+                screenshot("paste-$tag")
+            }
         }
         assertTrue(actions.calls.isEmpty())
     }
@@ -586,7 +595,14 @@ class MainScreenTest {
             compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
             screenshot("landscape-ntp")
             compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
-            compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+            try {
+                compose.waitUntil(5_000) {
+                    ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+                }
+                compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+            } finally {
+                screenshot("landscape-diagnostics")
+            }
         } finally {
             automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
             compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }

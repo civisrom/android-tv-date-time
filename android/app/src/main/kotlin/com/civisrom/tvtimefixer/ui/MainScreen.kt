@@ -17,6 +17,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -142,7 +143,7 @@ private fun DiagnosticLink(
     }
     val modifier = Modifier.focusRequester(requester).testTag(key)
     if (key == "diagnostics-open") {
-        Button(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
+        FilledTonalButton(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
     } else {
         TextButton(onClick = { onOpen(eventId, key) }, modifier = modifier) { Text(stringResource(title)) }
     }
@@ -297,7 +298,7 @@ private fun UsbSection(state: AppState, actions: AppActions) {
             Text(stringResource(R.string.error_usb_unsupported))
         } else {
             CopyableText(stringResource(R.string.usb_setup_hint), style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = actions::refreshUsbDevices, enabled = !state.busy, modifier = Modifier.testTag("usb-refresh")) {
+            Button(onClick = actions::refreshUsbDevices, enabled = !state.busy, modifier = Modifier.testTag("usb-refresh")) {
                 Text(stringResource(R.string.usb_refresh))
             }
             when {
@@ -657,7 +658,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
             // Списки раскрываются только при пустом поиске: иначе на экране
             // оказались бы сразу и результаты поиска, и весь справочник
             if (query.isBlank()) {
-                Button(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
+                FilledTonalButton(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
                     Text(
                         if (showCountries) {
                             stringResource(R.string.ntp_hide_countries)
@@ -679,7 +680,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     }
                 }
 
-                Button(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
+                FilledTonalButton(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
                     Text(
                         if (showAll) {
                             stringResource(R.string.ntp_hide_all)
