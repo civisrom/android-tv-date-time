@@ -43,7 +43,7 @@
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
     <!-- Спаривание -->
-    <string name="pairing_title">Pairing · wireless debugging on Android 11+</string>
+    <string name="pairing_title">Pairing · new wireless debugging on Android 11+</string>
     <string name="pairing_hint">Pairing codes are used by the newer wireless debugging mode on Android 11 and later, when supported by the target device firmware. On that device, open Developer options → Wireless debugging → Pair device with pairing code.</string>
     <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-digit code</string>

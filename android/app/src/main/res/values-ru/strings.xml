@@ -43,7 +43,7 @@
     <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
 
     <!-- Спаривание -->
-    <string name="pairing_title">Спаривание · беспроводная отладка Android 11+</string>
+    <string name="pairing_title">Спаривание · новая беспроводная отладка Android 11+</string>
     <string name="pairing_hint">Спаривание по коду используется в новом режиме беспроводной отладки на Android 11 и новее, если он доступен в прошивке подключаемого устройства. На нём откройте «Для разработчиков» → «Беспроводная отладка» → «Подключение с помощью кода».</string>
     <string name="pairing_address_hint">Адрес спаривания, например 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-значный код</string>
