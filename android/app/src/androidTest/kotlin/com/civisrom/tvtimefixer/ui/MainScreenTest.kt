@@ -443,10 +443,13 @@ class MainScreenTest {
     @Test fun ntp_input_survives_diagnostics_and_only_explicit_apply_executes() {
         screen(connected)
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
-        // IME changes the viewport; wait before scrolling and injecting a toolbar tap.
+        // Здесь проверяем сохранение формы; касания с IME проверяются отдельно
+        // в narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable.
         waitForKeyboard()
-        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
-        compose.onNodeWithTag("diagnostics-back").performClick()
+        compose.onNodeWithTag("diagnostics-open").performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.onNodeWithTag("diagnostics-back")
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
         assertTrue(actions.calls.isEmpty())
         compose.onNodeWithTag("ntp-apply").performScrollTo().performClick()
