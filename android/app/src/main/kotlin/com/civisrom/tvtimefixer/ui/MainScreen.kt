@@ -583,7 +583,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 ) {
                     Text(stringResource(R.string.ntp_apply))
                 }
-                TextButton(
+                FilledTonalButton(
                     onClick = { actions.checkNtpServer(custom) },
                     enabled = !state.busy && custom.isNotBlank(),
                     modifier = Modifier.focusRequester(checkFocus)
@@ -658,7 +658,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
             // Списки раскрываются только при пустом поиске: иначе на экране
             // оказались бы сразу и результаты поиска, и весь справочник
             if (query.isBlank()) {
-                FilledTonalButton(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
+                Button(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
                     Text(
                         if (showCountries) {
                             stringResource(R.string.ntp_hide_countries)
@@ -680,7 +680,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     }
                 }
 
-                FilledTonalButton(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
+                Button(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
                     Text(
                         if (showAll) {
                             stringResource(R.string.ntp_hide_all)

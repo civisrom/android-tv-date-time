@@ -190,7 +190,9 @@ class MainScreenTest {
     @Test fun opening_diagnostics_preserves_network_input_and_does_not_connect() {
         screen()
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.168.1.10:5555")
-        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+        // Проверяем сохранение формы; появление IME не должно сместить тестовое касание.
+        compose.onNodeWithTag("diagnostics-open").performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("diagnostics-back").performClick()
         compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.168.1.10:5555")
         assertTrue(actions.calls.isEmpty())
@@ -485,9 +487,12 @@ class MainScreenTest {
             compose.onNodeWithTag(tag).performScrollTo().performClick()
             waitForKeyboard()
             compose.onNodeWithTag(tag).assertIsFocused()
-            compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.PasteText) { assertTrue(it()) }
             try {
-                // Clipboard читается корутиной; ждём результат единственной вставки.
+                withTextSelectionWindows {
+                    compose.onNodeWithTag(tag).performTouchInput { longClick(center) }
+                    clickTextSelectionAction(android.R.string.paste)
+                }
+                // Проверяем результат единственной вставки через системное меню.
                 compose.waitUntil(5_000) {
                     compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text == address
                 }
@@ -618,14 +623,18 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
-    private fun copyDisplayedText(text: String) {
+    private fun copyDisplayedText(text: String) = withTextSelectionWindows {
+        copyDisplayedTextFromMenu(text)
+    }
+
+    private fun withTextSelectionWindows(action: () -> Unit) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val originalFlags = automation.serviceInfo.flags
         automation.serviceInfo = automation.serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
         try {
-            copyDisplayedTextFromMenu(text)
+            action()
         } finally {
             automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
         }
