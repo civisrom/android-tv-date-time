@@ -549,6 +549,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 else -> stringResource(R.string.ntp_current_unset)
             },
             color = if (ntpIsSet) ConnectedColor else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (ntpIsSet) FontWeight.Bold else null,
             style = MaterialTheme.typography.titleSmall,
         )
 
