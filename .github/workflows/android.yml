@@ -155,6 +155,7 @@ jobs:
           mkdir -p ui-screenshots
           timeout 30 "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
           timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true
 
       - name: Upload UI test results
@@ -167,5 +168,6 @@ jobs:
             ${{ runner.temp }}/ui-instrumentation.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt
+            ${{ runner.temp }}/ui-crashes.txt
           if-no-files-found: ignore
           retention-days: 7

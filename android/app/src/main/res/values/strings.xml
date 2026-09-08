@@ -90,6 +90,8 @@
     <string name="time_check_unavailable">Could not read the device time or NTP setting. Check the connection and try again.</string>
     <string name="time_check_server">Comparison server: %1$s</string>
     <string name="time_check_device_time">Device time when checked (UTC): %1$s</string>
+    <string name="time_check_device_local_time">Local device time when checked: %1$s (%2$s)</string>
+    <string name="time_check_utc_note">UTC has no local offset. For example, 13:00 UTC and 16:00 in UTC+3 are the same moment, not a synchronization error.</string>
     <string name="time_check_difference">Device − NTP: %1$s s; estimated uncertainty ±%2$s s.</string>
     <string name="time_check_auto_on">Automatic date and time are enabled.</string>
     <string name="time_check_auto_off">Automatic date and time are disabled. Enable them in the device settings.</string>

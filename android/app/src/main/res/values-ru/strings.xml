@@ -90,6 +90,8 @@
     <string name="time_check_unavailable">Не удалось прочитать время или настройку NTP с устройства. Проверьте соединение и повторите проверку.</string>
     <string name="time_check_server">Сервер сравнения: %1$s</string>
     <string name="time_check_device_time">Время устройства при проверке (UTC): %1$s</string>
+    <string name="time_check_device_local_time">Местное время устройства при проверке: %1$s (%2$s)</string>
+    <string name="time_check_utc_note">UTC — время без местного смещения. Например, 13:00 UTC и 16:00 в поясе UTC+3 — один момент; это не ошибка синхронизации.</string>
     <string name="time_check_difference">Устройство − NTP: %1$s с; погрешность оценки ±%2$s с.</string>
     <string name="time_check_auto_on">Автоматическая дата и время включены.</string>
     <string name="time_check_auto_off">Автоматическая дата и время выключены. Включите их в настройках устройства.</string>

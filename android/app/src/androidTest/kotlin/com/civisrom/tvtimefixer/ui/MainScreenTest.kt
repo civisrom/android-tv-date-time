@@ -79,6 +79,8 @@ import java.util.Locale
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.BeforeClass
+import org.junit.AfterClass
 
 private class ScreenActions : AppActions {
     val calls = mutableListOf<String>()
@@ -101,6 +103,23 @@ private class ScreenActions : AppActions {
 }
 
 class MainScreenTest {
+    companion object {
+        private var originalAccessibilityFlags = 0
+
+        @JvmStatic @BeforeClass fun inspectTextSelectionWindows() {
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            originalAccessibilityFlags = automation.serviceInfo.flags
+            automation.serviceInfo = automation.serviceInfo.apply {
+                flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            }
+        }
+
+        @JvmStatic @AfterClass fun restoreWindowInspection() {
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalAccessibilityFlags }
+        }
+    }
+
     @get:Rule val compose = createComposeRule()
     private val actions = ScreenActions()
     private lateinit var inputModeManager: InputModeManager
@@ -163,6 +182,17 @@ class MainScreenTest {
             .performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("time-check").performScrollTo().performClick()
         assertEquals(listOf("verify-time"), actions.calls)
+    }
+
+    @Test fun checked_time_shows_device_local_time_and_UTC_for_the_same_instant() {
+        screen(connected.copy(timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH,
+            deviceTimeMillis = 1_788_873_348_000L, timeZoneId = "Europe/Moscow")))
+        compose.onNodeWithText("Местное время устройства при проверке: 2026-09-08 16:15:48 (Europe/Moscow)")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Время устройства при проверке (UTC): 2026-09-08 13:15:48")
+            .performScrollTo().assertIsDisplayed()
+        screenshot("time-check-local-and-utc")
+        assertTrue(actions.calls.isEmpty())
     }
 
     private fun screen(state: AppState = AppState(), mode: DeviceMode = DeviceMode.HANDHELD,
@@ -328,7 +358,13 @@ class MainScreenTest {
         compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
         compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
         repeat(2) {
+            compose.onNodeWithTag("ntp-countries").performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-alternatives").performScrollTo().performClick()
+            compose.onNodeWithText("VN ·", substring = true).assertExists()
+            compose.onNodeWithText("time.cloudflare.com").assertExists()
             compose.onNodeWithTag("ntp-scan-start").performScrollTo().performClick()
+            compose.onNodeWithText("VN ·", substring = true).assertDoesNotExist()
+            compose.onNodeWithText("time.cloudflare.com").assertDoesNotExist()
             compose.onNodeWithTag("ntp-scan-progress").assertIsDisplayed().assertTextContains(
                 context.getString(com.civisrom.tvtimefixer.R.string.ntp_scan_progress, 0, 20, 0))
             compose.onNodeWithTag("ntp-scan-cancel").assertIsDisplayed()
@@ -486,12 +522,10 @@ class MainScreenTest {
         for (tag in listOf("network-address", "pairing-address", "pairing-connect-address", "ntp-address")) {
             compose.onNodeWithTag(tag).performScrollTo().performClick()
             waitForKeyboard()
-            compose.onNodeWithTag(tag).assertIsFocused()
+            compose.onNodeWithTag(tag).performScrollTo().assertIsFocused()
             try {
-                withTextSelectionWindows {
-                    compose.onNodeWithTag(tag).performTouchInput { longClick(center) }
-                    clickTextSelectionAction(android.R.string.paste)
-                }
+                compose.onNodeWithTag(tag).performTouchInput { longClick(center) }
+                clickTextSelectionAction(android.R.string.paste)
                 // Проверяем результат единственной вставки через системное меню.
                 compose.waitUntil(5_000) {
                     compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text == address
@@ -623,24 +657,7 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
-    private fun copyDisplayedText(text: String) = withTextSelectionWindows {
-        copyDisplayedTextFromMenu(text)
-    }
-
-    private fun withTextSelectionWindows(action: () -> Unit) {
-        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val originalFlags = automation.serviceInfo.flags
-        automation.serviceInfo = automation.serviceInfo.apply {
-            flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-        }
-        try {
-            action()
-        } finally {
-            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
-        }
-    }
-
-    private fun copyDisplayedTextFromMenu(text: String) {
+    private fun copyDisplayedText(text: String) {
         val node = compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo()
         val content = compose.onNodeWithTag("main-content")
         // Оставляем место для маркеров выделения и системного меню, вдали от панели навигации.

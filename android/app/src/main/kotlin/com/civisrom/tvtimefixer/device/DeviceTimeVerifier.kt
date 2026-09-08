@@ -5,6 +5,7 @@ import com.civisrom.tvtimefixer.data.isValidNtpServer
 import com.civisrom.tvtimefixer.net.SntpQuery
 import kotlinx.coroutines.CancellationException
 import kotlin.math.abs
+import java.util.TimeZone
 
 enum class DeviceTimeStatus { MATCH, MISMATCH, UNCERTAIN, NO_SERVER, NTP_UNAVAILABLE, DEVICE_UNAVAILABLE }
 
@@ -16,6 +17,7 @@ data class DeviceTimeCheck(
     val differenceSeconds: Double? = null,
     val uncertaintySeconds: Double? = null,
     val automaticTime: Boolean? = null,
+    val timeZoneId: String? = null,
 )
 
 /** Только чтение через ADB и один NTP-запрос. Вызывается на Dispatchers.IO. */
@@ -51,7 +53,10 @@ class DeviceTimeVerifier(
         if (seconds == null || seconds !in 0L..253_402_300_799L) {
             return result.copy(status = DeviceTimeStatus.DEVICE_UNAVAILABLE)
         }
-        val measured = result.copy(deviceTimeMillis = seconds * 1000L)
+        // Читаем пояс после замера: длительность этой команды не относится к date +%s.
+        // Неизвестный ID нельзя молча подменять GMT, как делает TimeZone.getTimeZone().
+        val zone = read(client, "getprop persist.sys.timezone")?.takeIf { it in TimeZone.getAvailableIDs() }
+        val measured = result.copy(deviceTimeMillis = seconds * 1000L, timeZoneId = zone)
         if (reference <= 0 || network.rttMs < 0 || started < referenceElapsed || finished < started ||
             finished - referenceElapsed > 30_000L) {
             return measured.copy(status = DeviceTimeStatus.UNCERTAIN)

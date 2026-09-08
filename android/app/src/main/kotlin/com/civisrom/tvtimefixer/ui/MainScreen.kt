@@ -16,13 +16,16 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +58,7 @@ import java.util.Date
 import java.util.TimeZone
 import java.text.SimpleDateFormat
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import com.civisrom.tvtimefixer.BuildConfig
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
@@ -523,6 +527,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
     val checkFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     var selectionRequest by remember { mutableIntStateOf(0) }
+    var selectionPulse by remember { mutableIntStateOf(0) }
     val onPick: (String) -> Unit = { server ->
         custom = server
         showCountries = false
@@ -530,6 +535,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
         selectionRequest += 1
     }
     LaunchedEffect(selectionRequest) {
+        selectionPulse = 0
         if (selectionRequest > 0) {
             withFrameNanos { }
             // clearFocus() на API 23 может вернуть фокус в поиск и открыть IME
@@ -537,6 +543,12 @@ private fun NtpSection(state: AppState, actions: AppActions,
             checkFocus.requestFocus()
             keyboard?.hide()
             addressView.bringIntoView()
+            // Небольшая подсказка после выбора, без изменения размеров и действий.
+            repeat(6) { phase ->
+                selectionPulse = phase + 1
+                delay(400)
+            }
+            selectionPulse = 0
         }
     }
 
@@ -569,6 +581,10 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 onValueChange = { custom = it },
                 label = { Text(stringResource(R.string.ntp_custom_hint)) },
                 singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = if (selectionPulse % 2 == 1) ConnectedColor else MaterialTheme.colorScheme.outline,
+                    unfocusedContainerColor = if (selectionPulse % 2 == 1) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
+                ),
                 modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
             )
             Text(
@@ -579,7 +595,9 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 Button(
                     onClick = { actions.applyNtpServer(custom) },
                     enabled = state.connected && !state.busy && custom.isNotBlank(),
-                    modifier = Modifier.testTag("ntp-apply"),
+                    modifier = Modifier.testTag("ntp-apply").border(2.dp,
+                        if (selectionPulse == 1 || selectionPulse == 3) ConnectedColor else Color.Transparent,
+                        ButtonDefaults.shape),
                 ) {
                     Text(stringResource(R.string.ntp_apply))
                 }
@@ -587,7 +605,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     onClick = { actions.checkNtpServer(custom) },
                     enabled = !state.busy && custom.isNotBlank(),
                     modifier = Modifier.focusRequester(checkFocus)
-                        .focusProperties { canFocus = true }.testTag("ntp-check"),
+                        .focusProperties { canFocus = true }.testTag("ntp-check").border(2.dp,
+                            if (selectionPulse == 1) ConnectedColor else Color.Transparent, ButtonDefaults.shape),
                 ) {
                     Text(stringResource(R.string.ntp_check))
                 }
@@ -699,7 +718,11 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 }
             }
 
-            NtpScanBlock(state, actions, onPick = onPick)
+            NtpScanBlock(state, actions, onPick = onPick, onStart = {
+                showCountries = false
+                showAll = false
+                actions.scanNtpServers()
+            })
         }
     }
 }
@@ -749,10 +772,17 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
                 })
             if (check.server.isNotEmpty()) CopyableText(stringResource(R.string.time_check_server, check.server))
             check.deviceTimeMillis?.let {
+                check.timeZoneId?.let { zone ->
+                    val local = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", locale).apply {
+                        timeZone = TimeZone.getTimeZone(zone)
+                    }.format(Date(it))
+                    CopyableText(stringResource(R.string.time_check_device_local_time, local, zone))
+                }
                 val utc = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", locale).apply {
                     timeZone = TimeZone.getTimeZone("UTC")
                 }.format(Date(it))
                 Text(stringResource(R.string.time_check_device_time, utc))
+                Text(stringResource(R.string.time_check_utc_note), style = MaterialTheme.typography.bodySmall)
             }
             if (check.differenceSeconds != null && check.uncertaintySeconds != null) {
                 Text(stringResource(R.string.time_check_difference, formatOffset(check.differenceSeconds, locale),
@@ -770,7 +800,7 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
 
 /** Подбор самого быстрого сервера — аналог автонастройки десктопной версии. */
 @Composable
-private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit) {
+private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit, onStart: () -> Unit) {
     val scan = state.ntpScan
     val progressView = remember { BringIntoViewRequester() }
     val scanning = scan != null && !scan.finished
@@ -783,7 +813,7 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
     Text(stringResource(R.string.ntp_scan_title), style = MaterialTheme.typography.bodyMedium)
 
     if (scan == null || scan.finished) {
-        Button(onClick = actions::scanNtpServers, enabled = !state.busy, modifier = Modifier.testTag("ntp-scan-start")) {
+        Button(onClick = onStart, enabled = !state.busy, modifier = Modifier.testTag("ntp-scan-start")) {
             Text(stringResource(R.string.ntp_scan_start))
         }
     } else {

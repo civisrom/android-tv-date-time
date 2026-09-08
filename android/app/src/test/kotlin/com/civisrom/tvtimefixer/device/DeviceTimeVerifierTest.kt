@@ -15,6 +15,7 @@ class DeviceTimeVerifierTest {
     private var adbDelay = 80L
     private var offset = 0L
     private var automatic = "1"
+    private var timeZone = "Europe/Moscow"
     private var server = "pool.ntp.org"
     private var queryCount = 0
     private var queryFailure: Exception? = null
@@ -32,6 +33,7 @@ class DeviceTimeVerifierTest {
             return when (command) {
                 "settings get global ntp_server" -> ShellResult(server, "", 0)
                 "settings get global auto_time" -> ShellResult(automatic, "", 0)
+                "getprop persist.sys.timezone" -> ShellResult(timeZone, "", 0)
                 "date +%s" -> {
                     elapsed += adbDelay
                     ShellResult(dateOutput ?: ((epoch + offset) / 1000).toString(), dateError, dateExit)
@@ -60,6 +62,27 @@ class DeviceTimeVerifierTest {
         assertEquals(0.552, check.uncertaintySeconds!!, 0.001)
         assertEquals(true, check.automaticTime)
         assertEquals(server, check.server)
+        assertEquals("Europe/Moscow", check.timeZoneId)
+    }
+
+    @Test fun `device zone affects display but never the UTC comparison`() {
+        val moscow = verify()
+        elapsed = 1_000L
+        timeZone = "America/New_York"
+        val newYork = verify()
+        assertEquals(moscow.deviceTimeMillis, newYork.deviceTimeMillis)
+        assertEquals(moscow.differenceSeconds, newYork.differenceSeconds)
+        assertEquals(moscow.status, newYork.status)
+        assertEquals(timeZone, newYork.timeZoneId)
+    }
+
+    @Test fun `unknown or unreadable zone does not become a false GMT display`() {
+        for (value in listOf("", "Unknown/Zone", "null")) {
+            timeZone = value
+            assertNull(verify().timeZoneId)
+        }
+        failingCommand = "getprop persist.sys.timezone"
+        assertNull(verify().timeZoneId)
     }
 
     @Test fun `both slow and fast device clocks report a signed mismatch`() {
@@ -187,7 +210,8 @@ class DeviceTimeVerifierTest {
         assertThrows(CancellationException::class.java) { verify() }
         queryFailure = null
         commandFailure = CancellationException("cancel")
-        for (command in listOf("settings get global ntp_server", "settings get global auto_time", "date +%s")) {
+        for (command in listOf("settings get global ntp_server", "settings get global auto_time", "date +%s",
+            "getprop persist.sys.timezone")) {
             failingCommand = command
             assertThrows(CancellationException::class.java) { verify() }
         }
@@ -195,7 +219,8 @@ class DeviceTimeVerifierTest {
 
     @Test fun `verification never writes settings or forces synchronization`() {
         verify()
-        assertEquals(listOf("settings get global ntp_server", "settings get global auto_time", "date +%s"), commands)
+        assertEquals(listOf("settings get global ntp_server", "settings get global auto_time", "date +%s",
+            "getprop persist.sys.timezone"), commands)
         assertEquals(1, queryCount)
     }
 
