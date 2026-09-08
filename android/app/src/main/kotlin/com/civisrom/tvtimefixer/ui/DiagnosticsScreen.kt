@@ -169,13 +169,13 @@ internal fun DiagnosticsScreen(
                             label = { Text(stringResource(R.string.diagnostics_all)) })
                         FilterChip(selected = errorsOnly, onClick = { errorsOnly = true }, modifier = Modifier.testTag("diagnostics-errors"),
                             label = { Text(stringResource(R.string.diagnostics_errors)) })
-                        TextButton(onClick = {
+                        Button(onClick = {
                             copyResult = if (runCatching {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Android TV Time Fixer", diagnosticReport(context, snapshot, mode)))
                             }.isSuccess) R.string.diagnostics_copied else R.string.diagnostics_copy_failed
                         }) { Text(stringResource(R.string.diagnostics_copy)) }
-                        TextButton(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
+                        Button(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
                             modifier = Modifier.testTag("diagnostics-clear")) { Text(stringResource(R.string.diagnostics_clear)) }
                     }
                     copyResult?.let { Text(stringResource(it)) }

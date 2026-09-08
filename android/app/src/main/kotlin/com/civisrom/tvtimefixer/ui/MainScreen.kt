@@ -618,7 +618,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
             DiagnosticLink(id, "ntp-details", onDiagnostics, returnFocus, onFocusRestored)
         }
         if (state.connected) {
-            TextButton(onClick = actions::verifyDeviceTime, enabled = !state.busy,
+            Button(onClick = actions::verifyDeviceTime, enabled = !state.busy,
                 modifier = Modifier.testTag("time-check")) {
                 Text(stringResource(R.string.time_check_action))
             }
@@ -657,7 +657,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
             // Списки раскрываются только при пустом поиске: иначе на экране
             // оказались бы сразу и результаты поиска, и весь справочник
             if (query.isBlank()) {
-                TextButton(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
+                Button(onClick = { showCountries = !showCountries }, modifier = Modifier.testTag("ntp-countries")) {
                     Text(
                         if (showCountries) {
                             stringResource(R.string.ntp_hide_countries)
@@ -679,7 +679,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     }
                 }
 
-                TextButton(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
+                Button(onClick = { showAll = !showAll }, modifier = Modifier.testTag("ntp-alternatives")) {
                     Text(
                         if (showAll) {
                             stringResource(R.string.ntp_hide_all)
