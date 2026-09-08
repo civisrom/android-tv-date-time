@@ -355,6 +355,7 @@ class MainScreenTest {
         screen(state)
         compose.onNodeWithTag("section-ntp-picker").performScrollTo().performClick()
         compose.onNodeWithTag("ntp-search").performScrollTo().performTextInput("cloudflare")
+        compose.onNodeWithTag("ntp-search").performTouchInput { click() }
         waitForKeyboard()
         compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
         try {
@@ -604,6 +605,7 @@ class MainScreenTest {
         }
         try {
             compose.waitUntil(5_000) { textSelectionActions(android.R.string.copy).isNotEmpty() }
+            screenshot("copy-menu-${text.substringBefore(':')}")
             // Домен может сразу выделиться целиком; тогда Android не предлагает «Выделить всё».
             if (textSelectionActions(android.R.string.selectAll).isNotEmpty()) {
                 clickTextSelectionAction(android.R.string.selectAll)
@@ -619,9 +621,14 @@ class MainScreenTest {
     }
 
     private fun clickTextSelectionAction(label: Int) {
+        // Дожидаемся доступного действия, затем нажимаем его ровно один раз.
+        // Повторные ACTION_CLICK во время перестройки панели могут убрать выделение.
+        var action: AccessibilityNodeInfo? = null
         compose.waitUntil(5_000) {
-            textSelectionActions(label).any { it.performAction(AccessibilityNodeInfo.ACTION_CLICK) }
+            action = textSelectionActions(label).firstOrNull { it.isClickable && it.isEnabled }
+            action != null
         }
+        assertTrue(checkNotNull(action).performAction(AccessibilityNodeInfo.ACTION_CLICK))
         compose.waitForIdle()
     }
 
