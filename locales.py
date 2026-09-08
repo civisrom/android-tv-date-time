@@ -504,8 +504,8 @@ arising from the use of this program.
                 ru="Введите корректный номер"
             ),
             "menu_item_9": Translation(
-                 en="9. Auto-setup NTP server (experimental mode)",
-                 ru="9. Автоматическая установка NTP-сервера (экспериментальный режим)"
+                 en="9. Auto-setup NTP server",
+                 ru="9. Автоматическая установка NTP-сервера"
             ),
             "menu_item_10": Translation(
                  en="10. Terminal mode (ADB and system commands)",

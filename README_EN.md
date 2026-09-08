@@ -90,7 +90,7 @@ replace troubleshooting other network faults.
 *   Console menus for Windows, Linux and macOS; release builds include ADB.
 *   Local subnet scanning with a selectable ADB port, plus separate mDNS discovery.
 *   Batch NTP updates for discovered or manually entered devices.
-*   Experimental automatic setup: choose a device, detect the region, test
+*   Automatic setup: choose a device, detect the region, test
     servers, offer the best five and apply after user confirmation.
 *   Favorite servers, copy/paste, a saved last address, and JSON settings
     export and import.
@@ -421,7 +421,7 @@ the addresses from the current debugging screens manually.
  6. Ping NTP servers
  7. Server management
  8. Network scan & batch NTP update
- 9. Auto-setup NTP server (experimental mode)
+ 9. Auto-setup NTP server
 10. Terminal mode (ADB and system commands)
 11. Android 11+ wireless debugging (pairing and mDNS discovery)
 12. Connect over USB
@@ -558,7 +558,7 @@ Opens a submenu for working with multiple devices:
 
 - **Time sync status** — compare device time with PC time
 
-### Item 9 — Auto-setup NTP server (experimental mode)
+### Item 9 — Auto-setup NTP server
 
 Helps choose a device and a suitable server:
 

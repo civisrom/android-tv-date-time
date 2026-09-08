@@ -3562,7 +3562,7 @@ class AndroidTVTimeFixer:
                 print(Fore.RED + locales.get("invalid_choice"))
 
     # ──────────────────────────────────────────────────────────
-    # Auto-setup NTP (experimental)
+    # Auto-setup NTP
     # ──────────────────────────────────────────────────────────
 
     # Маппинг Windows-имён таймзон (time.tzname) → IANA timezone
@@ -4316,7 +4316,7 @@ def main():
                 fixer.scan_batch_menu()
 
             elif choice == '9':
-                fixer.logger.info("Menu: Auto-setup NTP (experimental)")
+                fixer.logger.info("Menu: Auto-setup NTP")
                 fixer.auto_setup_ntp()
 
             elif choice == '10':
