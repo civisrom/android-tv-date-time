@@ -544,11 +544,12 @@ private fun NtpSection(state: AppState, actions: AppActions,
             keyboard?.hide()
             addressView.bringIntoView()
             // Небольшая подсказка после выбора, без изменения размеров и действий.
-            repeat(6) { phase ->
-                selectionPulse = phase + 1
-                delay(400)
+            for (step in 1..3) {
+                selectionPulse = step
+                delay(450)
+                selectionPulse = 0
+                if (step < 3) delay(300)
             }
-            selectionPulse = 0
         }
     }
 
@@ -582,8 +583,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 label = { Text(stringResource(R.string.ntp_custom_hint)) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = if (selectionPulse % 2 == 1) ConnectedColor else MaterialTheme.colorScheme.outline,
-                    unfocusedContainerColor = if (selectionPulse % 2 == 1) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
+                    unfocusedBorderColor = if (selectionPulse == 1) ConnectedColor else MaterialTheme.colorScheme.outline,
+                    unfocusedContainerColor = if (selectionPulse == 1) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
                 ),
                 modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
             )
@@ -596,7 +597,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     onClick = { actions.applyNtpServer(custom) },
                     enabled = state.connected && !state.busy && custom.isNotBlank(),
                     modifier = Modifier.testTag("ntp-apply").border(2.dp,
-                        if (selectionPulse == 1 || selectionPulse == 3) ConnectedColor else Color.Transparent,
+                        if (selectionPulse == 3) ConnectedColor else Color.Transparent,
                         ButtonDefaults.shape),
                 ) {
                     Text(stringResource(R.string.ntp_apply))
@@ -606,7 +607,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     enabled = !state.busy && custom.isNotBlank(),
                     modifier = Modifier.focusRequester(checkFocus)
                         .focusProperties { canFocus = true }.testTag("ntp-check").border(2.dp,
-                            if (selectionPulse == 1) ConnectedColor else Color.Transparent, ButtonDefaults.shape),
+                            if (selectionPulse == 2) ConnectedColor else Color.Transparent, ButtonDefaults.shape),
                 ) {
                     Text(stringResource(R.string.ntp_check))
                 }

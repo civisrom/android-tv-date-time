@@ -10,6 +10,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -698,6 +699,9 @@ class MainScreenTest {
     private fun textSelectionActions(label: Int): List<AccessibilityNodeInfo> =
         // Меню использует русскую локаль Compose и может находиться в отдельном окне.
         InstrumentationRegistry.getInstrumentation().uiAutomation.windows
+            // Ищем меню приложения, а не предложения IME. Поиск текста внутри
+            // клавиатуры AOSP API 23 роняет её AccessibilityNodeProviderCompat.
+            .filter { it.type != AccessibilityWindowInfo.TYPE_INPUT_METHOD }
             .mapNotNull { it.root }
             .flatMap { it.findAccessibilityNodeInfosByText(russianString(label)) }
 

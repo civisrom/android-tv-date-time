@@ -803,15 +803,18 @@ the configured NTP server. The result appears nearby: agreement within
 or unavailable data. ADB/NTP delays and whole-second clock readings are taken
 into account.
 
-The card shows the sampled device time in UTC, its difference from NTP, and
-automatic date and time status. **Verify device time** repeats only the read
+The card shows the sampled device time in UTC and, when its time zone is
+recognized, local time with the zone name, its difference from NTP, and
+automatic date and time status. For example, 13:00 UTC and 16:00 in UTC+3
+are the same moment, not a clock discrepancy. **Verify device time** repeats only the read
 and comparison; it does not change settings. Android may update its clock later,
 so a difference immediately after the write does not establish a failed setup.
 A failed check does not undo confirmation that the server address was saved.
 The NTP reply is received by the device running the APK: matching clocks do
 not prove that the TV synchronized with this particular server.
 
-The **Find the best one** button checks the 122-address reference and shows
+The **Find the best one** button collapses the open country and alternative
+lists, checks the 122-address reference, and shows
 up to five suitable servers, ordered first by successful reply percentage and
 then by response time. Duration depends on the network and timeouts. Progress
 shows **Checked N of 122, M usable**; **Stop** keeps results already found.
