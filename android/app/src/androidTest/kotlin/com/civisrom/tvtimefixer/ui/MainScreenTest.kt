@@ -350,6 +350,8 @@ class MainScreenTest {
             compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        // Дождаться появления IME, чтобы изменение высоты окна не сместило касание.
+        waitForKeyboard()
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
         compose.onNodeWithTag("ntp-check").performScrollTo().assertIsEnabled().performClick()
         assertEquals(listOf("check:pool.ntp.org"), actions.calls)

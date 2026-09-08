@@ -35,7 +35,8 @@ class DeviceCapabilitiesTest {
         assertEquals("8.00 GiB" to "2.00 GiB", parseDataStorage("Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/block/dm-8 $row"))
         assertEquals("8.00 GiB" to "2.00 GiB", parseDataStorage("/dev/very-long-name\n   $row"))
         assertEquals("" to "", parseDataStorage("/dev/block 10 0 20 0% /data"))
-        assertEquals("" to "", parseDataStorage("/dev/block 10 5 5 50% /system"))
+        assertEquals("8.00 GiB" to "2.00 GiB", parseDataStorage("/dev/block/dm-8 ${row.replace("/data", "/data/user/0")}"))
+        assertEquals("" to "", parseDataStorage("/dev/block $row\n/dev/system 10 5 5 50% /system"))
         assertEquals("" to "", parseDataStorage("Permission denied"))
     }
 

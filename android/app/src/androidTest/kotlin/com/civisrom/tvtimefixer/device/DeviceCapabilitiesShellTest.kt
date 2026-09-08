@@ -2,7 +2,6 @@ package com.civisrom.tvtimefixer.device
 
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.util.Base64
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.adb.AdbClient
 import com.civisrom.tvtimefixer.adb.ShellResult
@@ -18,8 +17,11 @@ class DeviceCapabilitiesShellTest {
             val script = "($command); tvtf_status=${'$'}?; printf '\\n__tvtf_status=%s\\n' \"${'$'}tvtf_status\""
             // executeShellCommand(String) делит аргументы по пробелам. Кодирование сохраняет
             // циклы и кавычки исходного скрипта и не требует файла на устройстве.
-            val encoded = Base64.encodeToString(script.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-            val wrapper = "echo${'$'}{IFS}$encoded|base64${'$'}{IFS}-d|sh"
+            // В Android 6 ещё нет утилиты base64; printf есть и в старом mksh.
+            val escaped = script.toByteArray(Charsets.UTF_8).joinToString("") {
+                "\\${(it.toInt() and 0xff).toString(8).padStart(3, '0')}"
+            }
+            val wrapper = "printf${'$'}{IFS}'$escaped'|sh"
             val pipe = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("sh -c $wrapper")
             val output = ParcelFileDescriptor.AutoCloseInputStream(pipe).use { it.bufferedReader().readText() }
             val index = output.lastIndexOf("__tvtf_status=")
@@ -36,12 +38,15 @@ class DeviceCapabilitiesShellTest {
         assertEquals(Build.MODEL, info.model)
         assertEquals(Build.VERSION.SDK_INT.toString(), info.apiLevel)
         assertTrue("Missing firmware build", info.buildDisplay.isNotEmpty())
-        assertTrue("Missing /data capacity", info.storageTotal.isNotEmpty())
-        assertTrue("Missing /data available space", info.storageAvailable.isNotEmpty())
-        assertTrue("Missing display modes", info.display.supportedModes.isNotEmpty())
-        assertTrue("Missing active display mode", info.display.activeMode.isNotEmpty())
-        assertTrue("Missing video declarations", info.videoDecoders.isNotEmpty())
-        assertTrue("Missing audio declarations", info.audioDecoders.isNotEmpty())
+        val missing = mapOf(
+            "/data capacity" to info.storageTotal,
+            "/data available space" to info.storageAvailable,
+            "display modes" to info.display.supportedModes,
+            "active display mode" to info.display.activeMode,
+            "video declarations" to info.videoDecoders,
+            "audio declarations" to info.audioDecoders,
+        ).filterValues { it.isEmpty() }.keys
+        assertTrue("Missing device details: $missing; df=${client.shell("df -k /data").trimmedOutput}", missing.isEmpty())
         before.forEach { (setting, value) -> assertEquals(value, client.shell("settings get global $setting").trimmedOutput) }
     }
 }

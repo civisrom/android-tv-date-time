@@ -44,10 +44,14 @@ internal fun parseDisplayDetails(raw: String): DisplayDetails {
     )
 }
 
-/** Размер доступного приложениям раздела /data, а не рекламный объём накопителя. */
+/**
+ * Ответ именно на `df -k /data`. Toybox может показать другую точку монтирования
+ * той же файловой системы (например /data/user/0), поэтому не сравниваем её с /data.
+ */
 internal fun parseDataStorage(raw: String): Pair<String, String> {
     val row = raw.lineSequence().map { it.trim().split(Regex("\\s+")) }
-        .firstOrNull { it.size >= 5 && it.last() == "/data" && it[it.size - 2].matches(Regex("\\d+%")) } ?: return "" to ""
+        .filter { it.size >= 5 && it.last().startsWith('/') && it[it.size - 2].matches(Regex("\\d+%")) }
+        .singleOrNull() ?: return "" to ""
     val total = row.getOrNull(row.size - 5)?.toLongOrNull() ?: return "" to ""
     val free = row.getOrNull(row.size - 3)?.toLongOrNull() ?: return "" to ""
     if (total <= 0 || free !in 0..total) return "" to ""
