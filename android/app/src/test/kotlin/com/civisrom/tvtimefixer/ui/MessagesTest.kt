@@ -2,6 +2,8 @@ package com.civisrom.tvtimefixer.ui
 
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.data.NtpProbeFailure
+import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
 import org.junit.Assert.assertEquals
@@ -10,6 +12,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessagesTest {
+
+    @Test fun `причины отклонения NTP показывают разные локализованные сообщения`() {
+        val messages = NtpProbeFailure.entries.map {
+            NtpProbeResult("time.example", false, 0, null, null, "fixture", failure = it).rejectionMessageRes()
+        }
+        assertTrue(messages.none { it == 0 })
+        assertEquals(NtpProbeFailure.entries.size, messages.distinct().size)
+    }
 
     @Test fun `clock agreement mismatch uncertainty and unavailable results have distinct messages`() {
         val messages = DeviceTimeStatus.entries.map { it.messageRes() }

@@ -37,6 +37,7 @@ import com.civisrom.tvtimefixer.adb.ACTION_USB_SYSTEM_STATE
 import com.civisrom.tvtimefixer.adb.targetOrNull
 import com.civisrom.tvtimefixer.data.NtpData
 import com.civisrom.tvtimefixer.data.NtpProbe
+import com.civisrom.tvtimefixer.data.NtpProbeFailure
 import com.civisrom.tvtimefixer.data.NtpScanner
 import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.data.isUsable
@@ -50,6 +51,7 @@ import com.civisrom.tvtimefixer.ui.AppState
 import com.civisrom.tvtimefixer.ui.MainScreen
 import com.civisrom.tvtimefixer.ui.UiMessage
 import com.civisrom.tvtimefixer.ui.toUiMessage
+import com.civisrom.tvtimefixer.ui.rejectionMessageRes
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticIssue
@@ -188,6 +190,7 @@ class MainActivity : ComponentActivity() {
                             failed && !result.connected && operation == Operation.READ_DEVICE
                         }, issue = if (!failed) null else when {
                             timeAction -> result.timeCheck?.diagnosticIssue()
+                            ntpAction && result.ntpCheck?.failure == NtpProbeFailure.INVALID_ADDRESS -> DiagnosticIssue.INVALID_NTP
                             ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
                             ntpAction && result.ntpCheck?.isUsable() == false -> DiagnosticIssue.NTP_UNUSABLE
                             result.ntpMessage?.res == R.string.ntp_not_confirmed -> DiagnosticIssue.NTP_NOT_CONFIRMED
@@ -247,7 +250,7 @@ class MainActivity : ComponentActivity() {
             withContext(Dispatchers.IO) { connector.disconnect() }
             state = state.copy(connection = ConnectionState.Connecting(address),
                 deviceInfo = null, currentNtpServer = "", ntpMessage = null,
-                ntpCheck = null, ntpRejected = null,
+                ntpCheck = null,
                 message = UiMessage(R.string.usb_authorize_hint))
             state = state.copy(operation = Operation.USB_PERMISSION)
             journal.record(Operation.USB_PERMISSION, Outcome.STARTED, DiagnosticTransport.USB)
@@ -283,9 +286,9 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) {
-            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null)
+            state = state.copy(ntpMessage = null, ntpCheck = null)
             val result = withContext(Dispatchers.IO) { ntpProbe.test(server) }
-            state.copy(ntpCheck = result, ntpRejected = server.takeUnless { result.isUsable() })
+            state.copy(ntpCheck = result)
         }
 
         /**
@@ -293,17 +296,16 @@ class MainActivity : ComponentActivity() {
          * сервер времени. Десктопная половина ведёт себя так же: адрес, не
          * прошедший проверку, до устройства не доходит.
          */
-        override fun applyNtpServer(server: String, force: Boolean) = run(Operation.APPLY_NTP) {
-            state = state.copy(ntpMessage = null, ntpRejected = null)
+        override fun applyNtpServer(server: String) = run(Operation.APPLY_NTP) {
+            state = state.copy(ntpMessage = null)
             val applied = withContext(Dispatchers.IO) {
-                val check = if (force) null else ntpProbe.test(server)
-                if (check != null && !check.isUsable()) {
+                val check = ntpProbe.test(server)
+                if (!check.isUsable()) {
                     return@withContext state.copy(
                         ntpCheck = check,
-                        ntpRejected = server,
                         ntpMessage = UiMessage(
                             R.string.ntp_check_rejected,
-                            listOf(check.error ?: getString(R.string.ntp_check_bad_clock)),
+                            listOf(getString(check.rejectionMessageRes())),
                         ),
                     )
                 }
@@ -350,7 +352,7 @@ class MainActivity : ComponentActivity() {
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
-            state = state.copy(ntpMessage = null, ntpCheck = null, ntpRejected = null, ntpDiagnosticEventId = null,
+            state = state.copy(ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
                 ntpScan = ScanProgress(0, NtpData.allServers.size, emptyList()))
             journal.record(Operation.SCAN_NTP, Outcome.STARTED)
             val started = System.nanoTime()

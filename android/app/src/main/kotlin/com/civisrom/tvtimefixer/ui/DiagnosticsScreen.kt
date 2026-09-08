@@ -71,7 +71,7 @@ internal fun Operation.labelRes(): Int = when (this) {
 
 private fun DiagnosticIssue.labelRes(): Int = when (this) {
     DiagnosticIssue.NTP_UNREACHABLE -> R.string.diagnostics_ntp_unreachable
-    DiagnosticIssue.NTP_UNUSABLE -> R.string.ntp_check_bad_clock
+    DiagnosticIssue.NTP_UNUSABLE -> R.string.ntp_check_invalid_response
     DiagnosticIssue.NTP_NOT_CONFIRMED -> R.string.diagnostics_ntp_not_confirmed
     DiagnosticIssue.INVALID_NTP -> R.string.ntp_invalid
     DiagnosticIssue.TIME_MISMATCH -> R.string.time_check_mismatch

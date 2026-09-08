@@ -771,16 +771,14 @@ green, a rejected one red.
     of that under the field.
 
 The **Check** button sends a real NTP request from the device running the
-APK and parses the reply. It checks reachability and the offset from that
-device's clock, allowing at most **60 seconds**. Possible outcomes:
+APK and parses the reply. It checks the address, reachability, and NTP response.
+The offset from the device's clock is informational and does not block applying a
+server: the TV, box, or phone clock may be wrong. Possible outcomes:
 
 *   *Answers as a time server: 42 ms, 100% of replies, clock offset +0.3 s* —
     the server passed the check from the current network.
 *   *Does not answer as a time server: …* — no suitable reply was received;
     possible causes include server availability, blocked UDP/123 or DNS failure.
-*   *It answers, but reports a time that is far off* — the offset exceeds the
-    threshold. Check both the server and the phone/tablet clock; this message
-    alone does not establish that the server is faulty.
 
 The phone and TV networks may impose different restrictions, so a successful
 phone-side check does not guarantee that the TV can reach the server.
@@ -793,10 +791,10 @@ line is updated with the value **read back from the device**.
 *   *"The device still reports …"* — the command went through but the write did
     not happen. Usually this means the connection lacks permission to change
     secure settings.
-*   *"Not applied: …"* — the address failed the check. An **Apply anyway**
-    button appears next to it: the check runs from the phone's network, and UDP
-    port 123 is blocked by some carriers and routers, so refusing outright
-    would be wrong.
+*   *"Not applied: …"* — the address failed the check. The app explains why:
+    an invalid address, DNS failure, no response, an invalid NTP reply, or a
+    network error. The TV setting stays unchanged; correct the address,
+    check the network, or choose another server and try again.
 
 After a successful write, **device time verification** runs automatically.
 It reads the device clock through ADB and compares it with a fresh reply from

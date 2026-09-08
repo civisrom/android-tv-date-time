@@ -4,6 +4,8 @@ import androidx.annotation.StringRes
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
+import com.civisrom.tvtimefixer.data.NtpProbeFailure
+import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.device.NtpUpdateResult
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
 
@@ -42,6 +44,15 @@ fun DiscoveredDevice.Kind.labelRes(): Int = when (this) {
 
 /** Строка результата смены сервера вместе с подстановками для неё. */
 data class UiMessage(@StringRes val res: Int, val args: List<String> = emptyList())
+
+@StringRes
+fun NtpProbeResult.rejectionMessageRes(): Int = if (reachable) R.string.ntp_check_invalid_response else when (failure) {
+    NtpProbeFailure.INVALID_ADDRESS -> R.string.ntp_invalid
+    NtpProbeFailure.DNS -> R.string.ntp_check_dns
+    NtpProbeFailure.TIMEOUT -> R.string.ntp_check_timeout
+    NtpProbeFailure.INVALID_RESPONSE -> R.string.ntp_check_invalid_response
+    NtpProbeFailure.NETWORK, null -> R.string.ntp_check_network
+}
 
 fun NtpUpdateResult.toUiMessage(): UiMessage = when (this) {
     is NtpUpdateResult.Applied -> UiMessage(R.string.ntp_applied, listOf(server))

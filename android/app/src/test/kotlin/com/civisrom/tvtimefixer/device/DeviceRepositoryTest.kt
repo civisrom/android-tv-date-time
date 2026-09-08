@@ -111,9 +111,10 @@ class DeviceRepositoryTest {
     @Test
     fun `некорректный адрес не доходит до устройства`() {
         val device = FakeDevice()
-        val result = DeviceRepository(device).setNtpServer("не сервер")
-
-        assertEquals(NtpUpdateResult.InvalidServer, result)
+        for (server in listOf("не сервер", "time.-pool.org", "time.pool-.org", "time.google.com:123",
+            "https://time.google.com", "999.0.0.1", "192.168.1.1:123")) {
+            assertEquals(server, NtpUpdateResult.InvalidServer, DeviceRepository(device).setNtpServer(server))
+        }
         assertTrue("команд быть не должно", device.commands.isEmpty())
     }
 

@@ -76,7 +76,7 @@
     <string name="ntp_apply">Применить</string>
     <string name="ntp_search_country">Поиск страны</string>
     <string name="ntp_applied">Установлен сервер времени %1$s.</string>
-    <string name="ntp_invalid">Это не похоже на адрес сервера.</string>
+    <string name="ntp_invalid">Неверный адрес сервера времени. Введите домен или IPv4 без порта, пробелов и http://.</string>
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
     <string name="time_check_title">Проверка времени устройства</string>
@@ -107,9 +107,11 @@
     <string name="ntp_check">Проверить</string>
     <string name="ntp_check_ok">Отвечает как сервер времени: %1$d мс, ответов %2$d%%, расхождение часов %3$s с.</string>
     <string name="ntp_check_failed">Не отвечает как сервер времени: %1$s</string>
-    <string name="ntp_check_bad_clock">Отвечает, но сообщает сильно неверное время. Применить его — значит сломать часы, а не починить.</string>
+    <string name="ntp_check_dns">Не удалось определить IP-адрес домена. Проверьте имя сервера и доступ к сети.</string>
+    <string name="ntp_check_timeout">Сервер не ответил. Проверьте сеть или попробуйте другой сервер; UDP-порт 123 может быть заблокирован.</string>
+    <string name="ntp_check_invalid_response">Получен некорректный ответ NTP. Попробуйте другой сервер времени.</string>
+    <string name="ntp_check_network">Не удалось проверить сервер из этой сети. Проверьте подключение и повторите попытку.</string>
     <string name="ntp_check_rejected">Не применено: %1$s</string>
-    <string name="ntp_apply_anyway">Применить всё-таки</string>
     <string name="ntp_scan_title">Подбор самого быстрого сервера</string>
     <string name="ntp_scan_start">Подобрать лучший</string>
     <string name="ntp_scan_cancel">Остановить</string>

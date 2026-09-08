@@ -4,6 +4,8 @@ import com.civisrom.tvtimefixer.net.NotAnNtpServerException
 import com.civisrom.tvtimefixer.net.SntpQuery
 import com.civisrom.tvtimefixer.net.SntpResult
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -85,26 +87,24 @@ class NtpProbeTest {
     }
 
     @Test
-    fun `сервер с уехавшими часами отвергается`() {
-        // Отвечает исправно, но сообщает время на два часа вперёд: задать такой
-        // телевизору — значит сломать часы, а не починить
-        val probe = NtpProbe(
-            FakeSntp(mapOf("skewed.example" to listOf(SntpResult(15, 7200.0)))),
-            attempts = 1,
-        )
-        val result = probe.test("skewed.example")
-
-        assertTrue("сервер отвечает", result.reachable)
-        assertFalse("но применять его нельзя", result.isUsable())
+    fun `сбитые локальные часы не мешают выбрать отвечающий NTP-сервер`() {
+        for (offset in listOf(-31_536_000.0, -7200.0, 7200.0, 31_536_000.0)) {
+            val probe = NtpProbe(
+                FakeSntp(mapOf("time.example" to listOf(SntpResult(15, offset)))), attempts = 1)
+            val result = probe.test("time.example")
+            assertTrue(result.reachable)
+            assertTrue(result.isUsable())
+            assertEquals(offset, result.offsetSeconds!!, 0.0)
+        }
     }
 
     @Test
-    fun `граница смещения совпадает с десктопной версией`() {
-        val ok = NtpProbeResult("a", true, 100, 10, MAX_OFFSET_SECONDS, null)
-        val tooMuch = NtpProbeResult("b", true, 100, 10, MAX_OFFSET_SECONDS + 0.1, null)
-        assertTrue(ok.isUsable())
-        assertFalse(tooMuch.isUsable())
-        assertEquals(60.0, MAX_OFFSET_SECONDS, 0.0)
+    fun `отсутствие ответа или некорректные числовые данные не проходят проверку`() {
+        val valid = NtpProbeResult("time.example", true, 100, 10, 0.0, null)
+        assertFalse(valid.copy(reachable = false).isUsable())
+        for (offset in listOf(null, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            assertFalse(valid.copy(offsetSeconds = offset).isUsable())
+        }
     }
 
     @Test
@@ -115,10 +115,29 @@ class NtpProbeTest {
             },
             attempts = 2,
         )
-        val result = probe.test("не адрес")
+        for (server in listOf("не адрес", "time.-pool.org", "time.pool-.org", "time.google.com:123",
+            "https://time.google.com", "999.0.0.1", "192.168.1.1:123")) {
+            val result = probe.test(server)
+            assertFalse(result.reachable)
+            assertFalse(result.isUsable())
+            assertEquals(NtpProbeFailure.INVALID_ADDRESS, result.failure)
+        }
+    }
 
-        assertFalse(result.reachable)
-        assertFalse(result.isUsable())
+    @Test
+    fun `DNS таймаут неверный ответ и сетевая ошибка имеют разные причины отказа`() {
+        for ((error, expected) in listOf(
+            UnknownHostException("dns fixture") to NtpProbeFailure.DNS,
+            SocketTimeoutException("timeout fixture") to NtpProbeFailure.TIMEOUT,
+            NotAnNtpServerException("invalid reply fixture") to NtpProbeFailure.INVALID_RESPONSE,
+            IOException("network fixture") to NtpProbeFailure.NETWORK,
+        )) {
+            val probe = NtpProbe(FakeSntp(mapOf("time.example" to listOf(error))), attempts = 1)
+            val result = probe.test("time.example")
+            assertFalse(result.isUsable())
+            assertEquals(expected, result.failure)
+            assertEquals(error.message, result.error)
+        }
     }
 
     @Test

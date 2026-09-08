@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import java.util.Date
@@ -74,7 +75,7 @@ interface AppActions {
     fun disconnect()
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
     fun checkNtpServer(server: String)
-    fun applyNtpServer(server: String, force: Boolean = false)
+    fun applyNtpServer(server: String)
     fun verifyDeviceTime()
     fun scanNtpServers()
     fun cancelNtpScan()
@@ -309,7 +310,7 @@ private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActi
                 is ConnectionState.Checking -> stringResource(R.string.connect_state_checking, connection.address.toString())
                 is ConnectionState.Failed -> stringResource(connection.reason.messageRes())
                 ConnectionState.Disconnected -> stringResource(R.string.connect_state_disconnected)
-            }, color = when (state.connection) {
+            }, fontWeight = FontWeight.Bold, color = when (state.connection) {
                 is ConnectionState.Connected -> ConnectedColor
                 is ConnectionState.Connecting, is ConnectionState.Checking -> MaterialTheme.colorScheme.onSurface
                 else -> MaterialTheme.colorScheme.error
@@ -336,6 +337,7 @@ private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: Ap
             Text(stringResource(R.string.connect_try_loopback))
         }
     }
+    Text(stringResource(R.string.discovery_authorize_hint), style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
@@ -579,19 +581,6 @@ private fun NtpSection(state: AppState, actions: AppActions,
             }
         }
 
-        // Проверка идёт из сети телефона, а UDP-порт 123 закрывают и операторы,
-        // и часть роутеров: полный запрет оставил бы человека вообще без
-        // возможности задать сервер
-        state.ntpRejected?.let { rejected ->
-            Button(
-                onClick = { actions.applyNtpServer(rejected, force = true) },
-                enabled = state.connected && !state.busy,
-                modifier = Modifier.testTag("ntp-apply-anyway"),
-            ) {
-                Text(stringResource(R.string.ntp_apply_anyway))
-            }
-        }
-
         state.ntpDiagnosticEventId?.let { id ->
             DiagnosticLink(id, "ntp-details", onDiagnostics, returnFocus, onFocusRestored)
         }
@@ -702,14 +691,9 @@ private fun NtpCheckCard(check: NtpProbeResult) {
                     ),
                     color = ConnectedColor,
                 )
-            } else if (check.reachable) {
-                Text(
-                    stringResource(R.string.ntp_check_bad_clock),
-                    color = MaterialTheme.colorScheme.error,
-                )
             } else {
                 Text(
-                    stringResource(R.string.ntp_check_failed, check.error.orEmpty()),
+                    stringResource(R.string.ntp_check_failed, stringResource(check.rejectionMessageRes())),
                     color = MaterialTheme.colorScheme.error,
                 )
             }

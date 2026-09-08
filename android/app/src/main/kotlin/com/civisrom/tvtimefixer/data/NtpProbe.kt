@@ -1,7 +1,11 @@
 package com.civisrom.tvtimefixer.data
 
 import com.civisrom.tvtimefixer.net.SntpQuery
-import kotlin.math.abs
+import com.civisrom.tvtimefixer.net.NotAnNtpServerException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+
+enum class NtpProbeFailure { INVALID_ADDRESS, DNS, TIMEOUT, INVALID_RESPONSE, NETWORK }
 
 /** Итог проверки одного сервера времени. */
 data class NtpProbeResult(
@@ -14,27 +18,16 @@ data class NtpProbeResult(
     val error: String?,
     /** IP, к которому обратились. У адреса, введённого как IP, совпадает с ним. */
     val ipAddress: String? = null,
+    val failure: NtpProbeFailure? = null,
 )
 
 /**
- * Предел расхождения часов, при котором сервер считается пригодным.
- *
- * Ровно то же число, что и в десктопной версии (`abs(avg_offset) > 60`
- * отвергает сервер). Расходиться нельзя: адрес, принятый на телефоне, должен
- * приниматься и на компьютере.
- */
-const val MAX_OFFSET_SECONDS = 60.0
-
-/**
- * Годен ли сервер к применению.
- *
- * Недостаточно того, что адрес ответил: сервер обязан сообщить время, близкое
- * к настоящему. Иначе телевизор получит адрес, который «работает», но часы по
- * нему уедут — а заметит это человек очень нескоро.
+ * Получен корректный NTP-ответ. Величина смещения не ограничивается:
+ * локальные часы могут быть сбиты, и сервер выбирают для их исправления.
  */
 fun NtpProbeResult.isUsable(): Boolean {
     val offset = offsetSeconds ?: return false
-    return reachable && abs(offset) <= MAX_OFFSET_SECONDS
+    return reachable && offset.isFinite()
 }
 
 /**
@@ -51,12 +44,14 @@ class NtpProbe(
     fun test(server: String): NtpProbeResult {
         val address = server.trim()
         if (!isValidNtpServer(address)) {
-            return NtpProbeResult(address, false, 0, null, null, ERROR_INVALID)
+            return NtpProbeResult(address, false, 0, null, null, ERROR_INVALID,
+                failure = NtpProbeFailure.INVALID_ADDRESS)
         }
 
         val rtts = mutableListOf<Long>()
         val offsets = mutableListOf<Double>()
         var lastError: String? = null
+        var failure: NtpProbeFailure? = null
         var resolved: String? = null
 
         repeat(attempts) {
@@ -67,11 +62,18 @@ class NtpProbe(
                 if (resolved == null) resolved = result.address.takeIf { it.isNotBlank() }
             } catch (e: Exception) {
                 lastError = e.message ?: e.javaClass.simpleName
+                failure = when (e) {
+                    is UnknownHostException -> NtpProbeFailure.DNS
+                    is SocketTimeoutException -> NtpProbeFailure.TIMEOUT
+                    is NotAnNtpServerException -> NtpProbeFailure.INVALID_RESPONSE
+                    else -> NtpProbeFailure.NETWORK
+                }
             }
         }
 
         if (rtts.isEmpty()) {
-            return NtpProbeResult(address, false, 0, null, null, lastError ?: ERROR_UNKNOWN)
+            return NtpProbeResult(address, false, 0, null, null, lastError ?: ERROR_UNKNOWN,
+                failure = failure ?: NtpProbeFailure.NETWORK)
         }
         return NtpProbeResult(
             server = address,

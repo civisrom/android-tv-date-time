@@ -39,6 +39,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -88,7 +89,7 @@ private class ScreenActions : AppActions {
         calls += "pair:$pairingAddress:$code:$connectAddress"
     }
     override fun checkNtpServer(server: String) { calls += "check:$server" }
-    override fun applyNtpServer(server: String, force: Boolean) { calls += "apply:$server:$force" }
+    override fun applyNtpServer(server: String) { calls += "apply:$server" }
     override fun verifyDeviceTime() { calls += "verify-time" }
     override fun scanNtpServers() { calls += "scan"; onScan() }
     override fun cancelNtpScan() { calls += "cancel-scan" }
@@ -208,32 +209,32 @@ class MainScreenTest {
     }
 
     @Test fun connecting_keeps_primary_inputs_and_enables_ntp_writes_only_while_connected() {
-        val state = mutableStateOf(AppState(ntpRejected = "pool.ntp.org"))
+        val state = mutableStateOf(AppState(ntpCheck = NtpProbeResult("pool.ntp.org", false, 0, null, null, "timeout")))
         compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, actions) } }
         compose.onNodeWithTag("network-address").performScrollTo().performTextInput("192.0.2.10:5555")
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
         compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.11:37123")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.11:37124")
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
 
         compose.runOnIdle { state.value = state.value.copy(connection = connected.connection) }
         compose.onNodeWithTag("network-address").performScrollTo().assertTextContains("192.0.2.10:5555")
         compose.onNodeWithTag("pairing-address").performScrollTo().assertTextContains("192.0.2.11:37123")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().assertTextContains("192.0.2.11:37124")
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
         compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsEnabled().performClick()
-        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+        assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
 
         compose.runOnIdle { state.value = state.value.copy(busy = true) }
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
         compose.runOnIdle { state.value = state.value.copy(connection = ConnectionState.Disconnected, busy = false) }
         compose.onNodeWithTag("ntp-address").assertTextContains("pool.ntp.org")
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-apply-anyway").assertIsNotEnabled()
-        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+        compose.onNodeWithTag("ntp-apply-anyway").assertDoesNotExist()
+        assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
     }
 
     @Test fun narrow_screen_at_double_font_keeps_pairing_fields_and_action_reachable() {
@@ -279,7 +280,7 @@ class MainScreenTest {
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
         assertTrue(actions.calls.isEmpty())
         compose.onNodeWithTag("ntp-apply").performScrollTo().performClick()
-        assertEquals(listOf("apply:pool.ntp.org:false"), actions.calls)
+        assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
     }
 
     @Test fun busy_usb_permission_keeps_diagnostics_accessible() {
@@ -339,7 +340,7 @@ class MainScreenTest {
         compose.onNodeWithTag("ntp-address").assertIsDisplayed().assertTextContains("time.cloudflare.com")
         assertTrue(actions.calls.isEmpty())
         compose.onNodeWithTag("ntp-apply").assertIsDisplayed().performClick()
-        assertEquals(listOf("apply:time.cloudflare.com:false"), actions.calls)
+        assertEquals(listOf("apply:time.cloudflare.com"), actions.calls)
     }
 
     @Test fun picking_a_search_result_hides_the_keyboard_and_reveals_the_address() {
@@ -475,7 +476,7 @@ class MainScreenTest {
         copyDisplayedText(server)
         compose.onNodeWithTag("ntp-address").assert(hasText(server).not())
         assertTrue(actions.calls.isEmpty())
-        compose.onNodeWithText(server).performScrollTo().performClick()
+        compose.onNodeWithText(server, useUnmergedTree = true).performScrollTo().performTouchInput { click() }
         compose.onNodeWithTag("ntp-address").assertTextContains(server)
         assertTrue(actions.calls.isEmpty())
     }
@@ -593,7 +594,12 @@ class MainScreenTest {
     }
 
     private fun copyDisplayedTextFromMenu(text: String) {
-        compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo().performTouchInput {
+        val node = compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo()
+        val content = compose.onNodeWithTag("main-content")
+        // Оставляем место для маркеров выделения и системного меню, вдали от панели навигации.
+        val scroll = node.fetchSemanticsNode().boundsInRoot.center.y - content.fetchSemanticsNode().boundsInRoot.center.y
+        content.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, scroll) }
+        node.performTouchInput {
             longClick(Offset(5f, center.y))
         }
         try {
