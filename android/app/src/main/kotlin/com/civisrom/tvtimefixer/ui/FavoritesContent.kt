@@ -3,14 +3,23 @@ package com.civisrom.tvtimefixer.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.detectDeviceMode
@@ -66,7 +75,7 @@ internal fun NtpFavorites(state: AppState, actions: AppActions, server: String, 
     state.favorites.servers.forEach { item ->
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick = { onPick(item.server) }, modifier = Modifier.testTag("favorite-ntp-${item.server}")) {
-                Text("${item.name} · ${item.server}")
+                Text(if (item.name.equals(item.server, ignoreCase = true)) item.server else "${item.name} · ${item.server}")
             }
             TextButton(onClick = { actions.removeFavoriteNtp(item.server) }, enabled = enabled) {
                 Text(stringResource(R.string.favorites_delete))
@@ -83,20 +92,28 @@ internal fun NtpFavorites(state: AppState, actions: AppActions, server: String, 
 private fun FavoriteEditor(initialName: String, initialAddress: String?, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var name by remember { mutableStateOf(initialName.take(80)) }
     var address by remember { mutableStateOf(initialAddress.orEmpty()) }
+    val saveFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val canSave = name.isNotBlank() && name.none { it.isISOControl() } &&
+        (initialAddress == null || parseDeviceAddress(address) != null)
+    val finishInput = KeyboardActions(onDone = { if (canSave) saveFocus.requestFocus(); keyboard?.hide() })
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.favorites_edit)) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(name, { name = it.take(80) }, label = { Text(stringResource(R.string.favorite_name)) },
-                singleLine = true, modifier = Modifier.testTag("favorite-name"))
+            OutlinedTextField(name, { name = it.take(80) }, label = { Text(stringResource(R.string.favorite_name), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                singleLine = true, modifier = Modifier.testTag("favorite-name"),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = finishInput)
             if (initialAddress != null) {
-                OutlinedTextField(address, { address = it }, label = { Text(stringResource(R.string.connect_address_hint)) },
-                    singleLine = true, modifier = Modifier.testTag("favorite-address"))
+                OutlinedTextField(address, { address = it }, label = { Text(stringResource(R.string.connect_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    singleLine = true, modifier = Modifier.testTag("favorite-address"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    keyboardActions = finishInput)
                 Text(stringResource(R.string.favorite_address_hint))
             }
         }
     }, confirmButton = {
         Button(onClick = { onSave(name.trim(), address.trim()) },
-            enabled = name.isNotBlank() && name.none { it.isISOControl() } &&
-                (initialAddress == null || parseDeviceAddress(address) != null), modifier = Modifier.testTag("favorite-confirm")) {
+            enabled = canSave, modifier = Modifier.focusRequester(saveFocus).focusProperties { canFocus = true }
+                .testTag("favorite-confirm")) {
             Text(stringResource(R.string.favorites_save))
         }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.diagnostics_cancel)) } })

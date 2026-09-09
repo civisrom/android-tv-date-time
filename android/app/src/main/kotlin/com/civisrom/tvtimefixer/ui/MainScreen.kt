@@ -61,6 +61,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import java.util.Date
@@ -437,7 +438,7 @@ private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: Ap
     var address by rememberSaveable { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
     OutlinedTextField(value = address, onValueChange = { address = it },
-        label = { Text(stringResource(R.string.connect_address_hint)) }, singleLine = true,
+        label = { Text(stringResource(R.string.connect_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) }, singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         modifier = Modifier.fillMaxWidth().testTag("network-address"))
@@ -546,6 +547,7 @@ private fun PairingSection(
 ) {
     var connectAddress by rememberSaveable { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
+    val submitFocus = remember { FocusRequester() }
     val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -560,7 +562,7 @@ private fun PairingSection(
         OutlinedTextField(
             value = pairingAddress,
             onValueChange = onPairingAddressChange,
-            label = { Text(stringResource(R.string.pairing_address_hint)) },
+            label = { Text(stringResource(R.string.pairing_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("pairing-address"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
@@ -570,7 +572,7 @@ private fun PairingSection(
         OutlinedTextField(
             value = code,
             onValueChange = onCode,
-            label = { Text(stringResource(R.string.pairing_code_hint)) },
+            label = { Text(stringResource(R.string.pairing_code_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().focusRequester(codeFocus).testTag("pairing-code"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -579,17 +581,20 @@ private fun PairingSection(
         OutlinedTextField(
             value = connectAddress,
             onValueChange = { connectAddress = it },
-            label = { Text(stringResource(R.string.pairing_connect_address_hint)) },
+            label = { Text(stringResource(R.string.pairing_connect_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("pairing-connect-address"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+            keyboardActions = KeyboardActions(onDone = {
+                if (pairingSupported && !state.busy) submitFocus.requestFocus()
+                keyboard?.hide()
+            }),
         )
         AddressPaste("pairing-connect-address") { connectAddress = it }
         Button(
             onClick = { actions.pairAndConnect(pairingAddress, code, connectAddress) },
             enabled = !state.busy && pairingSupported,
-            modifier = Modifier.testTag("pairing-connect"),
+            modifier = Modifier.focusRequester(submitFocus).focusProperties { canFocus = true }.testTag("pairing-connect"),
         ) {
             Text(stringResource(R.string.pairing_action))
         }
@@ -689,7 +694,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
             OutlinedTextField(
                 value = custom,
                 onValueChange = { custom = it },
-                label = { Text(stringResource(R.string.ntp_custom_hint)) },
+                label = { Text(stringResource(R.string.ntp_custom_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = if (highlightAddress) ConnectedColor else MaterialTheme.colorScheme.primary,
@@ -699,7 +704,10 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 ),
                 modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { checkFocus.requestFocus(); keyboard?.hide() }),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (!state.busy && custom.isNotBlank()) checkFocus.requestFocus()
+                    keyboard?.hide()
+                }),
             )
             AddressPaste("ntp-address") { custom = it }
             NtpFavorites(state, actions, custom, onPick)
@@ -791,7 +799,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text(stringResource(R.string.ntp_search_country)) },
+                label = { Text(stringResource(R.string.ntp_search_country), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("ntp-search"),
             )
@@ -938,7 +946,7 @@ private fun TimeZoneSection(state: AppState, actions: AppActions,
             chosen = it.trim().takeIf(::isValidTimeZoneId).orEmpty()
             showChoices = true
         }, singleLine = true, enabled = !state.busy,
-            label = { Text(stringResource(R.string.time_zone_search)) },
+            label = { Text(stringResource(R.string.time_zone_search), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.fillMaxWidth().testTag("time-zone-search"))
         Text(stringResource(R.string.time_zone_search_hint), style = MaterialTheme.typography.bodySmall)
         Button(onClick = {

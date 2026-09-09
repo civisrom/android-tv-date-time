@@ -385,7 +385,9 @@ class MainScreenTest {
         // Дождаться появления IME, чтобы изменение высоты окна не сместило касание.
         waitForKeyboard()
         compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("ntp-check").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithTag("ntp-address").performImeAction()
+        waitForKeyboard(false)
+        compose.onNodeWithTag("ntp-check").performScrollTo().assertIsEnabled().assertIsFocused().performClick()
         assertEquals(listOf("check:pool.ntp.org"), actions.calls)
         compose.onNodeWithTag("network-address").performScrollTo()
         screenshot("primary-connection")
@@ -444,6 +446,9 @@ class MainScreenTest {
         compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
         compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
         waitForKeyboard()
+        compose.onNodeWithTag("pairing-connect-address").performImeAction()
+        waitForKeyboard(false)
+        if (android.os.Build.VERSION.SDK_INT >= 29) compose.onNodeWithTag("pairing-connect").assertIsFocused()
         compose.onNodeWithTag("pairing-connect").performScrollTo().assertIsDisplayed()
         screenshot("phone-320-font200-pairing")
         assertTrue(actions.calls.isEmpty())
@@ -651,6 +656,7 @@ class MainScreenTest {
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
         waitForKeyboard()
         compose.onNodeWithTag("ntp-address").performImeAction()
+        waitForKeyboard(false)
         compose.onNodeWithTag("ntp-check").performScrollTo().assertIsDisplayed()
         screenshot("phone-320-font200-ntp")
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
@@ -664,7 +670,7 @@ class MainScreenTest {
         compose.onNodeWithTag("setup-about").performScrollTo().assertIsDisplayed()
         screenshot("tv-setup-font200-first")
         compose.onNodeWithTag("setup-next").performScrollTo().performClick()
-        compose.onNodeWithTag("setup-next").assertIsFocused()
+        compose.onNodeWithTag("setup-next").assertIsFocused().assertIsDisplayed()
         screenshot("tv-setup-font200-debugging")
         compose.onNodeWithTag("setup-next").performScrollTo().performClick()
         compose.onNodeWithTag("setup-connect").performScrollTo().assertIsDisplayed()
@@ -925,16 +931,16 @@ class MainScreenTest {
             .mapNotNull { it.root }
             .flatMap { it.findAccessibilityNodeInfosByText(russianString(label)) }
 
-    private fun waitForKeyboard() {
+    private fun waitForKeyboard(visible: Boolean = true) {
         compose.waitUntil(5_000) {
-            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) == visible
         }
         compose.waitForIdle()
     }
 
     private fun screenshot(name: String) {
         compose.waitForIdle()
-        val folder = File(context.getExternalFilesDir(null), "ui-screenshots").apply { mkdirs() }
+        val folder = File(context.filesDir, "ui-screenshots").apply { mkdirs() }
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         checkNotNull(bitmap)
         File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

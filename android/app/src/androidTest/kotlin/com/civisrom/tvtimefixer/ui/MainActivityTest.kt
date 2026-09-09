@@ -25,7 +25,7 @@ class MainActivityTest {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val file = File(instrumentation.targetContext.getExternalFilesDir(null), "ui-screenshots/native-$name.png")
+        val file = File(instrumentation.targetContext.filesDir, "ui-screenshots/native-$name.png")
         file.parentFile!!.mkdirs()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         checkNotNull(bitmap)
@@ -88,7 +88,8 @@ class MainActivityTest {
             compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
             compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
             compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
-            compose.onNodeWithTag("favorite-confirm").performClick()
+            compose.onNodeWithTag("favorite-name").performClick().performImeAction()
+            compose.onNodeWithTag("favorite-confirm").assertIsFocused().performClick()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }
             compose.activityRule.scenario.recreate()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }

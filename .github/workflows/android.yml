@@ -49,9 +49,9 @@ jobs:
         with:
           build-scan-publish: false
 
-      - name: Assemble debug APK
+      - name: Assemble debug and UI test APKs
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --max-workers=2 assembleDebug assembleDebugAndroidTest
 
       - name: Assemble unsigned release APK
         working-directory: android
@@ -77,6 +77,21 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record UI input checksums
+        working-directory: android/app/build/outputs/apk
+        run: sha256sum debug/app-debug.apk androidTest/debug/app-debug-androidTest.apk > ui-inputs.sha256
+
+      - name: Upload identical APKs for the emulator matrix
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ui-inputs
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            android/app/build/outputs/apk/ui-inputs.sha256
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload reports on failure
         if: failure()
@@ -200,14 +215,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - name: Download tested APKs from this run
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          build-scan-publish: false
+          name: android-ui-inputs
+          path: android/app/build/outputs/apk
 
-      - name: Build UI test APK
-        working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 assembleDebug assembleDebugAndroidTest
+      - name: Verify identical inputs
+        working-directory: android/app/build/outputs/apk
+        run: sha256sum -c ui-inputs.sha256
 
       - name: Start Android emulator
         env:
@@ -225,13 +241,15 @@ jobs:
             --path "$ANDROID_AVD_HOME/ui-test.avd"
           test -f "$ANDROID_AVD_HOME/ui-test.ini"
           emulator_features=()
+          emulator_memory=2048
           if [[ "$UI_TEST_IMAGE" == *'android-37.0;'* ]]; then
-            # API 37 mapper.ranchu aborts when the host advertises ReadColorBufferDMA.
-            # Disable its GLDirectMem prerequisite; keep the system UI and all APK tests enabled.
-            emulator_features=(-feature -GLDirectMem)
+            emulator_memory=4096
+            # API 37 mapper.ranchu cannot read the host DMA buffers. Disable both
+            # prerequisites of ANDROID_EMU_read_color_buffer_dma in gfxstream.
+            emulator_features=(-feature -GLDirectMem,-HasSharedSlotsHostMemoryAllocator -verbose)
           fi
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
-            -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 -partition-size 4096 \
+            -no-boot-anim -no-snapshot -gpu swiftshader -memory "$emulator_memory" -cores 2 -partition-size 4096 \
             "${emulator_features[@]}" \
             > "$RUNNER_TEMP/ui-emulator.log" 2>&1 &
           timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
@@ -277,7 +295,15 @@ jobs:
         if: always()
         run: |
           mkdir -p ui-screenshots
-          timeout 30 "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
+          # Scoped storage blocks shell access on some TV builds; debug run-as uses the app UID.
+          if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
+            while IFS= read -r name; do
+              name=${name//$'\r'/}
+              [[ "$name" =~ ^[a-zA-Z0-9._-]+\.png$ ]] || continue
+              timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
+                cat "files/ui-screenshots/$name" > "ui-screenshots/$name"
+            done <<< "$names"
+          fi
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
           timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true

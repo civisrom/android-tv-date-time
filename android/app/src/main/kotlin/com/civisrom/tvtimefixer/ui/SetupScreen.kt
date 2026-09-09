@@ -27,6 +27,15 @@ internal fun SetupScreen(state: AppState, actions: AppActions, onBack: () -> Uni
         .testTag("setup-screen"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.setup_step, step + 1, 3))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { if (step < 2) step++ else onBack() },
+                modifier = Modifier.focusRequester(nextFocus).testTag("setup-next")) {
+                Text(stringResource(if (step < 2) R.string.setup_next else R.string.setup_finish))
+            }
+            TextButton(onClick = { if (step > 0) step-- else onBack() }, modifier = Modifier.testTag("setup-back")) {
+                Text(stringResource(R.string.setup_back))
+            }
+        }
         when (step) {
             0 -> {
                 Text(stringResource(R.string.setup_intro))
@@ -61,15 +70,6 @@ internal fun SetupScreen(state: AppState, actions: AppActions, onBack: () -> Uni
                 Button(onClick = { actions.openSetupSettings(Settings.ACTION_DATE_SETTINGS) }) {
                     Text(stringResource(R.string.setup_date_settings))
                 }
-            }
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { if (step < 2) step++ else onBack() },
-                modifier = Modifier.focusRequester(nextFocus).testTag("setup-next")) {
-                Text(stringResource(if (step < 2) R.string.setup_next else R.string.setup_finish))
-            }
-            TextButton(onClick = { if (step > 0) step-- else onBack() }, modifier = Modifier.testTag("setup-back")) {
-                Text(stringResource(R.string.setup_back))
             }
         }
     }
