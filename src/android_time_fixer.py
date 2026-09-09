@@ -519,6 +519,7 @@ COUNTRY_NAMES = {
 CUSTOM_NTP_SERVERS = [
     'time.windows.com',
     'twc.trafficmanager.net',
+    '0.openwrt.pool.ntp.org',
     '0.europe.pool.ntp.org',
     '1.europe.pool.ntp.org',
     '2.europe.pool.ntp.org',
