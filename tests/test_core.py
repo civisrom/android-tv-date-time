@@ -730,8 +730,8 @@ class ReliabilityTests(unittest.TestCase):
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
         fixer.logger = logging.getLogger('test')
 
-        def run_adb(args, timeout=15):
-            calls.append(args)
+        def run_adb(args, timeout=15, input_text=None):
+            calls.append((args, input_text))
             return returncode, output
 
         fixer._run_adb = run_adb
@@ -743,7 +743,7 @@ class ReliabilityTests(unittest.TestCase):
         )
         with contextlib.redirect_stdout(io.StringIO()):
             fixer.pair_device('192.168.1.20:41234', '123456')
-        self.assertEqual(calls, [['pair', '192.168.1.20:41234', '123456']])
+        self.assertEqual(calls, [(['pair', '192.168.1.20:41234'], '123456\n')])
 
     def test_pairing_fails_when_output_does_not_confirm(self) -> None:
         # adb умеет завершаться с нулевым кодом, ничего при этом не спарив

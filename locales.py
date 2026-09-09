@@ -21,6 +21,10 @@ class Locales:
 
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
+            "terminal_output_truncated": Translation(
+                en="Only the final part of the command output is retained.",
+                ru="Сохранена заключительная часть вывода команды.",
+            ),
             "menu_item_usb": Translation(en="12. Connect over USB", ru="12. Подключиться по USB"),
             "usb_select_hint": Translation(
                 en="Enter u to select a USB device (no IP needed). USB is also available in main menu item 12.",

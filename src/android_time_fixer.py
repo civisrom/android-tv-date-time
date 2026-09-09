@@ -12,6 +12,7 @@ import statistics
 import datetime
 import ipaddress
 import logging
+from logging.handlers import RotatingFileHandler
 import platform
 import json
 import psutil
@@ -21,6 +22,7 @@ import threading
 import tempfile
 import subprocess
 import ast
+from collections import deque
 from dataclasses import dataclass
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -48,6 +50,16 @@ logger.setLevel(logging.INFO)
 logger.propagate = False
 APP_VERSION = '2.6.3'
 PROJECT_REPOSITORY_URL = 'https://github.com/civisrom/android-tv-date-time'
+
+
+class _PrivateRotatingFileHandler(RotatingFileHandler):
+    """Новый файл после ротации тоже создаётся без доступа других пользователей."""
+
+    def _open(self):
+        return open(
+            self.baseFilename, self.mode, encoding=self.encoding, errors=self.errors,
+            opener=lambda path, flags: os.open(path, flags, 0o600),
+        )
 
 #: Порт adbd для «отладки по сети» (adb tcpip). Беспроводная отладка
 #: Android 11+ открывает случайный порт, поэтому порт везде параметризован.
@@ -692,6 +704,7 @@ class AndroidTVTimeFixerError(Exception):
 class AndroidTVTimeFixer:
     MAX_SCAN_HOSTS = 65_534
     TERMINAL_COMMAND_TIMEOUT = 300
+    TERMINAL_OUTPUT_LIMIT = 64 * 1024
 
     @staticmethod
     def _program_dir() -> Path:
@@ -867,6 +880,8 @@ class AndroidTVTimeFixer:
 
         # Очищаем существующие обработчики чтобы избежать дублирования
         if self.logger.handlers:
+            for handler in self.logger.handlers:
+                handler.close()
             self.logger.handlers.clear()
 
         # Формат сообщений
@@ -881,7 +896,9 @@ class AndroidTVTimeFixer:
         # Обработчик для записи в файл
         try:
             log_file = self.data_dir / 'android_tv_fixer.log'
-            file_handler = logging.FileHandler(log_file, encoding='utf-8', mode='a')
+            file_handler = _PrivateRotatingFileHandler(
+                log_file, maxBytes=2 * 1024 * 1024, backupCount=2, encoding='utf-8'
+            )
             self._secure_file(log_file)
             file_handler.setLevel(logging.INFO)
             file_handler.setFormatter(formatter)
@@ -954,17 +971,33 @@ class AndroidTVTimeFixer:
         Returns:
             Tuple[int, str, str]: (код возврата, stdout, stderr)
         """
-        stdout_lines = []
-        stderr_lines = []
+        stdout_lines = deque()
+        stderr_lines = deque()
 
-        def _drain_stream(stream: Any, output: List[str], display: bool = False) -> None:
+        def _drain_stream(stream: Any, output: deque, display: bool = False) -> None:
+            retained = 0
+            truncated = False
             try:
-                for line in stream:
+                # readline(size) ограничивает и длинную строку без перевода строки,
+                # сохраняя немедленный показ обычных строк команд.
+                for line in iter(lambda: stream.readline(4096), ''):
                     output.append(line)
+                    retained += len(line)
+                    while retained > self.TERMINAL_OUTPUT_LIMIT:
+                        excess = retained - self.TERMINAL_OUTPUT_LIMIT
+                        first = output.popleft()
+                        removed = min(excess, len(first))
+                        if removed < len(first):
+                            output.appendleft(first[removed:])
+                        retained -= removed
+                        truncated = True
                     if display:
-                        print(Fore.GREEN + line.rstrip('\r\n'))
+                        print(Fore.GREEN + line, end='', flush=True)
             except Exception:
                 pass
+            finally:
+                if truncated:
+                    output.appendleft(locales.get('terminal_output_truncated') + '\n')
 
         if process.stdout is None or process.stderr is None:
             raise RuntimeError("Command output pipes are not configured")
@@ -1260,6 +1293,9 @@ class AndroidTVTimeFixer:
                     # Выполняем команду без завершения процессов ADB
                     self.execute_terminal_command(command)
                     
+                except EOFError:
+                    self.logger.info("Terminal input closed")
+                    break
                 except KeyboardInterrupt:
                     # Обработка Ctrl+C без завершения ADB процессов
                     self.logger.info(locales.get_en("terminal_mode_exit_ctrl_c"))
@@ -2372,7 +2408,8 @@ class AndroidTVTimeFixer:
     # mDNS discovery
     # ──────────────────────────────────────────────────────────
 
-    def _run_adb(self, args: List[str], timeout: int = 15) -> Tuple[int, str]:
+    def _run_adb(self, args: List[str], timeout: int = 15,
+                 input_text: Optional[str] = None) -> Tuple[int, str]:
         """Запускает встроенный adb и возвращает (код возврата, вывод)."""
         result = subprocess.run(
             [self.get_adb_path()] + args,
@@ -2382,6 +2419,7 @@ class AndroidTVTimeFixer:
             encoding=_subprocess_encoding(),
             timeout=timeout,
             check=False,
+            input=input_text,
             env=self.adb_env
         )
         return result.returncode, (result.stdout or '')
@@ -2555,7 +2593,7 @@ class AndroidTVTimeFixer:
     @staticmethod
     def validate_pairing_code(code: str) -> bool:
         """Код спаривания — ровно шесть цифр."""
-        return bool(re.fullmatch(r'\d{6}', code.strip()))
+        return bool(re.fullmatch(r'[0-9]{6}', code.strip()))
 
     def pair_device(self, address: str, code: str) -> None:
         """Спаривает компьютер с устройством по коду с экрана TV.
@@ -2572,11 +2610,13 @@ class AndroidTVTimeFixer:
         serial = f"{host}:{port}"
         print(Fore.CYAN + locales.get("pairing_in_progress", ip=serial))
         try:
-            returncode, output = self._run_adb(['pair', serial, code.strip()], timeout=60)
+            returncode, output = self._run_adb(['pair', serial], timeout=60,
+                                               input_text=code.strip() + '\n')
         except Exception as e:
-            raise AndroidTVTimeFixerError(locales.get("pairing_failed", ip=serial, error=str(e)))
+            error = str(e).replace(code.strip(), '[redacted]')
+            raise AndroidTVTimeFixerError(locales.get("pairing_failed", ip=serial, error=error)) from None
 
-        output = output.strip()
+        output = output.strip().replace(code.strip(), '[redacted]')
         if returncode != 0 or 'successfully paired' not in output.lower():
             raise AndroidTVTimeFixerError(
                 locales.get("pairing_failed", ip=serial, error=output or str(returncode))
