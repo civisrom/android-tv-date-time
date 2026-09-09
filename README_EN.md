@@ -68,7 +68,7 @@ replace troubleshooting other network faults.
 
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
-    52 alternative servers**, including regional pools, Cloudflare, Google
+    53 alternative servers**, including regional pools, Cloudflare, Google
     and other public NTP servers. Development checks keep the two reference lists consistent.
 *   **Time-server checks:** real NTP requests, round-trip time (RTT), successful
     reply percentage and offset from the controlling device's clock.
@@ -505,7 +505,7 @@ Connects to the device and displays detailed information: model, manufacturer, A
 
 ### Item 6 — Ping NTP servers
 
-Checks the 129 reference addresses using real NTP requests rather than ICMP ping.
+Checks the 130 reference addresses using real NTP requests rather than ICMP ping.
 Shows round-trip time (RTT) and successful reply percentage, sorting by
 availability, reply percentage and speed. Many unreachable addresses can make
 the check take longer because each request must time out.
@@ -785,8 +785,8 @@ green, a rejected one red.
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
     `KZ · Kazakhstan · kz.pool.ntp.org`, `BY · Belarus · by.pool.ntp.org`.
-*   **The alternative-server list.** **Show alternative time servers (52)** —
-    the same set as the desktop version: regional pools, Cloudflare, Google
+*   **The alternative-server list.** **Show alternative time servers (53)** —
+    the same set as the desktop version: `0.openwrt.pool.ntp.org`, regional pools, Cloudflare, Google
     and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
     (`time.google.com`) or IPv4 (`216.239.35.0`), without a port, spaces, path
@@ -836,12 +836,12 @@ The NTP reply is received by the device running the APK: matching clocks do
 not prove that the TV synchronized with this particular server.
 
 The **Find the best one** button collapses the open country and alternative
-lists and checks the 129-address reference with five NTP requests per server,
+lists and checks the 130-address reference with five NTP requests per server,
 separated by one-second pauses. Results require at least four valid replies.
 Up to five candidates are ranked by reply rate, then median delay plus delay
 variation (RMS). This estimates availability and connection stability, not
 absolute clock accuracy. Checking may take several minutes. Progress
-shows **Checked N of 129, M usable**; **Stop** keeps results already found.
+shows **Checked N of 130, M usable**; **Stop** keeps results already found.
 
 Each result shows a name and the IP address obtained during the check.
 Tapping either fills the input field and clears the results list.
