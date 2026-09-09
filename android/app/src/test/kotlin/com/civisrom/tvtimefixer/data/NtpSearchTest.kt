@@ -12,6 +12,14 @@ import org.junit.Test
  */
 class NtpSearchTest {
 
+    @Test fun `exact country server address is first and addresses are not stemmed`() {
+        assertEquals("ru.pool.ntp.org", searchNtpServers("RU.POOL.NTP.ORG").first().server)
+        assertTrue(searchNtpServers("ru.pool.ntp.org.invalid").isEmpty())
+        val matches = searchNtpServers("pool.ntp.org")
+        assertEquals(matches.size, matches.map { it.server }.distinct().size)
+        assertTrue(matches.size <= 12)
+    }
+
     private fun servers(query: String) = searchNtpServers(query).map { it.server }
 
     @Test

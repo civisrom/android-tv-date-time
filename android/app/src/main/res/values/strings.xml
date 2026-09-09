@@ -171,7 +171,7 @@
 
     <!-- Компактный интерфейс и локальная диагностика -->
     <string name="diagnostics_title">Diagnostics</string>
-    <string name="diagnostics_hint">Up to 200 events from the last 7 days, stored only on this device.</string>
+    <string name="diagnostics_hint">Up to 200 recent events, stored only on this device. Correcting the clock does not erase the history.</string>
     <string name="diagnostics_all">All</string>
     <string name="diagnostics_errors">Errors</string>
     <string name="diagnostics_copy">Copy report</string>

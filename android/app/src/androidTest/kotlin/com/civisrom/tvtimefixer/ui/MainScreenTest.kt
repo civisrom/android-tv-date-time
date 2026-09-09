@@ -158,7 +158,7 @@ class MainScreenTest {
     @Test fun checking_a_previous_connection_hides_connected_status_and_disables_time_changes() {
         val address = DeviceAddress("192.168.1.2", 5555)
         screen(connected.copy(connection = ConnectionState.Checking(address), busy = true,
-            currentNtpServer = "pool.ntp.org", timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH)))
+            deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org"), timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH)))
         compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.connect_state_checking, address.toString()))
             .assertIsDisplayed()
         compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.connect_state_connected, address.toString()))
@@ -169,7 +169,7 @@ class MainScreenTest {
     }
 
     @Test fun verifying_time_is_a_separate_read_action() {
-        screen(connected.copy(currentNtpServer = "pool.ntp.org"))
+        screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org")))
         compose.onNodeWithTag("time-check").performScrollTo().performClick()
         assertEquals(listOf("verify-time"), actions.calls)
     }
@@ -188,7 +188,7 @@ class MainScreenTest {
     }
 
     @Test fun a_failed_time_check_does_not_hide_the_saved_server() {
-        screen(connected.copy(currentNtpServer = "pool.ntp.org",
+        screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org"),
             ntpMessage = UiMessage(com.civisrom.tvtimefixer.R.string.ntp_applied, listOf("pool.ntp.org")),
             timeCheck = DeviceTimeCheck(DeviceTimeStatus.NTP_UNAVAILABLE, server = "pool.ntp.org")))
         compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_applied, "pool.ntp.org"))

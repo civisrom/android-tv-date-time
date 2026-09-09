@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
                         DiagnosticTransport.USB, reason = ConnectionError.USB_DISCONNECTED)
                     state = state.copy(connection = ConnectionState.Disconnected, busy = true,
                         operation = Operation.DISCONNECT, diagnosticEventId = event,
-                        deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
+                        deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
                         timeCheck = null, timeDiagnosticEventId = null,
                         timeZoneResult = null, timeZoneDiagnosticEventId = null,
                         message = UiMessage(R.string.error_usb_disconnected))
@@ -157,6 +157,8 @@ class MainActivity : ComponentActivity() {
 
         private fun run(operation: Operation, block: suspend (OperationTrace) -> AppState) {
             if (state.busy) return
+            if (operation in setOf(Operation.CONNECT_NETWORK, Operation.PAIR, Operation.CHECK_NTP,
+                    Operation.APPLY_NTP, Operation.CHECK_TIME) && !networkAllowed()) return
             val generation = ++actionGeneration
             val started = System.nanoTime()
             val transport = when (operation) {
@@ -216,7 +218,7 @@ class MainActivity : ComponentActivity() {
                         timeZoneDiagnosticEventId = if (zoneAction && failed) event else result.timeZoneDiagnosticEventId,
                         ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
                         timeDiagnosticEventId = if (timeAction && failed) event else result.timeDiagnosticEventId,
-                    ).withLatestUsb(state)
+                    ).withLatestBackground(state)
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
                     throw e
@@ -266,7 +268,7 @@ class MainActivity : ComponentActivity() {
         override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) { trace ->
             withContext(Dispatchers.IO) { connector.disconnect() }
             state = state.copy(connection = ConnectionState.Connecting(address),
-                deviceInfo = null, currentNtpServer = "", ntpMessage = null,
+                deviceInfo = null, ntpMessage = null,
                 ntpCheck = null,
                 message = UiMessage(R.string.usb_authorize_hint))
             state = state.copy(operation = Operation.USB_PERMISSION)
@@ -345,13 +347,14 @@ class MainActivity : ComponentActivity() {
                     ntpCheck = check,
                     ntpMessage = if (result is NtpUpdateResult.Failed) UiMessage(R.string.operation_failed_hint) else result.toUiMessage(),
                     ntpDiagnosticEventId = failureId,
-                    currentNtpServer = if (result is NtpUpdateResult.Applied) result.server else repository.currentNtpServer(),
+                    deviceInfo = state.deviceInfo?.copy(currentNtpServer =
+                        if (result is NtpUpdateResult.Applied) result.server else repository.currentNtpServer()),
                 )
             }
             if (applied.ntpMessage?.res != R.string.ntp_applied) return@run applied
 
             // Сохранение настройки уже подтверждено. Ошибка сравнения часов не отменяет этот факт.
-            state = applied.copy(operation = Operation.CHECK_TIME)
+            state = applied.copy(operation = Operation.CHECK_TIME).withLatestBackground(state)
             val transport = diagnosticTransport(state.connection.targetOrNull())
             val started = SystemClock.elapsedRealtime()
             journal.record(Operation.CHECK_TIME, Outcome.STARTED, transport)
@@ -404,6 +407,7 @@ class MainActivity : ComponentActivity() {
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
+            if (!networkAllowed()) return
             state = state.copy(ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
                 ntpScan = ScanProgress(0, NtpData.allServers.size, emptyList()))
             journal.record(Operation.SCAN_NTP, Outcome.STARTED)
@@ -588,6 +592,14 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
 
+    private fun networkAllowed(): Boolean {
+        if (missingDiscoveryPermissions().isEmpty()) return true
+        state = state.copy(discoveryPermissionNeeded = true,
+            message = UiMessage(R.string.discovery_permission_needed))
+        requestDiscoveryPermissions()
+        return false
+    }
+
     private fun requestDiscoveryPermissions() {
         val missing = missingDiscoveryPermissions()
         if (missing.isEmpty()) {
@@ -654,7 +666,8 @@ class MainActivity : ComponentActivity() {
      * ненажатой — отличить одно от другого было нечем.
      */
     private suspend fun AppState.withDeviceData(trace: OperationTrace): AppState {
-        val clean = copy(deviceInfo = null, currentNtpServer = "", timeZoneResult = null, timeZoneDiagnosticEventId = null)
+        val clean = copy(deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
+            timeZoneResult = null, timeZoneDiagnosticEventId = null, timeCheck = null, timeDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
         return withContext(Dispatchers.IO) {
             val client = connector.activeClient ?: return@withContext clean.copy(
@@ -662,7 +675,7 @@ class MainActivity : ComponentActivity() {
                 message = UiMessage(R.string.error_unreachable),
             )
             runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
-                onSuccess = { clean.copy(deviceInfo = it, currentNtpServer = it.currentNtpServer) },
+                onSuccess = { clean.copy(deviceInfo = it) },
                 onFailure = {
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,
                         diagnosticTransport(connection.targetOrNull()), error = it, trace = trace)

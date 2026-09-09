@@ -401,7 +401,7 @@ private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: Ap
         label = { Text(stringResource(R.string.connect_address_hint)) }, singleLine = true,
         modifier = Modifier.fillMaxWidth().testTag("network-address"))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { actions.connect(address) }, enabled = !state.busy) {
+        Button(onClick = { actions.connect(address) }, enabled = !state.busy, modifier = Modifier.testTag("network-connect")) {
             Text(stringResource(R.string.connect_action))
         }
         if (mode == DeviceMode.TELEVISION) TextButton(onClick = actions::connectLoopback, enabled = !state.busy) {
@@ -765,6 +765,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
 private fun TimeZoneSection(state: AppState, actions: AppActions,
     onDiagnostics: (Long?, String) -> Unit, returnFocus: String?, onFocusRestored: () -> Unit,
 ) {
+    val unsupported = state.deviceInfo?.apiLevel?.toIntOrNull()?.let { it < 28 } == true
     var query by rememberSaveable { mutableStateOf("") }
     var chosen by rememberSaveable { mutableStateOf("") }
     var showChoices by rememberSaveable { mutableStateOf(false) }
@@ -793,6 +794,7 @@ private fun TimeZoneSection(state: AppState, actions: AppActions,
         }
     }
     CopyableText(stringResource(R.string.time_zone_note), style = MaterialTheme.typography.bodySmall)
+    if (unsupported) Text(stringResource(R.string.time_zone_unsupported))
     if (state.connected) {
         val current = (state.timeZoneResult as? TimeZoneUpdateResult.Applied)?.zoneId
             ?: state.deviceInfo?.timezone.orEmpty()
@@ -813,7 +815,7 @@ private fun TimeZoneSection(state: AppState, actions: AppActions,
             applyFocus.requestFocus()
             keyboard?.hide()
             actions.applyTimeZone(chosen)
-        }, enabled = !state.busy && isValidTimeZoneId(chosen),
+        }, enabled = !state.busy && !unsupported && isValidTimeZoneId(chosen),
             modifier = Modifier.focusRequester(applyFocus).focusProperties { canFocus = true }
                 .bringIntoViewRequester(applyView).testTag("time-zone-apply")) {
             Text(stringResource(R.string.time_zone_apply))

@@ -26,6 +26,20 @@ import org.junit.Test
  */
 class AppStateTest {
 
+    @Test fun `late device read preserves discovery and a finished NTP scan`() {
+        val before = AppState(discoverySearching = true)
+        val latest = before.copy(discovered = listOf(com.civisrom.tvtimefixer.adb.DiscoveredDevice(
+            "TV", com.civisrom.tvtimefixer.data.DeviceAddress("192.0.2.1", 5555), com.civisrom.tvtimefixer.adb.DiscoveredDevice.Kind.LEGACY)),
+            discoverySearching = false, discoveryPermissionNeeded = true,
+            ntpScan = com.civisrom.tvtimefixer.data.ScanProgress(5, 5, emptyList()))
+        val completed = before.copy(deviceInfo = DeviceInfo(model = "Read TV")).withLatestBackground(latest)
+        assertEquals(latest.discovered, completed.discovered)
+        assertFalse(completed.discoverySearching)
+        assertTrue(completed.discoveryPermissionNeeded)
+        assertEquals(latest.ntpScan, completed.ntpScan)
+        assertEquals("Read TV", completed.deviceInfo?.model)
+    }
+
     private val address = DeviceAddress("192.168.0.112", 5555)
 
     @Test fun `связь на проверке не показывает подключение по сети или USB`() {
@@ -40,7 +54,7 @@ class AppStateTest {
     @Test fun `потеря связи убирает прежние сведения об устройстве и подтверждения времени`() {
         val usb = UsbDeviceAddress("/dev/bus/usb/test", "TV")
         val connected = AppState(connection = ConnectionState.Connected(address),
-            deviceInfo = DeviceInfo(model = "TV"), currentNtpServer = "pool.ntp.org",
+            deviceInfo = DeviceInfo(model = "TV", currentNtpServer = "pool.ntp.org"),
             ntpMessage = UiMessage(R.string.ntp_applied), ntpDiagnosticEventId = 1L,
             timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH), timeDiagnosticEventId = 2L,
             timeZoneResult = TimeZoneUpdateResult.Applied("Europe/Moscow"), timeZoneDiagnosticEventId = 3L,
@@ -63,8 +77,8 @@ class AppStateTest {
         val device = UsbDeviceAddress("/dev/bus/usb/test", "TV")
         val attached = beforeRead.copy(usbDevices = listOf(device), usbAttachedCount = 1,
             usbSystemState = UsbSystemState(hostConnected = true))
-        val lateResult = beforeRead.copy(currentNtpServer = "time.example.org")
-        val completed = lateResult.withLatestUsb(attached)
+        val lateResult = beforeRead.copy(deviceInfo = DeviceInfo(currentNtpServer = "time.example.org"))
+        val completed = lateResult.withLatestBackground(attached)
         assertEquals(listOf(device), completed.usbDevices)
         assertEquals(1, completed.usbAttachedCount)
         assertEquals(true, completed.usbSystemState.hostConnected)
@@ -73,7 +87,7 @@ class AppStateTest {
 
         val detached = attached.copy(usbDevices = emptyList(), usbAttachedCount = 0,
             usbSystemState = UsbSystemState(hostConnected = false))
-        val afterDetach = completed.copy(currentNtpServer = "pool.ntp.org").withLatestUsb(detached)
+        val afterDetach = completed.copy(deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org")).withLatestBackground(detached)
         assertTrue(afterDetach.usbDevices.isEmpty())
         assertEquals(0, afterDetach.usbAttachedCount)
         assertEquals(false, afterDetach.usbSystemState.hostConnected)

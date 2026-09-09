@@ -13,7 +13,8 @@ class TimeFixerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        diagnostics = DiagnosticJournal(File(noBackupFilesDir, "diagnostics"), File(filesDir, "last-crash.txt"))
+        diagnostics = DiagnosticJournal(File(noBackupFilesDir, "diagnostics"), File(filesDir, "last-crash.txt"),
+            monotonicClock = android.os.SystemClock::elapsedRealtime)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             diagnostics.recordCrash(error)

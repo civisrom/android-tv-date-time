@@ -16,12 +16,13 @@ on:
       - 'shared/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -78,14 +79,105 @@ jobs:
           retention-days: 7
 
   ui:
-    name: Интерфейс Android (API ${{ matrix.api }})
+    name: APK — ${{ matrix.name }}
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
-        api: [23, 30, 36]
+        include:
+          - name: phone-23
+            image: system-images;android-23;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-24
+            image: system-images;android-24;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-26
+            image: system-images;android-26;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-28
+            image: system-images;android-28;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-29
+            image: system-images;android-29;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-30
+            image: system-images;android-30;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-31
+            image: system-images;android-31;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-33
+            image: system-images;android-33;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-34
+            image: system-images;android-34;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-35
+            image: system-images;android-35;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-36
+            image: system-images;android-36;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-37.0
+            image: system-images;android-37.0;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: android-tv-30
+            image: system-images;android-30;android-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: android-tv-34
+            image: system-images;android-34;android-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: android-tv-36
+            image: system-images;android-36;android-tv;x86_64
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-30
+            image: system-images;android-30;google-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-34
+            image: system-images;android-34;google-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-36-16k
+            image: system-images;android-36;google-tv-ps16k;x86_64
+            device: tv_1080p
+            tv: true
+            page_size: 16384
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -107,15 +199,16 @@ jobs:
 
       - name: Start Android emulator
         env:
-          UI_TEST_API: ${{ matrix.api }}
+          UI_TEST_IMAGE: ${{ matrix.image }}
+          UI_TEST_DEVICE: ${{ matrix.device }}
         run: |
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           export ANDROID_AVD_HOME="$RUNNER_TEMP/ui-avd"
           mkdir -p "$ANDROID_AVD_HOME"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-${UI_TEST_API};google_apis;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "$UI_TEST_IMAGE"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
-            --package "system-images;android-${UI_TEST_API};google_apis;x86_64" --device pixel_2 \
+            --package "$UI_TEST_IMAGE" --device "$UI_TEST_DEVICE" \
             --path "$ANDROID_AVD_HOME/ui-test.avd"
           test -f "$ANDROID_AVD_HOME/ui-test.ini"
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
@@ -135,24 +228,19 @@ jobs:
           exit 1
 
       - name: Run Compose UI regression tests
-        timeout-minutes: 10
+        timeout-minutes: 20
         working-directory: android
         env:
-          UI_TEST_API: ${{ matrix.api }}
+          UI_TEST_TV: ${{ matrix.tv }}
+          UI_TEST_PAGE_SIZE: ${{ matrix.page_size }}
         # Явные установка и запуск позволяют отличить сбой ADB от сбоя тестов.
         # APK остаются установленными до сбора скриншотов.
         run: |
           set -o pipefail
           timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
           timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-          test_args=()
-          # Android 11 проверяет системные команды ветки, используемой SHIELD.
-          # Полный интерфейс проверяется на минимальной и современной API.
-          if [[ "$UI_TEST_API" == 30 ]]; then
-            test_args=(-e class com.civisrom.tvtimefixer.device.TimeZoneShellTest,com.civisrom.tvtimefixer.device.DeviceCapabilitiesShellTest,com.civisrom.tvtimefixer.data.ValidatorsAndroidTest)
-          fi
-          timeout 300 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
-            "${test_args[@]}" \
+          timeout 900 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+            -e expected_tv "$UI_TEST_TV" -e expected_page_size "$UI_TEST_PAGE_SIZE" \
             com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/ui-instrumentation.log"
           # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
@@ -171,7 +259,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: android-ui-api-${{ matrix.api }}
+          name: android-ui-${{ matrix.name }}
           path: |
             ui-screenshots/
             ${{ runner.temp }}/ui-instrumentation.log

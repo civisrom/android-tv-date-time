@@ -171,7 +171,7 @@
 
     <!-- Компактный интерфейс и локальная диагностика -->
     <string name="diagnostics_title">Диагностика</string>
-    <string name="diagnostics_hint">Последние 200 событий, не более 7 дней. Журнал хранится только на этом устройстве.</string>
+    <string name="diagnostics_hint">До 200 последних событий только на этом устройстве. Исправление часов не стирает историю.</string>
     <string name="diagnostics_all">Все</string>
     <string name="diagnostics_errors">Ошибки</string>
     <string name="diagnostics_copy">Скопировать отчёт</string>
