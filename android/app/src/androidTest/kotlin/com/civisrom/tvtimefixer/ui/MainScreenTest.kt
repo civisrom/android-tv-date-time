@@ -927,14 +927,14 @@ class MainScreenTest {
     }
 
     private fun textSelectionActions(label: Int): List<AccessibilityNodeInfo> {
-        // Меню использует русскую локаль Compose и может находиться в отдельном окне.
+        // Меню может использовать локаль Compose или системы и отдельное окно.
         val roots = InstrumentationRegistry.getInstrumentation().uiAutomation.windows
             // Ищем меню приложения, а не предложения IME. Поиск текста внутри
             // клавиатуры AOSP API 23 роняет её AccessibilityNodeProviderCompat.
             .filter { it.type != AccessibilityWindowInfo.TYPE_INPUT_METHOD }
             .mapNotNull { it.root }
-        val title = russianString(label)
-        val direct = roots.flatMap { it.findAccessibilityNodeInfosByText(title) }
+        val titles = setOf(russianString(label), context.getString(label))
+        val direct = roots.flatMap { root -> titles.flatMap(root::findAccessibilityNodeInfosByText) }
         if (direct.isNotEmpty()) return direct
         // findAccessibilityNodeInfosByText cannot cross an embedded SurfaceView hierarchy.
         // Android 17 renders the selection toolbar there; getChild can traverse it.
@@ -942,7 +942,7 @@ class MainScreenTest {
         val matches = mutableListOf<AccessibilityNodeInfo>()
         while (pending.isNotEmpty()) {
             val node = pending.removeFirst()
-            if (node.text?.toString()?.equals(title, ignoreCase = true) == true) matches += node
+            if (titles.any { node.text?.toString()?.equals(it, ignoreCase = true) == true }) matches += node
             for (index in 0 until node.childCount) node.getChild(index)?.let(pending::addLast)
         }
         return matches

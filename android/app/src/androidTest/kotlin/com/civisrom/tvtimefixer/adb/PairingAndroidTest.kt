@@ -14,6 +14,7 @@ import java.net.ServerSocket
 import java.security.KeyStore
 import java.security.cert.X509Certificate
 import java.util.concurrent.Executors
+import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
@@ -40,6 +41,17 @@ class PairingAndroidTest {
             }
             return
         }
+        val exporterStart = CyclicBarrier(2)
+        fun concurrentExporter(socket: SSLSocket): ByteArray {
+            exporterStart.await(8, TimeUnit.SECONDS)
+            val material = exportAndroidPairingKey(socket)
+            repeat(7) {
+                exporterStart.await(8, TimeUnit.SECONDS)
+                val again = exportAndroidPairingKey(socket)
+                try { assertArrayEquals(material, again) } finally { again.fill(0) }
+            }
+            return material
+        }
         val executor = Executors.newSingleThreadExecutor()
         ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
             listener.soTimeout = 8_000
@@ -52,7 +64,7 @@ class PairingAndroidTest {
                         tls.enabledProtocols = arrayOf("TLSv1.3")
                         tls.soTimeout = 8_000
                         tls.startHandshake()
-                        val material = exportAndroidPairingKey(tls)
+                        val material = concurrentExporter(tls)
                         assertEquals(64, material.size)
                         Spake2Context(Spake2Role.Bob, bytes("adb pair server\u0000"), bytes("adb pair client\u0000")).use { spake ->
                             val message = spake.generateMessage(bytes("123456") + material)
@@ -77,7 +89,7 @@ class PairingAndroidTest {
                 }
             }
             try {
-                runBlocking { PairingClient(5_000, 8_000, 15_000, ::exportAndroidPairingKey)
+                runBlocking { PairingClient(5_000, 8_000, 15_000, ::concurrentExporter)
                     .pair(DeviceAddress("127.0.0.1", listener.localPort), "123456") }
                 server.get(10, TimeUnit.SECONDS)
             } catch (error: Throwable) {

@@ -230,6 +230,7 @@ jobs:
           UI_TEST_IMAGE: ${{ matrix.image }}
           UI_TEST_DEVICE: ${{ matrix.device }}
         run: |
+          set -o pipefail
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           export ANDROID_AVD_HOME="$RUNNER_TEMP/ui-avd"
@@ -261,6 +262,7 @@ jobs:
           expected_api=${UI_TEST_IMAGE#*android-}
           expected_api=${expected_api%%;*}
           expected_api=${expected_api%%.*}
+          ready_samples=0
           for attempt in $(seq 1 120); do
             if [[ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
               if [[ "$expected_api" == 23 ]]; then
@@ -268,13 +270,22 @@ jobs:
                 # Installing there races vold stopping main services and remounting /data.
                 decrypt_state=$("$ANDROID_HOME/platform-tools/adb" shell getprop vold.decrypt | tr -d '\r')
                 if [[ -n "$decrypt_state" && "$decrypt_state" != trigger_restart_framework ]]; then
+                  ready_samples=0
                   sleep 2
                   continue
                 fi
-                if ! timeout 10 "$ANDROID_HOME/platform-tools/adb" shell pm path android | grep -q '^package:'; then
-                  sleep 2
-                  continue
-                fi
+              fi
+              # TV images can lose ADB transport just after boot_completed. Require a
+              # stable read-only connection before the first (single) APK install.
+              if ! timeout 10 "$ANDROID_HOME/platform-tools/adb" shell pm path android | grep -q '^package:'; then
+                ready_samples=0
+                sleep 2
+                continue
+              fi
+              ready_samples=$((ready_samples + 1))
+              if (( ready_samples < 4 )); then
+                sleep 2
+                continue
               fi
               test "$("$ANDROID_HOME/platform-tools/adb" shell getprop ro.build.version.sdk | tr -d '\r')" = "$expected_api"
               "$ANDROID_HOME/platform-tools/adb" shell input keyevent 82
@@ -289,6 +300,8 @@ jobs:
               timeout 1500 "$ANDROID_HOME/platform-tools/adb" logcat -v threadtime > "$RUNNER_TEMP/ui-live-logcat.txt" 2>&1 &
               echo $! > "$RUNNER_TEMP/ui-logcat.pid"
               exit 0
+            else
+              ready_samples=0
             fi
             sleep 2
           done

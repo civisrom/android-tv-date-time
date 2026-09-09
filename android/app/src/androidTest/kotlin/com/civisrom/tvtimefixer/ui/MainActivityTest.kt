@@ -7,6 +7,8 @@ import android.view.KeyEvent
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.MainActivity
@@ -87,9 +89,18 @@ class MainActivityTest {
         val app = compose.activity.application as com.civisrom.tvtimefixer.TimeFixerApplication
         try {
             compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+            compose.onNodeWithTag("ntp-address").performImeAction()
+            compose.waitUntil(5_000) {
+                ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) != true
+            }
+            InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
             compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
             compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
-            compose.onNodeWithTag("favorite-name").performClick().performImeAction()
+            try {
+                compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-name").fetchSemanticsNodes().isNotEmpty() }
+                compose.onNodeWithTag("favorite-name").performClick().performImeAction()
+            } finally { screenshot("favorite-dialog") }
             compose.onNodeWithTag("favorite-confirm").assertIsFocused().performClick()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }
             compose.activityRule.scenario.recreate()
