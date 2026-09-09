@@ -4195,6 +4195,13 @@ def _pause_before_exit(prompt):
 
 
 def main():
+    if sys.platform == 'win32':
+        # Windows uses an ANSI encoding for redirected streams even with a UTF-8 console.
+        # Configure the underlying streams (also forwarded by Colorama) before logging.
+        for stream in (sys.stdin, sys.stdout, sys.stderr):
+            reconfigure = getattr(stream, 'reconfigure', None)
+            if reconfigure is not None:
+                reconfigure(encoding='utf-8')
     try:
         fixer = AndroidTVTimeFixer()
     except Exception as e:
