@@ -25,6 +25,24 @@ class Locales:
                 en="Only the final part of the command output is retained.",
                 ru="Сохранена заключительная часть вывода команды.",
             ),
+            "favorite_remove_failed": Translation(
+                en="Could not save the removal. The favorite list has been restored.",
+                ru="Не удалось сохранить удаление. Список избранного восстановлен.",
+            ),
+            "import_too_large": Translation(en="The backup exceeds 1 MiB of text.", ru="Размер текста резервной копии превышает 1 МиБ."),
+            "import_version_unsupported": Translation(en="Unsupported backup format version.", ru="Эта версия формата резервной копии не поддерживается."),
+            "import_rollback_failed": Translation(
+                en="Import failed and the previous server list could not be restored on disk. The original list remains in memory; check file access before saving again.",
+                ru="Импорт не завершён; прежний список серверов не удалось восстановить на диске. Он сохранён в памяти. Проверьте доступ к файлу перед повторным сохранением.",
+            ),
+            "import_adb_restart": Translation(
+                en="The imported ADB server port will take effect after restarting the application.",
+                ru="Импортированный порт ADB-сервера будет использован после перезапуска программы.",
+            ),
+            "time_comparison_uncertain": Translation(
+                en="The reading delay does not allow a reliable comparison with the PC clock.",
+                ru="Задержка чтения не позволяет достоверно оценить расхождение с часами ПК.",
+            ),
             "menu_item_usb": Translation(en="12. Connect over USB", ru="12. Подключиться по USB"),
             "usb_select_hint": Translation(
                 en="Enter u to select a USB device (no IP needed). USB is also available in main menu item 12.",
@@ -1135,24 +1153,24 @@ arising from the use of this program.
 
             # ─── Device time sync ────────────────────────────────────────
             "device_time_title": Translation(
-                en="\nDevice time synchronization status:",
-                ru="\nСтатус синхронизации времени устройства:"
+                en="\nComparison with the PC clock (UTC):",
+                ru="\nСравнение с часами ПК (UTC):"
             ),
             "device_time": Translation(
-                en="  Device time : {time}",
-                ru="  Время устройства: {time}"
+                en="  Device time (UTC): {time}",
+                ru="  Время устройства (UTC): {time}"
             ),
             "pc_time": Translation(
-                en="  PC time     : {time}",
-                ru="  Время ПК        : {time}"
+                en="  PC time (UTC): {time}",
+                ru="  Время ПК (UTC): {time}"
             ),
             "time_in_sync": Translation(
-                en="  Status: Synchronized (difference < 60 sec)",
-                ru="  Статус: Синхронизировано (разница < 60 сек)"
+                en="  Difference from the PC clock is less than 60 seconds.",
+                ru="  Расхождение с часами ПК меньше 60 секунд."
             ),
             "time_out_of_sync": Translation(
-                en="  Status: OUT OF SYNC — difference: {diff}",
-                ru="  Статус: РАССИНХРОНИЗИРОВАНО — разница: {diff}"
+                en="  Difference from the PC clock: {diff}",
+                ru="  Расхождение с часами ПК: {diff}"
             ),
             "device_time_error": Translation(
                 en="Could not read device time: {error}",

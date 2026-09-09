@@ -57,7 +57,7 @@ class ValidatorsTest {
         assertNull(parseDeviceAddress("192.168.1.20:abc"))
         assertNull(parseDeviceAddress("999.0.0.1:5555"))
         assertNull(parseDeviceAddress(""))
-        for (port in listOf("+5555", "-5555", "", "55 55", "５５５５")) {
+        for (port in listOf("+5555", "-5555", "", "55 55", "５５５５", "000001")) {
             assertNull(port, parseDeviceAddress("192.168.1.20:$port"))
         }
         assertEquals(DeviceAddress("192.168.1.20", 1), parseDeviceAddress("192.168.1.20:1"))

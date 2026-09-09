@@ -541,13 +541,13 @@ class ReliabilityTests(unittest.TestCase):
     # Порт больше не подразумевается
     # ──────────────────────────────────────────────────────────
 
-    def test_parse_ip_port_falls_back_to_default(self) -> None:
+    def test_parse_ip_port_uses_default_only_when_port_is_missing(self) -> None:
         self.assertEqual(AndroidTVTimeFixer.parse_ip_port('192.168.1.20'),
                          ('192.168.1.20', DEFAULT_ADB_PORT))
         self.assertEqual(AndroidTVTimeFixer.parse_ip_port('192.168.1.20:37105'),
                          ('192.168.1.20', 37105))
-        self.assertEqual(AndroidTVTimeFixer.parse_ip_port('192.168.1.20:0'),
-                         ('192.168.1.20', DEFAULT_ADB_PORT))
+        with self.assertRaises(AndroidTVTimeFixerError):
+            AndroidTVTimeFixer.parse_ip_port('192.168.1.20:0')
 
     def test_scan_results_carry_the_scanned_port(self) -> None:
         import ipaddress

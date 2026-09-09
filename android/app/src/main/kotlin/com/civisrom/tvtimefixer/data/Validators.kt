@@ -52,7 +52,7 @@ fun parseDeviceAddress(input: String): DeviceAddress? {
 
     val host = value.substring(0, separator)
     val portText = value.substring(separator + 1)
-    if (portText.isEmpty() || portText.any { it !in '0'..'9' }) return null
+    if (portText.length !in 1..5 || portText.any { it !in '0'..'9' }) return null
     val port = portText.toIntOrNull() ?: return null
     if (port !in 1..65535) return null
     return if (isValidIpv4(host)) DeviceAddress(host, port) else null

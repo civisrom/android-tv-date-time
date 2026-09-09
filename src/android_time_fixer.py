@@ -82,7 +82,7 @@ ADB_MDNS_SERVICES = {
 }
 
 #: 'ip:port' в выводе adb mdns services
-_IP_PORT_RE = re.compile(r'^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$')
+_IP_PORT_RE = re.compile(r'^([0-9]{1,3}(?:\.[0-9]{1,3}){3}):([0-9]{1,5})$')
 
 #: Ответ adbd, когда включена беспроводная отладка: дальше всё идёт через TLS.
 #: В adb_shell.constants записи для STLS нет — adb_shell этот режим не умеет
@@ -1515,7 +1515,21 @@ class AndroidTVTimeFixer:
         if self.servers_file.exists():
             try:
                 with open(self.servers_file, 'r', encoding='utf-8') as f:
-                    return self._normalize_saved_servers(json.load(f))
+                    data = json.load(f)
+                # Ужесточение проверки старого адреса не должно скрывать остальные
+                # корректные записи. Исходный файл при загрузке не переписываем.
+                keys = ('favorite_servers', 'custom_servers')
+                if isinstance(data, dict) and all(isinstance(data.get(key, []), list) for key in keys):
+                    valid = {
+                        key: [value for value in data.get(key, [])
+                              if isinstance(value, str) and self.validate_ntp_server(value)]
+                        for key in keys
+                    }
+                    rejected = sum(len(data.get(key, [])) - len(valid[key]) for key in keys)
+                    if rejected:
+                        self.logger.warning("Ignored %d invalid saved NTP addresses", rejected)
+                    data = valid
+                return self._normalize_saved_servers(data)
             except Exception as e:
                 self.logger.warning(locales.get_en('logger_warning', error=str(e)))
         return {'favorite_servers': [], 'custom_servers': []}
@@ -1770,20 +1784,23 @@ class AndroidTVTimeFixer:
         Returns:
             bool: True если формат валидный, False в противном случае
         """
-        if not server:
+        if not isinstance(server, str):
+            return False
+        server = server.strip()
+        if not server or len(server) > 253:
             return False
 
         # Проверка на IP адрес
-        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
-        if re.match(ip_pattern, server):
+        ip_pattern = r'([0-9]{1,3}\.){3}[0-9]{1,3}'
+        if re.fullmatch(ip_pattern, server):
             octets = server.split('.')
             return all(0 <= int(octet) <= 255 for octet in octets)
 
         # Проверка на валидное доменное имя
         # Доменное имя может содержать буквы, цифры, дефисы и точки
         # Каждая часть должна начинаться и заканчиваться буквой или цифрой
-        domain_pattern = r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$'
-        return bool(re.match(domain_pattern, server))
+        domain_pattern = r'([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}'
+        return bool(re.fullmatch(domain_pattern, server))
 
     def copy_server_to_clipboard(self, server: str) -> bool:
         """Копирует адрес сервера в буфер обмена"""
@@ -1809,6 +1826,7 @@ class AndroidTVTimeFixer:
         # сохранение и файл избранного переставал обновляться вообще
         if not self.validate_ntp_server(server):
             return False
+        server = server.strip()
         if server in self.saved_servers['favorite_servers']:
             return True
         self.saved_servers['favorite_servers'].append(server)
@@ -1817,11 +1835,19 @@ class AndroidTVTimeFixer:
         self.saved_servers['favorite_servers'].remove(server)
         return False
 
-    def remove_from_favorites(self, server: str):
-        """Удаляет сервер из избранного"""
-        if server in self.saved_servers['favorite_servers']:
-            self.saved_servers['favorite_servers'].remove(server)
-            self.save_servers()
+    def remove_from_favorites(self, server: str) -> bool:
+        """Подтверждает удаление только после сохранения, сохраняя порядок при отказе."""
+        previous = self.saved_servers
+        if server not in previous['favorite_servers']:
+            return True
+        self.saved_servers = {
+            **previous,
+            'favorite_servers': [item for item in previous['favorite_servers'] if item != server],
+        }
+        if self.save_servers():
+            return True
+        self.saved_servers = previous
+        return False
 
     def server_management_menu(self) -> None:
         """Подменю управления серверами"""
@@ -1905,8 +1931,10 @@ class AndroidTVTimeFixer:
                     num = int(input(Fore.GREEN + locales.get("enter_server_number") + " " + Fore.WHITE).strip())
                     if 1 <= num <= len(favorites):
                         removed = favorites[num - 1]
-                        self.remove_from_favorites(removed)
-                        print(Fore.GREEN + locales.get("server_removed_from_favorites", server=removed))
+                        if self.remove_from_favorites(removed):
+                            print(Fore.GREEN + locales.get("server_removed_from_favorites", server=removed))
+                        else:
+                            print(Fore.RED + locales.get("favorite_remove_failed"))
                     else:
                         print(Fore.RED + locales.get("invalid_number"))
                 except ValueError:
@@ -1926,39 +1954,31 @@ class AndroidTVTimeFixer:
 
     @staticmethod
     def parse_ip_port(address: str) -> Tuple[str, int]:
-        """Разбирает адрес вида 'ip' или 'ip:port'.
-
-        Возвращает (ip, port); при отсутствующем или некорректном порте —
-        DEFAULT_ADB_PORT.
-        """
-        if ':' in address:
-            parts = address.rsplit(':', 1)
-            ip = parts[0]
-            try:
-                port = int(parts[1])
-                if not (1 <= port <= 65535):
-                    port = DEFAULT_ADB_PORT
-            except ValueError:
-                port = DEFAULT_ADB_PORT
-        else:
-            ip = address
-            port = DEFAULT_ADB_PORT
-        return ip.strip(), port
+        """Разбирает IPv4[:port]; ошибочный порт не подменяется другим адресом."""
+        if not AndroidTVTimeFixer.validate_ip(address):
+            raise AndroidTVTimeFixerError(locales.get("invalid_ip_format", port=DEFAULT_ADB_PORT))
+        ip, separator, port = address.strip().partition(':')
+        return ip, int(port) if separator else DEFAULT_ADB_PORT
 
     @staticmethod
     def validate_ip(ip: str) -> bool:
         """Проверяет IP-адрес, допускает формат ip или ip:port"""
+        if not isinstance(ip, str):
+            return False
+        ip = ip.strip()
         # Отделяем порт если есть и проверяем его явно,
         # чтобы некорректный порт не подменялся молча на порт по умолчанию
         if ':' in ip:
             ip, port_str = ip.rsplit(':', 1)
+            if not re.fullmatch(r'[0-9]{1,5}', port_str):
+                return False
             try:
                 if not (1 <= int(port_str) <= 65535):
                     return False
             except ValueError:
                 return False
-        pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
-        if not re.match(pattern, ip):
+        pattern = r'([0-9]{1,3}\.){3}[0-9]{1,3}'
+        if not re.fullmatch(pattern, ip):
             return False
         octets = ip.split('.')
         return all(0 <= int(octet) <= 255 for octet in octets)
@@ -2265,6 +2285,7 @@ class AndroidTVTimeFixer:
             raise AndroidTVTimeFixerError(locales.get('no_device_connected'))
         if not self.validate_ntp_server(ntp_server):
             raise AndroidTVTimeFixerError(locales.get("invalid_ntp_server_format"))
+        ntp_server = ntp_server.strip()
         if not self.verify_ntp_server(ntp_server):
             raise AndroidTVTimeFixerError(locales.get("ntp_server_not_added", server=ntp_server))
     
@@ -3286,24 +3307,31 @@ class AndroidTVTimeFixer:
 
         print(Fore.CYAN + locales.get("device_time_title"))
         try:
+            started = time.monotonic()
+            pc_started = time.time()
             timestamp_str = self.device.shell('date +%s').strip()
             device_timestamp = int(timestamp_str)
-            device_time = datetime.datetime.fromtimestamp(device_timestamp)
-            pc_time = datetime.datetime.now()
+            elapsed = time.monotonic() - started
+            epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+            device_time = epoch + datetime.timedelta(seconds=device_timestamp)
+            pc_time = epoch + datetime.timedelta(seconds=pc_started + elapsed / 2)
             diff = abs((pc_time - device_time).total_seconds())
+            uncertainty = elapsed / 2 + 1  # Задержка ADB и целые секунды date.
 
             print(Fore.WHITE + locales.get("device_time", time=device_time.strftime("%Y-%m-%d %H:%M:%S")))
             print(Fore.WHITE + locales.get("pc_time",     time=pc_time.strftime("%Y-%m-%d %H:%M:%S")))
 
-            if diff < 60:
+            if diff + uncertainty < 60:
                 print(Fore.GREEN + locales.get("time_in_sync"))
-            else:
+            elif diff - uncertainty >= 60:
                 hours   = int(diff // 3600)
                 minutes = int((diff % 3600) // 60)
                 seconds = int(diff % 60)
                 diff_str = (f"{hours}h {minutes}m {seconds}s" if hours > 0
                             else f"{minutes}m {seconds}s")
                 print(Fore.RED + locales.get("time_out_of_sync", diff=diff_str))
+            else:
+                print(Fore.YELLOW + locales.get("time_comparison_uncertain"))
         except Exception as e:
             print(Fore.YELLOW + locales.get("device_time_error", error=str(e)))
 
@@ -3316,11 +3344,13 @@ class AndroidTVTimeFixer:
         if path is None:
             path = str(self.data_dir / 'backup.json')
         export_data = {
-            'version': '1.0.0',
+            'version': '2.0.0',
             'exported_at': datetime.datetime.now().isoformat(),
             'language': self.load_language(),
             'last_ip': self.load_last_ip(),
             'saved_servers': self.saved_servers,
+            'scan_port': self.load_scan_port(),
+            'adb_server_port': self.load_adb_server_port(),
         }
         try:
             self._atomic_write_json(Path(path).expanduser(), export_data)
@@ -3337,9 +3367,14 @@ class AndroidTVTimeFixer:
             return
         try:
             with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                payload = f.read(1024 * 1024 + 1)
+            if len(payload) > 1024 * 1024:
+                raise ValueError(locales.get('import_too_large'))
+            data = json.loads(payload)
             if not isinstance(data, dict):
                 raise ValueError("Backup root must be an object")
+            if data.get('version', '1.0.0') not in ('1.0.0', '2.0.0'):
+                raise ValueError(locales.get('import_version_unsupported'))
 
             saved_servers = self.saved_servers
             if 'saved_servers' in data:
@@ -3361,6 +3396,12 @@ class AndroidTVTimeFixer:
                 'language': language or self.load_language(),
                 'last_device_ip': last_ip or self.load_last_ip(),
             }
+            for name in ('scan_port', 'adb_server_port'):
+                if name in data:
+                    port = data[name]
+                    if type(port) is not int or not 1 <= port <= 65535 or (name == 'adb_server_port' and port == 5037):
+                        raise ValueError(f"Invalid {name}")
+                    new_settings[name] = str(port)
 
             self.saved_servers = saved_servers
             if not self.save_servers():
@@ -3368,13 +3409,19 @@ class AndroidTVTimeFixer:
                 raise OSError("Could not save imported server settings")
             if not self._save_settings(new_settings):
                 self.saved_servers = previous_servers
-                self.save_servers()
+                if not self.save_servers():
+                    self.saved_servers = previous_servers
+                    raise OSError(locales.get('import_rollback_failed'))
                 raise OSError("Could not save imported settings")
 
             self.last_device_ip = new_settings['last_device_ip']
+            if 'scan_port' in new_settings:
+                self.scan_port = int(new_settings['scan_port'])
             if language:
                 set_language(language)
             print(Fore.GREEN + locales.get("import_success", path=path))
+            if 'adb_server_port' in new_settings:
+                print(Fore.YELLOW + locales.get('import_adb_restart'))
             self.logger.info(f"Settings imported from: {path}")
         except Exception as e:
             print(Fore.RED + locales.get("import_failed", error=str(e)))
