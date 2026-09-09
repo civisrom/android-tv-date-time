@@ -916,7 +916,10 @@ class MainScreenTest {
         // Повторные ACTION_CLICK во время перестройки панели могут убрать выделение.
         var action: AccessibilityNodeInfo? = null
         compose.waitUntil(5_000) {
-            action = textSelectionActions(label).firstOrNull { it.isClickable && it.isEnabled }
+            action = textSelectionActions(label).firstNotNullOfOrNull { labelNode ->
+                // The embedded Android 17 toolbar exposes the label separately from its button.
+                generateSequence(labelNode) { it.parent }.firstOrNull { it.isClickable && it.isEnabled }
+            }
             action != null
         }
         assertTrue(checkNotNull(action).performAction(AccessibilityNodeInfo.ACTION_CLICK))
@@ -954,8 +957,11 @@ class MainScreenTest {
 
     private fun screenshot(name: String) {
         compose.waitForIdle()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        // Compose can be idle while the system IME / window is still fading out on old Android.
+        automation.waitForIdle(300, 3_000)
         val folder = File(context.filesDir, "ui-screenshots").apply { mkdirs() }
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        val bitmap = automation.takeScreenshot()
         checkNotNull(bitmap)
         File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()

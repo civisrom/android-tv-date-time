@@ -25,6 +25,7 @@ class MainActivityTest {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.waitForIdle(300, 3_000)
         val file = File(instrumentation.targetContext.filesDir, "ui-screenshots/native-$name.png")
         file.parentFile!!.mkdirs()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
