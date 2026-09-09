@@ -3,7 +3,7 @@ package com.civisrom.tvtimefixer.ui
 import android.graphics.Bitmap
 import android.system.Os
 import android.system.OsConstants
-import androidx.compose.ui.input.key.Key
+import android.view.KeyEvent
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -60,13 +60,17 @@ class MainActivityTest {
     }
 
     @Test fun diagnostics_can_be_opened_and_closed_with_remote_keys() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Настоящее событие пульта переводит старый Android из touch mode.
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
         compose.onNodeWithTag("diagnostics-open").performScrollTo()
             .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        compose.onNodeWithTag("diagnostics-open").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("diagnostics-open").assertIsFocused()
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
         compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
         screenshot("diagnostics")
         compose.onNodeWithTag("diagnostics-back").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        compose.onNodeWithTag("diagnostics-back").performKeyInput { pressKey(Key.DirectionCenter) }
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
         compose.onNodeWithTag("diagnostics-open").assertIsDisplayed().assertIsFocused()
     }
 

@@ -100,7 +100,9 @@ private class ScreenActions : AppActions {
         calls += "pair:$pairingAddress:$code:$connectAddress"
     }
     override fun checkNtpServer(server: String) { calls += "check:$server" }
-    override fun applyNtpServer(server: String) { calls += "apply:$server" }
+    override fun applyNtpServer(server: String, allowUnverified: Boolean) { calls += "apply:$server" }
+    override fun resetNtpServer() { calls += "reset-ntp" }
+    override fun undoNtpServer() { calls += "undo-ntp" }
     override fun verifyDeviceTime() { calls += "verify-time" }
     override fun applyTimeZone(zoneId: String) { calls += "zone:$zoneId" }
     override fun scanNtpServers() { calls += "scan"; onScan() }
@@ -113,6 +115,28 @@ private class ScreenActions : AppActions {
 }
 
 class MainScreenTest {
+    @Test fun system_default_reset_needs_confirmation_and_can_be_cancelled() {
+        screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org", apiLevel = "30")))
+        compose.onNodeWithTag("ntp-reset").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-confirm-cancel").performClick()
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithTag("ntp-reset").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-confirm").performClick()
+        assertEquals(listOf("reset-ntp"), actions.calls)
+    }
+
+    @Test fun saved_setting_keeps_restart_requirement_and_auto_time_warning_visible_on_TV() {
+        screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org", apiLevel = "29"),
+            ntpChange = com.civisrom.tvtimefixer.device.NtpUpdateResult.Applied("pool.ntp.org", "null",
+                com.civisrom.tvtimefixer.device.NtpActivation.RESTART_REQUIRED, false)),
+            mode = DeviceMode.TELEVISION, scale = 2f, width = 480)
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_restart_required))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_check_auto_off))
+            .performScrollTo().assertIsDisplayed()
+        screenshot("ntp-restart-and-auto-time")
+        compose.onNodeWithTag("ntp-undo").performScrollTo().assertIsEnabled()
+    }
     companion object {
         private var originalAccessibilityFlags = 0
 
@@ -761,8 +785,10 @@ class MainScreenTest {
 
     @Test fun landscape_keeps_the_main_actions_reachable() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val television = com.civisrom.tvtimefixer.detectDeviceMode(context) == DeviceMode.TELEVISION
+        val originalOrientation = context.resources.configuration.orientation
         try {
-            automation.setRotation(UiAutomation.ROTATION_FREEZE_90)
+            if (!television) automation.setRotation(UiAutomation.ROTATION_FREEZE_90)
             compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
             screen(connected, width = 640)
             compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
@@ -779,8 +805,8 @@ class MainScreenTest {
                 screenshot("landscape-diagnostics")
             }
         } finally {
-            automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
-            compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }
+            if (!television) automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
+            compose.waitUntil(10_000) { context.resources.configuration.orientation == originalOrientation }
             automation.setRotation(UiAutomation.ROTATION_UNFREEZE)
         }
         assertTrue(actions.calls.isEmpty())

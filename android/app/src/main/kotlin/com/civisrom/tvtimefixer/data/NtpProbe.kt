@@ -66,7 +66,7 @@ class NtpProbe(
             if (attempt > 0) pause()
             checkCancelled()
             try {
-                val result = query.query(address)
+                val result = query.query(address, checkCancelled)
                 if (result.rttMs < 0 || !result.offsetSeconds.isFinite()) {
                     throw NotAnNtpServerException("Invalid NTP measurement")
                 }
@@ -75,6 +75,8 @@ class NtpProbe(
                 if (resolved == null) resolved = result.address.takeIf { it.isNotBlank() }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: InterruptedException) {
+                throw CancellationException("NTP cancelled", e)
             } catch (e: Exception) {
                 lastError = e.message ?: e.javaClass.simpleName
                 failure = when (e) {

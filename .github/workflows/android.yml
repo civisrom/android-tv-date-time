@@ -206,13 +206,14 @@ jobs:
           sudo chmod a+rw /dev/kvm
           export ANDROID_AVD_HOME="$RUNNER_TEMP/ui-avd"
           mkdir -p "$ANDROID_AVD_HOME"
+          { yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > "$RUNNER_TEMP/sdk-licenses.log"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "$UI_TEST_IMAGE"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
             --package "$UI_TEST_IMAGE" --device "$UI_TEST_DEVICE" \
             --path "$ANDROID_AVD_HOME/ui-test.avd"
           test -f "$ANDROID_AVD_HOME/ui-test.ini"
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
-            -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 \
+            -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 -partition-size 4096 \
             > "$RUNNER_TEMP/ui-emulator.log" 2>&1 &
           timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
           for attempt in $(seq 1 120); do
@@ -239,12 +240,19 @@ jobs:
           set -o pipefail
           timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
           timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-          timeout 900 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
-            -e expected_tv "$UI_TEST_TV" -e expected_page_size "$UI_TEST_PAGE_SIZE" \
-            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
-            | tee "$RUNNER_TEMP/ui-instrumentation.log"
-          # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
-          grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-instrumentation.log"
+          # Отдельные процессы ограничивают накопление Surface/IME в старых
+          # системных образах. Каждый тест выполняется один раз; сбои не скрываем повтором.
+          for shard in 0 1 2; do
+            "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
+            timeout 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+              -e numShards 3 -e shardIndex "$shard" \
+              -e expected_tv "$UI_TEST_TV" -e expected_page_size "$UI_TEST_PAGE_SIZE" \
+              com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
+              | tee "$RUNNER_TEMP/ui-shard-$shard.log"
+            cat "$RUNNER_TEMP/ui-shard-$shard.log" >> "$RUNNER_TEMP/ui-instrumentation.log"
+            # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
+            grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-shard-$shard.log"
+          done
 
       - name: Collect UI screenshots
         if: always()

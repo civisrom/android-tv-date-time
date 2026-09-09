@@ -9,6 +9,7 @@ import com.civisrom.tvtimefixer.data.ScanProgress
 import com.civisrom.tvtimefixer.device.DeviceInfo
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.device.NtpUpdateResult
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 
@@ -49,6 +50,8 @@ data class AppState(
     val ntpMessage: UiMessage? = null,
     /** Итог проверки одного адреса кнопкой «Проверить». */
     val ntpCheck: NtpProbeResult? = null,
+    val ntpChange: NtpUpdateResult.Applied? = null,
+    val ntpBeforeTime: DeviceTimeCheck? = null,
     /** Последний замер часов подключённого устройства; сбрасывается при новой настройке/связи. */
     val timeCheck: DeviceTimeCheck? = null,
     /** Идущий или законченный подбор лучшего сервера. */
@@ -70,6 +73,7 @@ data class AppState(
     fun connectionLost(): AppState = copy(
         connection = ConnectionState.Disconnected,
         deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
+        ntpChange = null, ntpBeforeTime = null,
         timeCheck = null, timeDiagnosticEventId = null,
         timeZoneResult = null, timeZoneDiagnosticEventId = null,
     )

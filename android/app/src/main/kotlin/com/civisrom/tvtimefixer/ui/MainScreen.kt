@@ -20,6 +20,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
@@ -93,7 +94,9 @@ interface AppActions {
     fun disconnect()
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
     fun checkNtpServer(server: String)
-    fun applyNtpServer(server: String)
+    fun applyNtpServer(server: String, allowUnverified: Boolean = false)
+    fun resetNtpServer()
+    fun undoNtpServer()
     fun verifyDeviceTime()
     fun applyTimeZone(zoneId: String)
     fun scanNtpServers()
@@ -549,6 +552,32 @@ private fun NtpSection(state: AppState, actions: AppActions,
     onDiagnostics: (Long?, String) -> Unit, returnFocus: String?, onFocusRestored: () -> Unit,
 ) {
     var custom by rememberSaveable { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf<String?>(null) }
+    var confirmedServer by remember { mutableStateOf("") }
+    LaunchedEffect(state.connection) { confirmation = null }
+    if (confirmation != null) AlertDialog(
+        onDismissRequest = { confirmation = null },
+        title = { Text(stringResource(R.string.ntp_confirm_title)) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(if (confirmation == "unverified") R.string.ntp_unverified_note else R.string.ntp_restore_note))
+            Text(stringResource(R.string.ntp_current, state.currentNtpServer.ifEmpty { "—" }))
+            Text(stringResource(R.string.ntp_new_value, if (confirmedServer == "null")
+                stringResource(R.string.ntp_system_default) else confirmedServer))
+        } },
+        confirmButton = { Button(onClick = {
+            if (state.connected && !state.busy) when (confirmation) {
+                "reset" -> actions.resetNtpServer()
+                "undo" -> actions.undoNtpServer()
+                "unverified" -> actions.applyNtpServer(confirmedServer, allowUnverified = true)
+            }
+            confirmation = null
+        }, enabled = state.connected && !state.busy, modifier = Modifier.testTag("ntp-confirm")) {
+            Text(stringResource(R.string.ntp_confirm_action))
+        } },
+        dismissButton = { TextButton(onClick = { confirmation = null }, modifier = Modifier.testTag("ntp-confirm-cancel")) {
+            Text(stringResource(R.string.diagnostics_cancel))
+        } },
+    )
     var query by rememberSaveable { mutableStateOf("") }
     var showAll by rememberSaveable { mutableStateOf(false) }
     var showCountries by rememberSaveable { mutableStateOf(false) }
@@ -598,6 +627,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
         CopyableText(
             when {
                 !state.connected -> stringResource(R.string.ntp_connect_first)
+                state.currentNtpServer == "null" -> stringResource(R.string.ntp_system_default)
                 ntpIsSet -> stringResource(R.string.ntp_current, state.currentNtpServer)
                 else -> stringResource(R.string.ntp_current_unset)
             },
@@ -644,6 +674,22 @@ private fun NtpSection(state: AppState, actions: AppActions,
         }
 
         state.ntpCheck?.let { NtpCheckCard(it) }
+        if (state.connected && !state.busy && state.ntpCheck?.server == custom.trim() &&
+            state.ntpCheck?.isUsable() == false && com.civisrom.tvtimefixer.data.isValidNtpServer(custom)) {
+            TextButton(onClick = { confirmedServer = custom.trim(); confirmation = "unverified" },
+                modifier = Modifier.testTag("ntp-unverified")) { Text(stringResource(R.string.ntp_save_unverified)) }
+        }
+        if (state.connected) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { confirmedServer = "null"; confirmation = "reset" },
+                enabled = !state.busy, modifier = Modifier.testTag("ntp-reset")) {
+                Text(stringResource(R.string.ntp_reset))
+            }
+            state.ntpChange?.let { change ->
+                TextButton(onClick = { confirmedServer = change.previous; confirmation = "undo" },
+                    enabled = !state.busy && change.server == state.currentNtpServer,
+                    modifier = Modifier.testTag("ntp-undo")) { Text(stringResource(R.string.ntp_undo)) }
+            }
+        }
 
         // Итог показывается здесь, а не в карточке вверху экрана: раздел
         // находится далеко внизу, и подтверждение там не видно
@@ -654,7 +700,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     // Успешная запись — зелёным, всё остальное здесь неудача:
                     // «не применено», «неверный адрес», «устройство сообщает
                     // другое значение»
-                    color = if (message.res == R.string.ntp_applied) {
+                    color = if (message.res in listOf(R.string.ntp_applied, R.string.ntp_default_applied)) {
                         ConnectedColor
                     } else {
                         MaterialTheme.colorScheme.error
@@ -663,6 +709,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 )
             }
         }
+
+        state.ntpChange?.takeIf { state.connected }?.let { NtpChangeCard(state, it) }
 
         state.ntpDiagnosticEventId?.let { id ->
             DiagnosticLink(id, "ntp-details", onDiagnostics, returnFocus, onFocusRestored)
@@ -756,6 +804,35 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 showAll = false
                 actions.scanNtpServers()
             })
+        }
+    }
+}
+
+@Composable
+private fun NtpChangeCard(state: AppState, change: com.civisrom.tvtimefixer.device.NtpUpdateResult.Applied) {
+    fun value(raw: String) = if (raw == "null") "" else raw
+    val system = stringResource(R.string.ntp_system_default)
+    fun label(raw: String) = value(raw).ifEmpty { system }
+    Card(Modifier.fillMaxWidth().testTag("ntp-change-result")) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.ntp_before_after, label(change.previous), label(change.server)), fontWeight = FontWeight.Bold)
+            fun measurement(check: DeviceTimeCheck?): String = check?.differenceSeconds?.let { delta ->
+                check.uncertaintySeconds?.let { String.format(Locale.ROOT, "%.2f ± %.2f s", delta, it) }
+            } ?: "—"
+            val before = measurement(state.ntpBeforeTime)
+            val after = measurement(state.timeCheck)
+            Text(stringResource(R.string.ntp_clock_before_after, before, after))
+            Text(stringResource(when (change.activation) {
+                com.civisrom.tvtimefixer.device.NtpActivation.RESTART_REQUIRED -> R.string.ntp_restart_required
+                com.civisrom.tvtimefixer.device.NtpActivation.NEXT_REFRESH -> R.string.ntp_next_refresh
+                com.civisrom.tvtimefixer.device.NtpActivation.UNKNOWN -> R.string.ntp_activation_unknown
+            }))
+            Text(stringResource(when (change.automaticTime) {
+                true -> R.string.ntp_auto_on
+                false -> R.string.time_check_auto_off
+                null -> R.string.time_check_auto_unknown
+            }))
+            Text(stringResource(R.string.time_check_note), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

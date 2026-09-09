@@ -6,6 +6,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
@@ -52,7 +53,7 @@ class NtpScanner(
             distinctServers.map { server ->
                 async {
                     val context = currentCoroutineContext()
-                    val result = gate.withPermit { probe.test(server) { context.ensureActive() } }
+                    val result = gate.withPermit { runInterruptible { probe.test(server) { context.ensureActive() } } }
                     reporting.withLock {
                         checked += 1
                         // Непригодные не копим: список нужен только чтобы

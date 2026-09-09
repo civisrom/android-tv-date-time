@@ -71,7 +71,7 @@
     <!-- Сервер времени -->
     <string name="ntp_title">Сервер времени</string>
     <string name="ntp_current">Текущий: %1$s</string>
-    <string name="ntp_current_unset">Сервер времени не задан</string>
+    <string name="ntp_current_unset">Настройку NTP не удалось прочитать</string>
     <string name="ntp_connect_first">Адрес сервера можно выбрать и проверить сейчас. Чтобы прочитать настройки устройства и применить сервер, сначала подключитесь к нему.</string>
     <string name="ntp_by_country">Введите код страны (ru, by, kz), её название (Армения, Россия, США) или адрес сервера. Регистр не важен. Нажмите на строку: адрес появится в поле выше, и экран перейдёт к нему.</string>
     <string name="ntp_custom_hint">Адрес сервера времени</string>
@@ -79,7 +79,7 @@
     <string name="ntp_scan_entry_ip">IP: %1$s — нажмите, чтобы задать адресом вместо имени</string>
     <string name="ntp_apply">Применить</string>
     <string name="ntp_search_country">Поиск страны</string>
-    <string name="ntp_applied">Установлен сервер времени %1$s.</string>
+    <string name="ntp_applied">Настройка NTP сохранена: %1$s.</string>
     <string name="ntp_invalid">Неверный адрес сервера времени. Введите домен или IPv4 без порта, пробелов и http://.</string>
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
@@ -89,7 +89,7 @@
     <string name="time_check_match">На момент проверки часы устройства совпадают с ответом NTP в пределах 5 секунд.</string>
     <string name="time_check_mismatch">Часы устройства пока расходятся с ответом NTP более чем на 5 секунд. Android может обновить их позже; повторите проверку.</string>
     <string name="time_check_uncertain">Точности измерения недостаточно для уверенного результата. Повторите проверку.</string>
-    <string name="time_check_no_server">На устройстве не задан поддерживаемый адрес NTP-сервера. Примените сервер и повторите проверку.</string>
+    <string name="time_check_no_server">Настройка NTP недоступна для этой проверки. Проверьте её значение или выберите поддерживаемый сервер.</string>
     <string name="time_check_ntp_unavailable">Не удалось получить ответ NTP для сравнения часов. Проверьте доступность сервера и повторите проверку.</string>
     <string name="time_check_unavailable">Не удалось прочитать время или настройку NTP с устройства. Проверьте соединение и повторите проверку.</string>
     <string name="time_check_server">Сервер сравнения: %1$s</string>
@@ -270,4 +270,21 @@
     <string name="info_codecs_note">Список из доступных файлов конфигурации может быть неполным и включать неактивные варианты. Он не подтверждает аппаратное ускорение, DRM, передачу звука без декодирования или воспроизведение конкретного файла.</string>
     <string name="info_yes">Да</string>
     <string name="info_no">Нет</string>
+    <string name="ntp_system_default">Системный источник времени (по умолчанию в прошивке)</string>
+    <string name="ntp_default_applied">Пользовательский NTP удалён. Android будет использовать системную настройку.</string>
+    <string name="ntp_confirm_title">Подтвердите изменение сервера времени</string>
+    <string name="ntp_confirm_action">Сохранить настройку</string>
+    <string name="ntp_restore_note">Изменяется настройка NTP подключённого устройства. Автовремя и часовой пояс сохраняют свои значения.</string>
+    <string name="ntp_new_value">Новое значение: %1$s</string>
+    <string name="ntp_unverified_note">Приложение не смогло проверить сервер из своей сети. Доступ у телевизора может отличаться. Сохраняйте только доверенный адрес: ответ сервера и синхронизация часов не подтверждены.</string>
+    <string name="ntp_save_unverified">Сохранить без успешной проверки…</string>
+    <string name="ntp_reset">Вернуть системный источник…</string>
+    <string name="ntp_undo">Отменить последнее изменение в этом подключении…</string>
+    <string name="ntp_before_after">Источник времени: %1$s → %2$s</string>
+    <string name="ntp_clock_before_after">Расхождение часов до → после: %1$s → %2$s</string>
+    <string name="ntp_restart_required">Настройка сохранена. На Android 6–10 для перечитывания источника NTP обычно нужен перезапуск устройства. Перезапустите TV в удобное время, подключитесь снова и проверьте часы.</string>
+    <string name="ntp_next_refresh">Настройка сохранена. Android может применить её при следующем обновлении сетевого времени. Если часы не исправились, проверьте автоматическую дату и время и при необходимости перезапустите TV.</string>
+    <string name="ntp_activation_unknown">Настройка сохранена. Прошивка может требовать перезапуска для перечитывания её службой времени.</string>
+    <string name="ntp_auto_on">Автоматическая дата и время: включены</string>
+    <string name="time_check_system_default">Android использует системную настройку времени. Её фактический сервер не указан в этой настройке; это не означает, что автосинхронизация выключена.</string>
 </resources>

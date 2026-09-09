@@ -6,7 +6,12 @@ import java.util.concurrent.CancellationException
 
 /** Чем закончилась попытка сменить сервер времени. */
 sealed interface NtpUpdateResult {
-    data class Applied(val server: String) : NtpUpdateResult
+    data class Applied(
+        val server: String,
+        val previous: String = "",
+        val activation: NtpActivation = NtpActivation.UNKNOWN,
+        val automaticTime: Boolean? = null,
+    ) : NtpUpdateResult
 
     /** Адрес не прошёл проверку формата — до устройства не дошло. */
     data object InvalidServer : NtpUpdateResult
@@ -33,23 +38,44 @@ private const val NTP_SETTING = "global ntp_server"
  * произошла, поэтому доверять коду возврата нельзя.
  */
 class DeviceRepository(private val client: AdbClient, private val onFailure: (Exception) -> Unit = {}) {
+    private var infoDeadline: Long? = null
 
-    fun currentNtpServer(): String = client.shell("settings get $NTP_SETTING").trimmedOutput
-        .takeUnless { it == "null" }
-        .orEmpty()
+    fun currentNtpServer(): String = client.shell("settings get $NTP_SETTING").let {
+        check(it.exitCode == 0 && it.errorOutput.isBlank() && it.trimmedOutput.isNotEmpty()) { "NTP setting read failed" }
+        it.trimmedOutput
+    }
 
     fun setNtpServer(server: String): NtpUpdateResult {
         val value = server.trim()
         if (!isValidNtpServer(value)) return NtpUpdateResult.InvalidServer
+        return writeNtpSetting(value)
+    }
+
+    fun resetNtpServer(): NtpUpdateResult = writeNtpSetting("null")
+
+    fun undoNtpServer(change: NtpUpdateResult.Applied): NtpUpdateResult = writeNtpSetting(change.previous, change.server)
+
+    private fun writeNtpSetting(value: String, expectedCurrent: String? = null): NtpUpdateResult {
+        if (value.isEmpty() || value.length > 4096 || value.any { it.isISOControl() }) return NtpUpdateResult.InvalidServer
 
         return try {
-            client.shell("settings put $NTP_SETTING ${shellQuote(value)}")
+            val previous = currentNtpServer()
+            if (expectedCurrent != null && previous != expectedCurrent) {
+                return NtpUpdateResult.NotConfirmed(expectedCurrent, previous)
+            }
+            val api = optional("getprop ro.build.version.sdk").trim().toIntOrNull()
+            val automatic = parseAutomaticSetting(optional("settings get global auto_time"))
+            val result = client.shell(if (value == "null") "settings delete $NTP_SETTING"
+                else "settings put $NTP_SETTING ${shellQuote(value)}")
+            check(result.exitCode == 0 && result.errorOutput.isBlank()) { "NTP setting write failed" }
             val confirmed = currentNtpServer()
             if (confirmed == value) {
-                NtpUpdateResult.Applied(value)
+                NtpUpdateResult.Applied(value, previous, ntpActivation(api), automatic)
             } else {
                 NtpUpdateResult.NotConfirmed(expected = value, actual = confirmed)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             runCatching { onFailure(e) }
             NtpUpdateResult.Failed(e.message ?: e::class.java.simpleName)
@@ -68,6 +94,9 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
      * без единого слова о причине.
      */
     fun readDeviceInfo(): DeviceInfo {
+        // Одна команда ограничена транспортом 15 с. После 45 с прекращаем
+        // необязательные запросы: полный опрос укладывается максимум в минуту.
+        infoDeadline = System.nanoTime() + 45_000_000_000L
         val result = client.shell("getprop")
         check(result.exitCode == 0) { "getprop failed (exit ${result.exitCode})" }
         val props = parseGetProp(result.output)
@@ -91,9 +120,7 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
             cpuAbi = prop("ro.product.cpu.abilist").ifEmpty { prop("ro.product.cpu.abi") },
             timezone = props["persist.sys.timezone"].orEmpty(),
             locale = props["persist.sys.locale"].orEmpty(),
-            currentNtpServer = optional("settings get $NTP_SETTING").trim()
-                .takeUnless { it == "null" }
-                .orEmpty(),
+            currentNtpServer = optional("settings get $NTP_SETTING").trim(),
             batteryLevel = parseBatteryLevel(optional("dumpsys battery")),
             totalRam = parseMemInfo(meminfo, "MemTotal"),
             availableRam = parseMemInfo(meminfo, "MemAvailable"),
@@ -124,7 +151,7 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
             videoDecoders = decoders.first,
             audioDecoders = decoders.second,
             networkAddresses = parseNetworkAddresses(optional("ip -o addr show scope global")),
-        )
+        ).also { infoDeadline = null }
     }
 
     /** На TV Android 12+ raw auto_time_zone=1 не означает наличия автоопределения. */
@@ -140,7 +167,9 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
 
     /** Вывод необязательной команды: пустая строка вместо исключения. */
     private fun optional(command: String): String = try {
-        client.shell(command).let { if (it.exitCode == 0) it.output else "" }
+        if (Thread.currentThread().isInterrupted) throw CancellationException("Device read cancelled")
+        if (infoDeadline?.let { System.nanoTime() >= it } == true) ""
+        else client.shell(command).let { if (it.exitCode == 0) it.output else "" }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {

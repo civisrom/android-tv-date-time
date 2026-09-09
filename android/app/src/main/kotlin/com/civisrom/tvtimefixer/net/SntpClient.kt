@@ -5,6 +5,15 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.SocketTimeoutException
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.RejectedExecutionException
+import kotlinx.coroutines.CancellationException
+import kotlin.math.round
 
 /**
  * Ответ сервера времени: сколько шёл обмен и насколько часы устройства
@@ -32,6 +41,14 @@ data class SntpResult(
 interface SntpQuery {
     /** Бросает исключение, если сервер не ответил или ответил не как NTP. */
     fun query(host: String): SntpResult
+    fun query(host: String, checkCancelled: () -> Unit): SntpResult {
+        checkCancelled()
+        return query(host).also { checkCancelled() }
+    }
+    fun query(host: String, port: Int, checkCancelled: () -> Unit = {}): SntpResult {
+        require(port == 123) { "This NTP client does not support custom ports" }
+        return query(host, checkCancelled)
+    }
 }
 
 /** Ответ пришёл, но это не ответ NTP-сервера. */
@@ -91,9 +108,9 @@ object SntpPacket {
 
         // Обе метки участвуют в расчёте смещения, поэтому нулевая делает ответ
         // бесполезным: настоящий сервер заполняет обе
-        val t2 = readTimestamp(response, INDEX_RECEIVE)
-        val t3 = readTimestamp(response, INDEX_TRANSMIT)
-        if (t2 == 0L || t3 == 0L || t3 < t2) return null
+        val t2 = readTimestamp(response, INDEX_RECEIVE, t1) ?: return null
+        val t3 = readTimestamp(response, INDEX_TRANSMIT, t2) ?: return null
+        if (t3 < t2) return null
 
         // RFC 4330: смещение = ((t2 - t1) + (t3 - t4)) / 2,
         // задержка = (t4 - t1) - (t3 - t2)
@@ -115,7 +132,7 @@ object SntpPacket {
     }
 
     /** 64-битная метка времени NTP по смещению в пакете — в миллисекунды Unix. */
-    private fun readTimestamp(buffer: ByteArray, offset: Int): Long {
+    private fun readTimestamp(buffer: ByteArray, offset: Int, referenceMillis: Long): Long? {
         var seconds = 0L
         for (i in 0 until 4) {
             seconds = (seconds shl 8) or (buffer[offset + i].toLong() and 0xFF)
@@ -124,33 +141,69 @@ object SntpPacket {
         for (i in 4 until 8) {
             fraction = (fraction shl 8) or (buffer[offset + i].toLong() and 0xFF)
         }
-        if (seconds == 0L && fraction == 0L) return 0L
+        if (seconds == 0L && fraction == 0L) return null
+        // RFC 5905: для восстановления эпохи нужен ориентир с точностью ±68 лет.
+        val referenceSeconds = referenceMillis / 1000L + EPOCH_OFFSET_SECONDS
+        seconds += round((referenceSeconds - seconds) / 4294967296.0).toLong() * 0x100000000L
         return (seconds - EPOCH_OFFSET_SECONDS) * 1000L + (fraction * 1000L) / 0x100000000L
     }
 }
 
 /** Настоящий клиент поверх UDP. Вся сетевая работа вызывающего — на Dispatchers.IO. */
-class UdpSntpClient(private val timeoutMs: Int = 2_000) : SntpQuery {
+class UdpSntpClient(
+    private val timeoutMs: Int = 2_000,
+    private val port: Int = SntpPacket.PORT,
+    private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
+    private val resolve: (String) -> Array<InetAddress> = InetAddress::getAllByName,
+) : SntpQuery {
 
-    override fun query(host: String): SntpResult {
-        // IPv4 предпочитается намеренно: адрес показывается пользователю и
-        // подставляется в поле, а проверка адреса во всём проекте — только
-        // IPv4. Вернув IPv6, мы предложили бы адрес, который сами же отвергнем.
-        val resolved = InetAddress.getAllByName(host)
-        val address = resolved.firstOrNull { it is Inet4Address } ?: resolved.first()
+    override fun query(host: String): SntpResult = query(host, port) { }
+
+    override fun query(host: String, checkCancelled: () -> Unit): SntpResult = query(host, port, checkCancelled)
+
+    override fun query(host: String, port: Int, checkCancelled: () -> Unit): SntpResult {
+        val deadline = elapsedRealtime() + timeoutMs
+        fun remaining(until: Long = deadline): Int {
+            checkCancelled()
+            if (Thread.currentThread().isInterrupted) throw CancellationException("NTP cancelled")
+            return (until - elapsedRealtime()).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                .also { if (it <= 0) throw SocketTimeoutException("NTP deadline exceeded") }
+        }
+        val lookup = try { dns.submit<Array<InetAddress>> { resolve(host) } }
+            catch (_: RejectedExecutionException) { throw SocketTimeoutException("DNS resolver busy") }
+        val resolved = try {
+            var result: Array<InetAddress>? = null
+            while (result == null) {
+                try { result = lookup.get(remaining().coerceAtMost(100).toLong(), TimeUnit.MILLISECONDS) }
+                catch (_: TimeoutException) { remaining() }
+            }
+            result.distinct().sortedBy { it !is Inet4Address }
+        } catch (e: ExecutionException) {
+            throw (e.cause as? Exception ?: e)
+        } finally {
+            lookup.cancel(true)
+            dns.purge()
+        }
+        var lastError: Exception = java.net.UnknownHostException(host)
+        for ((index, address) in resolved.withIndex()) {
+            val addressDeadline = elapsedRealtime() + remaining() / (resolved.size - index)
+            try {
         DatagramSocket().use { socket ->
             // Принимаем ответ только от выбранного адреса и UDP-порта.
-            socket.connect(address, SntpPacket.PORT)
-            socket.soTimeout = timeoutMs
+            socket.connect(address, port)
             val t1 = System.currentTimeMillis()
-            val started = SystemClock.elapsedRealtime()
+            val started = elapsedRealtime()
             val out = SntpPacket.request(t1)
-            socket.send(DatagramPacket(out, out.size, address, SntpPacket.PORT))
+            socket.send(DatagramPacket(out, out.size, address, port))
 
             val buffer = ByteArray(SntpPacket.SIZE)
             val incoming = DatagramPacket(buffer, buffer.size)
-            socket.receive(incoming)
-            val received = SystemClock.elapsedRealtime()
+            while (true) {
+                socket.soTimeout = remaining(addressDeadline).coerceAtMost(100)
+                try { socket.receive(incoming); break }
+                catch (_: SocketTimeoutException) { remaining(addressDeadline) }
+            }
+            val received = elapsedRealtime()
             // Автокоррекция часов телефона во время запроса не меняет длительность обмена.
             val t4 = t1 + (received - started)
 
@@ -158,5 +211,16 @@ class UdpSntpClient(private val timeoutMs: Int = 2_000) : SntpQuery {
                 ?: throw NotAnNtpServerException("$host отвечает, но не по протоколу NTP")
             return parsed.copy(address = address.hostAddress.orEmpty(), referenceElapsedMillis = received)
         }
+            } catch (e: CancellationException) { throw e }
+            catch (e: InterruptedException) { throw CancellationException("NTP cancelled", e) }
+            catch (e: Exception) { lastError = e }
+        }
+        throw lastError
+    }
+
+    private companion object {
+        // Системный DNS иногда игнорирует interrupt; ограничиваем и потоки, и очередь.
+        val dns = ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(16),
+            { task -> Thread(task, "ntp-dns").apply { isDaemon = true } })
     }
 }

@@ -71,7 +71,7 @@
     <!-- Сервер времени -->
     <string name="ntp_title">Time server</string>
     <string name="ntp_current">Current: %1$s</string>
-    <string name="ntp_current_unset">No time server is set</string>
+    <string name="ntp_current_unset">The NTP setting could not be read</string>
     <string name="ntp_connect_first">You can choose and check a server address now. Connect to the device to read its settings and apply the server.</string>
     <string name="ntp_by_country">Enter a country code (am, ru, us), a country name (Armenia, Russia, United States), or a server address. Case does not matter. Tap a row to fill the field above and scroll to it.</string>
     <string name="ntp_custom_hint">Time server address</string>
@@ -79,7 +79,7 @@
     <string name="ntp_scan_entry_ip">IP: %1$s — tap to use the address instead of the name</string>
     <string name="ntp_apply">Apply</string>
     <string name="ntp_search_country">Search country</string>
-    <string name="ntp_applied">Time server set to %1$s.</string>
+    <string name="ntp_applied">NTP setting saved: %1$s.</string>
     <string name="ntp_invalid">Invalid time server address. Enter a domain or IPv4 without a port, spaces, or http://.</string>
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
@@ -89,7 +89,7 @@
     <string name="time_check_match">At the time of this check, the device clock agrees with the NTP reply within 5 seconds.</string>
     <string name="time_check_mismatch">The device clock still differs from the NTP reply by more than 5 seconds. Android may update it later; check again.</string>
     <string name="time_check_uncertain">The measurement is not precise enough for a conclusive result. Check again.</string>
-    <string name="time_check_no_server">The device has no supported NTP server address set. Apply a server and check again.</string>
+    <string name="time_check_no_server">The NTP configuration could not be used for this comparison. Inspect the configured value or choose a supported server.</string>
     <string name="time_check_ntp_unavailable">Could not obtain an NTP reply to compare clocks. Check server availability and try again.</string>
     <string name="time_check_unavailable">Could not read the device time or NTP setting. Check the connection and try again.</string>
     <string name="time_check_server">Comparison server: %1$s</string>
@@ -270,4 +270,21 @@
     <string name="info_codecs_note">The list from readable configuration files may be incomplete and include inactive variants. It does not verify hardware acceleration, DRM, audio passthrough or playback of a particular file.</string>
     <string name="info_yes">Yes</string>
     <string name="info_no">No</string>
+    <string name="ntp_system_default">System time source (firmware default)</string>
+    <string name="ntp_default_applied">The custom NTP override was removed. Android will use its system configuration.</string>
+    <string name="ntp_confirm_title">Confirm time server change</string>
+    <string name="ntp_confirm_action">Save setting</string>
+    <string name="ntp_restore_note">This changes only the NTP setting on the connected device. Automatic time and the time zone stay as configured.</string>
+    <string name="ntp_new_value">New value: %1$s</string>
+    <string name="ntp_unverified_note">This app could not validate the server from its own network connection. The TV may have different network access. Save only if you trust this address; a reply and clock synchronization are not confirmed.</string>
+    <string name="ntp_save_unverified">Save without a successful probe…</string>
+    <string name="ntp_reset">Use system default…</string>
+    <string name="ntp_undo">Undo last change in this connection…</string>
+    <string name="ntp_before_after">Time source: %1$s → %2$s</string>
+    <string name="ntp_clock_before_after">Clock difference before → after: %1$s → %2$s</string>
+    <string name="ntp_restart_required">Setting saved. Android 6–10 normally needs a device restart to reload the NTP source. Restart the TV when convenient, then reconnect and check its time.</string>
+    <string name="ntp_next_refresh">Setting saved. Android can apply it at its next network time refresh. If the clock stays wrong, check automatic date and time and restart the TV if needed.</string>
+    <string name="ntp_activation_unknown">Setting saved. This firmware may require a restart before the time service reloads it.</string>
+    <string name="ntp_auto_on">Automatic date and time: enabled</string>
+    <string name="time_check_system_default">Android uses its system time configuration. Its actual server is not exposed by this setting; this does not mean automatic synchronization is disabled.</string>
 </resources>
