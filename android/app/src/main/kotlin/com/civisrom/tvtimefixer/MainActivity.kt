@@ -40,6 +40,10 @@ import com.civisrom.tvtimefixer.data.NtpProbe
 import com.civisrom.tvtimefixer.data.NtpProbeFailure
 import com.civisrom.tvtimefixer.data.NtpScanner
 import com.civisrom.tvtimefixer.data.ScanProgress
+import com.civisrom.tvtimefixer.data.Favorites
+import com.civisrom.tvtimefixer.data.FavoriteDevice
+import com.civisrom.tvtimefixer.data.FavoriteNtp
+import com.civisrom.tvtimefixer.data.usableDeviceSerial
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceRepository
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
@@ -97,6 +101,7 @@ class MainActivity : ComponentActivity() {
     private var actionGeneration = 0
     private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
+    private val favoritesStore get() = (application as TimeFixerApplication).favorites
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -108,7 +113,7 @@ class MainActivity : ComponentActivity() {
                     actionJob?.cancel()
                     val event = journal.record(Operation.USB_DETACHED, Outcome.FAILED,
                         DiagnosticTransport.USB, reason = ConnectionError.USB_DISCONNECTED)
-                    state = state.copy(connection = ConnectionState.Disconnected, busy = true,
+                    state = state.connectionLost().copy(busy = true,
                         operation = Operation.DISCONNECT, diagnosticEventId = event,
                         deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
                         timeCheck = null, timeDiagnosticEventId = null,
@@ -160,6 +165,8 @@ class MainActivity : ComponentActivity() {
             if (state.busy) return
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.PAIR, Operation.CHECK_NTP,
                     Operation.APPLY_NTP, Operation.CHECK_TIME) && !networkAllowed()) return
+            if (operation in setOf(Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE) &&
+                state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress && !networkAllowed()) return
             val generation = ++actionGeneration
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
                 state = state.connectionLost()
@@ -247,6 +254,52 @@ class MainActivity : ComponentActivity() {
             state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
+        override fun connectFavorite(favorite: FavoriteDevice) = run(Operation.CONNECT_NETWORK) { trace ->
+            val stored = state.favorites.devices.firstOrNull { it == favorite } ?: return@run state
+            val result = runInterruptible(Dispatchers.IO) { connector.connect(stored.address.toString()) }
+            val connected = state.copy(connection = result, message = null).withDeviceData(trace)
+            if (!connected.connected || stored.matches(connected.deviceInfo)) connected else {
+                runInterruptible(Dispatchers.IO) { connector.disconnect() }
+                connected.connectionLost().copy(message = UiMessage(R.string.favorite_identity_changed))
+            }
+        }
+
+        override fun saveCurrentDevice(name: String) {
+            val address = state.connectedAddress ?: return
+            val info = state.deviceInfo ?: return
+            if (!usableDeviceSerial(info.serial)) {
+                state = state.copy(message = UiMessage(R.string.favorite_identity_missing))
+                return
+            }
+            changeFavorites { old -> old.copy(devices = old.devices.filterNot { it.serial == info.serial } +
+                FavoriteDevice(name.trim(), address, info.serial, info.model)) }
+        }
+
+        override fun updateFavoriteDevice(favorite: FavoriteDevice) = changeFavorites { old ->
+            require(old.devices.any { it.serial == favorite.serial && it.model == favorite.model })
+            old.copy(devices = old.devices.map { if (it.serial == favorite.serial) favorite else it })
+        }
+
+        override fun removeFavoriteDevice(serial: String) = changeFavorites {
+            it.copy(devices = it.devices.filterNot { device -> device.serial == serial })
+        }
+
+        override fun saveFavoriteNtp(name: String, server: String) = changeFavorites { old ->
+            val canonical = server.trim().lowercase(java.util.Locale.ROOT)
+            old.copy(servers = old.servers.filterNot { it.server.equals(canonical, ignoreCase = true) } +
+                FavoriteNtp(name.trim(), canonical))
+        }
+
+        override fun removeFavoriteNtp(server: String) = changeFavorites {
+            it.copy(servers = it.servers.filterNot { entry -> entry.server == server })
+        }
+
+        override fun openSetupSettings(action: String) {
+            if (!openLocalSettings(this@MainActivity, action)) {
+                state = state.copy(message = UiMessage(R.string.setup_settings_unavailable))
+            }
+        }
+
         override fun connectLoopback() = run(Operation.CONNECT_NETWORK) { trace ->
             val result = runInterruptible(Dispatchers.IO) { connector.connectLoopback() }
             state.copy(connection = result, message = null).withDeviceData(trace)
@@ -254,17 +307,7 @@ class MainActivity : ComponentActivity() {
 
         override fun disconnect() = run(Operation.DISCONNECT) {
             runInterruptible(Dispatchers.IO) { connector.disconnect() }
-            AppState(
-                discovered = state.discovered,
-                discoveryAvailable = state.discoveryAvailable,
-                discoverySearching = state.discoverySearching,
-                discoveryPermissionNeeded = state.discoveryPermissionNeeded,
-                usbSupported = state.usbSupported,
-                usbDevices = state.usbDevices,
-                usbAttachedCount = state.usbAttachedCount,
-                usbScanFailed = state.usbScanFailed,
-                usbSystemState = state.usbSystemState,
-            )
+            state.connectionLost().copy(message = null, diagnosticEventId = null)
         }
 
         override fun refreshUsbDevices() = refreshUsbList(report = true)
@@ -448,7 +491,7 @@ class MainActivity : ComponentActivity() {
             scanJob = null
             // Найденное не выбрасываем: перебор останавливают обычно именно
             // потому, что подходящий сервер уже виден в списке
-            state = state.copy(ntpScan = state.ntpScan?.let { it.copy(checked = it.total) })
+            state = state.copy(ntpScan = state.ntpScan?.copy(cancelled = true))
         }
 
         override fun clearNtpScanResults() {
@@ -511,6 +554,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        state = state.copy(localSetup = readLocalSetup(this))
+        if (!state.favoritesReady && !state.favoritesBusy) loadFavorites()
         val connected = state.connection as? ConnectionState.Connected
         if (connected != null && !state.busy) {
             state = state.copy(connection = ConnectionState.Checking(connected.address))
@@ -518,12 +563,56 @@ class MainActivity : ComponentActivity() {
         refreshUsbList()
         if (missingDiscoveryPermissions().isEmpty()) {
             startDiscovery()
-        } else if (!permissionsRequested) {
-            // Один раз за жизнь Activity: после отказа система отвечает
-            // отказом молча, и дёргать её при каждом возврате на экран
-            // бессмысленно — дальше решает кнопка «Разрешить»
-            permissionsRequested = true
-            requestDiscoveryPermissions()
+        } else {
+            runCatching { discovery?.stop() }
+            state = state.copy(discoveryPermissionNeeded = true)
+            if (state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress) {
+                actionGeneration++
+                actionJob?.cancel()
+                state = state.copy(busy = false)
+                actions.disconnect()
+            }
+            if (!permissionsRequested) {
+                // Один раз за жизнь Activity: после отказа система отвечает
+                // отказом молча, и дёргать её при каждом возврате на экран
+                // бессмысленно — дальше решает кнопка «Разрешить»
+                permissionsRequested = true
+                requestDiscoveryPermissions()
+            }
+        }
+    }
+
+    private fun loadFavorites() {
+        state = state.copy(favoritesBusy = true)
+        lifecycleScope.launch {
+            try {
+                val loaded = runInterruptible(Dispatchers.IO) { favoritesStore.read() }
+                state = state.copy(favorites = loaded, favoritesReady = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                state = state.copy(message = UiMessage(R.string.favorites_storage_failed))
+            } finally {
+                state = state.copy(favoritesBusy = false)
+            }
+        }
+    }
+
+    private fun changeFavorites(change: (Favorites) -> Favorites) {
+        if (!state.favoritesReady || state.favoritesBusy) return
+        state = state.copy(favoritesBusy = true)
+        lifecycleScope.launch {
+            try {
+                val updated = change(state.favorites)
+                runInterruptible(Dispatchers.IO) { favoritesStore.write(updated) }
+                state = state.copy(favorites = updated, message = UiMessage(R.string.favorites_saved))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                state = state.copy(message = UiMessage(R.string.favorites_storage_failed))
+            } finally {
+                state = state.copy(favoritesBusy = false)
+            }
         }
     }
 
@@ -531,6 +620,7 @@ class MainActivity : ComponentActivity() {
         // Сканирование mDNS держит радио включённым — на время невидимости
         // приложения оно останавливается. Сохранённую связь проверяем при возврате.
         runCatching { discovery?.stop() }
+        if (scanJob?.isActive == true) actions.cancelNtpScan()
         super.onStop()
     }
 

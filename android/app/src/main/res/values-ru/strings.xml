@@ -1,5 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="error_connection_refused">Подключение к этому порту отклонено. Проверьте актуальный порт подключения на TV и включите сетевую отладку; порт спаривания для подключения не подходит.</string>
+    <string name="error_connection_timeout">Устройство не ответило вовремя. Проверьте адрес, запрос разрешения на TV, общую сеть и изоляцию клиентов в роутере. Затем повторите подключение.</string>
+    <string name="error_network_unavailable">Нет маршрута к устройству или не удалось определить адрес. Подключите оба устройства к одной доступной сети и проверьте IP-адрес.</string>
+    <string name="ntp_scan_stopped">Проверка остановлена: проверено %1$d из %2$d. Найденные результаты сохранены.</string>
+    <string name="setup_title">Настройка приложения на этом TV</string>
+    <string name="setup_step">Шаг %1$d из %2$d</string>
+    <string name="setup_intro">Для изменения источника времени нужен разрешённый доступ ADB. Установка APK не выдаёт системных прав и не включает отладку.</string>
+    <string name="setup_developer_instructions">Откройте «Об устройстве» и нажмите на номер сборки 7 раз, если режим разработчика ещё скрыт. Затем вернитесь сюда кнопкой «Назад» на пульте.</string>
+    <string name="setup_developer_state">Режим разработчика: %1$s</string>
+    <string name="setup_debug_state">USB-отладка: %1$s</string>
+    <string name="setup_debug_state_note">Этот системный флаг не подтверждает доступность отладки по сети. После возврата из настроек сведения обновятся.</string>
+    <string name="setup_about">Об устройстве</string>
+    <string name="setup_developer">Настройки разработчика</string>
+    <string name="setup_wireless">Если прошивка предлагает «Беспроводную отладку», включите её в своей доверенной сети. Порт спаривания и порт подключения различаются; перепишите оба из соответствующих экранов.</string>
+    <string name="setup_legacy">Найдите «Отладка по сети» или «ADB debugging». Наличие и название зависят от прошивки. Если доступна только USB-отладка, первоначальное включение сетевого ADB может потребовать компьютер и USB-подключение.</string>
+    <string name="setup_self_pairing">Диалог с кодом спаривания должен оставаться открыт. На TV, где он закрывается при переходе в приложение, выполняйте первоначальную настройку с телефона или компьютера. Уже спаренный компьютер не передаёт свои права этому APK.</string>
+    <string name="setup_connect_note">Если сетевой ADB уже слушает порт 5555 на этом TV, попробуйте локальное подключение и подтвердите системный запрос ключа. Кнопка не включает ADB и не перезапускает TV. Для другого порта используйте форму подключения.</string>
+    <string name="setup_return_to_form">Завершите мастер для ввода адреса, поиска устройства или спаривания. При отсутствии сетевой отладки используйте десктопную версию через USB.</string>
+    <string name="setup_date_settings">Дата и время этого TV</string>
+    <string name="setup_next">Далее</string>
+    <string name="setup_finish">К подключению</string>
+    <string name="setup_back">Назад</string>
+    <string name="setup_enabled">включён</string>
+    <string name="setup_disabled">выключен</string>
+    <string name="setup_unknown">не удалось определить</string>
+    <string name="setup_settings_unavailable">Прошивка не открыла настройки. Перейдите в системное меню настроек с пульта.</string>
+    <string name="favorite_devices">Избранные устройства</string>
+    <string name="favorite_current_device">Сохранить подключённое устройство</string>
+    <string name="favorite_device_hint">Сохраняются имя и адрес. При повторном подключении сравниваются модель и серийный номер, чтобы не выбрать другое устройство после смены IP.</string>
+    <string name="favorite_address_hint">Порт беспроводной отладки может измениться. Укажите актуальный адрес с экрана TV; при подключении устройство будет проверено снова.</string>
+    <string name="favorite_identity_changed">По этому адресу ответило другое устройство либо не удалось проверить его сведения. Подключение закрыто. Проверьте адрес и подключитесь вручную.</string>
+    <string name="favorite_identity_missing">Прошивка не предоставила пригодный серийный номер. Без него быстрое подключение нельзя защитить от смены устройства. Используйте ручной адрес.</string>
+    <string name="favorite_ntp_save">Сохранить сервер в избранном</string>
+    <string name="favorite_name">Название</string>
+    <string name="favorites_empty">Сохранённых устройств пока нет.</string>
+    <string name="favorites_edit">Название и адрес</string>
+    <string name="favorites_delete">Удалить</string>
+    <string name="favorites_save">Сохранить</string>
+    <string name="favorites_saved">Избранное сохранено на этом устройстве.</string>
+    <string name="favorites_storage_failed">Не удалось прочитать или сохранить избранное. Предыдущий файл сохранён. Проверьте свободное место; допускается до 20 устройств и 30 серверов.</string>
+    <string name="address_copy">Копировать адрес</string>
+    <string name="address_copied">Адрес скопирован</string>
+    <string name="address_paste">Вставить адрес</string>
     <string name="usb_title">Отладка по USB</string>
     <string name="usb_setup_hint">Подключите этот телефон или планшет в роли USB host (OTG) к поддерживаемому порту device/OTG целевого устройства кабелем передачи данных. Включите USB-отладку на целевом устройстве. Порт телевизора, работающий только как USB host, для этого не подходит.</string>
     <string name="usb_authorize_hint">Разрешите доступ к USB на этом устройстве, затем разблокируйте целевое устройство и подтвердите на нём запрос RSA для отладки. Авторизация может занять до минуты.</string>
@@ -15,7 +58,7 @@
     <string name="app_version">Версия %1$s</string>
 
     <!-- Режимы работы -->
-    <string name="mode_television">Запущено на телевизоре: подключение к этому же устройству.</string>
+    <string name="mode_television">Режим TV. Настройте доступ к этому телевизору в мастере или укажите адрес другого устройства.</string>
     <string name="mode_handheld">Запущено на телефоне: подключение к телевизору по сети или USB.</string>
 
     <!-- Подключение -->
@@ -39,7 +82,7 @@
     <string name="error_pairing_timeout">Время ожидания спаривания истекло. Проверьте сеть и получите новый код.</string>
     <string name="error_pairing_failed">Не удалось завершить спаривание. Проверьте порт спаривания и получите новый код на телевизоре.</string>
     <string name="error_tls_failed">Не удалось установить защищённое соединение. Проверьте порт отладки и повторите попытку.</string>
-    <string name="error_wireless_unsupported">Для спаривания нужен Android 10 или новее на устройстве с этим приложением. Классическая отладка по сети остаётся доступной.</string>
+    <string name="error_wireless_unsupported">Эта система не предоставляет нужную поддержку TLS для спаривания. Нужен Android 10 или новее и совместимый TLS-провайдер. Используйте классическую сетевую отладку или десктопную версию.</string>
     <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
 
     <string name="project_source_code">Исходный код проекта:</string>

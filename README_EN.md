@@ -521,7 +521,12 @@ the check take longer because each request must time out.
 6. Ping NTP servers
 7. Export / Import settings
 8. Return to main menu
+r — System default; u — Undo last change
 ```
+
+System default removes the custom NTP setting. Undo restores the previous
+value only for the same device while its setting still matches the last change.
+Both operations require a `yes` confirmation.
 
 Opens a submenu for managing favorite servers:
 
@@ -805,6 +810,14 @@ server: the TV, box, or phone clock may be wrong. Possible outcomes:
 The phone and TV networks may impose different restrictions, so a successful
 phone-side check does not guarantee that the TV can reach the server.
 
+**Use system default** removes the custom value and lets the firmware choose its
+time source. **Undo last change in this connection** restores the previous value in the current session
+if the device and setting have not changed. Both require confirmation. The result
+card shows the setting and clock measurement before and after the change.
+On Android 6–10, activating a new NTP setting usually requires restarting the
+device; Android 11+ reads it on the next network time refresh. Disabled automatic
+time is reported and is never silently enabled. Firmware behavior may vary.
+
 The **Apply** button does the same and, if the check passes, writes the address
 to the TV. The result appears **right under the button**, and the "Current:"
 line is updated with the value **read back from the device**.
@@ -967,14 +980,34 @@ operations.
 ### What the app does not do
 
 Unlike the desktop version there is no subnet scanning, no batch update across
-several TVs, no terminal mode, no favourite servers and no settings export. Use
+several TVs, no terminal mode and no settings export. Use
 the desktop program for those.
 
 ### TV Mode
 
-When installed on Android TV itself, the APK offers `127.0.0.1:5555` for
-legacy debugging. Whether this connection is accepted depends on the firmware.
+The APK can be installed directly on Android TV or Google TV. **Set up the app on this TV**
+opens three steps: developer options, available debugging methods, and connection.
+The guide opens system settings but does not enable debugging automatically.
+A separate button checks `127.0.0.1:5555`; support depends on the firmware.
 For wireless debugging, use pairing and the current TLS connection port.
+Pairing with a computer does not authorize the installed APK; the TV pairing
+dialog must remain open while entering its code.
+
+Controls support a remote. TV address fields provide explicit copy and paste
+buttons; pasting only fills the field and does not connect.
+
+### APK favorites
+
+**Favorite devices** can save a connected network device, edit its name and
+address, reconnect, or delete the entry. Reconnecting checks the model and
+serial number: an unexpected device at the previous IP ends the connection.
+This checks consistency with the saved entry, not cryptographic device identity.
+Firmware without a usable serial number cannot save this kind of entry.
+
+The time server section can save a custom NTP address with a name. Selecting
+a favorite only fills the field; applying remains a separate action. Up to
+20 devices and 30 servers are stored privately, excluded from backup and
+without pairing codes. A write failure is shown and preserves the previous file.
 
 
 ## Compatibility
@@ -1006,12 +1039,37 @@ needs a port supporting USB device mode, not only a port for storage devices.
 *   Phone → SHIELD discovery is not yet confirmed: Android returns an empty
     USB list in the tested configuration. Better diagnostics do not establish
     that this hardware scenario has been fixed.
-*   Automated UI checks run on Android 6 and Android 16; system commands for
-    device details and time zone changes are also checked on Android 11.
-    These checks do not replace physical testing of cables, USB roles or each TV model.
+*   CI is configured for Android 6–17 and Android TV / Google TV 11/14/16,
+    including a 16 KiB page-size image. See [Android CI runs](https://github.com/civisrom/android-tv-date-time/actions/workflows/android.yml)
+    for the result of a particular revision. APK checks cover the presence of
+    ARMv7, ARM64, x86 and x86-64 libraries and native alignment. x86 emulators
+    do not replace physical testing of modern ARM boxes, TVs, cables and USB roles.
 
 When reporting a problem, include both device models, Android versions,
 connection method and the error text. In the APK, details are available through Diagnostics.
+
+
+## Development checks
+
+On `dev`, CI builds desktop for Windows, Linux and macOS, checks the Python
+package and native ADB, and runs tests. Android CI builds debug and unsigned
+release APKs, runs unit tests, Lint, and emulator UI tests. Release publication
+depends on Android and dependency checks for the same source revision.
+
+Android dependency versions are locked in `android/app/gradle.lockfile`, with
+SHA-256 verification in `android/gradle/verification-metadata.xml`. For an
+intentional update, use `./gradlew --write-locks :app:dependencies`, then
+`--write-verification-metadata sha256` for build and Lint tasks. Hash generation
+alone does not verify provenance: compare new artifacts with official repositories
+and review the file changes. A normal build must then pass without these flags.
+Signing secrets are not needed for these checks. Configuration cache is disabled;
+signed builds must also use `--no-build-cache`.
+
+`python3 scripts/check_dependencies.py` checks locked Python and Maven dependencies
+with OSV, including test and build tools; CI also runs it on a schedule. Service
+unavailability means the check is incomplete. `python3 scripts/verify_android_apk.py <APK>`
+checks native ABIs and alignment. These checks complement functional app testing.
+
 
 ## License
 

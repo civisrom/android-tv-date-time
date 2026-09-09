@@ -21,8 +21,9 @@ data class ScanProgress(
     val total: Int,
     /** Пригодные к применению, уже упорядоченные лучшими вперёд. */
     val best: List<NtpProbeResult>,
+    val cancelled: Boolean = false,
 ) {
-    val finished: Boolean get() = checked >= total
+    val finished: Boolean get() = cancelled || checked >= total
 }
 
 /**

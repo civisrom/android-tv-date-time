@@ -159,7 +159,9 @@ internal fun DiagnosticsScreen(
         }
     }
     Column(
-        Modifier.fillMaxSize().safeDrawingPadding().padding(if (mode == DeviceMode.TELEVISION) 32.dp else 16.dp),
+        Modifier.fillMaxSize().safeDrawingPadding().padding(
+            horizontal = if (mode == DeviceMode.TELEVISION) 48.dp else 16.dp,
+            vertical = if (mode == DeviceMode.TELEVISION) 27.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.headlineSmall)

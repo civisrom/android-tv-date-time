@@ -99,11 +99,9 @@ class KadbAdbClientFactory(
             is AdbPairAuthException -> ConnectionError.PAIRING_REQUIRED
             is AdbAuthException -> ConnectionError.NOT_AUTHORIZED
             is NoSuchAlgorithmException -> ConnectionError.WIRELESS_UNSUPPORTED
-            is SocketTimeoutException,
-            is ConnectException,
-            is NoRouteToHostException,
-            is UnknownHostException,
-            -> ConnectionError.UNREACHABLE
+            is SocketTimeoutException -> ConnectionError.CONNECTION_TIMEOUT
+            is ConnectException -> ConnectionError.CONNECTION_REFUSED
+            is NoRouteToHostException, is UnknownHostException -> ConnectionError.NETWORK_UNAVAILABLE
             is IOException -> ConnectionError.UNREACHABLE
             else -> ConnectionError.UNKNOWN
         }
@@ -117,7 +115,8 @@ internal fun classifyPairingError(error: Exception): ConnectionError = when (err
     is PairingProtocolException -> ConnectionError.PAIRING_FAILED
     is SSLException -> ConnectionError.TLS_FAILED
     is NoSuchAlgorithmException -> ConnectionError.WIRELESS_UNSUPPORTED
-    is ConnectException, is NoRouteToHostException, is UnknownHostException -> ConnectionError.UNREACHABLE
+    is ConnectException -> ConnectionError.CONNECTION_REFUSED
+    is NoRouteToHostException, is UnknownHostException -> ConnectionError.NETWORK_UNAVAILABLE
     is IOException -> ConnectionError.PAIRING_FAILED
     else -> ConnectionError.UNKNOWN
 }

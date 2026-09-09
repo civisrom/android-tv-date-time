@@ -1,5 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="error_connection_refused">The connection to this port was refused. Check the current connection port on the TV and enable network debugging; a pairing port cannot be used for connection.</string>
+    <string name="error_connection_timeout">The device did not answer in time. Check the address, the authorization prompt on the TV, the shared network and router client isolation. Then reconnect.</string>
+    <string name="error_network_unavailable">No route to the device or its address could not be resolved. Connect both devices to an accessible shared network and check the IP address.</string>
+    <string name="ntp_scan_stopped">Scan stopped: checked %1$d of %2$d. Results found so far were retained.</string>
+    <string name="setup_title">Set up the app on this TV</string>
+    <string name="setup_step">Step %1$d of %2$d</string>
+    <string name="setup_intro">Changing the time source requires authorized ADB access. Installing the APK does not grant system privileges or enable debugging.</string>
+    <string name="setup_developer_instructions">Open About device and press the build number 7 times if Developer options are hidden. Return here with the Back button on your remote.</string>
+    <string name="setup_developer_state">Developer options: %1$s</string>
+    <string name="setup_debug_state">USB debugging: %1$s</string>
+    <string name="setup_debug_state_note">This system flag does not confirm network debugging availability. Information refreshes when you return from Settings.</string>
+    <string name="setup_about">About device</string>
+    <string name="setup_developer">Developer options</string>
+    <string name="setup_wireless">If the firmware offers Wireless debugging, enable it on your trusted network. Pairing and connection ports differ; copy both from their respective screens.</string>
+    <string name="setup_legacy">Look for Network debugging or ADB debugging. Availability and naming depend on the firmware. If only USB debugging is available, enabling network ADB initially may require a computer and a USB connection.</string>
+    <string name="setup_self_pairing">The pairing code dialog must remain open. On TVs that close it when switching apps, perform initial setup from a phone or computer. A paired computer does not transfer its authorization to this APK.</string>
+    <string name="setup_connect_note">If network ADB already listens on port 5555 on this TV, try a local connection and accept the system key prompt. The button does not enable ADB or restart the TV. For another port, use the connection form.</string>
+    <string name="setup_return_to_form">Finish this guide to enter an address, discover a device or pair. If network debugging is unavailable, use the desktop version over USB.</string>
+    <string name="setup_date_settings">Date and time on this TV</string>
+    <string name="setup_next">Next</string>
+    <string name="setup_finish">Go to connection</string>
+    <string name="setup_back">Back</string>
+    <string name="setup_enabled">enabled</string>
+    <string name="setup_disabled">disabled</string>
+    <string name="setup_unknown">unknown</string>
+    <string name="setup_settings_unavailable">The firmware could not open Settings. Use your remote to open the system settings menu.</string>
+    <string name="favorite_devices">Favorite devices</string>
+    <string name="favorite_current_device">Save connected device</string>
+    <string name="favorite_device_hint">Saves a name and address. Reconnecting checks the model and serial number to avoid choosing another device after its IP changes.</string>
+    <string name="favorite_address_hint">Wireless debugging ports can change. Enter the current address shown on the TV; the device will be checked again when connecting.</string>
+    <string name="favorite_identity_changed">Another device answered at this address, or its information could not be verified. The connection was closed. Check the address and connect manually.</string>
+    <string name="favorite_identity_missing">The firmware did not provide a usable serial number. Quick reconnect cannot be protected against choosing another device without it. Use a manual address.</string>
+    <string name="favorite_ntp_save">Save server to favorites</string>
+    <string name="favorite_name">Name</string>
+    <string name="favorites_empty">No saved devices yet.</string>
+    <string name="favorites_edit">Name and address</string>
+    <string name="favorites_delete">Delete</string>
+    <string name="favorites_save">Save</string>
+    <string name="favorites_saved">Favorites saved on this device.</string>
+    <string name="favorites_storage_failed">Could not read or save favorites. The previous file was retained. Check free space; the limits are 20 devices and 30 servers.</string>
+    <string name="address_copy">Copy address</string>
+    <string name="address_copied">Address copied</string>
+    <string name="address_paste">Paste address</string>
     <string name="usb_title">USB debugging</string>
     <string name="usb_setup_hint">Connect this phone/tablet as a USB host (OTG) to the target device’s supported device/OTG port using a data cable. Enable USB debugging on the target. A host-only TV USB port cannot be used for this connection.</string>
     <string name="usb_authorize_hint">Allow USB access on this device, then unlock the target and confirm its RSA debugging prompt. Authorization may take up to a minute.</string>
@@ -15,7 +58,7 @@
     <string name="app_version">Version %1$s</string>
 
     <!-- Режимы работы -->
-    <string name="mode_television">Running on a TV: it will connect to this device itself.</string>
+    <string name="mode_television">TV mode. Use the setup guide for this TV or enter another device address.</string>
     <string name="mode_handheld">Running on a phone: connect to a TV over the network or USB.</string>
 
     <!-- Подключение -->
@@ -39,7 +82,7 @@
     <string name="error_pairing_timeout">Pairing timed out. Check the network and request a fresh pairing code.</string>
     <string name="error_pairing_failed">Pairing could not finish. Check the pairing port and request a fresh code on the TV.</string>
     <string name="error_tls_failed">The secure connection could not be established. Check the debugging port and try again.</string>
-    <string name="error_wireless_unsupported">Pairing requires Android 10 or later on the device running this app. Classic network debugging is still available.</string>
+    <string name="error_wireless_unsupported">This system does not provide the TLS support needed for pairing. Android 10 or later and a compatible TLS provider are required. Use classic network debugging or the desktop version.</string>
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
     <string name="project_source_code">Project source code:</string>

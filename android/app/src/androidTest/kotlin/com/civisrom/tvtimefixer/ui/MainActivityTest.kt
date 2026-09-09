@@ -81,4 +81,43 @@ class MainActivityTest {
         compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsNotEnabled()
         screenshot("recreated")
     }
+
+    @Test fun favorite_server_is_saved_by_the_real_activity_and_restored_after_recreation() {
+        val app = compose.activity.application as com.civisrom.tvtimefixer.TimeFixerApplication
+        try {
+            compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+            compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
+            compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
+            compose.onNodeWithTag("favorite-confirm").performClick()
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }
+            compose.activityRule.scenario.recreate()
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("favorite-ntp-pool.ntp.org").performScrollTo().performClick()
+            compose.onNodeWithTag("ntp-address").assertTextContains("pool.ntp.org")
+            compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
+            screenshot("favorite-restored")
+        } finally { app.favorites.write(com.civisrom.tvtimefixer.data.Favorites()) }
+    }
+
+    @Test fun TV_setup_is_navigable_with_actual_remote_events_and_survives_resume() {
+        org.junit.Assume.assumeTrue(detectDeviceMode(compose.activity) == DeviceMode.TELEVISION)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
+        compose.onNodeWithTag("setup-open").performScrollTo()
+            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.onNodeWithTag("setup-screen").assertIsDisplayed()
+        compose.onNodeWithTag("setup-next").assertIsFocused()
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.onNodeWithTag("setup-next").performScrollTo().assertIsFocused()
+        screenshot("tv-setup-debugging")
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.onNodeWithTag("setup-connect").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-next").performScrollTo()
+            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.onNodeWithTag("setup-open").assertIsDisplayed().assertIsFocused()
+    }
 }

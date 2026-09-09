@@ -188,29 +188,29 @@ class UdpSntpClient(
         for ((index, address) in resolved.withIndex()) {
             val addressDeadline = elapsedRealtime() + remaining() / (resolved.size - index)
             try {
-        DatagramSocket().use { socket ->
-            // Принимаем ответ только от выбранного адреса и UDP-порта.
-            socket.connect(address, port)
-            val t1 = System.currentTimeMillis()
-            val started = elapsedRealtime()
-            val out = SntpPacket.request(t1)
-            socket.send(DatagramPacket(out, out.size, address, port))
+                DatagramSocket().use { socket ->
+                    // Принимаем ответ только от выбранного адреса и UDP-порта.
+                    socket.connect(address, port)
+                    val t1 = System.currentTimeMillis()
+                    val started = elapsedRealtime()
+                    val out = SntpPacket.request(t1)
+                    socket.send(DatagramPacket(out, out.size, address, port))
 
-            val buffer = ByteArray(SntpPacket.SIZE)
-            val incoming = DatagramPacket(buffer, buffer.size)
-            while (true) {
-                socket.soTimeout = remaining(addressDeadline).coerceAtMost(100)
-                try { socket.receive(incoming); break }
-                catch (_: SocketTimeoutException) { remaining(addressDeadline) }
-            }
-            val received = elapsedRealtime()
-            // Автокоррекция часов телефона во время запроса не меняет длительность обмена.
-            val t4 = t1 + (received - started)
+                    val buffer = ByteArray(SntpPacket.SIZE)
+                    val incoming = DatagramPacket(buffer, buffer.size)
+                    while (true) {
+                        socket.soTimeout = remaining(addressDeadline).coerceAtMost(100)
+                        try { socket.receive(incoming); break }
+                        catch (_: SocketTimeoutException) { remaining(addressDeadline) }
+                    }
+                    val received = elapsedRealtime()
+                    // Автокоррекция часов телефона во время запроса не меняет длительность обмена.
+                    val t4 = t1 + (received - started)
 
-            val parsed = SntpPacket.parse(buffer.copyOf(incoming.length), t1, t4, out)
-                ?: throw NotAnNtpServerException("$host отвечает, но не по протоколу NTP")
-            return parsed.copy(address = address.hostAddress.orEmpty(), referenceElapsedMillis = received)
-        }
+                    val parsed = SntpPacket.parse(buffer.copyOf(incoming.length), t1, t4, out)
+                        ?: throw NotAnNtpServerException("$host отвечает, но не по протоколу NTP")
+                    return parsed.copy(address = address.hostAddress.orEmpty(), referenceElapsedMillis = received)
+                }
             } catch (e: CancellationException) { throw e }
             catch (e: InterruptedException) { throw CancellationException("NTP cancelled", e) }
             catch (e: Exception) { lastError = e }

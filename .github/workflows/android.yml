@@ -9,11 +9,13 @@ on:
     paths:
       - 'android/**'
       - 'shared/**'
+      - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
   pull_request:
     paths:
       - 'android/**'
       - 'shared/**'
+      - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
   workflow_dispatch:
   workflow_call:
@@ -51,9 +53,18 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
 
+      - name: Assemble unsigned release APK
+        working-directory: android
+        run: ./gradlew --no-daemon --no-configuration-cache --no-build-cache assembleRelease
+
       - name: Unit tests
         working-directory: android
         run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Verify APK architectures and memory page alignment
+        run: |
+          python3 scripts/verify_android_apk.py android/app/build/outputs/apk/debug/app-debug.apk
+          python3 scripts/verify_android_apk.py android/app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Lint
         working-directory: android
@@ -212,8 +223,15 @@ jobs:
             --package "$UI_TEST_IMAGE" --device "$UI_TEST_DEVICE" \
             --path "$ANDROID_AVD_HOME/ui-test.avd"
           test -f "$ANDROID_AVD_HOME/ui-test.ini"
+          emulator_features=()
+          if [[ "$UI_TEST_IMAGE" == *'android-37.0;'* ]]; then
+            # API 37 mapper.ranchu aborts when the host advertises ReadColorBufferDMA.
+            # Disable its GLDirectMem prerequisite; keep the system UI and all APK tests enabled.
+            emulator_features=(-feature -GLDirectMem)
+          fi
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
             -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 -partition-size 4096 \
+            "${emulator_features[@]}" \
             > "$RUNNER_TEMP/ui-emulator.log" 2>&1 &
           timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
           for attempt in $(seq 1 120); do
@@ -238,8 +256,8 @@ jobs:
         # APK остаются установленными до сбора скриншотов.
         run: |
           set -o pipefail
-          timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
-          timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           # Отдельные процессы ограничивают накопление Surface/IME в старых
           # системных образах. Каждый тест выполняется один раз; сбои не скрываем повтором.
           for shard in 0 1 2; do

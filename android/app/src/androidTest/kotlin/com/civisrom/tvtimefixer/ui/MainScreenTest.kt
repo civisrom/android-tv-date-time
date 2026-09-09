@@ -52,6 +52,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -93,6 +94,13 @@ private class ScreenActions : AppActions {
     val calls = mutableListOf<String>()
     var onScan: () -> Unit = {}
     var onClearScan: () -> Unit = {}
+    override fun connectFavorite(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice) { calls += "favorite:${favorite.address}" }
+    override fun saveCurrentDevice(name: String) { calls += "save-device:$name" }
+    override fun updateFavoriteDevice(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice) { calls += "edit-device:${favorite.address}" }
+    override fun removeFavoriteDevice(serial: String) { calls += "delete-device:$serial" }
+    override fun saveFavoriteNtp(name: String, server: String) { calls += "save-ntp:$name:$server" }
+    override fun removeFavoriteNtp(server: String) { calls += "delete-ntp:$server" }
+    override fun openSetupSettings(action: String) { calls += "settings:$action" }
     override fun connect(address: String) { calls += "connect:$address" }
     override fun connectLoopback() { calls += "loopback" }
     override fun disconnect() { calls += "disconnect" }
@@ -642,11 +650,49 @@ class MainScreenTest {
         screen(connected, scale = 2f, width = 320)
         compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
         waitForKeyboard()
+        compose.onNodeWithTag("ntp-address").performImeAction()
         compose.onNodeWithTag("ntp-check").performScrollTo().assertIsDisplayed()
         screenshot("phone-320-font200-ntp")
         compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
         compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
         screenshot("phone-320-font200-diagnostics")
+    }
+
+    @Test fun television_setup_supports_remote_steps_large_text_and_return_focus() {
+        screen(AppState(), mode = DeviceMode.TELEVISION, scale = 2f, width = 480)
+        compose.onNodeWithTag("setup-open").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-about").performScrollTo().assertIsDisplayed()
+        screenshot("tv-setup-font200-first")
+        compose.onNodeWithTag("setup-next").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-next").assertIsFocused()
+        screenshot("tv-setup-font200-debugging")
+        compose.onNodeWithTag("setup-next").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-connect").performScrollTo().assertIsDisplayed()
+        assertTrue(actions.calls.isEmpty())
+        compose.onNodeWithTag("setup-next").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-open").assertIsFocused()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun favorite_ntp_selection_only_fills_the_address_without_writing_to_the_TV() {
+        screen(connected.copy(favoritesReady = true, favorites = com.civisrom.tvtimefixer.data.Favorites(
+            servers = listOf(com.civisrom.tvtimefixer.data.FavoriteNtp("Дом", "pool.ntp.org")))))
+        compose.onNodeWithTag("favorite-ntp-pool.ntp.org").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-address").assertTextContains("pool.ntp.org")
+        compose.onNodeWithTag("ntp-check").assertIsFocused()
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun favorite_device_address_edit_rejects_invalid_port_and_does_not_connect() {
+        val favorite = com.civisrom.tvtimefixer.data.FavoriteDevice("Гостиная", DeviceAddress("192.0.2.7", 37123), "fixture", "TV")
+        screen(AppState(favoritesReady = true, favorites = com.civisrom.tvtimefixer.data.Favorites(devices = listOf(favorite))))
+        compose.onNodeWithTag("section-favorites").performScrollTo().performClick()
+        compose.onNodeWithText("Название и адрес").performScrollTo().performClick()
+        compose.onNodeWithTag("favorite-address").performSemanticsAction(SemanticsActions.SetText) { it(androidx.compose.ui.text.AnnotatedString("192.0.2.7:0")) }
+        compose.onNodeWithTag("favorite-confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("favorite-address").performSemanticsAction(SemanticsActions.SetText) { it(androidx.compose.ui.text.AnnotatedString("192.0.2.9:40404")) }
+        compose.onNodeWithTag("favorite-confirm").performClick()
+        assertEquals(listOf("edit-device:192.0.2.9:40404"), actions.calls)
     }
 
     @Test fun recreated_ui_restores_addresses_without_replaying_actions() {
@@ -684,8 +730,12 @@ class MainScreenTest {
             waitForKeyboard()
             compose.onNodeWithTag(tag).performScrollTo().assertIsFocused()
             try {
-                compose.onNodeWithTag(tag).performTouchInput { longClick(center) }
-                clickTextSelectionAction(android.R.string.paste)
+                if (com.civisrom.tvtimefixer.detectDeviceMode(context) == DeviceMode.TELEVISION) {
+                    compose.onNodeWithTag("paste-$tag").performScrollTo().performClick()
+                } else {
+                    compose.onNodeWithTag(tag).performTouchInput { longClick(center) }
+                    clickTextSelectionAction(android.R.string.paste)
+                }
                 // Проверяем результат единственной вставки через системное меню.
                 compose.waitUntil(5_000) {
                     compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text == address
@@ -820,6 +870,15 @@ class MainScreenTest {
     }
 
     private fun copyDisplayedText(text: String) {
+        if (com.civisrom.tvtimefixer.detectDeviceMode(context) == DeviceMode.TELEVISION) {
+            val tag = if (text.contains(':')) "discovered-$text" else "ntp-$text"
+            compose.onNodeWithTag("copy-$tag").performScrollTo().performClick()
+            compose.runOnIdle {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                assertEquals(text, clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+            }
+            return
+        }
         val node = compose.onNodeWithText(text, useUnmergedTree = true).performScrollTo()
         val content = compose.onNodeWithTag("main-content")
         // Оставляем место для маркеров выделения и системного меню, вдали от панели навигации.

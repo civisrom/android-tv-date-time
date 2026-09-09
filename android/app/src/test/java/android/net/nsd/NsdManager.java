@@ -8,7 +8,7 @@ public class NsdManager {
     public final Map<String, DiscoveryListener> discovery = new HashMap<>();
     public final List<ServiceInfoCallback> callbacks = new ArrayList<>();
     public final List<ServiceInfoCallback> unregistered = new ArrayList<>();
-    public final List<ResolveListener> resolves = new ArrayList<>();
+    public final List<ResolveListener> resolves = new java.util.concurrent.CopyOnWriteArrayList<>();
     public void discoverServices(String type, int protocol, DiscoveryListener listener) {
         discovery.put(type, listener);
     }

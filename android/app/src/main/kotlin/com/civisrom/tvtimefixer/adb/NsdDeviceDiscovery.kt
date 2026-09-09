@@ -10,6 +10,8 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -27,7 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
  * приводит к состоянию «недоступно», а не к исключению наружу. Адрес
  * устройства всегда можно ввести руками.
  */
-class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
+class NsdDeviceDiscovery(context: Context, private val resolveTimeoutMs: Long = 5_000) : DeviceDiscovery {
 
     private val nsd = context.applicationContext
         .getSystemService(Context.NSD_SERVICE) as NsdManager
@@ -38,6 +40,11 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
      * предыдущий запрос ещё не завершился, а найтись три сервиса могут разом.
      */
     private val resolver = Executors.newSingleThreadExecutor()
+    private val deadlines = java.util.concurrent.ScheduledThreadPoolExecutor(1) { task ->
+        Thread(task, "nsd-deadline").apply { isDaemon = true }
+    }.apply { removeOnCancelPolicy = true }
+    private var resolvingToken: Any? = null
+    private var resolveDeadline: ScheduledFuture<*>? = null
 
     private val lock = Any()
     private val devices = LinkedHashMap<String, DiscoveredDevice>()
@@ -88,6 +95,9 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
             devices.clear()
             pending.clear()
             resolving = false
+            resolvingToken = null
+            resolveDeadline?.cancel(false)
+            resolveDeadline = null
             services.clear()
             unregistering = callbacks.values.toList()
             callbacks.clear()
@@ -104,6 +114,7 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
         }
         stop()
         resolver.shutdown()
+        deadlines.shutdownNow()
     }
 
     // ── Обнаружение ──────────────────────────────────────────────────────
@@ -160,7 +171,7 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
         synchronized(lock) {
             if (!active(epoch)) return
             val key = keyOf(info.serviceName, kind)
-            if (services.containsKey(key)) return
+            if (services.containsKey(key) || services.size >= 256) return
             val token = Any()
             services[key] = token
             // API 34 subscriptions are continuous; an initial update is not guaranteed.
@@ -188,10 +199,13 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
             val (info, kind) = item
             val key = keyOf(info.serviceName, kind)
             val token = services[key] ?: return resolveNext(epoch)
+            resolvingToken = token
+            resolveDeadline = deadlines.schedule({
+                completeResolve(epoch, token) { if (services[key] === token) services.remove(key) }
+            }, resolveTimeoutMs, TimeUnit.MILLISECONDS)
             runCatching { nsd.resolveService(info, resolveListener(kind, epoch, key, token)) }
                 .onFailure {
-                    services.remove(key)
-                    resolveNext(epoch)
+                    completeResolve(epoch, token) { if (services[key] === token) services.remove(key) }
                 }
         }
     }
@@ -200,18 +214,27 @@ class NsdDeviceDiscovery(context: Context) : DeviceDiscovery {
     private fun resolveListener(kind: DiscoveredDevice.Kind, epoch: Long, key: String, token: Any) =
         object : NsdManager.ResolveListener {
             override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) {
-                synchronized(lock) {
-                    if (!active(epoch)) return
+                completeResolve(epoch, token) {
                     if (services[key] === token) services.remove(key)
                 }
-                resolveNext(epoch)
             }
 
             override fun onServiceResolved(info: NsdServiceInfo) {
-                remember(info, kind, epoch, key, token)
-                resolveNext(epoch)
+                completeResolve(epoch, token) { remember(info, kind, epoch, key, token) }
             }
         }
+
+    /** Только один callback или deadline может продвинуть очередь. Поздний ответ не трогает новый запрос. */
+    private fun completeResolve(epoch: Long, token: Any, result: () -> Unit) {
+        synchronized(lock) {
+            if (!active(epoch) || resolvingToken !== token) return
+            resolvingToken = null
+            resolveDeadline?.cancel(false)
+            resolveDeadline = null
+            result()
+            resolveNext(epoch)
+        }
+    }
 
     /**
      * Android 14 и новее. `resolveService` там объявлен устаревшим, а

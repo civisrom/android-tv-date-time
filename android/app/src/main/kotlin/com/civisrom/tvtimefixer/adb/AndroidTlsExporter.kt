@@ -24,8 +24,8 @@ internal fun exportAndroidPairingKey(socket: SSLSocket): ByteArray {
     } catch (e: InvocationTargetException) {
         throw SSLException("TLS exporter failed", e.cause ?: e)
     } catch (e: ReflectiveOperationException) {
-        throw SSLException("Android TLS exporter is unavailable", e)
+        throw AdbConnectionException(ConnectionError.WIRELESS_UNSUPPORTED, e)
     } catch (e: SecurityException) {
-        throw SSLException("Android TLS exporter access is denied", e)
+        throw AdbConnectionException(ConnectionError.WIRELESS_UNSUPPORTED, e)
     }
 }

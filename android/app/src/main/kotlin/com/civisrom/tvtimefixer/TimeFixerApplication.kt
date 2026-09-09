@@ -8,6 +8,7 @@ import com.civisrom.tvtimefixer.diagnostics.Outcome
 import java.io.File
 
 class TimeFixerApplication : Application() {
+    val favorites by lazy { com.civisrom.tvtimefixer.data.FavoritesStore(File(noBackupFilesDir, "favorites.bin")) }
     lateinit var diagnostics: DiagnosticJournal
         private set
 

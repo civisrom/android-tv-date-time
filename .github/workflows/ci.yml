@@ -73,10 +73,22 @@ jobs:
         run: |
           poetry run python -c "import android_time_fixer"
           poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
-          poetry run flake8 --select=F src/android_time_fixer.py locales.py scripts tests
+          poetry run flake8 --select=F src locales.py scripts tests
 
       - name: Run regression tests
         run: poetry run python -m unittest discover -s tests -v
+
+      - name: Verify Python package contents
+        shell: bash
+        run: |
+          poetry build --format wheel
+          poetry run python - <<'PY'
+          import pathlib, zipfile
+          wheel = next(pathlib.Path('dist').glob('*.whl'))
+          with zipfile.ZipFile(wheel) as package:
+              expected = {p.name for p in pathlib.Path('src').glob('*.py')} | {'locales.py'}
+              assert expected <= set(package.namelist()), 'Python package is missing application modules'
+          PY
 
       # Проверяем native ADB: моки не обнаруживают различия его ОС-бэкендов
       # и правил автозапуска сервера. Никакие устройства CI не изменяет.

@@ -21,6 +21,9 @@ import com.civisrom.tvtimefixer.device.TimeZoneFailure
 fun ConnectionError.messageRes(): Int = when (this) {
     ConnectionError.INVALID_ADDRESS -> R.string.error_invalid_address
     ConnectionError.UNREACHABLE -> R.string.error_unreachable
+    ConnectionError.CONNECTION_REFUSED -> R.string.error_connection_refused
+    ConnectionError.CONNECTION_TIMEOUT -> R.string.error_connection_timeout
+    ConnectionError.NETWORK_UNAVAILABLE -> R.string.error_network_unavailable
     ConnectionError.PAIRING_REQUIRED -> R.string.error_pairing_required
     ConnectionError.NOT_AUTHORIZED -> R.string.error_not_authorized
     ConnectionError.PAIRING_REJECTED -> R.string.error_pairing_rejected

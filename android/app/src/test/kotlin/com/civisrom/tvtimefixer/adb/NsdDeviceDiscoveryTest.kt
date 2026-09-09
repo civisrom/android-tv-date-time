@@ -16,6 +16,26 @@ class NsdDeviceDiscoveryTest {
 
     @After fun close() { discovery.close(); Build.VERSION.SDK_INT = 34 }
 
+    @Test fun `hung legacy resolve times out and late callback cannot advance a new request`() {
+        Build.VERSION.SDK_INT = 33
+        NsdDeviceDiscovery(Context(nsd), resolveTimeoutMs = 250).use { timed ->
+            timed.start()
+            val listener = nsd.discovery.getValue(SERVICE_TLS_CONNECT)
+            listener.onServiceFound(pair)
+            listener.onServiceFound(connect)
+            val deadline = System.nanoTime() + 2_000_000_000
+            while (nsd.resolves.size < 2 && System.nanoTime() < deadline) Thread.sleep(5)
+            assertEquals(2, nsd.resolves.size)
+            nsd.resolves[0].onServiceResolved(pair)
+            assertTrue(timed.state.value.devices.isEmpty())
+            nsd.resolves[1].onServiceResolved(connect)
+            assertEquals(listOf("active-connect"), timed.state.value.devices.map { it.name })
+            timed.stop()
+            nsd.resolves[1].onServiceResolved(pair)
+            assertTrue(timed.state.value.devices.isEmpty())
+        }
+    }
+
     @Test fun `API 34 missing first update cannot block another service`() {
         Build.VERSION.SDK_INT = 34
         discovery.start()

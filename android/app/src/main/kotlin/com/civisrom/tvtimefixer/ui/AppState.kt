@@ -20,6 +20,10 @@ import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
  * проверить целиком, не поднимая Compose.
  */
 data class AppState(
+    val localSetup: com.civisrom.tvtimefixer.LocalSetupState = com.civisrom.tvtimefixer.LocalSetupState(),
+    val favorites: com.civisrom.tvtimefixer.data.Favorites = com.civisrom.tvtimefixer.data.Favorites(),
+    val favoritesReady: Boolean = false,
+    val favoritesBusy: Boolean = false,
     val connection: ConnectionState = ConnectionState.Disconnected,
     val busy: Boolean = false,
     val operation: Operation? = null,
@@ -61,6 +65,8 @@ data class AppState(
 
     /** Результат ADB меняет свои поля; фоновые службы продолжают владеть своими. */
     fun withLatestBackground(latest: AppState): AppState = copy(
+        localSetup = latest.localSetup, favorites = latest.favorites,
+        favoritesReady = latest.favoritesReady, favoritesBusy = latest.favoritesBusy,
         usbSupported = latest.usbSupported, usbDevices = latest.usbDevices,
         usbAttachedCount = latest.usbAttachedCount, usbScanFailed = latest.usbScanFailed,
         usbSystemState = latest.usbSystemState,

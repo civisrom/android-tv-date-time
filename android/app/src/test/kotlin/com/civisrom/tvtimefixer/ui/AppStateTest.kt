@@ -31,12 +31,16 @@ class AppStateTest {
         val latest = before.copy(discovered = listOf(com.civisrom.tvtimefixer.adb.DiscoveredDevice(
             "TV", com.civisrom.tvtimefixer.data.DeviceAddress("192.0.2.1", 5555), com.civisrom.tvtimefixer.adb.DiscoveredDevice.Kind.LEGACY)),
             discoverySearching = false, discoveryPermissionNeeded = true,
+            favoritesReady = true, favorites = com.civisrom.tvtimefixer.data.Favorites(
+                servers = listOf(com.civisrom.tvtimefixer.data.FavoriteNtp("Дом", "pool.ntp.org"))),
             ntpScan = com.civisrom.tvtimefixer.data.ScanProgress(5, 5, emptyList()))
         val completed = before.copy(deviceInfo = DeviceInfo(model = "Read TV")).withLatestBackground(latest)
         assertEquals(latest.discovered, completed.discovered)
         assertFalse(completed.discoverySearching)
         assertTrue(completed.discoveryPermissionNeeded)
         assertEquals(latest.ntpScan, completed.ntpScan)
+        assertEquals(latest.favorites, completed.favorites)
+        assertTrue(completed.favoritesReady)
         assertEquals("Read TV", completed.deviceInfo?.model)
     }
 

@@ -5,6 +5,10 @@ plugins {
 
 import groovy.json.JsonSlurper
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 android {
     namespace = "com.civisrom.tvtimefixer"
     compileSdk = 37
@@ -210,7 +214,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
     // JVM-only TLS exporter for protocol fixtures; never packaged into the APK.
-    testImplementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
-    testImplementation("com.github.Flyfish233:spake2-java:1.1.1")
-    testImplementation("org.bouncycastle:bcprov-jdk18on:1.84")
+    testImplementation(libs.conscrypt.fixture)
+    testImplementation(libs.spake2)
+    testImplementation(libs.bouncycastle)
+    androidTestImplementation(libs.spake2)
+    androidTestImplementation(libs.bouncycastle)
 }

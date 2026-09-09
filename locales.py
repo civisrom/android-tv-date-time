@@ -1105,12 +1105,12 @@ arising from the use of this program.
                 ru="  Прогресс: {checked}/{total} проверено, {found} найдено"
             ),
             "scan_complete": Translation(
-                en="Scan complete. Found devices: {count}",
-                ru="Сканирование завершено. Найдено устройств: {count}"
+                en="Scan complete. Connection candidates: {count}",
+                ru="Сканирование завершено. Адресов для проверки подключения: {count}"
             ),
             "scan_found": Translation(
-                en="Found {count} device(s) with open ADB port:",
-                ru="Найдено {count} устройств с открытым портом ADB:"
+                en="Found {count} connection candidate(s); ADB authorization still needs to be checked:",
+                ru="Найдено {count} адресов для подключения; доступ ADB ещё требует проверки:"
             ),
             "scan_none": Translation(
                 en="No Android TV devices found on local network",
@@ -1350,8 +1350,8 @@ arising from the use of this program.
                 ru="\n[Авто] Сканирование сети для поиска Android TV устройств..."
             ),
             "auto_found_device": Translation(
-                en="[Auto] Found device: {ip}",
-                ru="[Авто] Найдено устройство: {ip}"
+                en="[Auto] Connection candidate: {ip}",
+                ru="[Авто] Адрес для проверки подключения: {ip}"
             ),
             "auto_use_found_device": Translation(
                 en="[Auto] Press Enter to use this address and continue, or q to cancel: ",

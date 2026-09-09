@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -56,6 +58,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import java.util.Locale
@@ -89,6 +93,13 @@ internal const val PROJECT_REPOSITORY_URL = "https://github.com/civisrom/android
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
+    fun connectFavorite(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice)
+    fun saveCurrentDevice(name: String)
+    fun updateFavoriteDevice(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice)
+    fun removeFavoriteDevice(serial: String)
+    fun saveFavoriteNtp(name: String, server: String)
+    fun removeFavoriteNtp(server: String)
+    fun openSetupSettings(action: String)
     fun connect(address: String)
     fun connectLoopback()
     fun disconnect()
@@ -117,6 +128,7 @@ fun MainScreen(
     onRefreshDiagnostics: () -> Unit = {},
     onClearDiagnostics: () -> Unit = {},
 ) {
+    var showSetup by rememberSaveable { mutableStateOf(false) }
     var showDiagnostics by rememberSaveable { mutableStateOf(false) }
     var selectedEvent by rememberSaveable { mutableStateOf<Long?>(null) }
     var returnFocus by rememberSaveable { mutableStateOf<String?>(null) }
@@ -126,7 +138,9 @@ fun MainScreen(
     var pairingCode by remember { mutableStateOf("") }
     LaunchedEffect(state.connected) { if (state.connected) pairingCode = "" }
     val holder = rememberSaveableStateHolder()
-    if (showDiagnostics) {
+    if (showSetup) {
+        SetupScreen(state, actions, onBack = { showSetup = false; returnFocus = "setup-open" })
+    } else if (showDiagnostics) {
         DiagnosticsScreen(mode, diagnostics, selectedEvent,
             onBack = {
                 val available = when (origin) {
@@ -145,7 +159,7 @@ fun MainScreen(
             onDiagnostics = { id, key ->
                 selectedEvent = id; origin = key; returnFocus = null
                 onRefreshDiagnostics(); showDiagnostics = true
-            }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null })
+            }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null }, onSetup = { showSetup = true })
     }
 }
 
@@ -181,6 +195,7 @@ private fun MainContent(
     onDiagnostics: (Long?, String) -> Unit,
     returnFocus: String?,
     onFocusRestored: () -> Unit,
+    onSetup: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
     var repositoryLinkFailed by remember { mutableStateOf(false) }
@@ -209,7 +224,8 @@ private fun MainContent(
     Column(
         modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = if (mode == DeviceMode.TELEVISION) 32.dp else 16.dp, vertical = 24.dp)
+            .padding(horizontal = if (mode == DeviceMode.TELEVISION) 48.dp else 16.dp,
+                vertical = if (mode == DeviceMode.TELEVISION) 27.dp else 24.dp)
             .testTag("main-content"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -226,6 +242,15 @@ private fun MainContent(
         Text(stringResource(if (mode == DeviceMode.TELEVISION) R.string.mode_television else R.string.mode_handheld),
             style = MaterialTheme.typography.bodyMedium)
         DiagnosticLink(null, "diagnostics-open", onDiagnostics, returnFocus, onFocusRestored, R.string.diagnostics_title)
+        if (mode == DeviceMode.TELEVISION) {
+            val setupFocus = remember { FocusRequester() }
+            LaunchedEffect(returnFocus) {
+                if (returnFocus == "setup-open") { setupFocus.requestFocus(); onFocusRestored() }
+            }
+            FilledTonalButton(onClick = onSetup, modifier = Modifier.focusRequester(setupFocus).testTag("setup-open")) {
+                Text(stringResource(R.string.setup_title))
+            }
+        }
         diagnostics.previousCrashId?.let { id ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
@@ -235,6 +260,9 @@ private fun MainContent(
             }
         }
         ConnectionStatus(mode, state, actions)
+        FunctionCard("favorites") {
+            ExpandableSection(stringResource(R.string.favorite_devices), "favorites") { DeviceFavorites(state, actions) }
+        }
         FunctionCard("discovery") {
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {
@@ -319,10 +347,17 @@ private fun ExpandableSection(
     val open = expanded ?: localExpanded
     val description = stringResource(if (open) R.string.section_expanded else R.string.section_collapsed)
     val holder = rememberSaveableStateHolder()
+    val sectionFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(
-            onClick = { if (onExpanded != null) onExpanded(!open) else localExpanded = !open },
-            modifier = Modifier.testTag("section-$key").semantics { stateDescription = description },
+            onClick = {
+                sectionFocus.requestFocus()
+                keyboard?.hide()
+                if (onExpanded != null) onExpanded(!open) else localExpanded = !open
+            },
+            modifier = Modifier.focusRequester(sectionFocus).focusProperties { canFocus = true }
+                .testTag("section-$key").semantics { stateDescription = description },
         ) { Text((if (open) "− " else "+ ") + title, style = MaterialTheme.typography.titleMedium) }
         if (open) holder.SaveableStateProvider(key) { content() }
     }
@@ -400,9 +435,13 @@ private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActi
 @Composable
 private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: AppActions) {
     var address by rememberSaveable { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
     OutlinedTextField(value = address, onValueChange = { address = it },
         label = { Text(stringResource(R.string.connect_address_hint)) }, singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         modifier = Modifier.fillMaxWidth().testTag("network-address"))
+    AddressPaste("network-address") { address = it }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = { actions.connect(address) }, enabled = !state.busy, modifier = Modifier.testTag("network-connect")) {
             Text(stringResource(R.string.connect_action))
@@ -470,6 +509,7 @@ private fun DiscoveredRow(
                 CopyableText(device.address.toString())
                 Text("  ·  ${stringResource(device.kind.labelRes())}")
             }
+            AddressCopy(device.address.toString(), "discovered-${device.address}")
             if (connected) {
                 Text(
                     stringResource(R.string.discovery_connected),
@@ -505,6 +545,7 @@ private fun PairingSection(
     codeFocus: FocusRequester,
 ) {
     var connectAddress by rememberSaveable { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
     val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -522,13 +563,18 @@ private fun PairingSection(
             label = { Text(stringResource(R.string.pairing_address_hint)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("pairing-address"),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         )
+        AddressPaste("pairing-address", onPairingAddressChange)
         OutlinedTextField(
             value = code,
             onValueChange = onCode,
             label = { Text(stringResource(R.string.pairing_code_hint)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().focusRequester(codeFocus).testTag("pairing-code"),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         )
         OutlinedTextField(
             value = connectAddress,
@@ -536,7 +582,10 @@ private fun PairingSection(
             label = { Text(stringResource(R.string.pairing_connect_address_hint)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("pairing-connect-address"),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         )
+        AddressPaste("pairing-connect-address") { connectAddress = it }
         Button(
             onClick = { actions.pairAndConnect(pairingAddress, code, connectAddress) },
             enabled = !state.busy && pairingSupported,
@@ -649,7 +698,11 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     unfocusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
                 ),
                 modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { checkFocus.requestFocus(); keyboard?.hide() }),
             )
+            AddressPaste("ntp-address") { custom = it }
+            NtpFavorites(state, actions, custom, onPick)
             Text(
                 stringResource(R.string.ntp_address_note),
                 style = MaterialTheme.typography.bodySmall,
@@ -792,6 +845,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                             onClick = { onPick(server) },
                             enabled = !state.busy,
                         ) { CopyableText(server) }
+                        AddressCopy(server, "ntp-$server")
                     }
                 }
             }
@@ -1002,6 +1056,9 @@ private fun DeviceTimeCard(check: DeviceTimeCheck) {
 /** Подбор устойчиво отвечающего сервера — аналог автонастройки десктопной версии. */
 @Composable
 private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) -> Unit, onStart: () -> Unit) {
+    state.ntpScan?.takeIf { it.cancelled }?.let {
+        Text(stringResource(R.string.ntp_scan_stopped, it.checked, it.total))
+    }
     val scan = state.ntpScan
     val progressView = remember { BringIntoViewRequester() }
     val scanning = scan != null && !scan.finished

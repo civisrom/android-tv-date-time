@@ -38,6 +38,9 @@ enum class ConnectionError {
 
     /** До устройства не достучались: не та сеть, не тот адрес, отладка выключена. */
     UNREACHABLE,
+    CONNECTION_REFUSED,
+    CONNECTION_TIMEOUT,
+    NETWORK_UNAVAILABLE,
 
     /** Устройство требует спаривания по коду (Android 11+). */
     PAIRING_REQUIRED,
