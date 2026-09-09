@@ -4187,6 +4187,13 @@ class AndroidTVTimeFixer:
             self.logger.error(f"Failed to retrieve device info: {e}")
             raise AndroidTVTimeFixerError(locales.get("device_info_error", error=str(e)))
 
+def _pause_before_exit(prompt):
+    try:
+        input(prompt)
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
 def main():
     try:
         fixer = AndroidTVTimeFixer()
@@ -4196,43 +4203,43 @@ def main():
         logger.error(f"Startup failed: {e}", exc_info=True)
         print(Fore.RED + f"Startup failed: {e}")
         if sys.platform == 'win32':
-            input("Press Enter to exit...")
+            _pause_before_exit("Press Enter to exit...")
         sys.exit(1)
 
     fixer.logger.info("=" * 50)
     fixer.logger.info("Application started")
 
-    # Попытка загрузить сохранённый язык
-    saved_language = fixer.load_language()
-
-    if saved_language in ('en', 'ru'):
-        # Автоматически устанавливаем сохранённый язык
-        set_language(saved_language)
-        fixer.logger.info(f"Language loaded from settings: {saved_language.upper()}")
-        if saved_language == 'ru':
-            print(locales.get("language_loaded_ru"))
-        else:
-            print(locales.get("language_loaded_en"))
-    else:
-        # Запрашиваем выбор языка у пользователя
-        print(locales.get("select_language"))  # Выводим сообщение для выбора языка
-        print("1. " + locales.get("english"))  # Выбор для английского
-        print("2. " + locales.get("russian"))  # Выбор для русского
-        # Ввод пользователя
-        lang_choice = input(locales.get("enter_number")).strip()
-        # Назначение языка на основе выбора
-        if lang_choice == "2":
-            set_language("ru")
-            fixer.save_language("ru")
-            fixer.logger.info("User selected language: Russian")
-            print(locales.get("language_set_ru"))  # Подтверждение выбора
-        else:
-            set_language("en")
-            fixer.save_language("en")
-            fixer.logger.info("User selected language: English")
-            print(locales.get("language_set_en"))  # Подтверждение выбора
-
     try:
+        # Попытка загрузить сохранённый язык
+        saved_language = fixer.load_language()
+
+        if saved_language in ('en', 'ru'):
+            # Автоматически устанавливаем сохранённый язык
+            set_language(saved_language)
+            fixer.logger.info(f"Language loaded from settings: {saved_language.upper()}")
+            if saved_language == 'ru':
+                print(locales.get("language_loaded_ru"))
+            else:
+                print(locales.get("language_loaded_en"))
+        else:
+            # Запрашиваем выбор языка у пользователя
+            print(locales.get("select_language"))  # Выводим сообщение для выбора языка
+            print("1. " + locales.get("english"))  # Выбор для английского
+            print("2. " + locales.get("russian"))  # Выбор для русского
+            # Ввод пользователя
+            lang_choice = input(locales.get("enter_number")).strip()
+            # Назначение языка на основе выбора
+            if lang_choice == "2":
+                set_language("ru")
+                fixer.save_language("ru")
+                fixer.logger.info("User selected language: Russian")
+                print(locales.get("language_set_ru"))  # Подтверждение выбора
+            else:
+                set_language("en")
+                fixer.save_language("en")
+                fixer.logger.info("User selected language: English")
+                print(locales.get("language_set_en"))  # Подтверждение выбора
+
         # Показываем дисклеймер
         print(Fore.RED + locales.get("disclaimer"))
 
@@ -4412,7 +4419,7 @@ def main():
                 print(Fore.GREEN + locales.get('exit_message'))
                 fixer.logger.info("Application closed normally")
                 if sys.platform == 'win32':
-                    input(locales.get('windows_press_enter'))
+                    _pause_before_exit(locales.get('windows_press_enter'))
                 sys.exit(0)
 
             elif choice.lower() == 'b':
@@ -4426,8 +4433,12 @@ def main():
         fixer.logger.error(f"Application error: {e}")
         print(Fore.RED + locales.get('error_message', error=str(e)))
         if sys.platform == 'win32':
-            input(locales.get('windows_press_enter'))
+            _pause_before_exit(locales.get('windows_press_enter'))
         sys.exit(1)
+    except EOFError:
+        fixer.logger.info("Application input closed")
+        print(Fore.GREEN + locales.get('exit_message'))
+        sys.exit(0)
     except KeyboardInterrupt:
         fixer.logger.info("Application interrupted by user (Ctrl+C)")
         print(Fore.RED + locales.get('operation_aborted'))
@@ -4436,7 +4447,7 @@ def main():
         fixer.logger.error(f"Unexpected error: {e}", exc_info=True)
         print(Fore.RED + locales.get('unexpected_error', error=str(e)))
         if sys.platform == 'win32':
-            input(locales.get('windows_press_enter'))
+            _pause_before_exit(locales.get('windows_press_enter'))
         sys.exit(1)
 
     finally:

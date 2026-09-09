@@ -128,8 +128,10 @@ jobs:
           poetry run pyinstaller --clean --noconfirm pyinstaller.spec
           if [[ "$RUNNER_OS" == Windows ]]; then
             ./dist/AndroidTVTimeFixer.exe --version
+            poetry run python scripts/smoke_desktop.py ./dist/AndroidTVTimeFixer.exe
           else
             ./dist/AndroidTVTimeFixer --version
+            poetry run python scripts/smoke_desktop.py ./dist/AndroidTVTimeFixer
           fi
 
       - name: Package Windows test build
