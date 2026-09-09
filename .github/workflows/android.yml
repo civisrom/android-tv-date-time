@@ -85,6 +85,7 @@ jobs:
           name: android-reports
           path: |
             android/app/build/reports/**
+            android/build/reports/dependency-verification/**
             android/app/build/outputs/logs/**
           if-no-files-found: ignore
           retention-days: 7
