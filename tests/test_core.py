@@ -447,7 +447,7 @@ class ReliabilityTests(unittest.TestCase):
         with self.assertRaises(AndroidTVTimeFixerError):
             transport.shell('getprop')
 
-    def test_platform_tools_transport_close_disconnects(self) -> None:
+    def test_platform_tools_transport_close_preserves_shared_connection(self) -> None:
         calls = []
 
         def runner(args, **kwargs):
@@ -455,7 +455,7 @@ class ReliabilityTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, stdout='')
 
         PlatformToolsTransport('adb', '192.168.1.20:5555', runner=runner).close()
-        self.assertEqual(calls, [['adb', 'disconnect', '192.168.1.20:5555']])
+        self.assertEqual(calls, [])
 
     def test_tls_device_reports_pairing_required(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
@@ -528,14 +528,15 @@ class ReliabilityTests(unittest.TestCase):
                 self.assertIsInstance(transport, PlatformToolsTransport)
                 self.assertIn('shell', run.call_args.args[0])
 
-    def test_platform_tools_failed_shell_probe_disconnects(self) -> None:
+    def test_failed_shell_probe_does_not_disconnect_other_clients(self) -> None:
         results = [subprocess.CompletedProcess(['adb'], 0, stdout='connected to 192.168.1.20:37105'),
                    subprocess.CompletedProcess(['adb'], 1, stdout='error: device offline'),
                    subprocess.CompletedProcess(['adb'], 0, stdout='')]
         with mock.patch('src.android_time_fixer.subprocess.run', side_effect=results) as run:
             with self.assertRaises(AndroidTVTimeFixerError):
                 self._platform_tools_fixer()._connect_via_platform_tools('192.168.1.20', 37105)
-            self.assertEqual(run.call_args.args[0], ['adb', 'disconnect', '192.168.1.20:37105'])
+            self.assertEqual(run.call_count, 2)
+            self.assertFalse(any('disconnect' in call.args[0] for call in run.call_args_list))
 
     # ──────────────────────────────────────────────────────────
     # Порт больше не подразумевается

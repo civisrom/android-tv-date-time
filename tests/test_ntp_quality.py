@@ -28,48 +28,28 @@ class NtpQualityTests(unittest.TestCase):
         self.assertEqual(1, requested.call_count)
 
     def test_query_rejects_invalid_protocol_and_preserves_large_clock_offset(self):
-        class Socket:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
-            def settimeout(self, timeout):
-                self.timeout = timeout
-
-            def connect(self, address):
-                self.address = address
-
-            def send(self, data):
-                self.query = ntplib.NTPPacket()
-                self.query.from_data(data)
-
-            def recv(self, count):
-                packet = ntplib.NTPPacket(version=4, mode=4)
-                packet.stratum = 1
-                packet.orig_timestamp = self.query.tx_timestamp
-                packet.recv_timestamp = self.query.tx_timestamp + 31_536_000
-                packet.tx_timestamp = packet.recv_timestamp + 0.001
-                for key, value in changes.items():
-                    setattr(packet, key, value)
-                return packet.to_data()[:length]
-
         cases = [({}, 48), ({'mode': 3}, 48), ({'version': 2}, 48),
                  ({'leap': 3}, 48), ({'stratum': 0}, 48), ({'stratum': 16}, 48),
                  ({'orig_timestamp': 1}, 48), ({'recv_timestamp': 0}, 48),
                  ({'tx_timestamp': 1}, 48), ({}, 20)]
         for changes, length in cases:
-            with self.subTest(changes=changes, length=length), \
-                    mock.patch('src.android_time_fixer.socket.getaddrinfo',
-                               return_value=[(socket.AF_INET, socket.SOCK_DGRAM, 17, '', ('192.0.2.1', 123))]), \
-                    mock.patch('src.android_time_fixer.socket.socket', return_value=Socket()), \
-                    mock.patch('src.android_time_fixer.time.monotonic', side_effect=[100, 100.05]):
+            from src.ntp_network import parse_response
+            sent = ntplib.system_to_ntp_time(1_800_000_000)
+            request = ntplib.NTPPacket(version=4, mode=3, tx_timestamp=sent).to_data()
+            packet = ntplib.NTPPacket(version=4, mode=4)
+            packet.stratum = 1
+            packet.orig_timestamp = sent
+            packet.recv_timestamp = sent + 31_536_000
+            packet.tx_timestamp = packet.recv_timestamp + 0.001
+            for key, value in changes.items():
+                setattr(packet, key, value)
+            response = packet.to_data()[:length]
+            with self.subTest(changes=changes, length=length):
                 if changes or length != 48:
                     with self.assertRaises(ntplib.NTPException):
-                        AndroidTVTimeFixer._query_ntp_server('time.example', 2)
+                        parse_response(response, request, sent, 0.05)
                 else:
-                    result = AndroidTVTimeFixer._query_ntp_server('time.example', 2)
+                    result = parse_response(response, request, sent, 0.05)
                     self.assertGreater(result.offset, 31_535_999)
                     self.assertAlmostEqual(0.049, result.delay, places=4)
 

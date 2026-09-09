@@ -361,9 +361,61 @@ arising from the use of this program.
                 en="Failed to get current NTP server: {error}",
                 ru="Не удалось получить текущий сервер NTP: {error}"
             ),
+            "ntp_system_default": Translation(
+                en='System time source',
+                ru='Системный источник времени'
+            ),
+            "ntp_before_after": Translation(
+                en='NTP setting saved: {before} → {after}',
+                ru='Настройка NTP сохранена: {before} → {after}'
+            ),
+            "ntp_clock_before_after": Translation(
+                en='Clock difference from this computer before → after: {before} → {after}. This is not proof of NTP synchronization.',
+                ru='Расхождение с часами этого компьютера до → после: {before} → {after}. Это не подтверждение синхронизации по NTP.'
+            ),
+            "ntp_restart_required": Translation(
+                en='Android 6–10 usually needs a TV restart to reload this setting. Restart when convenient, reconnect and check the clock.',
+                ru='На Android 6–10 обычно нужен перезапуск TV для перечитывания настройки. Перезапустите в удобное время, подключитесь и проверьте часы.'
+            ),
+            "ntp_next_refresh": Translation(
+                en='Android may apply the setting at its next network time refresh. If the clock stays wrong, check automatic time and restart the TV if needed.',
+                ru='Android может применить настройку при следующем обновлении сетевого времени. Если часы не исправились, проверьте автовремя и при необходимости перезапустите TV.'
+            ),
+            "ntp_auto_on": Translation(
+                en='Automatic date and time: enabled',
+                ru='Автоматическая дата и время: включены'
+            ),
+            "ntp_auto_off": Translation(
+                en='Automatic date and time: disabled. Enable it in the TV settings for automatic synchronization.',
+                ru='Автоматическая дата и время выключены. Включите их в настройках TV для автосинхронизации.'
+            ),
+            "ntp_auto_unknown": Translation(
+                en='Automatic date and time status could not be read.',
+                ru='Статус автоматической даты и времени прочитать не удалось.'
+            ),
+            "ntp_changed_elsewhere": Translation(
+                en='The setting changed since this operation. Refresh it before making another change.',
+                ru='Настройка уже изменилась после этой операции. Проверьте её перед следующим изменением.'
+            ),
+            "ntp_no_undo": Translation(
+                en='There is no change to undo in this connection.',
+                ru='В этом подключении нет изменения для отмены.'
+            ),
+            "ntp_restore_menu": Translation(
+                en='r. Restore system NTP; u. Undo last change in this connection',
+                ru='r. Вернуть системный NTP; u. Отменить последнее изменение в этом подключении'
+            ),
+            "ntp_restore_confirm": Translation(
+                en='Change only the NTP setting on the connected device? Type yes to confirm: ',
+                ru='Изменить настройку NTP подключённого устройства? Для подтверждения введите yes: '
+            ),
+            "ntp_unverified_confirm": Translation(
+                en='This computer could not validate the server. The TV may have different network access. Save this trusted address without a successful probe? Type yes: ',
+                ru='Проверка с компьютера не удалась. Сетевой доступ у TV может отличаться. Сохранить доверенный адрес без успешной проверки? Введите yes: '
+            ),
             "ntp_server_set": Translation(
-                en="NTP server {ntp_server} is reachable and has been added",
-                ru="Сервер NTP {ntp_server} доступен и добавлен"
+                en="NTP setting saved: {ntp_server}",
+                ru="Настройка NTP сохранена: {ntp_server}"
             ),
             "ntp_server_confirmation_failed": Translation(
                 en="Failed to confirm NTP server change.",
@@ -1139,8 +1191,8 @@ arising from the use of this program.
                 ru="  Запрос авторизации отправлен на {ip}. Подтвердите его на экране устройства."
             ),
             "batch_success": Translation(
-                en="  OK  {ip}: NTP server {server} is reachable and has been added",
-                ru="  ОК  {ip}: NTP-сервер {server} доступен и добавлен"
+                en="  OK  {ip}: NTP setting saved: {server}. Enable automatic time; Android 6–10 usually needs a TV restart.",
+                ru="  ОК  {ip}: настройка NTP сохранена: {server}. Включите автовремя; на Android 6–10 обычно нужен перезапуск TV."
             ),
             "batch_failed": Translation(
                 en="  ERR {ip}: {error}",
@@ -1230,12 +1282,12 @@ arising from the use of this program.
             ),
 
             "ntp_verify_before_apply": Translation(
-                en="Verifying NTP server time sync (3 attempts)...",
-                ru="Проверка синхронизации времени NTP-сервера (3 попытки)..."
+                en="Testing the NTP server from this computer (3 attempts)...",
+                ru="Проверка ответа NTP-сервера с этого компьютера (3 попытки)..."
             ),
             "ntp_verify_detailed": Translation(
-                en="NTP server {server} is working correctly:\n  RTT: {rtt:.1f}ms | Success: {success:.0f}% | Offset: {offset:.3f}s",
-                ru="NTP-сервер {server} работает корректно:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
+                en="NTP server {server} replied to this computer:\n  RTT: {rtt:.1f}ms | Success: {success:.0f}% | Offset: {offset:.3f}s",
+                ru="NTP-сервер {server} ответил этому компьютеру:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
             ),
             "ntp_verify_failed": Translation(
                 en="Warning: NTP server {server} is not reachable as a time server. It will not be added.",
