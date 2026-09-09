@@ -25,7 +25,8 @@ internal fun parseDisplayDetails(raw: String): DisplayDetails {
     val modeId = Regex(""", modeId (\d+)""").find(display)?.groupValues?.get(1)
     // Stop at the next field, not at a mode's nested HDR / refresh-rate array.
     val modesText = display.substringAfter("supportedModes [", "").substringBefore(", colorMode")
-    val modes = Regex("""\{id=(\d+), width=(\d+), height=(\d+), fps=([0-9.]+)""")
+    // Android 17 adds mode metadata before width; never consume a neighbouring mode.
+    val modes = Regex("""\{id=(\d+), (?:[^{}]*?, )?width=(\d+), height=(\d+), fps=([0-9.]+)""")
         .findAll(modesText).mapNotNull { match ->
             val (id, width, height, fps) = match.destructured
             val rate = fps.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: return@mapNotNull null
