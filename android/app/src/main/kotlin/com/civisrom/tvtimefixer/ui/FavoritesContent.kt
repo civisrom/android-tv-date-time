@@ -34,17 +34,17 @@ internal fun DeviceFavorites(state: AppState, actions: AppActions) {
     LaunchedEffect(state.connection) { creating = false }
     val enabled = state.favoritesReady && !state.favoritesBusy && !state.busy
     Text(stringResource(R.string.favorite_device_hint))
-    if (state.connectedAddress != null) Button(onClick = { creating = true }, enabled = enabled && state.deviceInfo != null,
+    if (state.connectedAddress != null) Button(shape = MaterialTheme.shapes.medium, onClick = { creating = true }, enabled = enabled && state.deviceInfo != null,
         modifier = Modifier.testTag("favorite-device-save")) { Text(stringResource(R.string.favorite_current_device)) }
     if (state.favorites.devices.isEmpty()) Text(stringResource(R.string.favorites_empty))
     state.favorites.devices.forEach { device ->
         Text(device.name, style = MaterialTheme.typography.titleSmall)
         Text("${device.model} · ${device.address}")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { actions.connectFavorite(device) }, enabled = enabled,
+            Button(shape = MaterialTheme.shapes.medium, onClick = { actions.connectFavorite(device) }, enabled = enabled,
                 modifier = Modifier.testTag("favorite-connect-${device.serial}")) { Text(stringResource(R.string.connect_action)) }
-            TextButton(onClick = { editing = device }, enabled = enabled) { Text(stringResource(R.string.favorites_edit)) }
-            TextButton(onClick = { deleting = device }, enabled = enabled) { Text(stringResource(R.string.favorites_delete)) }
+            TextButton(shape = MaterialTheme.shapes.medium, onClick = { editing = device }, enabled = enabled) { Text(stringResource(R.string.favorites_edit)) }
+            TextButton(shape = MaterialTheme.shapes.medium, onClick = { deleting = device }, enabled = enabled) { Text(stringResource(R.string.favorites_delete)) }
         }
     }
     if (creating || editing != null) {
@@ -59,10 +59,10 @@ internal fun DeviceFavorites(state: AppState, actions: AppActions) {
     deleting?.let { device ->
         AlertDialog(onDismissRequest = { deleting = null }, title = { Text(stringResource(R.string.favorites_delete)) },
             text = { Text(device.name) }, confirmButton = {
-                Button(onClick = { actions.removeFavoriteDevice(device.serial); deleting = null }) {
+                Button(shape = MaterialTheme.shapes.medium, onClick = { actions.removeFavoriteDevice(device.serial); deleting = null }) {
                     Text(stringResource(R.string.favorites_delete))
                 }
-            }, dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.diagnostics_cancel)) } })
+            }, dismissButton = { TextButton(shape = MaterialTheme.shapes.medium, onClick = { deleting = null }) { Text(stringResource(R.string.diagnostics_cancel)) } })
     }
 }
 
@@ -70,14 +70,14 @@ internal fun DeviceFavorites(state: AppState, actions: AppActions) {
 internal fun NtpFavorites(state: AppState, actions: AppActions, server: String, onPick: (String) -> Unit) {
     var editing by remember { mutableStateOf<String?>(null) }
     val enabled = state.favoritesReady && !state.favoritesBusy
-    if (isValidNtpServer(server)) TextButton(onClick = { editing = server.trim() }, enabled = enabled,
+    if (isValidNtpServer(server)) TextButton(shape = MaterialTheme.shapes.medium, onClick = { editing = server.trim() }, enabled = enabled,
         modifier = Modifier.testTag("favorite-ntp-save")) { Text(stringResource(R.string.favorite_ntp_save)) }
     state.favorites.servers.forEach { item ->
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(onClick = { onPick(item.server) }, modifier = Modifier.testTag("favorite-ntp-${item.server}")) {
+            FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = { onPick(item.server) }, modifier = Modifier.testTag("favorite-ntp-${item.server}")) {
                 Text(if (item.name.equals(item.server, ignoreCase = true)) item.server else "${item.name} · ${item.server}")
             }
-            TextButton(onClick = { actions.removeFavoriteNtp(item.server) }, enabled = enabled) {
+            TextButton(shape = MaterialTheme.shapes.medium, onClick = { actions.removeFavoriteNtp(item.server) }, enabled = enabled) {
                 Text(stringResource(R.string.favorites_delete))
             }
         }
@@ -111,12 +111,12 @@ private fun FavoriteEditor(initialName: String, initialAddress: String?, onDismi
             }
         }
     }, confirmButton = {
-        Button(onClick = { onSave(name.trim(), address.trim()) },
+        Button(shape = MaterialTheme.shapes.medium, onClick = { onSave(name.trim(), address.trim()) },
             enabled = canSave, modifier = Modifier.focusRequester(saveFocus).focusProperties { canFocus = true }
                 .testTag("favorite-confirm")) {
             Text(stringResource(R.string.favorites_save))
         }
-    }, dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.diagnostics_cancel)) } })
+    }, dismissButton = { TextButton(shape = MaterialTheme.shapes.medium, onClick = onDismiss) { Text(stringResource(R.string.diagnostics_cancel)) } })
 }
 
 /** На TV системное touch-меню буфера бывает недоступно. Эти кнопки доступны пульту. */
@@ -126,7 +126,7 @@ internal fun AddressCopy(text: String, tag: String) {
     if (detectDeviceMode(LocalContext.current) != DeviceMode.TELEVISION) return
     val clipboard = LocalClipboardManager.current
     var copied by remember(text) { mutableStateOf(false) }
-    TextButton(onClick = { clipboard.setText(AnnotatedString(text)); copied = true }, modifier = Modifier.testTag("copy-$tag")) {
+    TextButton(shape = MaterialTheme.shapes.medium, onClick = { clipboard.setText(AnnotatedString(text)); copied = true }, modifier = Modifier.testTag("copy-$tag")) {
         Text(stringResource(if (copied) R.string.address_copied else R.string.address_copy))
     }
 }
@@ -136,7 +136,7 @@ internal fun AddressCopy(text: String, tag: String) {
 internal fun AddressPaste(tag: String, onPaste: (String) -> Unit) {
     if (detectDeviceMode(LocalContext.current) != DeviceMode.TELEVISION) return
     val clipboard = LocalClipboardManager.current
-    TextButton(onClick = { clipboard.getText()?.text?.take(253)?.let(onPaste) }, modifier = Modifier.testTag("paste-$tag")) {
+    TextButton(shape = MaterialTheme.shapes.medium, onClick = { clipboard.getText()?.text?.take(253)?.let(onPaste) }, modifier = Modifier.testTag("paste-$tag")) {
         Text(stringResource(R.string.address_paste))
     }
 }

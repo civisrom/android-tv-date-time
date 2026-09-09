@@ -46,7 +46,11 @@ class DeviceCapabilitiesShellTest {
             "video declarations" to info.videoDecoders,
             "audio declarations" to info.audioDecoders,
         ).filterValues { it.isEmpty() }.keys
-        assertTrue("Missing device details: $missing; df=${client.shell("df -k /data").trimmedOutput}", missing.isEmpty())
+        if (missing.isNotEmpty()) {
+            val displays = client.shell("dumpsys display").trimmedOutput.lineSequence()
+                .filter { "DisplayDeviceInfo{" in it }.take(12).joinToString("\n")
+            fail("Missing device details: $missing; df=${client.shell("df -k /data").trimmedOutput}; displays=$displays")
+        }
         before.forEach { (setting, value) -> assertEquals(value, client.shell("settings get global $setting").trimmedOutput) }
     }
 

@@ -666,6 +666,7 @@ class MainScreenTest {
 
     @Test fun television_setup_supports_remote_steps_large_text_and_return_focus() {
         screen(AppState(), mode = DeviceMode.TELEVISION, scale = 2f, width = 480)
+        compose.runOnIdle { inputModeManager.requestInputMode(InputMode.Touch) }
         compose.onNodeWithTag("setup-open").performScrollTo().performClick()
         compose.onNodeWithTag("setup-about").performScrollTo().assertIsDisplayed()
         screenshot("tv-setup-font200-first")

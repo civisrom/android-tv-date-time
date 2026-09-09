@@ -115,6 +115,26 @@ jobs:
       max-parallel: 4
       matrix:
         include:
+          - name: phone-37.0
+            image: system-images;android-37.0;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-23
+            image: system-images;android-23;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-24
+            image: system-images;android-24;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-33
+            image: system-images;android-33;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
           - name: android-tv-36
             image: system-images;android-36;android-tv;x86_64
             device: tv_1080p
@@ -125,11 +145,6 @@ jobs:
             device: tv_1080p
             tv: true
             page_size: 16384
-          - name: phone-37.0
-            image: system-images;android-37.0;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
           - name: android-tv-30
             image: system-images;android-30;android-tv;x86
             device: tv_1080p
@@ -165,11 +180,6 @@ jobs:
             device: pixel_2
             tv: false
             page_size: 4096
-          - name: phone-33
-            image: system-images;android-33;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
           - name: phone-34
             image: system-images;android-34;google_apis;x86_64
             device: pixel_2
@@ -192,16 +202,6 @@ jobs:
             page_size: 4096
           - name: phone-26
             image: system-images;android-26;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-24
-            image: system-images;android-24;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-23
-            image: system-images;android-23;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
@@ -268,6 +268,13 @@ jobs:
               "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
+              if [[ "$expected_api" == 24 ]]; then
+                # This image's unrelated Messenger crashes at boot and covers the test UI.
+                "$ANDROID_HOME/platform-tools/adb" shell pm disable-user --user 0 com.google.android.apps.messaging
+                "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.google.android.apps.messaging
+              fi
+              timeout 1500 "$ANDROID_HOME/platform-tools/adb" logcat -v threadtime > "$RUNNER_TEMP/ui-live-logcat.txt" 2>&1 &
+              echo $! > "$RUNNER_TEMP/ui-logcat.pid"
               exit 0
             fi
             sleep 2
@@ -323,6 +330,12 @@ jobs:
           fi
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys display > "$RUNNER_TEMP/ui-display.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys window > "$RUNNER_TEMP/ui-window.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out screencap -p > ui-screenshots/emulator-final.png || true
+          if [[ -f "$RUNNER_TEMP/ui-logcat.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/ui-logcat.pid")" || true
+          fi
           timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true
 
       - name: Upload UI test results
@@ -336,5 +349,8 @@ jobs:
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt
             ${{ runner.temp }}/ui-crashes.txt
+            ${{ runner.temp }}/ui-display.txt
+            ${{ runner.temp }}/ui-window.txt
+            ${{ runner.temp }}/ui-live-logcat.txt
           if-no-files-found: ignore
           retention-days: 7
