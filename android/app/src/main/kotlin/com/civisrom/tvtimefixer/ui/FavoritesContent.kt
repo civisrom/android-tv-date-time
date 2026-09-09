@@ -93,11 +93,12 @@ private fun FavoriteEditor(initialName: String, initialAddress: String?, onDismi
     var name by remember { mutableStateOf(initialName.take(80)) }
     var address by remember { mutableStateOf(initialAddress.orEmpty()) }
     val saveFocus = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
     val canSave = name.isNotBlank() && name.none { it.isISOControl() } &&
         (initialAddress == null || parseDeviceAddress(address) != null)
-    val finishInput = KeyboardActions(onDone = { if (canSave) saveFocus.requestFocus(); keyboard?.hide() })
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.favorites_edit)) }, text = {
+        // The dialog has its own Compose view and input session.
+        val keyboard = LocalSoftwareKeyboardController.current
+        val finishInput = KeyboardActions(onDone = { if (canSave) saveFocus.requestFocus(); keyboard?.hide() })
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(name, { name = it.take(80) }, label = { Text(stringResource(R.string.favorite_name), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true, modifier = Modifier.testTag("favorite-name"),

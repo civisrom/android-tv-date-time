@@ -4,12 +4,16 @@ import android.graphics.Bitmap
 import android.system.Os
 import android.system.OsConstants
 import android.view.KeyEvent
+import android.view.View
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.MainActivity
 import com.civisrom.tvtimefixer.DeviceMode
@@ -99,7 +103,19 @@ class MainActivityTest {
             compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
             try {
                 compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-name").fetchSemanticsNodes().isNotEmpty() }
-                compose.onNodeWithTag("favorite-name").performClick().performImeAction()
+                lateinit var dialogView: View
+                onView(isRoot()).inRoot(isDialog()).check { view, error ->
+                    if (error != null) throw error
+                    dialogView = checkNotNull(view)
+                }
+                compose.onNodeWithTag("favorite-name").performClick()
+                compose.waitUntil(5_000) {
+                    ViewCompat.getRootWindowInsets(dialogView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                }
+                compose.onNodeWithTag("favorite-name").performImeAction()
+                compose.waitUntil(5_000) {
+                    ViewCompat.getRootWindowInsets(dialogView)?.isVisible(WindowInsetsCompat.Type.ime()) == false
+                }
             } finally { screenshot("favorite-dialog") }
             compose.onNodeWithTag("favorite-confirm").assertIsFocused().performClick()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }
