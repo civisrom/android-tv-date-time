@@ -1093,9 +1093,10 @@ APK можно установить непосредственно на Android 
 от Android-проверок и проверки зависимостей той же версии исходников.
 
 Версии Android-зависимостей закреплены в `android/app/gradle.lockfile`, SHA-256 —
-в `android/gradle/verification-metadata.xml`. При осознанном обновлении используйте
-`./gradlew --write-locks :app:dependencies`, затем `--write-verification-metadata sha256`
-для задач сборки и Lint. Генерация хэшей сама по себе не проверяет происхождение:
+в `android/gradle/verification-metadata.xml`. При осознанном обновлении в каталоге `android` используйте
+`./gradlew --refresh-dependencies --write-locks :app:dependencies`, затем
+`--refresh-dependencies --write-verification-metadata sha256` для задач сборки и Lint.
+Обновление метаданных обязательно: кэш может скрыть parent POM и альтернативные `.module`. Генерация хэшей сама по себе не проверяет происхождение:
 сверьте новые артефакты с официальными репозиториями и проверьте изменения файлов.
 После этого обычная сборка должна пройти без этих флагов. Секреты подписи для
 такой проверки не нужны. Configuration cache отключён; подписанные сборки также

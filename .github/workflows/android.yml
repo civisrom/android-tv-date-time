@@ -100,23 +100,43 @@ jobs:
       max-parallel: 4
       matrix:
         include:
-          - name: phone-23
-            image: system-images;android-23;google_apis;x86_64
+          - name: android-tv-36
+            image: system-images;android-36;android-tv;x86_64
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-36-16k
+            image: system-images;android-36;google-tv-ps16k;x86_64
+            device: tv_1080p
+            tv: true
+            page_size: 16384
+          - name: phone-37.0
+            image: system-images;android-37.0;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
-          - name: phone-24
-            image: system-images;android-24;google_apis;x86_64
-            device: pixel_2
-            tv: false
+          - name: android-tv-30
+            image: system-images;android-30;android-tv;x86
+            device: tv_1080p
+            tv: true
             page_size: 4096
-          - name: phone-26
-            image: system-images;android-26;google_apis;x86_64
-            device: pixel_2
-            tv: false
+          - name: google-tv-30
+            image: system-images;android-30;google-tv;x86
+            device: tv_1080p
+            tv: true
             page_size: 4096
-          - name: phone-28
-            image: system-images;android-28;google_apis;x86_64
+          - name: android-tv-34
+            image: system-images;android-34;android-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-34
+            image: system-images;android-34;google-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: phone-31
+            image: system-images;android-31;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
@@ -127,11 +147,6 @@ jobs:
             page_size: 4096
           - name: phone-30
             image: system-images;android-30;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-31
-            image: system-images;android-31;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
@@ -155,41 +170,26 @@ jobs:
             device: pixel_2
             tv: false
             page_size: 4096
-          - name: phone-37.0
-            image: system-images;android-37.0;google_apis;x86_64
+          - name: phone-28
+            image: system-images;android-28;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
-          - name: android-tv-30
-            image: system-images;android-30;android-tv;x86
-            device: tv_1080p
-            tv: true
+          - name: phone-26
+            image: system-images;android-26;google_apis;x86_64
+            device: pixel_2
+            tv: false
             page_size: 4096
-          - name: android-tv-34
-            image: system-images;android-34;android-tv;x86
-            device: tv_1080p
-            tv: true
+          - name: phone-24
+            image: system-images;android-24;google_apis;x86_64
+            device: pixel_2
+            tv: false
             page_size: 4096
-          - name: android-tv-36
-            image: system-images;android-36;android-tv;x86_64
-            device: tv_1080p
-            tv: true
+          - name: phone-23
+            image: system-images;android-23;google_apis;x86_64
+            device: pixel_2
+            tv: false
             page_size: 4096
-          - name: google-tv-30
-            image: system-images;android-30;google-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: google-tv-34
-            image: system-images;android-34;google-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: google-tv-36-16k
-            image: system-images;android-36;google-tv-ps16k;x86_64
-            device: tv_1080p
-            tv: true
-            page_size: 16384
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6

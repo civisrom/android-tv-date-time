@@ -1058,8 +1058,10 @@ depends on Android and dependency checks for the same source revision.
 
 Android dependency versions are locked in `android/app/gradle.lockfile`, with
 SHA-256 verification in `android/gradle/verification-metadata.xml`. For an
-intentional update, use `./gradlew --write-locks :app:dependencies`, then
-`--write-verification-metadata sha256` for build and Lint tasks. Hash generation
+intentional update, run `./gradlew --refresh-dependencies --write-locks :app:dependencies`
+from `android`, then use `--refresh-dependencies --write-verification-metadata sha256`
+for build and Lint tasks. Refresh metadata explicitly: a warm cache can hide parent
+POMs and alternative `.module` files. Hash generation
 alone does not verify provenance: compare new artifacts with official repositories
 and review the file changes. A normal build must then pass without these flags.
 Signing secrets are not needed for these checks. Configuration cache is disabled;
