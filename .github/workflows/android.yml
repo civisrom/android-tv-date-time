@@ -236,6 +236,8 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           { yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > "$RUNNER_TEMP/sdk-licenses.log"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "$UI_TEST_IMAGE"
+          # The emulator must see the runner's ephemeral ADB identity at boot.
+          "$ANDROID_HOME/platform-tools/adb" start-server
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
             --package "$UI_TEST_IMAGE" --device "$UI_TEST_DEVICE" \
             --path "$ANDROID_AVD_HOME/ui-test.avd"
@@ -244,9 +246,12 @@ jobs:
           emulator_memory=2048
           if [[ "$UI_TEST_IMAGE" == *'android-37.0;'* ]]; then
             emulator_memory=4096
-            # API 37 mapper.ranchu cannot read the host DMA buffers. Disable both
-            # prerequisites of ANDROID_EMU_read_color_buffer_dma in gfxstream.
-            emulator_features=(-feature -GLDirectMem,-HasSharedSlotsHostMemoryAllocator -verbose)
+            # Older avdmanager misreads the SDK's decimal api-level 37.0 as 0.
+            # Correct only AVD metadata; keep the installed Android 17 system image.
+            sed -n '/^target=/p' "$ANDROID_AVD_HOME/ui-test.ini"
+            sed -i 's/^target=.*/target=android-37/' "$ANDROID_AVD_HOME/ui-test.ini" "$ANDROID_AVD_HOME/ui-test.avd/config.ini"
+            grep -qx 'target=android-37' "$ANDROID_AVD_HOME/ui-test.ini"
+            emulator_features=(-verbose)
           fi
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
             -no-boot-anim -no-snapshot -gpu swiftshader -memory "$emulator_memory" -cores 2 -partition-size 4096 \
@@ -255,6 +260,10 @@ jobs:
           timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
           for attempt in $(seq 1 120); do
             if [[ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
+              expected_api=${UI_TEST_IMAGE#*android-}
+              expected_api=${expected_api%%;*}
+              expected_api=${expected_api%%.*}
+              test "$("$ANDROID_HOME/platform-tools/adb" shell getprop ro.build.version.sdk | tr -d '\r')" = "$expected_api"
               "$ANDROID_HOME/platform-tools/adb" shell input keyevent 82
               "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
@@ -279,17 +288,23 @@ jobs:
           timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           # Отдельные процессы ограничивают накопление Surface/IME в старых
           # системных образах. Каждый тест выполняется один раз; сбои не скрываем повтором.
+          ui_failed=0
           for shard in 0 1 2; do
             "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
-            timeout 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+            if ! timeout 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
               -e numShards 3 -e shardIndex "$shard" \
               -e expected_tv "$UI_TEST_TV" -e expected_page_size "$UI_TEST_PAGE_SIZE" \
               com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
-              | tee "$RUNNER_TEMP/ui-shard-$shard.log"
+              | tee "$RUNNER_TEMP/ui-shard-$shard.log"; then
+              ui_failed=1
+            fi
             cat "$RUNNER_TEMP/ui-shard-$shard.log" >> "$RUNNER_TEMP/ui-instrumentation.log"
             # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
-            grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-shard-$shard.log"
+            if ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-shard-$shard.log"; then
+              ui_failed=1
+            fi
           done
+          exit "$ui_failed"
 
       - name: Collect UI screenshots
         if: always()
@@ -300,8 +315,10 @@ jobs:
             while IFS= read -r name; do
               name=${name//$'\r'/}
               [[ "$name" =~ ^[a-zA-Z0-9._-]+\.png$ ]] || continue
-              timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
-                cat "files/ui-screenshots/$name" > "ui-screenshots/$name"
+              if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
+                cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
+                rm -f -- "ui-screenshots/$name"
+              fi
             done <<< "$names"
           fi
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true

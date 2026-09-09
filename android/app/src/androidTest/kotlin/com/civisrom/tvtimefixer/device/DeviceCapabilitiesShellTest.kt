@@ -8,7 +8,7 @@ import com.civisrom.tvtimefixer.adb.ShellResult
 import org.junit.Assert.*
 import org.junit.Test
 
-/** Проверяет настоящий вывод служб Android 6/11/16, не меняя настройки устройства. */
+/** Настоящие службы Android; изменённые тестом настройки восстанавливаются в finally. */
 class DeviceCapabilitiesShellTest {
     private val client = object : AdbClient {
         override fun isAlive() = true
@@ -48,5 +48,48 @@ class DeviceCapabilitiesShellTest {
         ).filterValues { it.isEmpty() }.keys
         assertTrue("Missing device details: $missing; df=${client.shell("df -k /data").trimmedOutput}", missing.isEmpty())
         before.forEach { (setting, value) -> assertEquals(value, client.shell("settings get global $setting").trimmedOutput) }
+    }
+
+    @Test fun real_NTP_setting_supports_reset_undo_and_rejects_stale_undo() {
+        val repository = DeviceRepository(client)
+        val original = repository.currentNtpServer()
+        val automatic = client.shell("settings get global auto_time").trimmedOutput
+        val automaticZone = client.shell("settings get global auto_time_zone").trimmedOutput
+        var failure: Throwable? = null
+        try {
+            val applied = repository.setNtpServer("first.ntp.invalid")
+            assertEquals(NtpUpdateResult.Applied("first.ntp.invalid", original,
+                if (Build.VERSION.SDK_INT < 30) NtpActivation.RESTART_REQUIRED else NtpActivation.NEXT_REFRESH,
+                when (automatic) { "1" -> true; "0" -> false; else -> null }), applied)
+            assertEquals("first.ntp.invalid", repository.currentNtpServer())
+
+            val reset = repository.resetNtpServer()
+            assertTrue("Reset failed: $reset", reset is NtpUpdateResult.Applied)
+            assertEquals("null", repository.currentNtpServer())
+            val undone = repository.undoNtpServer(reset as NtpUpdateResult.Applied)
+            assertTrue("Undo failed: $undone", undone is NtpUpdateResult.Applied)
+            assertEquals("first.ntp.invalid", repository.currentNtpServer())
+
+            assertTrue(repository.setNtpServer("second.ntp.invalid") is NtpUpdateResult.Applied)
+            assertEquals(NtpUpdateResult.NotConfirmed("first.ntp.invalid", "second.ntp.invalid"),
+                repository.undoNtpServer(applied as NtpUpdateResult.Applied))
+            assertEquals("second.ntp.invalid", repository.currentNtpServer())
+            assertEquals(automatic, client.shell("settings get global auto_time").trimmedOutput)
+            assertEquals(automaticZone, client.shell("settings get global auto_time_zone").trimmedOutput)
+        } catch (error: Throwable) {
+            failure = error
+            throw error
+        } finally {
+            try {
+                // Restore independently of the implementation under test, including system default.
+                val quoted = "'${original.replace("'", "'\\''")}'"
+                val restore = client.shell(if (original == "null") "settings delete global ntp_server"
+                    else "settings put global ntp_server $quoted")
+                assertEquals("NTP restoration failed", 0, restore.exitCode)
+                assertEquals(original, repository.currentNtpServer())
+            } catch (restoreError: Throwable) {
+                if (failure == null) throw restoreError else failure.addSuppressed(restoreError)
+            }
+        }
     }
 }
