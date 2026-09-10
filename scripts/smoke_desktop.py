@@ -16,9 +16,15 @@ def main():
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise RuntimeError('Run this smoke test only on a disposable GitHub runner')
     cases = (
-        ('language-eof', '', 'Выберите язык'),
-        ('english-menu-eof', '1\n\n', 'Main Menu'),
-        ('russian-exit', '2\n\n0\n\n', 'Главное меню'),
+        ('language-eof', '', ('Выберите язык',)),
+        ('english-menu-eof', '1\n\n', ('Main Menu',)),
+        ('russian-exit', '2\n\n0\n\n', ('Главное меню',)),
+        ('english-terminal-help', '1\n\n10\nhelp\nadb --help\nexit\n0\n\n',
+         ('ADB reference for the desktop application', 'adb bugreport bugreport.zip',
+          'Android Debug Bridge version')),
+        ('russian-terminal-help', '2\n\n10\nhelp\nadb --help\nexit\n0\n\n',
+         ('Справочник ADB для десктопной программы', 'adb bugreport bugreport.zip',
+          'Android Debug Bridge version')),
     )
     for name, answers, expected in cases:
         with tempfile.TemporaryDirectory(prefix='desktop-smoke-') as directory:
@@ -33,7 +39,7 @@ def main():
             if output.stat().st_size > 256 * 1024:
                 raise AssertionError(f'{name}: excessive console output')
             text = output.read_text(encoding='utf-8', errors='replace')
-            if result.returncode != 0 or expected not in text or 'Traceback' in text:
+            if result.returncode != 0 or any(marker not in text for marker in expected) or 'Traceback' in text:
                 raise AssertionError(f'{name}: exit={result.returncode}, output={text[-3000:]}')
             print(f'{name}: passed')
 

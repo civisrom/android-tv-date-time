@@ -1060,6 +1060,10 @@ class AndroidTVTimeFixer:
                 )
     
                 return_code, stdout, stderr = self._process_command_output(process)
+
+                if stderr:
+                    self.logger.error("ADB STDERR: %s", stderr.strip())
+                    print(Fore.RED + stderr.strip())
     
                 # Проверяем наличие ошибок подключения
                 combined_output = f"{stdout}\n{stderr}".lower()
@@ -1079,9 +1083,6 @@ class AndroidTVTimeFixer:
                     return True
                 else:
                     # Если ошибка не связана с подключением, прекращаем попытки
-                    if stderr:
-                        self.logger.error(f"STDERR: {stderr.strip()}")
-                        print(f"\033[31m{stderr.strip()}\033[0m")
                     return False
     
             except Exception as e:
@@ -1132,7 +1133,9 @@ class AndroidTVTimeFixer:
                         stdout=PIPE,
                         stderr=PIPE,
                         universal_newlines=True,
-                        encoding='utf-8' if sys.platform != 'win32' else 'cp866',
+                        encoding=_subprocess_encoding() if first_token in ('adb', 'adb.exe') else (
+                            'utf-8' if sys.platform != 'win32' else 'cp866'
+                        ),
                         bufsize=1,
                         env=environment,
                         **self._popen_group_options()
@@ -1143,9 +1146,9 @@ class AndroidTVTimeFixer:
                 if return_code != 0:
                     self.logger.error(f"Command execution error. Code: {return_code}")
                     print(Fore.RED + locales.get("command_error"))
-                    if stderr:
-                        self.logger.error(f"STDERR: {stderr}")
-                        print(Fore.RED + stderr)
+                if stderr:
+                    self.logger.warning("STDERR: %s", stderr.strip())
+                    print(Fore.RED + stderr)
     
         except FileNotFoundError as e:
             error_msg = f"Command not found: {e}"

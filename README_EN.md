@@ -606,7 +606,7 @@ authorization; the fallback subnet scan checks one specified port.
 
 ### Item 10 — Terminal mode
 
-Interactive mode for executing any ADB and system commands. Useful for advanced users:
+A mode for executing ADB commands and external programs. Useful for advanced users:
 - App management (install, uninstall)
 - File transfers (push/pull)
 - Screenshots and screen recording
@@ -614,6 +614,34 @@ Interactive mode for executing any ADB and system commands. Useful for advanced 
 - Device reboot
 
 Commands: `help` — help, `clear` — clear screen, `exit` — exit terminal mode.
+
+The built-in Russian and English `help` covers the public ADB 37.0.1 commands
+with explanations, Android TV examples and terminal limitations. `adb --help`
+shows the original help of the actual bundled ADB; `adb shell pm help`,
+`adb shell am help` and `adb logcat --help` show help from the connected Android
+version. Available `adb shell` commands depend on the firmware.
+
+To connect over the network, run one line at a time, replacing the example address:
+
+```text
+adb connect 192.168.1.100:5555
+adb devices -l
+adb shell getprop ro.product.model
+```
+
+`adb devices` only lists devices: do not append an IP to that command.
+Approve debugging on the TV; for code-based wireless debugging, pair in item 11
+first and use the current connection port. For USB, start with `adb devices -l`.
+With multiple devices, use `adb -s SERIAL shell ...`. The application uses its own
+ADB server, so connect within item 10.
+
+The terminal handles text and limits each command to 300 seconds. For screenshots,
+use `adb shell screencap -p /sdcard/screen.png`, then
+`adb pull /sdcard/screen.png screen.png`; for reports, use `adb bugreport bugreport.zip`.
+The PC shell does not interpret `>`, `<`, `|` or `&&`; after `adb shell` they may
+execute on the device. Use an external terminal for interactive shells, binary
+streams and long operations. Windows built-ins need `cmd /c` (for example,
+`cmd /c dir`); `cd` does not change the next command's working directory.
 
 ### Item 11 — Android 11+ wireless debugging
 

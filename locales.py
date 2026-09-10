@@ -586,349 +586,772 @@ arising from the use of this program.
                  ru="10. Режим терминала (команды ADB и системные)"
             ),
             "terminal_mode_welcome": Translation(
-                 en="Terminal mode activated. Type 'help', 'adb --help' for available commands or 'exit' to quit.",
-                 ru="Режим терминала активирован. Введите 'help', 'adb --help' для списка команд или 'exit' для выхода."
+                 en="Terminal mode: 'help' for the application guide, 'adb --help' for native ADB help, 'exit' to quit.",
+                 ru="Режим терминала: 'help' — справочник программы, 'adb --help' — справка ADB, 'exit' — выход."
             ),
             "terminal_mode_help": Translation(
-                 en="\nYou can execute any ADB or system commands."
-                 "\nBefore running commands in the terminal, you must connect to the device 'adb connect <ip>:<port>'"
-                 "\nAvoid Cyrillic and spaces in file paths or use quotes",
-                 ru="\nВы можете выполнять любые команды ADB или системные команды."
-                 "\nПрежде чем выполнять команды в терминале необходимо подключиться к устройству 'adb connect <ip>:<port>'"
-                 "\nИзбегайте кириллицы и пробелов в путях к файлам или используйте кавычки"
+                 en="\nNetwork connection: adb connect IP:PORT (replace with your TV's address)."
+                 "\nThen: adb devices -l — check the connection; adb shell getprop ro.product.model — read the model."
+                 "\nadb devices only lists devices: do not append an IP address to it."
+                 "\nApprove the debugging prompt on the TV. For USB, start with adb devices -l."
+                 "\nType help for commands, examples and terminal limitations.",
+                 ru="\nПодключение по сети: adb connect IP:PORT (подставьте адрес своего телевизора)."
+                 "\nЗатем: adb devices -l — проверить связь; adb shell getprop ro.product.model — прочитать модель."
+                 "\nadb devices только показывает список: IP-адрес к этой команде не добавляйте."
+                 "\nПодтвердите отладку на TV. Для USB начните с adb devices -l."
+                 "\nВведите help для команд, примеров и ограничений терминала."
             ),
             "terminal_mode_commands": Translation(
-                 en="""Available commands:
-                    - Any ADB command (e.g., 'adb devices', 'adb shell')
-                    - System commands
-                    - 'help', '?', 'adb --help' - Show this help
-                    - 'clear' - Clear screen
-                    - 'exit', 'quit', or 'q' - Exit terminal mode
-            
-            Basic commands:
-            Connecting to a device:
-                adb devices
-                    Show connected devices.
+                 en="""ADB reference for the desktop application
+Public commands of the bundled Platform Tools 37.0.1 and Android examples.
+Commands run on the connected device unless the description says otherwise.
+Android shell tools, permissions and options depend on the TV firmware.
+Replace IP:PORT, SERIAL, PACKAGE, USER_ID and file paths with your own values.
+Square brackets mean optional arguments; do not type the brackets.
+LOCAL is a PC path, REMOTE a device path, PACKAGE an app's package identifier.
+COMMAND is the command to run; ... means several arguments; | separates alternatives.
+Run each command on a separate line.
 
-                adb connect <ip>:<port>
-                    Connect to a device over Wi-Fi.
+1. Connect first, then check the connection
+  adb connect 192.168.1.100:5555
+    Example: replace the address with your TV's IP and debugging port.
+    For classic network debugging the usual port is 5555.
+  adb devices -l
+    List devices known to this ADB server. Do not append an IP address.
+    This command does not connect to a TV or scan your local network.
+    device = connected; unauthorized = approve the RSA prompt on the TV;
+    offline = transport unavailable. An empty list means no known devices.
+  adb shell getprop ro.product.model
+    Read the model of the single connected device.
+  adb -s SERIAL shell getprop ro.product.model
+    Select one device when several are connected. Copy SERIAL from devices;
+    for a network connection it is normally IP:PORT.
+  adb -d shell getprop ro.product.model
+    Select the single USB device. USB does not need adb connect.
+  adb disconnect IP:PORT
+    Disconnect this network device.
+  adb disconnect
+    Disconnect all TCP/IP devices on this server, not USB devices.
+  adb get-state
+    Query the selected transport's state; an unauthorized/offline device
+    can return an error. Use devices -l to diagnose all device states.
+  adb get-serialno
+    Show the selected device's ADB identifier.
+  adb get-devpath
+    Show its transport path, not a directory on the Android filesystem.
 
-                adb disconnect [<ip>:<port>]
-                    Disconnect from a device (default: all).
-            
-            Device state information:
-                adb get-state
-                    Show device state: device, offline, or unauthorized.
+The application uses its own ADB server. Connect within item 10 even if you
+already connected from another terminal or menu item. Allow debugging on the TV.
+USB debugging alone does not enable TCP/IP port 5555.
+With code-based wireless debugging, pair in menu item 11, then connect to the
+connection port shown on the TV. The pairing port is a different port.
+  adb mdns check
+    Check the ADB mDNS discovery backend.
+  adb mdns services
+    List advertised debugging addresses and ports; this is not a subnet scan.
+  adb pair IP:PAIR_PORT [CODE]
+    Native pairing command. Without CODE it waits for interactive input.
+    Use menu item 11 here: it prompts for the code without putting it in
+    command arguments. Pairing alone does not guarantee an active connection.
+  adb -d tcpip 5555
+    Switch an already authorized USB device to classic TCP/IP debugging.
+    Requires firmware support; then use adb connect IP:5555.
+  adb -s SERIAL usb
+    Restart the device's adbd in USB mode; its TCP/IP connection will be lost.
 
-                adb get-serialno
-                    Get the device's serial number.
+2. Terminal controls and limits
+  help / ?
+    Show this application reference.
+  adb --help
+    Show the complete original help of the actual bundled ADB executable.
+  adb help
+    Another spelling of the original ADB help.
+  adb version
+    Show the ADB version, not the application or Android version.
+  clear
+    Clear the screen.
+  exit / quit / q
+    Return to the main menu.
+Ctrl+C interrupts a running command and returns to terminal>.
+A command has a 300-second limit. Prefer finite log/process snapshots.
+This terminal handles text output. Use push/pull for binary files.
+Local shell redirection (> or <), pipes (|) and command chains (&&) are not
+interpreted on the PC. After adb shell they may be interpreted ON THE DEVICE.
+Use the file-saving examples below instead of redirecting ADB output.
+Interactive adb shell and commands requiring a real terminal should be run in
+an external terminal; here use adb shell COMMAND for individual commands.
+External executables in PATH can run here. Windows built-ins require cmd /c,
+for example cmd /c dir. On Linux/macOS, ls runs directly. cd and environment
+changes in a child shell do not persist; use explicit file paths.
+Quote local paths with spaces. Remote shell quoting follows Android shell rules.
 
-                adb get-devpath
-                    Get the device's system path.
-            
-            Working with apps:
-            Installing and uninstalling apps:
-                adb install <APK path>
-                    Install APK on the device.
-                    
-                adb install-multiple <file paths>
-                    Install split APKs.
+3. Global ADB options (place before the command)
+  adb [-d | -e | -s SERIAL | -t ID] COMMAND
+    -d: single USB device; -e: single TCP/IP device;
+    -s: device identifier; -t: transport_id from devices -l.
+  adb -H HOST -P PORT COMMAND
+    Select an ADB server on a computer. PORT is the server port, not the
+    TV's debugging port. Normally omit these options in this application.
+  adb -L SOCKET start-server
+    Choose a server listening socket, for example tcp:localhost:5039.
+  adb -a start-server
+    Allow the server to listen on all network interfaces.
+  adb --one-device SERIAL start-server
+    Restrict a newly started server to one USB device (serial or USB address).
+    -L, -a and --one-device configure server startup; use an external terminal
+    for such custom servers, since this application manages its own server.
+  adb --exit-on-write-error COMMAND
+    Exit if the command's stdout is closed.
+Do not use environment variables to select a device here: use -s explicitly.
 
-                adb uninstall <package name>
-                    Uninstall an app.
+4. Files, screenshots and video
+  adb push "local file.txt" /sdcard/Download/file.txt
+    Copy a local file to the device.
+  adb pull /sdcard/Download/file.txt "local file.txt"
+    Copy a device file to the PC. Directories can also be transferred.
+  adb push [--sync] [-z ALGORITHM | -Z] [-n] [-q] LOCAL... REMOTE
+    --sync: transfer changed files; -n: dry run without storing them;
+    -q: quiet progress; -z: compression; -Z: no compression.
+  adb pull [-a] [-z ALGORITHM | -Z] [-q] REMOTE... LOCAL
+    -a: preserve timestamps and modes; other transfer flags as above.
+    ALGORITHM: any, none, brotli, lz4 or zstd; support also depends on the device.
+  adb shell ls -l /sdcard/Download
+    List files in this directory.
+  adb shell mkdir -p /sdcard/Download/adb-demo
+    Create the directory, including missing parent directories.
+  adb shell mv /sdcard/Download/old.txt /sdcard/Download/new.txt
+    Rename or move a file; an existing destination may be overwritten.
+  adb shell rm /sdcard/Download/file.txt
+    Delete this file. Plain rm does not remove directories recursively.
+  adb shell rmdir /sdcard/Download/adb-demo
+    Remove an empty directory.
+  adb shell screencap -p /sdcard/screen.png
+    Save a PNG screenshot ON THE DEVICE.
+  adb pull /sdcard/screen.png screen.png
+    Download that screenshot to the PC. Run after screencap.
+  adb shell screenrecord --time-limit 30 /sdcard/demo.mp4
+    Record 30 seconds of screen video without audio; requires device support.
+  adb pull /sdcard/demo.mp4 demo.mp4
+    Download the completed recording. Protected content may not be captured.
 
-                adb shell pm uninstall --user <user_id> <package_name>
-                    Uninstall an app for a specific user.
-            
-            List installed apps:
-                adb shell pm list packages
-                    Show all installed packages.
+5. Applications and users
+  adb install "app.apk"
+    Install an APK compatible with this device.
+  adb install -r "app.apk"
+    Update an installed app while keeping data; a compatible signature is required.
+  adb install-multiple "base.apk" "split_config.apk"
+    Install one app from its complete, matching set of split APKs.
+  adb install-multi-package "first.apk" "second.apk"
+    Install several packages atomically when supported by the device.
+Installation options:
+    -r: replace; -t: allow test APKs; -d: allow a version downgrade for
+    debuggable apps; -g: grant runtime permissions; --instant: instant app;
+    --abi ABI: select ABI; -p: partial install (install-multiple only).
+    -s requests external storage; legacy -l requests forward-lock.
+    Availability and acceptance of these options depend on Android.
+    --streaming / --no-streaming: choose the installation transfer method.
+    --fastdeploy / --no-fastdeploy: enable/disable the deployment agent.
+    --force-agent / --date-check-agent / --version-check-agent: control agent updates.
+    --local-agent: use an agent from a local build (Linux/macOS only).
+  adb uninstall [-k] PACKAGE
+    Remove an app; -k keeps its data/cache.
+  adb shell pm list packages
+    List package identifiers; add -s for system apps or -3 for third-party apps.
+  adb shell pm path PACKAGE
+    Show installed APK paths.
+  adb shell pm list users
+    List Android users and their numeric IDs.
+  adb shell pm uninstall --user USER_ID PACKAGE
+    Remove the app for that user. User 0 is the owner, not always the active user.
+  adb shell pm disable-user --user USER_ID PACKAGE
+    Disable an app for that user, subject to firmware permissions.
+  adb shell pm enable --user USER_ID PACKAGE
+    Enable the app again for the same user.
+  adb shell pm clear --user USER_ID PACKAGE
+    Delete the app's data for that user, including settings and sign-ins.
+  adb shell am start -n PACKAGE/ACTIVITY
+    Launch the specified accessible activity.
+  adb shell am start -a android.settings.SETTINGS
+    Open Android settings if this action is supported on the TV.
+  adb shell am force-stop PACKAGE
+    Stop the app.
+  adb shell am broadcast -a ACTION
+    Send a broadcast; protected actions can be denied by Android.
 
-                adb shell pm list packages -s
-                    System apps only.
+6. TV controls
+  adb shell input keyevent KEYCODE_HOME
+    Go to the home screen.
+  adb shell input keyevent KEYCODE_BACK
+    Go back.
+  adb shell input keyevent KEYCODE_DPAD_CENTER
+    Press OK. Use KEYCODE_DPAD_UP/DOWN/LEFT/RIGHT for navigation.
+  adb shell input text hello%sworld
+    Type "hello world" into the focused field. %s means a space;
+    basic Latin text is supported, arbitrary Unicode input is not guaranteed.
+  adb shell input tap X Y
+    Tap screen coordinates, where supported.
+  adb shell input swipe X1 Y1 X2 Y2 DURATION_MS
+    Swipe between coordinates; duration is in milliseconds.
 
-                adb shell pm list packages -3
-                    Third-party apps only.
-            
-            App management:
-                adb shell pm enable <package_name>
-                    Enable an app.
+7. Time and system diagnostics
+  adb shell date
+    Read the device's current date/time.
+  adb shell settings get global ntp_server
+    Read the configured NTP override; null means no stored override.
+  adb shell settings get global auto_time
+    Read automatic time setting (normally 1 = on, 0 = off).
+  adb shell settings get global auto_time_zone
+    Read automatic time-zone setting.
+  adb shell getprop persist.sys.timezone
+    Read the current time-zone property.
+  adb shell settings put global ntp_server pool.ntp.org
+    Set an NTP override if firmware permits it. This does not prove that time
+    has synchronized; menu items 1/2 provide configuration with verification.
+  adb shell settings put global auto_time 1
+    Enable automatic time; success does not guarantee an NTP response.
+  adb shell settings delete global ntp_server
+    Remove the override so the firmware can use its configured default.
+  adb shell getprop
+    List system properties; append ro.build.version.release for Android version.
+  adb shell cat /proc/cpuinfo
+    Show CPU information exposed by the kernel.
+  adb shell df -h
+    Show filesystem space.
+  adb shell ps -A
+    List all processes on modern Android; on older firmware try ps without -A.
+  adb shell top -b -n 1
+    Print one process snapshot on Android with Toybox; check top --help on older TVs.
+  adb shell dumpsys -l
+    List services that provide diagnostics.
+  adb shell dumpsys SERVICE
+    Inspect one listed service, for example display, power or meminfo.
+    network_time_update_service and time_detector can explain time sync if present.
+  adb logcat -d -t 200
+    Print the last 200 log lines and exit; -d prevents continuous streaming.
+  adb logcat -b crash -d
+    Print the crash buffer and exit.
+  adb logcat
+    Stream logs until interrupted; the application's 300-second limit applies.
+  adb bugreport bugreport.zip
+    Save a report to the PC without >. ZIP requires Android 7+ support;
+    older devices may print text. Reports exceeding 300 seconds need an
+    external terminal. Reports can contain device and account information.
+  adb jdwp
+    List processes exposing the Java debugger transport.
+  adb host-features
+    List features of the PC's ADB server.
+  adb features
+    List features shared by the server and selected device.
+  adb server-status
+    Show the server's configuration, backends and paths.
 
-                adb shell pm disable <package_name>
-                    Disable an app.
+8. Forward and reverse ports
+  adb forward --list
+    List PC-to-device forwarding rules.
+  adb forward [--no-rebind] tcp:6100 tcp:7100
+    Forward PC port 6100 to device port 7100; --no-rebind rejects an existing rule.
+  adb forward --remove tcp:6100
+    Remove that PC-side forwarding rule.
+  adb forward --remove-all
+    Remove all forward rules.
+  adb reverse --list
+    List device-to-PC forwarding rules.
+  adb reverse [--no-rebind] tcp:7100 tcp:6100
+    Forward device port 7100 to PC port 6100.
+  adb reverse --remove tcp:7100
+    Remove that device-side reverse rule.
+  adb reverse --remove-all
+    Remove reverse rules on the selected device.
+forward endpoints: tcp:PORT, localabstract:NAME, localreserved:NAME,
+localfilesystem:PATH, dev:PATH, dev-raw:PATH, jdwp:PID (remote only),
+vsock:CID:PORT (remote only), acceptfd:FD (listening only).
+reverse endpoints: tcp:PORT, localabstract:NAME, localreserved:NAME,
+localfilesystem:PATH. tcp:0 requests an available listening port.
+The target service must exist; forwarding does not start a service.
 
-                adb shell am start -n <package_name>/<activity_name>
-                    Start a specific app activity.
+9. Server, reconnecting and waiting
+  adb start-server
+    Ensure the application's ADB server is running.
+  adb kill-server
+    Stop that server and disconnect its devices, including other application
+    instances using it. The next ADB command will start a server again.
+  adb reconnect
+    Reconnect the selected transport from the PC side.
+  adb reconnect device
+    Request reconnection from the device side.
+  adb reconnect offline
+    Reset offline/unauthorized transports. This does not approve RSA access.
+  adb wait-for-device
+    Wait for a usable transport, within this terminal's 300-second limit.
+  adb wait-for-TRANSPORT-STATE
+    TRANSPORT: usb, local (TCP/IP), any. STATE: device, recovery, rescue,
+    sideload, bootloader, disconnect. For example wait-for-usb-device.
+    Waiting does not establish a connection or confirm that Android has booted.
+  adb -s SERIAL attach
+    Reattach a detached USB device; requires the libusb backend.
+  adb -s SERIAL detach
+    Release a USB device for another process; requires libusb.
 
-                adb shell am force-stop <package_name>
-                    Force stop an app.
+10. Reboot, recovery and developer builds
+These commands change device state. Root/verity/remount usually require an
+eng/userdebug build; retail TVs commonly reject them. ADB does not grant root.
+  adb reboot
+    Reboot Android normally.
+  adb reboot bootloader
+    Reboot into the bootloader, where normal ADB commands are usually unavailable.
+  adb reboot recovery
+    Reboot into recovery, if supported.
+  adb reboot sideload
+    Reboot into recovery's OTA sideload mode.
+  adb reboot sideload-auto-reboot
+    Enter sideload mode and reboot automatically after sideloading.
+  adb sideload "update.zip"
+    Send and install a compatible OTA package in recovery sideload mode.
+  adb root
+    Restart the device's adbd as root on builds that allow it.
+  adb unroot
+    Restart adbd without root.
+  adb remount [-R]
+    Remount applicable partitions writable; -R permits a required reboot.
+  adb disable-verity
+    Disable dm-verity verification on a supported developer build.
+  adb enable-verity
+    Re-enable dm-verity on that build; follow the device's reboot instructions.
+  adb keygen "new-adb-key"
+    Generate an ADB private/public key pair on the PC. This does not pair or
+    authorize a TV. The private key must remain private.
+  adb sync [-l] [-n] [-q] [-z ALGORITHM | -Z] [PARTITION]
+    Sync an Android build from ANDROID_PRODUCT_OUT, not an arbitrary folder.
+    PARTITION: all, data, odm, oem, product, system, system_ext, vendor.
+    -l lists pending copies; -n dry run; -q quiet. Intended for OS developers
+    with writable targets and a configured external build environment.
+  adb emu help
+    Show emulator console commands; only for an Android emulator, not a TV.
+  adb emu COMMAND
+    Send a command from that console reference to the selected emulator.
 
-                adb shell am broadcast -a <action>
-                    Send a broadcast intent.
-            
-            File operations:
-            File transfer:
-                adb push <local path> <device path>
-                    Copy a file to the device.
+11. Shell syntax and help from the device
+  adb shell [-e ESCAPE] [-n] [-T | -t | -tt] [-x] [COMMAND...]
+    Run an Android shell command. -n disables stdin; -T disables PTY;
+    -t requests PTY when attached to a terminal; -tt forces PTY;
+    -e chooses an escape character (or none); -x disables remote exit codes
+    and stdout/stderr separation. Without COMMAND the shell is interactive:
+    use an external terminal for that mode.
+  adb exec-out COMMAND
+    Read raw command output. Binary output needs an external terminal;
+    do not use this terminal to redirect a PNG or other binary stream.
+  adb exec-in COMMAND
+    Feed stdin to a device command; use an external terminal for file/pipe input.
+  adb shell ls /system/bin
+    List executables actually present on this Android device.
+  adb shell toybox
+    List Toybox utilities when Toybox is included in the firmware.
+  adb shell pm help
+    Show this Android version's package-manager commands and options.
+  adb shell am help
+    Show activity-manager commands and intent options.
+  adb shell cmd -l
+    List services with shell commands on supported Android versions.
+  adb shell cmd SERVICE help
+    Show the selected service's own command reference.
+  adb shell settings help
+    Show supported settings operations and namespaces.
+  adb shell input --help
+    Show available input commands; older versions may show help with input alone.
+  adb shell dumpsys --help
+    Show diagnostic command options.
+  adb shell top --help
+    Check process-monitor options for this firmware.
+  adb shell screenrecord --help
+    Check screen recording options and device limitations.
+  adb logcat --help
+    Show log options for the connected Android version.
 
-                adb pull <device path> [local path]
-                    Copy a file from the device.
-            
-            File system management:
-                adb shell ls <path>
-                    List directory contents.
-
-                adb shell mkdir <path>
-                    Create a directory.
-
-                adb shell rm <path>
-                    Delete a file or directory.
-
-                adb shell mv <source> <destination>
-                    Move or rename a file/directory.
-            
-            Device operations:
-            Rebooting the device:
-                adb reboot
-                    Reboot the device.
-
-                adb reboot bootloader
-                    Reboot into bootloader mode.
-
-                adb reboot recovery
-                    Reboot into recovery mode.
-            
-            Input and interactions:
-                adb shell input keyevent <key_code>
-                    Simulate a key press (e.g., Home, Back).
-
-                adb shell input text "<text>"
-                    Input text.
-
-                adb shell input tap <x> <y>
-                    Simulate a tap.
-
-                adb shell input swipe <x1> <y1> <x2> <y2> <duration>
-                    Simulate a swipe.
-            
-            Capturing the screen:
-                adb exec-out screencap -p > screen.png
-                    Save a screenshot to the PC.
-
-                adb shell screenrecord <path>
-                    Record screen video.
-            
-            System information:
-            Logs and diagnostics:
-                adb logcat
-                    Show device logs.
-                    
-                adb bugreport > bugreport.zip
-                    Save a bug report.
-            
-            Process information:
-                adb shell top
-                    Show active processes.
-
-                adb shell ps
-                    List all processes.
-            
-            System details:
-                adb shell getprop
-                    Show system properties.
-
-                adb shell cat /proc/cpuinfo
-                    CPU information.
-
-                adb shell dumpsys
-                    General system diagnostics.
-            
-            Debugging:
-            Shell access:
-                adb shell
-                    Start a shell on the device.
-            
-            Port management:
-                adb forward <local port> <remote port>
-                    Forward a port for debugging.
-
-                adb reverse <remote port> <local port>
-                    Reverse port forwarding.
-            
-            Root commands:
-                adb root
-                    Restart ADB in root mode (if supported).
-
-                adb unroot
-                    Restart ADB in non-root mode.
+Official references:
+  https://developer.android.com/tools/adb
+  https://developer.android.com/tools/logcat
+  https://developer.android.com/tools/dumpsys
+  https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/docs/user/adb.1.md
+Use adb --help for the executable's exact reference; shell help comes from the TV.
 """,
-                 ru="""Доступные команды:
-                    - Любые команды ADB (например, 'adb devices', 'adb shell')
-                    - Системные команды
-                    - 'help', '?' или 'adb --help' - Показать эту справку
-                    - 'clear' - Очистить экран
-                    - 'exit', 'quit' или 'q' - Выйти из режима терминала
-            
-            Основные команды:
-            Подключение к устройству:
-                adb devices
-                    Показать список подключенных устройств.
+                 ru="""Справочник ADB для десктопной программы
+Публичные команды встроенных Platform Tools 37.0.1 и примеры для Android.
+Команды обращаются к подключённому устройству, если в пояснении не указано иное.
+Утилиты Android shell, права и параметры зависят от прошивки телевизора.
+Заменяйте IP:PORT, SERIAL, PACKAGE, USER_ID и пути своими значениями.
+Квадратные скобки обозначают необязательные аргументы; сами скобки не вводите.
+LOCAL — путь на ПК, REMOTE — на устройстве, PACKAGE — имя пакета приложения.
+COMMAND — выполняемая команда; ... означает несколько аргументов; | разделяет варианты.
+Каждую команду выполняйте отдельной строкой.
 
-                adb connect <ip>:<port>
-                    Подключиться к устройству по Wi-Fi.
+1. Сначала подключение, затем проверка
+  adb connect 192.168.1.100:5555
+    Пример: замените адрес на IP телевизора и его порт отладки.
+    Для классической отладки по сети обычно используется порт 5555.
+  adb devices -l
+    Список устройств, известных этому ADB-серверу. IP после команды не добавляйте.
+    Команда не подключает телевизор и не сканирует локальную сеть.
+    device = подключено; unauthorized = подтвердите запрос RSA на телевизоре;
+    offline = связь недоступна. Пустой список означает отсутствие устройств.
+  adb shell getprop ro.product.model
+    Прочитать модель единственного подключённого устройства.
+  adb -s SERIAL shell getprop ro.product.model
+    Выбрать устройство, если подключено несколько. SERIAL возьмите из devices;
+    для сетевого подключения это обычно IP:PORT.
+  adb -d shell getprop ro.product.model
+    Выбрать единственное USB-устройство. Для USB команда adb connect не нужна.
+  adb disconnect IP:PORT
+    Отключить это сетевое устройство.
+  adb disconnect
+    Отключить все TCP/IP-устройства этого сервера; USB не отключается.
+  adb get-state
+    Запросить состояние выбранного соединения; unauthorized/offline могут
+    возвращаться ошибкой. Для диагностики всех состояний используйте devices -l.
+  adb get-serialno
+    Показать ADB-идентификатор выбранного устройства.
+  adb get-devpath
+    Показать путь транспорта, а не каталог в файловой системе Android.
 
-                adb disconnect [<ip>:<port>]
-                    Отключиться от устройства (по умолчанию от всех).
+У программы свой ADB-сервер. Подключайтесь внутри пункта 10, даже если уже
+подключались из другого терминала или пункта меню. Разрешите отладку на TV.
+Включение USB-отладки само по себе не открывает TCP/IP-порт 5555.
+Для беспроводной отладки по коду сначала выполните спаривание в пункте 11,
+затем подключитесь к порту соединения с экрана TV. Порт спаривания отличается.
+  adb mdns check
+    Проверить доступность механизма обнаружения mDNS в ADB.
+  adb mdns services
+    Показать объявленные адреса и порты отладки; это не сканирование подсети.
+  adb pair IP:PAIR_PORT [CODE]
+    Штатная команда спаривания. Без CODE ожидает интерактивный ввод.
+    Здесь используйте пункт 11: он запрашивает код без передачи в аргументах
+    команды. Успешное спаривание ещё не гарантирует активное соединение.
+  adb -d tcpip 5555
+    Переключить уже авторизованное USB-устройство на классическую отладку TCP/IP.
+    Требуется поддержка прошивки; после этого выполните adb connect IP:5555.
+  adb -s SERIAL usb
+    Перезапустить adbd устройства в режиме USB; соединение TCP/IP разорвётся.
 
-             Информация о состоянии:
-                    adb get-state
-                        Показать состояние устройства: device, offline или unauthorized.
+2. Управление терминалом и ограничения
+  help / ?
+    Эта справка программы.
+  adb --help
+    Полная оригинальная справка фактически встроенного исполняемого файла ADB.
+  adb help
+    Другой вариант вызова оригинальной справки ADB.
+  adb version
+    Версия ADB, а не программы или Android.
+  clear
+    Очистить экран.
+  exit / quit / q
+    Вернуться в главное меню.
+Ctrl+C прерывает выполняемую команду и возвращает к terminal>.
+На команду отводится 300 секунд. Для журналов и процессов удобнее разовые снимки.
+Терминал обрабатывает текстовый вывод. Двоичные файлы передавайте через push/pull.
+Перенаправление (> или <), конвейеры (|) и цепочки команд (&&) на ПК здесь не
+обрабатываются. После adb shell эти операторы могут выполниться НА УСТРОЙСТВЕ.
+Для сохранения файлов используйте примеры ниже вместо перенаправления вывода ADB.
+Интерактивный adb shell и команды, которым нужен полноценный терминал, запускайте
+во внешней консоли; здесь выполняйте отдельные команды через adb shell COMMAND.
+Можно запускать внешние программы из PATH. Встроенным командам Windows нужен
+cmd /c, например cmd /c dir. В Linux/macOS ls запускается напрямую. cd и изменения
+окружения дочерней оболочки не сохраняются; указывайте явные пути к файлам.
+Локальные пути с пробелами заключайте в кавычки. Для путей на TV действуют
+правила кавычек оболочки Android.
 
-                    adb get-serialno
-                        Получить серийный номер устройства.
+3. Общие параметры ADB (ставятся перед командой)
+  adb [-d | -e | -s SERIAL | -t ID] COMMAND
+    -d: единственное USB; -e: единственное TCP/IP-устройство;
+    -s: идентификатор устройства; -t: transport_id из devices -l.
+  adb -H HOST -P PORT COMMAND
+    Выбрать ADB-сервер на компьютере. PORT — порт сервера, а не порт отладки TV.
+    В обычной работе с программой эти параметры не нужны.
+  adb -L SOCKET start-server
+    Выбрать сокет сервера, например tcp:localhost:5039.
+  adb -a start-server
+    Разрешить серверу слушать все сетевые интерфейсы.
+  adb --one-device SERIAL start-server
+    Ограничить новый сервер одним USB-устройством (серийный номер или USB-адрес).
+    -L, -a и --one-device задают запуск сервера; для такой настройки используйте
+    внешнюю консоль, поскольку программа сама управляет своим сервером.
+  adb --exit-on-write-error COMMAND
+    Завершить команду, если её поток stdout закрыт.
+Для выбора устройства здесь используйте -s, а не переменные окружения.
 
-                    adb get-devpath
-                        Получить путь к устройству в системе.
-            
-                Работа с приложениями:
-                Установка и удаление приложений:
-                    adb install <путь к APK>
-                        Установить APK на устройство.
+4. Файлы, снимки экрана и видео
+  adb push "local file.txt" /sdcard/Download/file.txt
+    Скопировать локальный файл на устройство.
+  adb pull /sdcard/Download/file.txt "local file.txt"
+    Скопировать файл с устройства на ПК. Также можно передавать каталоги.
+  adb push [--sync] [-z ALGORITHM | -Z] [-n] [-q] LOCAL... REMOTE
+    --sync: передавать изменившиеся файлы; -n: проба без сохранения файлов;
+    -q: скрыть прогресс; -z: выбрать сжатие; -Z: отключить сжатие.
+  adb pull [-a] [-z ALGORITHM | -Z] [-q] REMOTE... LOCAL
+    -a: сохранить время и режим доступа; остальные параметры как выше.
+    ALGORITHM: any, none, brotli, lz4 или zstd; нужна поддержка устройства.
+  adb shell ls -l /sdcard/Download
+    Показать файлы в этом каталоге.
+  adb shell mkdir -p /sdcard/Download/adb-demo
+    Создать каталог вместе с недостающими родительскими каталогами.
+  adb shell mv /sdcard/Download/old.txt /sdcard/Download/new.txt
+    Переместить или переименовать файл; существующий целевой файл может замениться.
+  adb shell rm /sdcard/Download/file.txt
+    Удалить этот файл. Обычный rm не удаляет каталоги рекурсивно.
+  adb shell rmdir /sdcard/Download/adb-demo
+    Удалить пустой каталог.
+  adb shell screencap -p /sdcard/screen.png
+    Сохранить снимок PNG НА УСТРОЙСТВЕ.
+  adb pull /sdcard/screen.png screen.png
+    Скачать этот снимок на ПК. Выполняется после screencap.
+  adb shell screenrecord --time-limit 30 /sdcard/demo.mp4
+    Записать 30 секунд экрана без звука; нужна поддержка устройства.
+  adb pull /sdcard/demo.mp4 demo.mp4
+    Скачать завершённую запись. Защищённое содержимое может не попасть в кадр.
 
-                    adb install-multiple <путь к файлам>
-                        Установить APK с несколькими компонентами (split APK).
+5. Приложения и пользователи
+  adb install "app.apk"
+    Установить совместимый с устройством APK.
+  adb install -r "app.apk"
+    Обновить приложение с сохранением данных; требуется совместимая подпись.
+  adb install-multiple "base.apk" "split_config.apk"
+    Установить одно приложение из полного набора совместимых split APK.
+  adb install-multi-package "first.apk" "second.apk"
+    Атомарно установить несколько пакетов, если это поддерживает устройство.
+Параметры установки:
+    -r: замена; -t: разрешить тестовые APK; -d: разрешить понижение версии
+    отлаживаемого приложения; -g: выдать разрешения времени выполнения;
+    --instant: мгновенное приложение; --abi ABI: выбрать ABI;
+    -p: частичная установка (только install-multiple).
+    -s запрашивает внешнее хранилище; устаревший -l — forward-lock.
+    Доступность и допустимость параметров зависят от Android.
+    --streaming / --no-streaming: выбрать способ передачи при установке.
+    --fastdeploy / --no-fastdeploy: включить/выключить агент быстрой установки.
+    --force-agent / --date-check-agent / --version-check-agent: обновление агента.
+    --local-agent: агент из локальной сборки (только Linux/macOS).
+  adb uninstall [-k] PACKAGE
+    Удалить приложение; -k сохраняет его данные и кэш.
+  adb shell pm list packages
+    Показать имена пакетов; добавьте -s для системных или -3 для сторонних.
+  adb shell pm path PACKAGE
+    Показать пути установленных APK.
+  adb shell pm list users
+    Показать пользователей Android и их числовые идентификаторы.
+  adb shell pm uninstall --user USER_ID PACKAGE
+    Удалить приложение для этого пользователя. 0 — владелец, не всегда текущий.
+  adb shell pm disable-user --user USER_ID PACKAGE
+    Отключить приложение для пользователя, если прошивка разрешает.
+  adb shell pm enable --user USER_ID PACKAGE
+    Снова включить приложение для того же пользователя.
+  adb shell pm clear --user USER_ID PACKAGE
+    Стереть данные приложения для пользователя, включая настройки и входы.
+  adb shell am start -n PACKAGE/ACTIVITY
+    Запустить указанную доступную Activity приложения.
+  adb shell am start -a android.settings.SETTINGS
+    Открыть настройки Android, если TV поддерживает это действие.
+  adb shell am force-stop PACKAGE
+    Остановить приложение.
+  adb shell am broadcast -a ACTION
+    Отправить широковещательное сообщение; защищённые действия Android отклонит.
 
-                    adb uninstall <имя пакета>
-                        Удалить приложение.
+6. Управление телевизором
+  adb shell input keyevent KEYCODE_HOME
+    Открыть главный экран.
+  adb shell input keyevent KEYCODE_BACK
+    Вернуться назад.
+  adb shell input keyevent KEYCODE_DPAD_CENTER
+    Нажать OK. Для навигации используйте KEYCODE_DPAD_UP/DOWN/LEFT/RIGHT.
+  adb shell input text hello%sworld
+    Ввести «hello world» в активное поле. %s обозначает пробел;
+    базовая латиница поддерживается, произвольный Unicode не гарантируется.
+  adb shell input tap X Y
+    Нажать в координатах экрана, если устройство поддерживает.
+  adb shell input swipe X1 Y1 X2 Y2 DURATION_MS
+    Провести между координатами; длительность задаётся в миллисекундах.
 
-                    adb shell pm uninstall --user <user_id> <package_name>
-                        Удалить приложение для конкретного пользователя.
-            
-                Список установленных приложений:
-                    adb shell pm list packages
-                        Показать все установленные пакеты.
+7. Время и системная диагностика
+  adb shell date
+    Прочитать текущую дату и время устройства.
+  adb shell settings get global ntp_server
+    Прочитать переопределённый NTP-сервер; null означает отсутствие записи.
+  adb shell settings get global auto_time
+    Прочитать настройку автоматического времени (обычно 1 — вкл., 0 — выкл.).
+  adb shell settings get global auto_time_zone
+    Прочитать настройку автоматического часового пояса.
+  adb shell getprop persist.sys.timezone
+    Прочитать свойство текущего часового пояса.
+  adb shell settings put global ntp_server pool.ntp.org
+    Задать NTP-сервер, если прошивка разрешает. Запись не доказывает синхронизацию
+    часов; пункты 1/2 меню предоставляют настройку с проверкой.
+  adb shell settings put global auto_time 1
+    Включить автоматическое время; успех не гарантирует ответ NTP-сервера.
+  adb shell settings delete global ntp_server
+    Удалить переопределение, чтобы прошивка использовала своё значение по умолчанию.
+  adb shell getprop
+    Показать системные свойства; добавьте ro.build.version.release для версии Android.
+  adb shell cat /proc/cpuinfo
+    Показать сведения о процессоре, доступные через ядро.
+  adb shell df -h
+    Показать свободное место в файловых системах.
+  adb shell ps -A
+    Все процессы на современных Android; на старых попробуйте ps без -A.
+  adb shell top -b -n 1
+    Один снимок процессов на Android с Toybox; на старых TV проверьте top --help.
+  adb shell dumpsys -l
+    Список служб, предоставляющих диагностику.
+  adb shell dumpsys SERVICE
+    Диагностика выбранной службы, например display, power или meminfo.
+    network_time_update_service и time_detector помогают проверить время, если есть.
+  adb logcat -d -t 200
+    Последние 200 строк журнала с завершением; -d отключает непрерывное ожидание.
+  adb logcat -b crash -d
+    Вывести буфер ошибок приложений и завершиться.
+  adb logcat
+    Непрерывный журнал до прерывания; действует лимит программы 300 секунд.
+  adb bugreport bugreport.zip
+    Сохранить отчёт на ПК без >. ZIP требует поддержки Android 7+;
+    старые устройства могут выдать текст. Для отчёта дольше 300 секунд нужна
+    внешняя консоль. Отчёт может содержать сведения об устройстве и аккаунтах.
+  adb jdwp
+    Список процессов, предоставляющих транспорт отладчика Java.
+  adb host-features
+    Возможности ADB-сервера на ПК.
+  adb features
+    Общие возможности сервера и выбранного устройства.
+  adb server-status
+    Конфигурация сервера, его механизмы USB/mDNS и используемые пути.
 
-                    adb shell pm list packages -s
-                        Только системные приложения.
+8. Перенаправление портов
+  adb forward --list
+    Список перенаправлений с ПК на устройство.
+  adb forward [--no-rebind] tcp:6100 tcp:7100
+    Порт 6100 ПК на порт 7100 устройства; --no-rebind запрещает замену правила.
+  adb forward --remove tcp:6100
+    Удалить это перенаправление со стороны ПК.
+  adb forward --remove-all
+    Удалить все правила forward.
+  adb reverse --list
+    Список перенаправлений с устройства на ПК.
+  adb reverse [--no-rebind] tcp:7100 tcp:6100
+    Порт 7100 устройства на порт 6100 ПК.
+  adb reverse --remove tcp:7100
+    Удалить это обратное перенаправление.
+  adb reverse --remove-all
+    Удалить правила reverse выбранного устройства.
+Адреса forward: tcp:PORT, localabstract:NAME, localreserved:NAME,
+localfilesystem:PATH, dev:PATH, dev-raw:PATH, jdwp:PID (только удалённая сторона),
+vsock:CID:PORT (только удалённая сторона), acceptfd:FD (только слушающая сторона).
+Адреса reverse: tcp:PORT, localabstract:NAME, localreserved:NAME,
+localfilesystem:PATH. tcp:0 запрашивает свободный слушающий порт.
+Целевая служба должна существовать; перенаправление не запускает службу.
 
-                    adb shell pm list packages -3
-                        Только сторонние приложения.
-            
-                Управление приложениями:
-                    adb shell pm enable <package_name>
-                        Включить приложение.
+9. Сервер, переподключение и ожидание
+  adb start-server
+    Убедиться, что ADB-сервер программы запущен.
+  adb kill-server
+    Остановить этот сервер и отключить его устройства, включая сессии других
+    экземпляров программы. Следующая команда ADB снова запустит сервер.
+  adb reconnect
+    Переподключить выбранный транспорт со стороны ПК.
+  adb reconnect device
+    Запросить переподключение со стороны устройства.
+  adb reconnect offline
+    Сбросить соединения offline/unauthorized. Это не подтверждает доступ по RSA.
+  adb wait-for-device
+    Дождаться доступного соединения в пределах лимита терминала 300 секунд.
+  adb wait-for-TRANSPORT-STATE
+    TRANSPORT: usb, local (TCP/IP), any. STATE: device, recovery, rescue,
+    sideload, bootloader, disconnect. Например, wait-for-usb-device.
+    Ожидание не создаёт соединение и не подтверждает полную загрузку Android.
+  adb -s SERIAL attach
+    Вернуть отсоединённое USB-устройство этому серверу; нужен механизм libusb.
+  adb -s SERIAL detach
+    Освободить USB-устройство для другого процесса; нужен libusb.
 
-                    adb shell pm disable <package_name>
-                        Отключить приложение.
+10. Перезагрузка, recovery и сборки разработчика
+Эти команды меняют состояние устройства. Для root/verity/remount обычно нужна
+сборка eng/userdebug; серийные TV часто отказывают. ADB сам не предоставляет root.
+  adb reboot
+    Обычная перезагрузка Android.
+  adb reboot bootloader
+    Перезагрузка в загрузчик; обычные команды ADB там, как правило, недоступны.
+  adb reboot recovery
+    Перезагрузка в режим восстановления, если он поддерживается.
+  adb reboot sideload
+    Перезагрузка в режим установки OTA через recovery.
+  adb reboot sideload-auto-reboot
+    Войти в sideload и автоматически перезагрузиться после установки.
+  adb sideload "update.zip"
+    Передать и установить совместимый пакет OTA в режиме recovery sideload.
+  adb root
+    Перезапустить adbd устройства от root на сборке, которая это разрешает.
+  adb unroot
+    Перезапустить adbd без root.
+  adb remount [-R]
+    Перемонтировать поддерживаемые разделы для записи; -R разрешает перезагрузку.
+  adb disable-verity
+    Отключить проверку dm-verity на совместимой сборке разработчика.
+  adb enable-verity
+    Включить dm-verity обратно; выполните указания устройства о перезагрузке.
+  adb keygen "new-adb-key"
+    Создать закрытый и открытый ADB-ключи на ПК. Команда не спаривает TV и не
+    выдаёт доступ к нему. Закрытый ключ должен оставаться секретным.
+  adb sync [-l] [-n] [-q] [-z ALGORITHM | -Z] [PARTITION]
+    Синхронизировать сборку Android из ANDROID_PRODUCT_OUT, не произвольную папку.
+    PARTITION: all, data, odm, oem, product, system, system_ext, vendor.
+    -l: список будущих копирований; -n: проба; -q: без прогресса. Для разработчиков
+    ОС с доступными для записи разделами и настроенным внешним окружением сборки.
+  adb emu help
+    Справка консоли эмулятора Android; к физическому телевизору не относится.
+  adb emu COMMAND
+    Выполнить команду из этой справки консоли на выбранном эмуляторе.
 
-                    adb shell am start -n <package_name>/<activity_name>
-                        Запустить определенное Activity приложения.
+11. Синтаксис shell и справка самого устройства
+  adb shell [-e ESCAPE] [-n] [-T | -t | -tt] [-x] [COMMAND...]
+    Выполнить команду Android. -n: не читать stdin; -T: без псевдотерминала;
+    -t: запросить его при наличии терминала; -tt: запросить принудительно;
+    -e: символ выхода (или none); -x: отключить коды завершения Android
+    и разделение stdout/stderr. Без COMMAND открывается интерактивная оболочка:
+    для неё используйте внешнюю консоль.
+  adb exec-out COMMAND
+    Получить сырой вывод команды. Для двоичных данных нужна внешняя консоль;
+    не перенаправляйте PNG и другие двоичные потоки через этот терминал.
+  adb exec-in COMMAND
+    Передать stdin команде устройства; для файла или конвейера нужна внешняя консоль.
+  adb shell ls /system/bin
+    Список исполняемых файлов, реально присутствующих на этом Android.
+  adb shell toybox
+    Список утилит Toybox, если он включён в прошивку.
+  adb shell pm help
+    Команды и параметры менеджера пакетов этой версии Android.
+  adb shell am help
+    Команды управления Activity и параметры Intent.
+  adb shell cmd -l
+    Список служб с командами shell на поддерживаемых версиях Android.
+  adb shell cmd SERVICE help
+    Справка команд выбранной службы.
+  adb shell settings help
+    Поддерживаемые операции с настройками и пространства имён.
+  adb shell input --help
+    Доступные команды ввода; на старых версиях справку может дать input без аргументов.
+  adb shell dumpsys --help
+    Параметры системной диагностики.
+  adb shell top --help
+    Параметры просмотра процессов именно этой прошивки.
+  adb shell screenrecord --help
+    Параметры записи экрана и ограничения устройства.
+  adb logcat --help
+    Параметры журналов подключённой версии Android.
 
-                    adb shell am force-stop <package_name>
-                        Принудительно остановить приложение.
-
-                    adb shell am broadcast -a <action>
-                        Отправить широковещательное сообщение.
-            
-                Работа с файлами:
-                Передача файлов:
-                    adb push <локальный путь> <путь на устройстве>
-                        Скопировать файл на устройство.
-
-                    adb pull <путь на устройстве> [локальный путь]
-                        Скопировать файл с устройства.
-            
-                Работа с файловой системой:
-                    adb shell ls <путь>
-                        Просмотреть содержимое каталога.
-
-                    adb shell mkdir <путь>
-                        Создать каталог.
-
-                    adb shell rm <путь>
-                        Удалить файл или каталог.
-
-                    adb shell mv <откуда> <куда>
-                        Переместить или переименовать файл/каталог.
-            
-                Работа с устройством:
-                Перезагрузка устройства:
-                    adb reboot
-                        Перезагрузить устройство.
-
-                    adb reboot bootloader
-                        Перезагрузить в режим загрузчика.
-
-                    adb reboot recovery
-                        Перезагрузить в режим восстановления.
-            
-                Управление состояниями:
-                    adb shell input keyevent <key_code>
-                        Отправить клавишу (например, Home, Back).
-
-                    adb shell input text "<текст>"
-                        Ввести текст.
-
-                    adb shell input tap <x> <y>
-                        Эмулировать нажатие.
-
-                    adb shell input swipe <x1> <y1> <x2> <y2> <duration>
-                        Эмулировать свайп.
-            
-                Захват экрана:
-                    adb exec-out screencap -p > screen.png
-                        Сохранить снимок экрана на ПК.
-
-                    adb shell screenrecord <путь>
-                        Записать видео с экрана.
-            
-                Системная информация:
-                Журналы и диагностика:
-                    adb logcat
-                        Вывести логи устройства.
-
-                    adb bugreport > bugreport.zip
-                        Сохранить отчет о состоянии устройства.
-            
-                Информация о процессах:
-                    adb shell top
-                        Показать активные процессы.
-
-                    adb shell ps
-                        Список всех процессов.
-            
-                Получение информации о системе:
-                    adb shell getprop
-                        Показать системные свойства устройства.
-
-                    adb shell cat /proc/cpuinfo
-                        Информация о процессоре.
-
-                    adb shell dumpsys
-                        Общая диагностика устройства.
-            
-                Отладка:
-                Открытие shell:
-                    adb shell
-                        Запустить терминал на устройстве.
-            
-                Управление портами:
-                    adb forward <локальный порт> <удаленный порт>
-                        Перенаправить порт для отладки.
-
-                    adb reverse <удаленный порт> <локальный порт>
-                        Перенаправить порт в обратном направлении.
-            
-                Запуск команд от имени root:
-                    adb root
-                        Перезапустить ADB в режиме root (если устройство поддерживает).
-                        
-                    adb unroot
-                        Перезапустить ADB в обычном режиме."""
+Официальные источники:
+  https://developer.android.com/tools/adb
+  https://developer.android.com/tools/logcat
+  https://developer.android.com/tools/dumpsys
+  https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/docs/user/adb.1.md
+Точная справка исполняемого файла — adb --help; справка shell поступает с телевизора.
+"""
             ),
             "terminal_mode_exit_ctrl_c": Translation(
-                 en="Terminal mode deactivated.",
-                 ru="Режим терминала деактивирован."
+                 en="Command interrupted. Type 'exit' to leave terminal mode.",
+                 ru="Команда прервана. Для выхода из режима терминала введите 'exit'."
             ),
             "terminal_mode_error": Translation(
                  en="Error executing command: {error}",
