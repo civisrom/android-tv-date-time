@@ -9,19 +9,22 @@ on:
     paths:
       - 'android/**'
       - 'shared/**'
+      - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
   pull_request:
     paths:
       - 'android/**'
       - 'shared/**'
+      - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -46,13 +49,22 @@ jobs:
         with:
           build-scan-publish: false
 
-      - name: Assemble debug APK
+      - name: Assemble debug and UI test APKs
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --max-workers=2 assembleDebug assembleDebugAndroidTest
+
+      - name: Assemble unsigned release APK
+        working-directory: android
+        run: ./gradlew --no-daemon --no-configuration-cache --no-build-cache assembleRelease
 
       - name: Unit tests
         working-directory: android
         run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Verify APK architectures and memory page alignment
+        run: |
+          python3 scripts/verify_android_apk.py android/app/build/outputs/apk/debug/app-debug.apk
+          python3 scripts/verify_android_apk.py android/app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Lint
         working-directory: android
@@ -66,6 +78,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Record UI input checksums
+        working-directory: android/app/build/outputs/apk
+        run: sha256sum debug/app-debug.apk androidTest/debug/app-debug-androidTest.apk > ui-inputs.sha256
+
+      - name: Upload identical APKs for the emulator matrix
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ui-inputs
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            android/app/build/outputs/apk/ui-inputs.sha256
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload reports on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -73,19 +100,111 @@ jobs:
           name: android-reports
           path: |
             android/app/build/reports/**
+            android/build/reports/dependency-verification/**
             android/app/build/outputs/logs/**
           if-no-files-found: ignore
           retention-days: 7
 
   ui:
-    name: Интерфейс Android (API ${{ matrix.api }})
+    name: APK — ${{ matrix.name }}
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
-        api: [23, 30, 36]
+        include:
+          - name: phone-28
+            image: system-images;android-28;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-31
+            image: system-images;android-31;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-37.0
+            image: system-images;android-37.0;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-23
+            image: system-images;android-23;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-24
+            image: system-images;android-24;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-33
+            image: system-images;android-33;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: android-tv-36
+            image: system-images;android-36;android-tv;x86_64
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-36-16k
+            image: system-images;android-36;google-tv-ps16k;x86_64
+            device: tv_1080p
+            tv: true
+            page_size: 16384
+          - name: android-tv-30
+            image: system-images;android-30;android-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-30
+            image: system-images;android-30;google-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: android-tv-34
+            image: system-images;android-34;android-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: google-tv-34
+            image: system-images;android-34;google-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: phone-29
+            image: system-images;android-29;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-30
+            image: system-images;android-30;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-34
+            image: system-images;android-34;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-35
+            image: system-images;android-35;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-36
+            image: system-images;android-36;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-26
+            image: system-images;android-26;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -96,87 +215,188 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - name: Download tested APKs from this run
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          build-scan-publish: false
+          name: android-ui-inputs
+          path: android/app/build/outputs/apk
 
-      - name: Build UI test APK
-        working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 assembleDebug assembleDebugAndroidTest
+      - name: Verify identical inputs
+        working-directory: android/app/build/outputs/apk
+        run: sha256sum -c ui-inputs.sha256
 
       - name: Start Android emulator
         env:
-          UI_TEST_API: ${{ matrix.api }}
+          UI_TEST_IMAGE: ${{ matrix.image }}
+          UI_TEST_DEVICE: ${{ matrix.device }}
         run: |
+          set -o pipefail
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           export ANDROID_AVD_HOME="$RUNNER_TEMP/ui-avd"
           mkdir -p "$ANDROID_AVD_HOME"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "system-images;android-${UI_TEST_API};google_apis;x86_64"
+          { yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > "$RUNNER_TEMP/sdk-licenses.log"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "$UI_TEST_IMAGE"
+          # The emulator must see the runner's ephemeral ADB identity at boot.
+          "$ANDROID_HOME/platform-tools/adb" start-server
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
-            --package "system-images;android-${UI_TEST_API};google_apis;x86_64" --device pixel_2 \
+            --package "$UI_TEST_IMAGE" --device "$UI_TEST_DEVICE" \
             --path "$ANDROID_AVD_HOME/ui-test.avd"
           test -f "$ANDROID_AVD_HOME/ui-test.ini"
+          emulator_features=()
+          emulator_memory=2048
+          if [[ "$UI_TEST_IMAGE" == *'android-37.0;'* ]]; then
+            emulator_memory=4096
+            # Older avdmanager misreads the SDK's decimal api-level 37.0 as 0.
+            # Correct only AVD metadata; keep the installed Android 17 system image.
+            sed -n '/^target=/p' "$ANDROID_AVD_HOME/ui-test.ini"
+            sed -i 's/^target=.*/target=android-37/' "$ANDROID_AVD_HOME/ui-test.ini" "$ANDROID_AVD_HOME/ui-test.avd/config.ini"
+            grep -qx 'target=android-37' "$ANDROID_AVD_HOME/ui-test.ini"
+            emulator_features=(-verbose)
+          elif [[ "$UI_TEST_IMAGE" == *';google-tv-ps16k;'* ]]; then
+            # With 2 GiB this image's first-boot services trigger LMK killing the IME.
+            emulator_memory=4096
+          fi
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
-            -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 \
+            -no-boot-anim -no-snapshot -gpu swiftshader -memory "$emulator_memory" -cores 2 -partition-size 4096 \
+            "${emulator_features[@]}" \
             > "$RUNNER_TEMP/ui-emulator.log" 2>&1 &
           timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
+          expected_api=${UI_TEST_IMAGE#*android-}
+          expected_api=${expected_api%%;*}
+          expected_api=${expected_api%%.*}
+          ready_samples=0
           for attempt in $(seq 1 120); do
             if [[ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
-              "$ANDROID_HOME/platform-tools/adb" shell input keyevent 82
+              if [[ "$expected_api" == 23 ]]; then
+                # First-boot encryption also sets boot_completed in a temporary framework.
+                # Installing there races vold stopping main services and remounting /data.
+                decrypt_state=$("$ANDROID_HOME/platform-tools/adb" shell getprop vold.decrypt | tr -d '\r')
+                if [[ -n "$decrypt_state" && "$decrypt_state" != trigger_restart_framework ]]; then
+                  ready_samples=0
+                  sleep 2
+                  continue
+                fi
+              fi
+              # TV images can lose ADB transport just after boot_completed. Require a
+              # stable read-only connection before the first (single) APK install.
+              if ! timeout 10 "$ANDROID_HOME/platform-tools/adb" shell pm path android | grep -q '^package:'; then
+                ready_samples=0
+                sleep 2
+                continue
+              fi
+              ready_samples=$((ready_samples + 1))
+              if (( ready_samples < 4 )); then
+                sleep 2
+                continue
+              fi
+              test "$("$ANDROID_HOME/platform-tools/adb" shell getprop ro.build.version.sdk | tr -d '\r')" = "$expected_api"
+              # MENU can trigger a launcher input ANR during first-boot work.
+              # Wake/unlock through system services without sending a key to an app.
+              "$ANDROID_HOME/platform-tools/adb" shell svc power stayon true
+              "$ANDROID_HOME/platform-tools/adb" shell wm dismiss-keyguard
               "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
+              if [[ "$expected_api" == 24 ]]; then
+                # This image's unrelated Messenger crashes at boot and covers the test UI.
+                "$ANDROID_HOME/platform-tools/adb" shell pm disable-user --user 0 com.google.android.apps.messaging
+                "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.google.android.apps.messaging
+              fi
+              # Separate short probes can reconnect silently during TV first-boot setup.
+              # Keep one transport alive after setup before the first APK installation.
+              if ! timeout 30 "$ANDROID_HOME/platform-tools/adb" shell '
+                for sample in 1 2 3 4 5 6 7 8; do
+                  pm path android | grep -q "^package:" || exit 1
+                  sleep 2
+                done
+              '; then
+                ready_samples=0
+                sleep 2
+                continue
+              fi
+              timeout 1500 "$ANDROID_HOME/platform-tools/adb" logcat -v threadtime > "$RUNNER_TEMP/ui-live-logcat.txt" 2>&1 &
+              echo $! > "$RUNNER_TEMP/ui-logcat.pid"
               exit 0
+            else
+              ready_samples=0
             fi
             sleep 2
           done
           exit 1
 
       - name: Run Compose UI regression tests
-        timeout-minutes: 10
+        timeout-minutes: 20
         working-directory: android
         env:
-          UI_TEST_API: ${{ matrix.api }}
+          UI_TEST_TV: ${{ matrix.tv }}
+          UI_TEST_PAGE_SIZE: ${{ matrix.page_size }}
         # Явные установка и запуск позволяют отличить сбой ADB от сбоя тестов.
         # APK остаются установленными до сбора скриншотов.
         run: |
           set -o pipefail
-          timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
-          timeout 120 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-          test_args=()
-          # Android 11 проверяет системные команды ветки, используемой SHIELD.
-          # Полный интерфейс проверяется на минимальной и современной API.
-          if [[ "$UI_TEST_API" == 30 ]]; then
-            test_args=(-e class com.civisrom.tvtimefixer.device.TimeZoneShellTest,com.civisrom.tvtimefixer.device.DeviceCapabilitiesShellTest,com.civisrom.tvtimefixer.data.ValidatorsAndroidTest)
-          fi
-          timeout 300 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
-            "${test_args[@]}" \
-            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
-            | tee "$RUNNER_TEMP/ui-instrumentation.log"
-          # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
-          grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-instrumentation.log"
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          # Отдельные процессы ограничивают накопление Surface/IME в старых
+          # системных образах. Каждый тест выполняется один раз; сбои не скрываем повтором.
+          ui_failed=0
+          for shard in 0 1 2; do
+            "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
+            if ! timeout 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+              -e numShards 3 -e shardIndex "$shard" \
+              -e expected_tv "$UI_TEST_TV" -e expected_page_size "$UI_TEST_PAGE_SIZE" \
+              com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
+              | tee "$RUNNER_TEMP/ui-shard-$shard.log"; then
+              ui_failed=1
+            fi
+            cat "$RUNNER_TEMP/ui-shard-$shard.log" >> "$RUNNER_TEMP/ui-instrumentation.log"
+            # am instrument может вернуть код 0 даже при проваленных JUnit-тестах.
+            if ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-shard-$shard.log"; then
+              ui_failed=1
+            fi
+          done
+          exit "$ui_failed"
 
-      - name: Collect UI screenshots
+      - name: Collect UI screenshots and IME timeout details
         if: always()
         run: |
           mkdir -p ui-screenshots
-          timeout 30 "$ANDROID_HOME/platform-tools/adb" pull /sdcard/Android/data/com.civisrom.tvtimefixer/files/ui-screenshots/. ui-screenshots/ || true
+          # Scoped storage blocks shell access on some TV builds; debug run-as uses the app UID.
+          if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
+            while IFS= read -r name; do
+              name=${name//$'\r'/}
+              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt)$ ]] || continue
+              if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
+                cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
+                rm -f -- "ui-screenshots/$name"
+              fi
+            done <<< "$names"
+          fi
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys display > "$RUNNER_TEMP/ui-display.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys window > "$RUNNER_TEMP/ui-window.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell cat /proc/meminfo > "$RUNNER_TEMP/ui-memory.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out screencap -p > ui-screenshots/emulator-final.png || true
+          if [[ -f "$RUNNER_TEMP/ui-logcat.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/ui-logcat.pid")" || true
+          fi
           timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true
 
       - name: Upload UI test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: android-ui-api-${{ matrix.api }}
+          name: android-ui-${{ matrix.name }}
           path: |
             ui-screenshots/
             ${{ runner.temp }}/ui-instrumentation.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt
             ${{ runner.temp }}/ui-crashes.txt
+            ${{ runner.temp }}/ui-display.txt
+            ${{ runner.temp }}/ui-window.txt
+            ${{ runner.temp }}/ui-memory.txt
+            ${{ runner.temp }}/ui-live-logcat.txt
           if-no-files-found: ignore
           retention-days: 7

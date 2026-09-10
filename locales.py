@@ -21,6 +21,28 @@ class Locales:
 
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
+            "terminal_output_truncated": Translation(
+                en="Only the final part of the command output is retained.",
+                ru="Сохранена заключительная часть вывода команды.",
+            ),
+            "favorite_remove_failed": Translation(
+                en="Could not save the removal. The favorite list has been restored.",
+                ru="Не удалось сохранить удаление. Список избранного восстановлен.",
+            ),
+            "import_too_large": Translation(en="The backup exceeds 1 MiB of text.", ru="Размер текста резервной копии превышает 1 МиБ."),
+            "import_version_unsupported": Translation(en="Unsupported backup format version.", ru="Эта версия формата резервной копии не поддерживается."),
+            "import_rollback_failed": Translation(
+                en="Import failed and the previous server list could not be restored on disk. The original list remains in memory; check file access before saving again.",
+                ru="Импорт не завершён; прежний список серверов не удалось восстановить на диске. Он сохранён в памяти. Проверьте доступ к файлу перед повторным сохранением.",
+            ),
+            "import_adb_restart": Translation(
+                en="The imported ADB server port will take effect after restarting the application.",
+                ru="Импортированный порт ADB-сервера будет использован после перезапуска программы.",
+            ),
+            "time_comparison_uncertain": Translation(
+                en="The reading delay does not allow a reliable comparison with the PC clock.",
+                ru="Задержка чтения не позволяет достоверно оценить расхождение с часами ПК.",
+            ),
             "menu_item_usb": Translation(en="12. Connect over USB", ru="12. Подключиться по USB"),
             "usb_select_hint": Translation(
                 en="Enter u to select a USB device (no IP needed). USB is also available in main menu item 12.",
@@ -339,9 +361,61 @@ arising from the use of this program.
                 en="Failed to get current NTP server: {error}",
                 ru="Не удалось получить текущий сервер NTP: {error}"
             ),
+            "ntp_system_default": Translation(
+                en='System time source',
+                ru='Системный источник времени'
+            ),
+            "ntp_before_after": Translation(
+                en='NTP setting saved: {before} → {after}',
+                ru='Настройка NTP сохранена: {before} → {after}'
+            ),
+            "ntp_clock_before_after": Translation(
+                en='Clock difference from this computer before → after: {before} → {after}. This is not proof of NTP synchronization.',
+                ru='Расхождение с часами этого компьютера до → после: {before} → {after}. Это не подтверждение синхронизации по NTP.'
+            ),
+            "ntp_restart_required": Translation(
+                en='Android 6–10 usually needs a TV restart to reload this setting. Restart when convenient, reconnect and check the clock.',
+                ru='На Android 6–10 обычно нужен перезапуск TV для перечитывания настройки. Перезапустите в удобное время, подключитесь и проверьте часы.'
+            ),
+            "ntp_next_refresh": Translation(
+                en='Android may apply the setting at its next network time refresh. If the clock stays wrong, check automatic time and restart the TV if needed.',
+                ru='Android может применить настройку при следующем обновлении сетевого времени. Если часы не исправились, проверьте автовремя и при необходимости перезапустите TV.'
+            ),
+            "ntp_auto_on": Translation(
+                en='Automatic date and time: enabled',
+                ru='Автоматическая дата и время: включены'
+            ),
+            "ntp_auto_off": Translation(
+                en='Automatic date and time: disabled. Enable it in the TV settings for automatic synchronization.',
+                ru='Автоматическая дата и время выключены. Включите их в настройках TV для автосинхронизации.'
+            ),
+            "ntp_auto_unknown": Translation(
+                en='Automatic date and time status could not be read.',
+                ru='Статус автоматической даты и времени прочитать не удалось.'
+            ),
+            "ntp_changed_elsewhere": Translation(
+                en='The setting changed since this operation. Refresh it before making another change.',
+                ru='Настройка уже изменилась после этой операции. Проверьте её перед следующим изменением.'
+            ),
+            "ntp_no_undo": Translation(
+                en='There is no change to undo in this connection.',
+                ru='В этом подключении нет изменения для отмены.'
+            ),
+            "ntp_restore_menu": Translation(
+                en='r. Restore system NTP; u. Undo last change in this connection',
+                ru='r. Вернуть системный NTP; u. Отменить последнее изменение в этом подключении'
+            ),
+            "ntp_restore_confirm": Translation(
+                en='Change only the NTP setting on the connected device? Type yes to confirm: ',
+                ru='Изменить настройку NTP подключённого устройства? Для подтверждения введите yes: '
+            ),
+            "ntp_unverified_confirm": Translation(
+                en='This computer could not validate the server. The TV may have different network access. Save this trusted address without a successful probe? Type yes: ',
+                ru='Проверка с компьютера не удалась. Сетевой доступ у TV может отличаться. Сохранить доверенный адрес без успешной проверки? Введите yes: '
+            ),
             "ntp_server_set": Translation(
-                en="NTP server {ntp_server} is reachable and has been added",
-                ru="Сервер NTP {ntp_server} доступен и добавлен"
+                en="NTP setting saved: {ntp_server}",
+                ru="Настройка NTP сохранена: {ntp_server}"
             ),
             "ntp_server_confirmation_failed": Translation(
                 en="Failed to confirm NTP server change.",
@@ -1031,12 +1105,12 @@ arising from the use of this program.
                 ru="  Прогресс: {checked}/{total} проверено, {found} найдено"
             ),
             "scan_complete": Translation(
-                en="Scan complete. Found devices: {count}",
-                ru="Сканирование завершено. Найдено устройств: {count}"
+                en="Scan complete. Connection candidates: {count}",
+                ru="Сканирование завершено. Адресов для проверки подключения: {count}"
             ),
             "scan_found": Translation(
-                en="Found {count} device(s) with open ADB port:",
-                ru="Найдено {count} устройств с открытым портом ADB:"
+                en="Found {count} connection candidate(s); ADB authorization still needs to be checked:",
+                ru="Найдено {count} адресов для подключения; доступ ADB ещё требует проверки:"
             ),
             "scan_none": Translation(
                 en="No Android TV devices found on local network",
@@ -1117,8 +1191,8 @@ arising from the use of this program.
                 ru="  Запрос авторизации отправлен на {ip}. Подтвердите его на экране устройства."
             ),
             "batch_success": Translation(
-                en="  OK  {ip}: NTP server {server} is reachable and has been added",
-                ru="  ОК  {ip}: NTP-сервер {server} доступен и добавлен"
+                en="  OK  {ip}: NTP setting saved: {server}. Enable automatic time; Android 6–10 usually needs a TV restart.",
+                ru="  ОК  {ip}: настройка NTP сохранена: {server}. Включите автовремя; на Android 6–10 обычно нужен перезапуск TV."
             ),
             "batch_failed": Translation(
                 en="  ERR {ip}: {error}",
@@ -1131,24 +1205,24 @@ arising from the use of this program.
 
             # ─── Device time sync ────────────────────────────────────────
             "device_time_title": Translation(
-                en="\nDevice time synchronization status:",
-                ru="\nСтатус синхронизации времени устройства:"
+                en="\nComparison with the PC clock (UTC):",
+                ru="\nСравнение с часами ПК (UTC):"
             ),
             "device_time": Translation(
-                en="  Device time : {time}",
-                ru="  Время устройства: {time}"
+                en="  Device time (UTC): {time}",
+                ru="  Время устройства (UTC): {time}"
             ),
             "pc_time": Translation(
-                en="  PC time     : {time}",
-                ru="  Время ПК        : {time}"
+                en="  PC time (UTC): {time}",
+                ru="  Время ПК (UTC): {time}"
             ),
             "time_in_sync": Translation(
-                en="  Status: Synchronized (difference < 60 sec)",
-                ru="  Статус: Синхронизировано (разница < 60 сек)"
+                en="  Difference from the PC clock is less than 60 seconds.",
+                ru="  Расхождение с часами ПК меньше 60 секунд."
             ),
             "time_out_of_sync": Translation(
-                en="  Status: OUT OF SYNC — difference: {diff}",
-                ru="  Статус: РАССИНХРОНИЗИРОВАНО — разница: {diff}"
+                en="  Difference from the PC clock: {diff}",
+                ru="  Расхождение с часами ПК: {diff}"
             ),
             "device_time_error": Translation(
                 en="Could not read device time: {error}",
@@ -1208,12 +1282,12 @@ arising from the use of this program.
             ),
 
             "ntp_verify_before_apply": Translation(
-                en="Verifying NTP server time sync (3 attempts)...",
-                ru="Проверка синхронизации времени NTP-сервера (3 попытки)..."
+                en="Testing the NTP server from this computer (3 attempts)...",
+                ru="Проверка ответа NTP-сервера с этого компьютера (3 попытки)..."
             ),
             "ntp_verify_detailed": Translation(
-                en="NTP server {server} is working correctly:\n  RTT: {rtt:.1f}ms | Success: {success:.0f}% | Offset: {offset:.3f}s",
-                ru="NTP-сервер {server} работает корректно:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
+                en="NTP server {server} replied to this computer:\n  RTT: {rtt:.1f}ms | Success: {success:.0f}% | Offset: {offset:.3f}s",
+                ru="NTP-сервер {server} ответил этому компьютеру:\n  RTT: {rtt:.1f}мс | Успех: {success:.0f}% | Смещение: {offset:.3f}с"
             ),
             "ntp_verify_failed": Translation(
                 en="Warning: NTP server {server} is not reachable as a time server. It will not be added.",
@@ -1276,8 +1350,8 @@ arising from the use of this program.
                 ru="\n[Авто] Сканирование сети для поиска Android TV устройств..."
             ),
             "auto_found_device": Translation(
-                en="[Auto] Found device: {ip}",
-                ru="[Авто] Найдено устройство: {ip}"
+                en="[Auto] Connection candidate: {ip}",
+                ru="[Авто] Адрес для проверки подключения: {ip}"
             ),
             "auto_use_found_device": Translation(
                 en="[Auto] Press Enter to use this address and continue, or q to cancel: ",

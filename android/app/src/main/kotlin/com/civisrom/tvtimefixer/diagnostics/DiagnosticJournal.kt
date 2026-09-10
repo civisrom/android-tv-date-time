@@ -88,9 +88,10 @@ class DiagnosticJournal(
     private val directory: File,
     private val legacyCrash: File? = null,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val monotonicClock: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : AutoCloseable {
     private sealed interface Command {
-        data class Append(val event: DiagnosticEvent, val epoch: Long) : Command
+        data class Append(val event: DiagnosticEvent, val epoch: Long, val observedAt: Long) : Command
         data object Clear : Command
         data object Refresh : Command
         data class Barrier(val done: CountDownLatch) : Command
@@ -105,6 +106,9 @@ class DiagnosticJournal(
     private val eventsFile = File(directory, "events.bin")
     private val crashFile = File(directory, "crash.bin")
     private var events = mutableListOf<DiagnosticEvent>()
+    // Возраст по настенным часам недостоверен именно в приложении исправления
+    // времени. После перезапуска возраст неизвестен: остаются лимиты числа/байтов.
+    private val observedAt = mutableMapOf<Long, Long>()
     private val worker = thread(name = "diagnostics-writer", isDaemon = true) {
         load()
         var processedClear = 0L
@@ -113,6 +117,7 @@ class DiagnosticJournal(
             val requestedClear = clearEpoch.get()
             if (processedClear != requestedClear) {
                 events.clear()
+                observedAt.clear()
                 val saved = persist()
                 if (saved) {
                     runCatching {
@@ -130,6 +135,7 @@ class DiagnosticJournal(
                 is Command.Append -> {
                     if (command.epoch == processedClear) {
                         events.add(command.event)
+                        observedAt[command.event.id] = command.observedAt
                         persist()
                     }
                 }
@@ -154,7 +160,7 @@ class DiagnosticJournal(
         }).joinToString("\n").take(2048)
         val event = DiagnosticEvent(ids.incrementAndGet(), clock(), operation, outcome, transport,
             durationMs.coerceAtLeast(0), reason, details, issue)
-        offer(Command.Append(event, clearEpoch.get()))
+        offer(Command.Append(event, clearEpoch.get(), monotonicClock()))
         return event.id
     }
 
@@ -214,6 +220,7 @@ class DiagnosticJournal(
             val current = ids.get()
             if (current >= loadedId || ids.compareAndSet(current, loadedId)) break
         }
+        events.forEach { observedAt[it.id] = monotonicClock() }
         val saved = persist()
         mutableSnapshot.update { state -> state.copy(previousCrashId = importedCrash?.id?.takeIf { id ->
             events.any { it.id == id }
@@ -226,13 +233,15 @@ class DiagnosticJournal(
     }
 
     private fun persist(): Boolean {
-        events.removeAll { clock() - it.time > MAX_AGE_MS }
+        val now = monotonicClock()
+        events.removeAll { event -> observedAt[event.id]?.let { now - it > MAX_AGE_MS } == true }
         events = events.takeLast(MAX_EVENTS).toMutableList()
         var bytes = encode(events)
         while (bytes.size > FILE_BUDGET && events.isNotEmpty()) {
             events.removeAt(0)
             bytes = encode(events)
         }
+        observedAt.keys.retainAll(events.map { it.id }.toSet())
         val saved = runCatching { atomicWrite(eventsFile, bytes) }.isSuccess
         mutableSnapshot.update { state -> state.copy(events = events.toList(), storageAvailable = saved,
             previousCrashId = state.previousCrashId?.takeIf { id -> events.any { it.id == id } }) }

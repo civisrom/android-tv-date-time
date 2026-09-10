@@ -159,11 +159,13 @@ internal fun DiagnosticsScreen(
         }
     }
     Column(
-        Modifier.fillMaxSize().safeDrawingPadding().padding(if (mode == DeviceMode.TELEVISION) 32.dp else 16.dp),
+        Modifier.fillMaxSize().safeDrawingPadding().padding(
+            horizontal = if (mode == DeviceMode.TELEVISION) 48.dp else 16.dp,
+            vertical = if (mode == DeviceMode.TELEVISION) 27.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.headlineSmall)
-        FilledTonalButton(onClick = onBack, modifier = Modifier.focusRequester(backFocus)
+        FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = onBack, modifier = Modifier.focusRequester(backFocus)
             .focusProperties { canFocus = true }.testTag("diagnostics-back")) {
             Text(stringResource(R.string.diagnostics_back))
         }
@@ -181,13 +183,13 @@ internal fun DiagnosticsScreen(
                             label = { Text(stringResource(R.string.diagnostics_all)) })
                         FilterChip(selected = errorsOnly, onClick = { errorsOnly = true }, modifier = Modifier.testTag("diagnostics-errors"),
                             label = { Text(stringResource(R.string.diagnostics_errors)) })
-                        FilledTonalButton(onClick = {
+                        FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = {
                             copyResult = if (runCatching {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Android TV Time Fixer", diagnosticReport(context, snapshot, mode)))
                             }.isSuccess) R.string.diagnostics_copied else R.string.diagnostics_copy_failed
                         }) { Text(stringResource(R.string.diagnostics_copy)) }
-                        FilledTonalButton(onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
+                        FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
                             modifier = Modifier.testTag("diagnostics-clear")) { Text(stringResource(R.string.diagnostics_clear)) }
                     }
                     copyResult?.let { Text(stringResource(it)) }
@@ -207,7 +209,7 @@ internal fun DiagnosticsScreen(
                             if (event.transport == DiagnosticTransport.USB) R.string.diagnostics_transport_usb else R.string.diagnostics_transport_network))
                         event.reason?.let { Text(stringResource(it.messageRes())) }
                         event.issue?.let { Text(stringResource(it.labelRes())) }
-                        TextButton(onClick = { expandedId = if (expandedId == event.id) null else event.id }) {
+                        TextButton(shape = MaterialTheme.shapes.medium, onClick = { expandedId = if (expandedId == event.id) null else event.id }) {
                             Text(stringResource(R.string.diagnostics_details))
                         }
                         if (expandedId == event.id) {
@@ -227,11 +229,11 @@ internal fun DiagnosticsScreen(
         title = { Text(stringResource(R.string.diagnostics_clear)) },
         text = { Text(stringResource(R.string.diagnostics_clear_confirm)) },
         confirmButton = {
-            Button(onClick = { onClear(); confirmClear = false; expandedId = null; copyResult = null },
+            Button(shape = MaterialTheme.shapes.medium, onClick = { onClear(); confirmClear = false; expandedId = null; copyResult = null },
                 modifier = Modifier.testTag("diagnostics-confirm-clear")) { Text(stringResource(R.string.diagnostics_clear)) }
         },
         dismissButton = {
-            TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.diagnostics_cancel)) }
+            TextButton(shape = MaterialTheme.shapes.medium, onClick = { confirmClear = false }) { Text(stringResource(R.string.diagnostics_cancel)) }
         },
     )
 }

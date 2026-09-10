@@ -21,6 +21,9 @@ import com.civisrom.tvtimefixer.device.TimeZoneFailure
 fun ConnectionError.messageRes(): Int = when (this) {
     ConnectionError.INVALID_ADDRESS -> R.string.error_invalid_address
     ConnectionError.UNREACHABLE -> R.string.error_unreachable
+    ConnectionError.CONNECTION_REFUSED -> R.string.error_connection_refused
+    ConnectionError.CONNECTION_TIMEOUT -> R.string.error_connection_timeout
+    ConnectionError.NETWORK_UNAVAILABLE -> R.string.error_network_unavailable
     ConnectionError.PAIRING_REQUIRED -> R.string.error_pairing_required
     ConnectionError.NOT_AUTHORIZED -> R.string.error_not_authorized
     ConnectionError.PAIRING_REJECTED -> R.string.error_pairing_rejected
@@ -65,7 +68,8 @@ fun NtpProbeResult.rejectionMessageRes(): Int = if (reachable) R.string.ntp_chec
 }
 
 fun NtpUpdateResult.toUiMessage(): UiMessage = when (this) {
-    is NtpUpdateResult.Applied -> UiMessage(R.string.ntp_applied, listOf(server))
+    is NtpUpdateResult.Applied -> if (server == "null") UiMessage(R.string.ntp_default_applied)
+        else UiMessage(R.string.ntp_applied, listOf(server))
     NtpUpdateResult.InvalidServer -> UiMessage(R.string.ntp_invalid)
     is NtpUpdateResult.NotConfirmed -> UiMessage(
         R.string.ntp_not_confirmed,
@@ -80,6 +84,7 @@ fun DeviceTimeStatus.messageRes(): Int = when (this) {
     DeviceTimeStatus.MISMATCH -> R.string.time_check_mismatch
     DeviceTimeStatus.UNCERTAIN -> R.string.time_check_uncertain
     DeviceTimeStatus.NO_SERVER -> R.string.time_check_no_server
+    DeviceTimeStatus.SYSTEM_DEFAULT -> R.string.time_check_system_default
     DeviceTimeStatus.NTP_UNAVAILABLE -> R.string.time_check_ntp_unavailable
     DeviceTimeStatus.DEVICE_UNAVAILABLE -> R.string.time_check_unavailable
 }

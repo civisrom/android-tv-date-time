@@ -4,8 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <!-- Required on Android 17 only when targeting SDK 37 or newer. -->
-    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- При переходе на targetSdk 37 добавить ACCESS_LOCAL_NETWORK вместе с
+         проверкой всех сетевых действий. Для текущего targetSdk 36 не объявлять. -->
 
     <!-- Одно приложение ставится и на телефон, и на телевизор. Ни одна из этих
          возможностей не должна быть обязательной, иначе фильтры установки

@@ -1,13 +1,12 @@
 package com.civisrom.tvtimefixer.device
 
 import com.civisrom.tvtimefixer.adb.AdbClient
-import com.civisrom.tvtimefixer.data.isValidNtpServer
 import com.civisrom.tvtimefixer.net.SntpQuery
 import kotlinx.coroutines.CancellationException
 import kotlin.math.abs
 import java.util.TimeZone
 
-enum class DeviceTimeStatus { MATCH, MISMATCH, UNCERTAIN, NO_SERVER, NTP_UNAVAILABLE, DEVICE_UNAVAILABLE }
+enum class DeviceTimeStatus { MATCH, MISMATCH, UNCERTAIN, NO_SERVER, SYSTEM_DEFAULT, NTP_UNAVAILABLE, DEVICE_UNAVAILABLE }
 
 /** Разовый замер часов, а не подтверждение источника последней синхронизации Android. */
 data class DeviceTimeCheck(
@@ -25,7 +24,7 @@ class DeviceTimeVerifier(
     private val query: SntpQuery,
     private val elapsedRealtime: () -> Long,
 ) {
-    fun verify(client: AdbClient, onFailure: (Exception) -> Unit = {}): DeviceTimeCheck {
+    fun verify(client: AdbClient, referenceOverride: String? = null, onFailure: (Exception) -> Unit = {}): DeviceTimeCheck {
         val server = read(client, "settings get global ntp_server")
             ?: return DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
         val automatic = when (read(client, "settings get global auto_time")) {
@@ -33,17 +32,22 @@ class DeviceTimeVerifier(
             "0" -> false
             else -> null
         }
-        val base = DeviceTimeCheck(DeviceTimeStatus.NO_SERVER, automaticTime = automatic)
-        if (!isValidNtpServer(server)) return base
-        val result = base.copy(server = server)
-        val network = try {
-            query.query(server)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (error: Exception) {
-            runCatching { onFailure(error) }
-            return result.copy(status = DeviceTimeStatus.NTP_UNAVAILABLE)
+        val config = NtpConfiguration(referenceOverride ?: server)
+        val base = DeviceTimeCheck(if (config.systemDefault) DeviceTimeStatus.SYSTEM_DEFAULT else DeviceTimeStatus.NO_SERVER,
+            automaticTime = automatic)
+        if (config.endpoints.isEmpty()) return base
+        var network: com.civisrom.tvtimefixer.net.SntpResult? = null
+        var result = base.copy(server = referenceOverride ?: server)
+        for (endpoint in config.endpoints.take(4)) {
+            try {
+                network = query.query(endpoint.host, endpoint.port)
+                result = result.copy(server = if (endpoint.port == 123) endpoint.host else "${endpoint.host}:${endpoint.port}")
+                break
+            } catch (e: CancellationException) { throw e }
+            catch (e: InterruptedException) { throw CancellationException("Clock check cancelled", e) }
+            catch (error: Exception) { runCatching { onFailure(error) } }
         }
+        if (network == null) return result.copy(status = DeviceTimeStatus.NTP_UNAVAILABLE)
         val reference = network.referenceTimeMillis
             ?: return result.copy(status = DeviceTimeStatus.NTP_UNAVAILABLE)
         val referenceElapsed = network.referenceElapsedMillis

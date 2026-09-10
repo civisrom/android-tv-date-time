@@ -43,7 +43,10 @@ fun searchNtpServers(query: String): List<NtpMatch> {
     var attempt = needle
     while (true) {
         val found = matchAll(attempt)
-        if (found.isNotEmpty() || attempt.length <= MIN_STEM) return found.take(SEARCH_LIMIT)
+        if (found.isNotEmpty() || attempt.length <= MIN_STEM || '.' in needle || ':' in needle) {
+            return found.distinctBy { it.server }.sortedByDescending { it.server.equals(needle, ignoreCase = true) }
+                .take(SEARCH_LIMIT)
+        }
         attempt = attempt.dropLast(1)
     }
 }
@@ -51,7 +54,7 @@ fun searchNtpServers(query: String): List<NtpMatch> {
 private fun matchAll(needle: String): List<NtpMatch> {
     val countries = NtpData.countries
         .filter {
-            it.code.lowercase().contains(needle) ||
+            it.server.lowercase().contains(needle) || it.code.lowercase().contains(needle) ||
                 it.nameEn.lowercase().contains(needle) ||
                 it.nameRu.lowercase().contains(needle)
         }

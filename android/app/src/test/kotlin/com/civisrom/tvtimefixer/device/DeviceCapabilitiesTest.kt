@@ -30,6 +30,20 @@ class DeviceCapabilitiesTest {
         assertEquals("", parseDisplayDetails(display.replace("modeId 2", "modeId 99")).activeMode)
     }
 
+    @Test fun `Android 17 mode metadata does not hide resolution or refresh rate`() {
+        // API 37 adds parentModeId, sfModeId and flags before width (CE2A.260420.019).
+        val modern = display.replace("{id=1, width=", "{id=1, parentModeId=-1, sfModeId=0, flags=, width=")
+            .replace("{id=2, width=", "{id=2, parentModeId=1, sfModeId=1, flags=VRR, width=")
+            .replace("FLAG_DEFAULT_DISPLAY", "FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY")
+        val info = parseDisplayDetails(modern)
+        assertEquals("3840 × 2160 @ 59.94 Hz", info.activeMode)
+        assertEquals("1920 × 1080 @ 60 Hz\n3840 × 2160 @ 59.94 Hz", info.supportedModes)
+        assertEquals(listOf(1, 2, 3, 4), info.hdrTypes)
+        assertEquals(true, info.allm)
+        val missingWidth = modern.replace("width=1920, ", "")
+        assertEquals("3840 × 2160 @ 59.94 Hz", parseDisplayDetails(missingWidth).supportedModes)
+    }
+
     @Test fun `data storage uses available blocks and supports wrapped filesystem names`() {
         val row = "8388608 4194304 2097152 50% /data"
         assertEquals("8.00 GiB" to "2.00 GiB", parseDataStorage("Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/block/dm-8 $row"))

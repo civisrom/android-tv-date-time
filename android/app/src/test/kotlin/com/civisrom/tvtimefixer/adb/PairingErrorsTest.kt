@@ -13,6 +13,6 @@ class PairingErrorsTest {
         assertEquals(ConnectionError.PAIRING_TIMEOUT, classifyPairingError(SocketTimeoutException()))
         assertEquals(ConnectionError.TLS_FAILED, classifyPairingError(SSLException("fixture")))
         assertEquals(ConnectionError.PAIRING_FAILED, classifyPairingError(IOException("peer closed")))
-        assertEquals(ConnectionError.UNREACHABLE, classifyPairingError(ConnectException()))
+        assertEquals(ConnectionError.CONNECTION_REFUSED, classifyPairingError(ConnectException()))
     }
 }

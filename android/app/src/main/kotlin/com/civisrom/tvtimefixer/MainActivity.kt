@@ -40,6 +40,10 @@ import com.civisrom.tvtimefixer.data.NtpProbe
 import com.civisrom.tvtimefixer.data.NtpProbeFailure
 import com.civisrom.tvtimefixer.data.NtpScanner
 import com.civisrom.tvtimefixer.data.ScanProgress
+import com.civisrom.tvtimefixer.data.Favorites
+import com.civisrom.tvtimefixer.data.FavoriteDevice
+import com.civisrom.tvtimefixer.data.FavoriteNtp
+import com.civisrom.tvtimefixer.data.usableDeviceSerial
 import com.civisrom.tvtimefixer.data.isUsable
 import com.civisrom.tvtimefixer.device.DeviceRepository
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
@@ -73,6 +77,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import com.civisrom.tvtimefixer.diagnostics.OperationTrace
 
 class MainActivity : ComponentActivity() {
@@ -96,6 +101,7 @@ class MainActivity : ComponentActivity() {
     private var actionGeneration = 0
     private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
+    private val favoritesStore get() = (application as TimeFixerApplication).favorites
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -107,16 +113,16 @@ class MainActivity : ComponentActivity() {
                     actionJob?.cancel()
                     val event = journal.record(Operation.USB_DETACHED, Outcome.FAILED,
                         DiagnosticTransport.USB, reason = ConnectionError.USB_DISCONNECTED)
-                    state = state.copy(connection = ConnectionState.Disconnected, busy = true,
+                    state = state.connectionLost().copy(busy = true,
                         operation = Operation.DISCONNECT, diagnosticEventId = event,
-                        deviceInfo = null, currentNtpServer = "", ntpMessage = null, ntpDiagnosticEventId = null,
+                        deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
                         timeCheck = null, timeDiagnosticEventId = null,
                         timeZoneResult = null, timeZoneDiagnosticEventId = null,
                         message = UiMessage(R.string.error_usb_disconnected))
                     lifecycleScope.launch {
                         // Даже releaseInterface/close могут ждать kernel I/O.
                         // Освобождаем USB вне UI, до следующего подключения.
-                        withContext(Dispatchers.IO) {
+                        runInterruptible(Dispatchers.IO) {
                             usb.detached(device.deviceName)
                             connector.disconnect()
                         }
@@ -157,7 +163,14 @@ class MainActivity : ComponentActivity() {
 
         private fun run(operation: Operation, block: suspend (OperationTrace) -> AppState) {
             if (state.busy) return
+            if (operation in setOf(Operation.CONNECT_NETWORK, Operation.PAIR, Operation.CHECK_NTP,
+                    Operation.APPLY_NTP, Operation.CHECK_TIME) && !networkAllowed()) return
+            if (operation in setOf(Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE) &&
+                state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress && !networkAllowed()) return
             val generation = ++actionGeneration
+            if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
+                state = state.connectionLost()
+            }
             val started = System.nanoTime()
             val transport = when (operation) {
                 Operation.CONNECT_USB -> DiagnosticTransport.USB
@@ -188,7 +201,7 @@ class MainActivity : ComponentActivity() {
                     val failed = when (operation) {
                         Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
                         Operation.CHECK_NTP -> result.ntpCheck?.isUsable() != true
-                        Operation.APPLY_NTP -> result.ntpMessage?.res != R.string.ntp_applied
+                        Operation.APPLY_NTP -> result.ntpMessage?.res !in listOf(R.string.ntp_applied, R.string.ntp_default_applied)
                         Operation.CHECK_TIME -> result.timeCheck?.status != DeviceTimeStatus.MATCH
                         Operation.APPLY_TIME_ZONE -> result.timeZoneResult !is TimeZoneUpdateResult.Applied
                         Operation.READ_DEVICE -> result.diagnosticEventId != null || !result.connected || result.deviceInfo == null
@@ -216,7 +229,7 @@ class MainActivity : ComponentActivity() {
                         timeZoneDiagnosticEventId = if (zoneAction && failed) event else result.timeZoneDiagnosticEventId,
                         ntpDiagnosticEventId = if (ntpAction && failed) event else result.ntpDiagnosticEventId,
                         timeDiagnosticEventId = if (timeAction && failed) event else result.timeDiagnosticEventId,
-                    ).withLatestUsb(state)
+                    ).withLatestBackground(state)
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
                     throw e
@@ -237,36 +250,72 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun connect(address: String) = run(Operation.CONNECT_NETWORK) { trace ->
-            val result = withContext(Dispatchers.IO) { connector.connect(address) }
+            val result = runInterruptible(Dispatchers.IO) { connector.connect(address) }
             state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
+        override fun connectFavorite(favorite: FavoriteDevice) = run(Operation.CONNECT_NETWORK) { trace ->
+            val stored = state.favorites.devices.firstOrNull { it == favorite } ?: return@run state
+            val result = runInterruptible(Dispatchers.IO) { connector.connect(stored.address.toString()) }
+            val connected = state.copy(connection = result, message = null).withDeviceData(trace)
+            if (!connected.connected || stored.matches(connected.deviceInfo)) connected else {
+                runInterruptible(Dispatchers.IO) { connector.disconnect() }
+                connected.connectionLost().copy(message = UiMessage(R.string.favorite_identity_changed))
+            }
+        }
+
+        override fun saveCurrentDevice(name: String) {
+            val address = state.connectedAddress ?: return
+            val info = state.deviceInfo ?: return
+            if (!usableDeviceSerial(info.serial)) {
+                state = state.copy(message = UiMessage(R.string.favorite_identity_missing))
+                return
+            }
+            changeFavorites { old -> old.copy(devices = old.devices.filterNot { it.serial == info.serial } +
+                FavoriteDevice(name.trim(), address, info.serial, info.model)) }
+        }
+
+        override fun updateFavoriteDevice(favorite: FavoriteDevice) = changeFavorites { old ->
+            require(old.devices.any { it.serial == favorite.serial && it.model == favorite.model })
+            old.copy(devices = old.devices.map { if (it.serial == favorite.serial) favorite else it })
+        }
+
+        override fun removeFavoriteDevice(serial: String) = changeFavorites {
+            it.copy(devices = it.devices.filterNot { device -> device.serial == serial })
+        }
+
+        override fun saveFavoriteNtp(name: String, server: String) = changeFavorites { old ->
+            val canonical = server.trim().lowercase(java.util.Locale.ROOT)
+            old.copy(servers = old.servers.filterNot { it.server.equals(canonical, ignoreCase = true) } +
+                FavoriteNtp(name.trim(), canonical))
+        }
+
+        override fun removeFavoriteNtp(server: String) = changeFavorites {
+            it.copy(servers = it.servers.filterNot { entry -> entry.server == server })
+        }
+
+        override fun openSetupSettings(action: String) {
+            if (!openLocalSettings(this@MainActivity, action)) {
+                state = state.copy(message = UiMessage(R.string.setup_settings_unavailable))
+            }
+        }
+
         override fun connectLoopback() = run(Operation.CONNECT_NETWORK) { trace ->
-            val result = withContext(Dispatchers.IO) { connector.connectLoopback() }
+            val result = runInterruptible(Dispatchers.IO) { connector.connectLoopback() }
             state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
         override fun disconnect() = run(Operation.DISCONNECT) {
-            withContext(Dispatchers.IO) { connector.disconnect() }
-            AppState(
-                discovered = state.discovered,
-                discoveryAvailable = state.discoveryAvailable,
-                discoverySearching = state.discoverySearching,
-                discoveryPermissionNeeded = state.discoveryPermissionNeeded,
-                usbSupported = state.usbSupported,
-                usbDevices = state.usbDevices,
-                usbAttachedCount = state.usbAttachedCount,
-                usbScanFailed = state.usbScanFailed,
-                usbSystemState = state.usbSystemState,
-            )
+            runInterruptible(Dispatchers.IO) { connector.disconnect() }
+            state.connectionLost().copy(message = null, diagnosticEventId = null)
         }
 
         override fun refreshUsbDevices() = refreshUsbList(report = true)
 
         override fun connectUsb(address: UsbDeviceAddress) = run(Operation.CONNECT_USB) { trace ->
-            withContext(Dispatchers.IO) { connector.disconnect() }
+            runInterruptible(Dispatchers.IO) { connector.disconnect() }
             state = state.copy(connection = ConnectionState.Connecting(address),
-                deviceInfo = null, currentNtpServer = "", ntpMessage = null,
+                deviceInfo = null, ntpMessage = null,
                 ntpCheck = null,
                 message = UiMessage(R.string.usb_authorize_hint))
             state = state.copy(operation = Operation.USB_PERMISSION)
@@ -285,7 +334,7 @@ class MainActivity : ComponentActivity() {
             if (reason != null) {
                 return@run state.copy(connection = ConnectionState.Failed(address, reason, permissionEvent), message = null)
             }
-            val result = withContext(Dispatchers.IO) { connector.connectUsb(address) }
+            val result = runInterruptible(Dispatchers.IO) { connector.connectUsb(address) }
             state.copy(connection = result, message = null).withDeviceData(trace)
         }
 
@@ -304,77 +353,83 @@ class MainActivity : ComponentActivity() {
 
         override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) { trace ->
             state = state.copy(ntpMessage = null, ntpCheck = null)
-            val result = withContext(Dispatchers.IO) { ntpProbe.test(server) }
+            val result = runInterruptible(Dispatchers.IO) { ntpProbe.test(server) }
             trace.ntp(result)
             state.copy(ntpCheck = result)
         }
 
-        /**
-         * Применяет адрес, предварительно убедившись, что он отвечает как
-         * сервер времени. Десктопная половина ведёт себя так же: адрес, не
-         * прошедший проверку, до устройства не доходит.
-         */
-        override fun applyNtpServer(server: String) = run(Operation.APPLY_NTP) { trace ->
+        override fun applyNtpServer(server: String, allowUnverified: Boolean) = changeNtp(server, allowUnverified)
+
+        override fun resetNtpServer() = changeNtp(null)
+
+        override fun undoNtpServer() {
+            val change = state.ntpChange ?: return
+            changeNtp(change.previous, allowUnverified = true, undo = change)
+        }
+
+        private fun changeNtp(server: String?, allowUnverified: Boolean = false,
+            undo: NtpUpdateResult.Applied? = null,
+        ) = run(Operation.APPLY_NTP) { trace ->
             state = state.copy(ntpMessage = null)
-            val applied = withContext(Dispatchers.IO) {
-                val check = ntpProbe.test(server)
-                trace.ntp(check)
-                if (!check.isUsable()) {
-                    return@withContext state.copy(
-                        ntpCheck = check,
-                        ntpMessage = UiMessage(
-                            R.string.ntp_check_rejected,
-                            listOf(getString(check.rejectionMessageRes())),
-                        ),
-                    )
-                }
-                val client = connector.activeClient ?: return@withContext state.copy(
-                    connection = ConnectionState.Disconnected,
-                    message = UiMessage(R.string.error_unreachable),
-                )
+            val client = connector.activeClient ?: return@run state.connectionLost().copy(
+                message = UiMessage(R.string.error_unreachable))
+            var reference: String? = null
+            val applied = runInterruptible(Dispatchers.IO) {
+                val check = if (server != null && undo == null && !allowUnverified) ntpProbe.test(server) else null
+                check?.let(trace::ntp)
+                if (check != null && !check.isUsable()) return@runInterruptible state.copy(
+                    ntpCheck = check, ntpMessage = UiMessage(R.string.ntp_check_rejected,
+                        listOf(getString(check.rejectionMessageRes()))))
                 var failureId: Long? = null
                 val repository = DeviceRepository(trace.client(client)) { error ->
                     failureId = journal.record(Operation.APPLY_NTP, Outcome.FAILED,
                         diagnosticTransport(state.connection.targetOrNull()), error = error, trace = trace)
                 }
-                val result = repository.setNtpServer(server)
+                val previous = repository.currentNtpServer()
+                reference = server?.takeUnless { it == "null" } ?: previous.takeUnless { it == "null" }
+                val before = timeVerifier.verify(trace.client(client), referenceOverride = reference, onFailure = trace::exception)
+                val result = when {
+                    undo != null -> repository.undoNtpServer(undo)
+                    server == null -> repository.resetNtpServer()
+                    else -> repository.setNtpServer(server)
+                }
                 trace.ntpUpdate(result)
-                // Значение перечитывается всегда: `settings put` рапортует об
-                // успехе и тогда, когда записи не произошло
-                state.copy(
-                    ntpCheck = check,
+                val actual = if (result is NtpUpdateResult.Applied) result.server
+                    else runCatching { repository.currentNtpServer() }.getOrDefault("")
+                state.copy(ntpCheck = check,
                     ntpMessage = if (result is NtpUpdateResult.Failed) UiMessage(R.string.operation_failed_hint) else result.toUiMessage(),
                     ntpDiagnosticEventId = failureId,
-                    currentNtpServer = if (result is NtpUpdateResult.Applied) result.server else repository.currentNtpServer(),
-                )
+                    ntpChange = (result as? NtpUpdateResult.Applied) ?: state.ntpChange,
+                    ntpBeforeTime = if (result is NtpUpdateResult.Applied) before else state.ntpBeforeTime,
+                    deviceInfo = (state.deviceInfo ?: com.civisrom.tvtimefixer.device.DeviceInfo()).copy(currentNtpServer = actual))
             }
-            if (applied.ntpMessage?.res != R.string.ntp_applied) return@run applied
-
-            // Сохранение настройки уже подтверждено. Ошибка сравнения часов не отменяет этот факт.
-            state = applied.copy(operation = Operation.CHECK_TIME)
-            val transport = diagnosticTransport(state.connection.targetOrNull())
-            val started = SystemClock.elapsedRealtime()
-            journal.record(Operation.CHECK_TIME, Outcome.STARTED, transport)
+            if (applied.ntpMessage?.res !in listOf(R.string.ntp_applied, R.string.ntp_default_applied)) return@run applied
+            // Запись уже подтверждена. Сравнение часов — отдельное наблюдение с контроллера.
+            state = applied.copy(operation = Operation.CHECK_TIME).withLatestBackground(state)
             val clockTrace = OperationTrace()
-            val verified = try {
-                state.withDeviceTime(clockTrace)
-            } catch (e: CancellationException) {
-                journal.record(Operation.CHECK_TIME, Outcome.CANCELLED, transport, trace = clockTrace)
-                throw e
+            var verified = state.withDeviceTime(clockTrace, reference)
+            // Автовремя может обновиться позже записи. Небольшое число повторов,
+            // без скрытой перезагрузки устройства и без обещания смены системного источника.
+            repeat(2) {
+                if (verified.timeCheck?.status == DeviceTimeStatus.MISMATCH &&
+                    applied.ntpChange?.activation == com.civisrom.tvtimefixer.device.NtpActivation.NEXT_REFRESH &&
+                    applied.ntpChange.automaticTime == true) {
+                    delay(1500)
+                    verified = state.withDeviceTime(clockTrace, reference)
+                }
             }
             val failed = verified.timeCheck?.status != DeviceTimeStatus.MATCH
             val event = journal.record(Operation.CHECK_TIME, if (failed) Outcome.FAILED else Outcome.SUCCESS,
-                transport, durationMs = SystemClock.elapsedRealtime() - started,
-                issue = verified.timeCheck?.diagnosticIssue(), trace = clockTrace)
+                diagnosticTransport(state.connection.targetOrNull()), issue = verified.timeCheck?.diagnosticIssue(), trace = clockTrace)
             verified.copy(timeDiagnosticEventId = event.takeIf { failed })
         }
 
         override fun verifyDeviceTime() = run(Operation.CHECK_TIME) { trace -> state.withDeviceTime(trace) }
 
         override fun applyTimeZone(zoneId: String) = run(Operation.APPLY_TIME_ZONE) { trace ->
-            withContext(Dispatchers.IO) {
+            runInterruptible(Dispatchers.IO) {
                 val client = connector.activeClient
-                if (!state.connected || client == null) return@withContext state.connectionLost().copy(
+                if (!state.connected || client == null) return@runInterruptible state.connectionLost().copy(
                     timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE),
                     message = UiMessage(R.string.error_unreachable),
                 )
@@ -404,6 +459,7 @@ class MainActivity : ComponentActivity() {
 
         override fun scanNtpServers() {
             if (scanJob?.isActive == true) return
+            if (!networkAllowed()) return
             state = state.copy(ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
                 ntpScan = ScanProgress(0, NtpData.allServers.size, emptyList()))
             journal.record(Operation.SCAN_NTP, Outcome.STARTED)
@@ -435,7 +491,7 @@ class MainActivity : ComponentActivity() {
             scanJob = null
             // Найденное не выбрасываем: перебор останавливают обычно именно
             // потому, что подходящий сервер уже виден в списке
-            state = state.copy(ntpScan = state.ntpScan?.let { it.copy(checked = it.total) })
+            state = state.copy(ntpScan = state.ntpScan?.copy(cancelled = true))
         }
 
         override fun clearNtpScanResults() {
@@ -498,6 +554,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        state = state.copy(localSetup = readLocalSetup(this))
+        if (!state.favoritesReady && !state.favoritesBusy) loadFavorites()
         val connected = state.connection as? ConnectionState.Connected
         if (connected != null && !state.busy) {
             state = state.copy(connection = ConnectionState.Checking(connected.address))
@@ -505,12 +563,56 @@ class MainActivity : ComponentActivity() {
         refreshUsbList()
         if (missingDiscoveryPermissions().isEmpty()) {
             startDiscovery()
-        } else if (!permissionsRequested) {
-            // Один раз за жизнь Activity: после отказа система отвечает
-            // отказом молча, и дёргать её при каждом возврате на экран
-            // бессмысленно — дальше решает кнопка «Разрешить»
-            permissionsRequested = true
-            requestDiscoveryPermissions()
+        } else {
+            runCatching { discovery?.stop() }
+            state = state.copy(discoveryPermissionNeeded = true)
+            if (state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress) {
+                actionGeneration++
+                actionJob?.cancel()
+                state = state.copy(busy = false)
+                actions.disconnect()
+            }
+            if (!permissionsRequested) {
+                // Один раз за жизнь Activity: после отказа система отвечает
+                // отказом молча, и дёргать её при каждом возврате на экран
+                // бессмысленно — дальше решает кнопка «Разрешить»
+                permissionsRequested = true
+                requestDiscoveryPermissions()
+            }
+        }
+    }
+
+    private fun loadFavorites() {
+        state = state.copy(favoritesBusy = true)
+        lifecycleScope.launch {
+            try {
+                val loaded = runInterruptible(Dispatchers.IO) { favoritesStore.read() }
+                state = state.copy(favorites = loaded, favoritesReady = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                state = state.copy(message = UiMessage(R.string.favorites_storage_failed))
+            } finally {
+                state = state.copy(favoritesBusy = false)
+            }
+        }
+    }
+
+    private fun changeFavorites(change: (Favorites) -> Favorites) {
+        if (!state.favoritesReady || state.favoritesBusy) return
+        state = state.copy(favoritesBusy = true)
+        lifecycleScope.launch {
+            try {
+                val updated = change(state.favorites)
+                runInterruptible(Dispatchers.IO) { favoritesStore.write(updated) }
+                state = state.copy(favorites = updated, message = UiMessage(R.string.favorites_saved))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                state = state.copy(message = UiMessage(R.string.favorites_storage_failed))
+            } finally {
+                state = state.copy(favoritesBusy = false)
+            }
         }
     }
 
@@ -518,6 +620,7 @@ class MainActivity : ComponentActivity() {
         // Сканирование mDNS держит радио включённым — на время невидимости
         // приложения оно останавливается. Сохранённую связь проверяем при возврате.
         runCatching { discovery?.stop() }
+        if (scanJob?.isActive == true) actions.cancelNtpScan()
         super.onStop()
     }
 
@@ -543,7 +646,7 @@ class MainActivity : ComponentActivity() {
         // кнопки и появляется полоса загрузки, сдвигающая поля ввода.
         if (returning) state = state.copy(busy = true, connection = ConnectionState.Checking(target))
         try {
-            val result = withContext(Dispatchers.IO) { connector.checkConnection() }
+            val result = runInterruptible(Dispatchers.IO) { connector.checkConnection() }
             // Новая команда пока ждёт Mutex. Ей нужен актуальный результат
             // проверки, но отключённое через USB receiver устройство не восстанавливаем.
             if (state.connection.targetOrNull() != target) return@withLock
@@ -587,6 +690,14 @@ class MainActivity : ComponentActivity() {
         discoveryPermissions(Build.VERSION.SDK_INT, applicationInfo.targetSdkVersion).filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
+
+    private fun networkAllowed(): Boolean {
+        if (missingDiscoveryPermissions().isEmpty()) return true
+        state = state.copy(discoveryPermissionNeeded = true,
+            message = UiMessage(R.string.discovery_permission_needed))
+        requestDiscoveryPermissions()
+        return false
+    }
 
     private fun requestDiscoveryPermissions() {
         val missing = missingDiscoveryPermissions()
@@ -654,16 +765,18 @@ class MainActivity : ComponentActivity() {
      * ненажатой — отличить одно от другого было нечем.
      */
     private suspend fun AppState.withDeviceData(trace: OperationTrace): AppState {
-        val clean = copy(deviceInfo = null, currentNtpServer = "", timeZoneResult = null, timeZoneDiagnosticEventId = null)
+        val clean = copy(deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
+            timeZoneResult = null, timeZoneDiagnosticEventId = null, timeCheck = null, timeDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
-        return withContext(Dispatchers.IO) {
-            val client = connector.activeClient ?: return@withContext clean.copy(
+        return runInterruptible(Dispatchers.IO) {
+            val client = connector.activeClient ?: return@runInterruptible clean.copy(
                 connection = ConnectionState.Disconnected,
                 message = UiMessage(R.string.error_unreachable),
             )
             runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
-                onSuccess = { clean.copy(deviceInfo = it, currentNtpServer = it.currentNtpServer) },
+                onSuccess = { clean.copy(deviceInfo = it) },
                 onFailure = {
+                    if (it is CancellationException) throw it
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,
                         diagnosticTransport(connection.targetOrNull()), error = it, trace = trace)
                     clean.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
@@ -672,10 +785,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun AppState.withDeviceTime(trace: OperationTrace): AppState = withContext(Dispatchers.IO) {
+    private suspend fun AppState.withDeviceTime(trace: OperationTrace, reference: String? = null): AppState = runInterruptible(Dispatchers.IO) {
         val client = connector.activeClient
         val check = if (!connected || client == null) DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
-            else timeVerifier.verify(trace.client(client), onFailure = trace::exception)
+            else timeVerifier.verify(trace.client(client), referenceOverride = reference, onFailure = trace::exception)
         trace.deviceTime(check)
         copy(timeCheck = check)
     }
@@ -694,6 +807,7 @@ class MainActivity : ComponentActivity() {
         DeviceTimeStatus.MISMATCH -> DiagnosticIssue.TIME_MISMATCH
         DeviceTimeStatus.UNCERTAIN -> DiagnosticIssue.TIME_UNCERTAIN
         DeviceTimeStatus.NO_SERVER -> DiagnosticIssue.INVALID_NTP
+        DeviceTimeStatus.SYSTEM_DEFAULT -> null
         DeviceTimeStatus.NTP_UNAVAILABLE -> DiagnosticIssue.NTP_UNREACHABLE
         DeviceTimeStatus.DEVICE_UNAVAILABLE -> DiagnosticIssue.TIME_UNAVAILABLE
     }

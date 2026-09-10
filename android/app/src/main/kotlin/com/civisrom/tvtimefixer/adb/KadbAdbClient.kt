@@ -15,20 +15,21 @@ import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 
 /** Реализация поверх Kadb. Вся сетевая работа уходит на Dispatchers.IO. */
-class KadbAdbClient(private val kadb: Kadb) : AdbClient {
+class KadbAdbClient(private val kadb: Kadb, private val commandTimeoutMs: Long = 15_000) : AdbClient {
+    @Volatile private var closed = false
 
-    override fun shell(command: String): ShellResult {
-        val response = kadb.shell(command)
-        return ShellResult(
-            output = response.output,
-            errorOutput = response.errorOutput,
-            exitCode = response.exitCode,
-        )
+    override fun shell(command: String): ShellResult = boundedAdbCommand(commandTimeoutMs, ::close) {
+        check(!closed) { "ADB client closed" }
+        val v2 = kadb.supportsFeature("shell_v2")
+        val service = if (v2) "shell,v2,raw:$command" else "shell:$command"
+        require(service.toByteArray(Charsets.UTF_8).size < 4096) { "ADB command too long" }
+        kadb.open(service).use { readBoundedShell(it.source, v2) }
     }
 
-    override fun isAlive(): Boolean = runCatching { kadb.connectionCheck() }.getOrDefault(false)
+    override fun isAlive(): Boolean = !closed && runCatching { kadb.connectionCheck() }.getOrDefault(false)
 
     override fun close() {
+        closed = true
         runCatching { kadb.close() }
     }
 }
@@ -54,8 +55,9 @@ class KadbAdbClientFactory(
      */
     override fun connect(address: DeviceAddress): AdbClient {
         val kadb = Kadb.create(address.host, address.port, connectTimeoutMs, socketTimeoutMs)
+        val client = KadbAdbClient(kadb)
         val response = try {
-            kadb.shell(ADB_PROBE_COMMAND)
+            client.shell(ADB_PROBE_COMMAND)
         } catch (e: CancellationException) {
             runCatching { kadb.close() }
             throw e
@@ -67,7 +69,7 @@ class KadbAdbClientFactory(
             runCatching { kadb.close() }
             throw AdbConnectionException(ConnectionError.UNREACHABLE)
         }
-        return KadbAdbClient(kadb)
+        return client
     }
 
     override suspend fun pair(address: DeviceAddress, pairingCode: String) {
@@ -97,11 +99,9 @@ class KadbAdbClientFactory(
             is AdbPairAuthException -> ConnectionError.PAIRING_REQUIRED
             is AdbAuthException -> ConnectionError.NOT_AUTHORIZED
             is NoSuchAlgorithmException -> ConnectionError.WIRELESS_UNSUPPORTED
-            is SocketTimeoutException,
-            is ConnectException,
-            is NoRouteToHostException,
-            is UnknownHostException,
-            -> ConnectionError.UNREACHABLE
+            is SocketTimeoutException -> ConnectionError.CONNECTION_TIMEOUT
+            is ConnectException -> ConnectionError.CONNECTION_REFUSED
+            is NoRouteToHostException, is UnknownHostException -> ConnectionError.NETWORK_UNAVAILABLE
             is IOException -> ConnectionError.UNREACHABLE
             else -> ConnectionError.UNKNOWN
         }
@@ -115,7 +115,8 @@ internal fun classifyPairingError(error: Exception): ConnectionError = when (err
     is PairingProtocolException -> ConnectionError.PAIRING_FAILED
     is SSLException -> ConnectionError.TLS_FAILED
     is NoSuchAlgorithmException -> ConnectionError.WIRELESS_UNSUPPORTED
-    is ConnectException, is NoRouteToHostException, is UnknownHostException -> ConnectionError.UNREACHABLE
+    is ConnectException -> ConnectionError.CONNECTION_REFUSED
+    is NoRouteToHostException, is UnknownHostException -> ConnectionError.NETWORK_UNAVAILABLE
     is IOException -> ConnectionError.PAIRING_FAILED
     else -> ConnectionError.UNKNOWN
 }

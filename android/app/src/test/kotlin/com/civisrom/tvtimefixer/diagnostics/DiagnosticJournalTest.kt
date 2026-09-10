@@ -38,17 +38,24 @@ class DiagnosticJournalTest {
         }
     }
 
-    @Test fun `history survives restart and drops records after seven days`() = temporary { root ->
+    @Test fun `clock correction preserves history and elapsed age expires it`() = temporary { root ->
         var now = 1_800_000_000_000L
-        DiagnosticJournal(root, clock = { now }).use {
+        var elapsed = 1000L
+        DiagnosticJournal(root, clock = { now }, monotonicClock = { elapsed }).use {
             it.record(Operation.USB_SCAN, Outcome.SUCCESS, DiagnosticTransport.USB, issue = DiagnosticIssue.USB_NO_ADB)
             it.awaitIdle()
             assertEquals(1, it.snapshot.value.events.size)
         }
-        DiagnosticJournal(root, clock = { now }).use {
+        DiagnosticJournal(root, clock = { now }, monotonicClock = { elapsed }).use {
             it.awaitIdle()
             assertEquals(DiagnosticIssue.USB_NO_ADB, it.snapshot.value.events.single().issue)
-            now += DiagnosticJournal.MAX_AGE_MS + 1
+            now += 30L * DiagnosticJournal.MAX_AGE_MS
+            it.refresh(); it.awaitIdle()
+            assertEquals(1, it.snapshot.value.events.size)
+            now -= 60L * DiagnosticJournal.MAX_AGE_MS
+            it.refresh(); it.awaitIdle()
+            assertEquals(1, it.snapshot.value.events.size)
+            elapsed += DiagnosticJournal.MAX_AGE_MS + 1
             it.refresh(); it.awaitIdle()
             assertTrue(it.snapshot.value.events.isEmpty())
         }

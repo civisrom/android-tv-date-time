@@ -447,7 +447,7 @@ class ReliabilityTests(unittest.TestCase):
         with self.assertRaises(AndroidTVTimeFixerError):
             transport.shell('getprop')
 
-    def test_platform_tools_transport_close_disconnects(self) -> None:
+    def test_platform_tools_transport_close_preserves_shared_connection(self) -> None:
         calls = []
 
         def runner(args, **kwargs):
@@ -455,7 +455,7 @@ class ReliabilityTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, stdout='')
 
         PlatformToolsTransport('adb', '192.168.1.20:5555', runner=runner).close()
-        self.assertEqual(calls, [['adb', 'disconnect', '192.168.1.20:5555']])
+        self.assertEqual(calls, [])
 
     def test_tls_device_reports_pairing_required(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
@@ -528,26 +528,27 @@ class ReliabilityTests(unittest.TestCase):
                 self.assertIsInstance(transport, PlatformToolsTransport)
                 self.assertIn('shell', run.call_args.args[0])
 
-    def test_platform_tools_failed_shell_probe_disconnects(self) -> None:
+    def test_failed_shell_probe_does_not_disconnect_other_clients(self) -> None:
         results = [subprocess.CompletedProcess(['adb'], 0, stdout='connected to 192.168.1.20:37105'),
                    subprocess.CompletedProcess(['adb'], 1, stdout='error: device offline'),
                    subprocess.CompletedProcess(['adb'], 0, stdout='')]
         with mock.patch('src.android_time_fixer.subprocess.run', side_effect=results) as run:
             with self.assertRaises(AndroidTVTimeFixerError):
                 self._platform_tools_fixer()._connect_via_platform_tools('192.168.1.20', 37105)
-            self.assertEqual(run.call_args.args[0], ['adb', 'disconnect', '192.168.1.20:37105'])
+            self.assertEqual(run.call_count, 2)
+            self.assertFalse(any('disconnect' in call.args[0] for call in run.call_args_list))
 
     # ──────────────────────────────────────────────────────────
     # Порт больше не подразумевается
     # ──────────────────────────────────────────────────────────
 
-    def test_parse_ip_port_falls_back_to_default(self) -> None:
+    def test_parse_ip_port_uses_default_only_when_port_is_missing(self) -> None:
         self.assertEqual(AndroidTVTimeFixer.parse_ip_port('192.168.1.20'),
                          ('192.168.1.20', DEFAULT_ADB_PORT))
         self.assertEqual(AndroidTVTimeFixer.parse_ip_port('192.168.1.20:37105'),
                          ('192.168.1.20', 37105))
-        self.assertEqual(AndroidTVTimeFixer.parse_ip_port('192.168.1.20:0'),
-                         ('192.168.1.20', DEFAULT_ADB_PORT))
+        with self.assertRaises(AndroidTVTimeFixerError):
+            AndroidTVTimeFixer.parse_ip_port('192.168.1.20:0')
 
     def test_scan_results_carry_the_scanned_port(self) -> None:
         import ipaddress
@@ -730,8 +731,8 @@ class ReliabilityTests(unittest.TestCase):
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
         fixer.logger = logging.getLogger('test')
 
-        def run_adb(args, timeout=15):
-            calls.append(args)
+        def run_adb(args, timeout=15, input_text=None):
+            calls.append((args, input_text))
             return returncode, output
 
         fixer._run_adb = run_adb
@@ -743,7 +744,7 @@ class ReliabilityTests(unittest.TestCase):
         )
         with contextlib.redirect_stdout(io.StringIO()):
             fixer.pair_device('192.168.1.20:41234', '123456')
-        self.assertEqual(calls, [['pair', '192.168.1.20:41234', '123456']])
+        self.assertEqual(calls, [(['pair', '192.168.1.20:41234'], '123456\n')])
 
     def test_pairing_fails_when_output_does_not_confirm(self) -> None:
         # adb умеет завершаться с нулевым кодом, ничего при этом не спарив

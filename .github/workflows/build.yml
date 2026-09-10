@@ -26,6 +26,12 @@ env:
   ADB_VERSION: '37.0.1'
 
 jobs:
+  validate-android:
+    uses: ./.github/workflows/android.yml
+
+  validate-dependencies:
+    uses: ./.github/workflows/dependency-security.yml
+
   setup-and-build:
     name: Build for ${{ matrix.platform }}
     strategy:
@@ -306,7 +312,7 @@ jobs:
           if-no-files-found: error
 
   create-release:
-    needs: [setup-and-build, build-android]
+    needs: [setup-and-build, build-android, validate-android, validate-dependencies]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
     permissions:

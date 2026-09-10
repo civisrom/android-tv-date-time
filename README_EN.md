@@ -12,6 +12,7 @@
 - [Main menu](#main-menu) and [desktop instructions](#how-to-use-the-program)
 - [Screenshots](#screenshots)
 - [Android application](#android-application)
+- [Installation on the TV itself](#tv-mode) and [APK favorite devices](#4-favorite-devices)
 - [Compatibility and verified scenarios](#compatibility)
 - [License](#license) and [disclaimer](#disclaimer)
 
@@ -26,7 +27,7 @@ Two versions are available:
 
 *   **Desktop program:** a console utility for Windows, Linux and macOS with
     batch operations, favorites and a terminal.
-*   **Android app:** an APK for a phone, tablet or Android TV itself. Buttons
+*   **Android app:** an APK for a phone, tablet or a TV running Android TV / Google TV. Buttons
     handle the main actions without a computer or manual ADB commands.
     **The Android app operates in test mode.**
 
@@ -76,6 +77,9 @@ replace troubleshooting other network faults.
 *   **Setting verification:** the program reads the NTP value back after writing
     it. This confirms the stored address; Android itself performs the actual
     clock synchronization.
+*   **NTP recovery:** restore the system time source or undo the last change
+    with confirmation. See the source and clock offset before/after, plus
+    guidance about automatic time and restarting the device.
 *   **Device details:** model, manufacturer, Android/API, CPU, memory, display,
     serial number, timezone and uptime. Available fields depend on firmware;
     the desktop version also shows network parameters and compares device time
@@ -101,14 +105,21 @@ replace troubleshooting other network faults.
     and reboot, subject to the permissions of the connection.
 *   File logging and a separate ADB server port. Data locations and interaction
     with other ADB instances are explained below.
+*   Multiple windows can work together: closing one instance does not stop
+    the ADB server while another instance of the program is still using it.
 
 ### Android app features
 
-*   A separate APK for phones, tablets or Android TV: configuration without a computer.
+*   A separate APK for phones, tablets, Android TV or Google TV, with guided
+    debugging and connection setup when running directly on a TV.
+*   Favorite devices immediately after network discovery: save names and
+    addresses, with model and serial-number checks when reconnecting.
+    Favorite NTP servers are available under Time server.
 *   Always-expanded connection IP and NTP settings; pairing, time zone,
     additional lists and help can be collapsed. Functions have separate gray panels.
 *   Long-press copying of text and addresses with ports; background connection
-    checks without flickering buttons and fields.
+    checks without flickering buttons and fields. TV mode has explicit buttons
+    for copying and pasting addresses with a remote.
 *   Expanded connected device details in a grouped list that starts collapsed
     and hides unavailable information.
 *   Manual time zone changes on the connected device with result verification,
@@ -124,7 +135,8 @@ replace troubleshooting other network faults.
 
 ## Getting started
 
-1. Install the desktop program or the APK on a phone/tablet.
+1. Install the desktop program or the APK on a phone, tablet or the TV itself.
+   For the last option, start with [TV Mode](#tv-mode).
 2. Enable debugging on the **controlled device** whose time needs fixing.
 3. Choose a connection: **USB** uses a cable and RSA authorization;
    **classic network ADB** uses an IP and port; **Android 11+ wireless debugging**
@@ -133,6 +145,9 @@ replace troubleshooting other network faults.
    the APK shows connection status and device details on the main screen.
 5. Choose and check a time server, apply it and verify the value read back.
    Use **item 1 or 2** on the desktop, or **Time server** in the APK.
+6. Check the clock and automatic date and time on the target device. If the
+   app says a restart is needed, restart at a convenient time, reconnect
+   and repeat the check.
 
 Network ADB requires the devices to reach each other over the local network.
 The phone can use Wi-Fi while the TV uses Ethernet on the same router, provided
@@ -188,15 +203,15 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.3.apk` from [release 2.6.3](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.3). [What's new](release-notes/v2.6.3-en.md).
+1.  Download `AndroidTVTimeFixer-2.6.4.apk` from [release 2.6.4](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.4). [What's new](release-notes/v2.6.4-en.md).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.3.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.4.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.3.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.4.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
@@ -410,7 +425,7 @@ Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
 In the APK, expand the
-[Pairing section](#6-pairing--new-wireless-debugging-on-android-11).
+[Pairing section](#7-pairing--new-wireless-debugging-on-android-11).
 
 Both programs distinguish pairing and connection services in mDNS and verify
 the connection with a command on the device. A listed service does not yet
@@ -521,7 +536,12 @@ the check take longer because each request must time out.
 6. Ping NTP servers
 7. Export / Import settings
 8. Return to main menu
+r — System default; u — Undo last change
 ```
+
+System default removes the custom NTP setting. Undo restores the previous
+value only for the same device while its setting still matches the last change.
+Both operations require a `yes` confirmation.
 
 Opens a submenu for managing favorite servers:
 
@@ -670,7 +690,7 @@ the modern wireless mode, not for every connection method.
 
 ### Application screen sections
 
-The app is a single scrolling screen. The connection IP address and main time
+The main app screen scrolls. The connection IP address and main time
 server settings remain expanded, including after connection. Pairing, time zone,
 additional lists and help sections can be collapsed.
 Each function has its own gray panel. Primary and secondary actions use different
@@ -684,6 +704,9 @@ the version, a source code label and the link above the main menu; opening the l
 
 One line under the name: "Running on a phone: it will connect to a TV over the
 network or USB" or "Running on a TV". The app works this out by itself; nothing to set.
+
+On a TV, **Set up the app on this TV** also opens the [setup guide](#tv-mode).
+The **Diagnostics** button is available in both modes.
 
 #### 2. "Connect to a device"
 
@@ -757,21 +780,43 @@ Android 17 does not need an extra prompt either. A future target SDK 37
 build must request `ACCESS_LOCAL_NETWORK`; denial affects direct connections
 as well as discovery. See [Android's local-network permission rules](https://developer.android.com/privacy-and-security/local-network-permission).
 
-#### 4. "Time server"
+#### 4. "Favorite devices"
 
-This section is always visible below the network discovery menu. You can choose and
+This collapsible panel sits **immediately after automatically discovered
+devices and before Time server**.
+
+1. Connect to the required device over the network and press **Save connected
+   device**. USB connections cannot be saved in this list.
+2. On the next launch, expand the panel and press **Connect** beside the entry.
+   If its IP or wireless debugging port has changed, first update it through
+   **Name and address**, using the current details shown on the TV.
+3. **Delete** removes an entry after confirmation without changing TV settings.
+
+Reconnecting checks the model and serial number. If a different device responds,
+or its details cannot be verified, the connection closes: check the address
+and connect manually. This checks consistency with the saved entry, not
+cryptographic device identity. Firmware without a usable serial number cannot
+save this kind of entry.
+
+Up to 20 devices are stored privately in the APK, without pairing codes or
+system backup. A write failure is reported and preserves the previous file.
+Uninstalling the app or clearing its data removes the list.
+
+#### 5. "Time server"
+
+This section is always visible below favorite devices. You can choose and
 check a server address before connecting to a device. **Apply** becomes available
 once connected; an explanation is shown until then. Search, lists and scanning
 are inside **Choose a server**. An ongoing scan and its Stop button
 remain visible when the picker is collapsed.
 
-After connecting, **Current:** shows the value read from the device.
-The line is bold and green. **No time server is set** means the app did not
-obtain a custom `ntp_server` value; Android normally uses the firmware default.
-If reading the setting is unsupported or fails, an empty field does not
-identify which system server is being used.
+After connecting, **Current:** shows the custom address read from the device
+in bold green text. Without a custom value, the app shows **System time source
+(firmware default)**: automatic synchronization may still work, but this setting
+does not reveal the firmware's server address. **The NTP setting could not be read**
+means reading failed or is unsupported; it does not confirm the system default.
 
-The outcome is marked the same way: **green** for "Time server set to …",
+The outcome is marked the same way: **green** for "NTP setting saved: …",
 **red** for any failure. The Check button follows suit — a usable server is
 green, a rejected one red.
 
@@ -792,6 +837,12 @@ green, a rejected one red.
     (`time.google.com`) or IPv4 (`216.239.35.0`), without a port, spaces, path
     or `http://`. The standard NTP port, UDP/123, is used.
 
+**Favorite NTP servers.** Enter an address, press **Save server to favorites**,
+then give it a name. Selecting a saved server only fills the field: checking
+and applying remain separate actions. Save up to 30 servers and delete entries
+you no longer need. The list is stored locally with favorite devices; saving
+an entry does not confirm that the server is reachable.
+
 The **Check** button sends real NTP requests from the device running the
 APK and parses the replies. It checks the address, reachability, and NTP responses.
 The offset from the device's clock is informational and does not block applying a
@@ -805,11 +856,19 @@ server: the TV, box, or phone clock may be wrong. Possible outcomes:
 The phone and TV networks may impose different restrictions, so a successful
 phone-side check does not guarantee that the TV can reach the server.
 
+**Use system default** removes the custom value and lets the firmware choose its
+time source. **Undo last change in this connection** restores the previous value in the current session
+if the device and setting have not changed. Both require confirmation. The result
+card shows the setting and clock measurement before and after the change.
+On Android 6–10, activating a new NTP setting usually requires restarting the
+device; Android 11+ reads it on the next network time refresh. Disabled automatic
+time is reported and is never silently enabled. Firmware behavior may vary.
+
 The **Apply** button does the same and, if the check passes, writes the address
 to the TV. The result appears **right under the button**, and the "Current:"
 line is updated with the value **read back from the device**.
 
-*   *"Time server set to …"* — the address was saved and read back from the device.
+*   *"NTP setting saved: …"* — the address was saved and read back from the device.
 *   *"The device still reports …"* — the command went through but the write did
     not happen. Usually this means the connection lacks permission to change
     secure settings.
@@ -817,6 +876,13 @@ line is updated with the value **read back from the device**.
     an invalid address, DNS failure, no response, an invalid NTP reply, or a
     network error. The TV setting stays unchanged; correct the address,
     check the network, or choose another server and try again.
+
+If a valid address fails the network check, **Save without a successful
+probe…** appears. This separate action requires confirmation and can help
+when the phone and TV have different access to NTP. Use a server you know:
+the app verifies that the setting was written, but does not confirm server
+access from the TV or clock synchronization. Invalid addresses cannot be
+saved this way.
 
 After a successful write, **device time verification** runs automatically.
 It reads the device clock through ADB and compares it with a fresh reply from
@@ -841,7 +907,8 @@ separated by one-second pauses. Results require at least four valid replies.
 Up to five candidates are ranked by reply rate, then median delay plus delay
 variation (RMS). This estimates availability and connection stability, not
 absolute clock accuracy. Checking may take several minutes. Progress
-shows **Checked N of 130, M usable**; **Stop** keeps results already found.
+shows **Checked N of 130, M usable**; **Stop** keeps results already found
+and reports the actual number checked instead of marking the search as complete.
 
 Each result shows a name and the IP address obtained during the check.
 Tapping either fills the input field and clears the results list.
@@ -849,7 +916,7 @@ The address field highlights three times; applying remains a separate action.
 An IP can help with TV-side DNS problems, but a service is not guaranteed
 to keep that resolved address permanently.
 
-#### 5. "Time zone"
+#### 6. "Time zone"
 
 This section is visible on phones and TVs, starts collapsed, and follows the NTP
 settings. Connect to the device, expand the section, and search by city or enter
@@ -866,7 +933,7 @@ Required commands are checked on the connected device. AOSP includes them from
 Android 9, but firmware restrictions can vary. If unsupported, use the TV’s date
 and time settings. The phone’s Android version alone does not hide this menu.
 
-#### 6. Pairing — new wireless debugging on Android 11+
+#### 7. Pairing — new wireless debugging on Android 11+
 
 The pairing section starts collapsed; tap its heading to expand it.
 **Pair** on a discovered device expands the form, fills its address, and focuses the code field.
@@ -918,9 +985,10 @@ inactivity and 60 seconds for the overall pairing operation. App addresses
 currently support IPv4 only.
 
 Change history: [2.6.1](release-notes/v2.6.1-en.md),
-[2.6.2](release-notes/v2.6.2-en.md) and [2.6.3](release-notes/v2.6.3-en.md).
+[2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md)
+and [2.6.4](release-notes/v2.6.4-en.md).
 
-#### 7. USB debugging
+#### 8. USB debugging
 
 Expand this section manually, or it opens automatically when USB ADB is
 detected. It contains list refresh, device selection and the connection
@@ -930,7 +998,7 @@ are explained in [USB debugging](#usb-debugging).
 If the mobile app cannot connect over USB, try the desktop version for
 Windows, Linux or macOS.
 
-#### 8. "Device"
+#### 9. "Device"
 
 Details read from the TV include firmware and security patches, chip and app
 architectures, graphics, RAM and data storage, display modes and HDR, audio
@@ -967,14 +1035,37 @@ operations.
 ### What the app does not do
 
 Unlike the desktop version there is no subnet scanning, no batch update across
-several TVs, no terminal mode, no favourite servers and no settings export. Use
+several TVs, no terminal mode and no settings export. Use
 the desktop program for those.
 
 ### TV Mode
 
-When installed on Android TV itself, the APK offers `127.0.0.1:5555` for
-legacy debugging. Whether this connection is accepted depends on the firmware.
-For wireless debugging, use pairing and the current TLS connection port.
+The APK can be installed directly on Android TV or Google TV. **Set up the app
+on this TV**, below the title, opens three steps:
+
+1. **Developer options.** Open About and press the build number seven times if
+   developer mode is hidden. Return to the APK with the remote's Back button.
+   The guide shows available mode information and opens developer settings.
+2. **Debugging.** Choose Network debugging or Wireless debugging if the firmware
+   provides it. The USB debugging indicator does not establish that network
+   ADB is enabled. Pairing needs a code, a pairing port and a separate current
+   connection port.
+3. **Connection.** If classic network ADB already listens on port 5555, try
+   the `127.0.0.1:5555` check button and approve the RSA prompt. For a different
+   port or pairing, press Go to connection and use the main screen.
+   Date and time on this TV opens the system settings.
+
+The guide does not enable ADB or restart the TV. If switching to the APK closes
+the firmware's pairing-code dialog, perform initial setup from a phone or
+computer. Pairing a computer does not authorize the installed APK. If network
+debugging is unavailable or local connections are blocked, use another
+controlling device; USB requires a suitable port on the TV.
+
+Controls support a remote. TV address fields provide explicit copy and paste
+buttons; pasting only fills the field and does not connect.
+Finishing text input dismisses the keyboard and focuses the next action.
+In the favorites dialog, press Save after entering a name: dismissing the
+keyboard alone does not save the entry.
 
 
 ## Compatibility
@@ -1006,12 +1097,39 @@ needs a port supporting USB device mode, not only a port for storage devices.
 *   Phone → SHIELD discovery is not yet confirmed: Android returns an empty
     USB list in the tested configuration. Better diagnostics do not establish
     that this hardware scenario has been fixed.
-*   Automated UI checks run on Android 6 and Android 16; system commands for
-    device details and time zone changes are also checked on Android 11.
-    These checks do not replace physical testing of cables, USB roles or each TV model.
+*   CI is configured for Android 6–17 and Android TV / Google TV 11/14/16,
+    including a 16 KiB page-size image. See [Android CI runs](https://github.com/civisrom/android-tv-date-time/actions/workflows/android.yml)
+    for the result of a particular revision. APK checks cover the presence of
+    ARMv7, ARM64, x86 and x86-64 libraries and native alignment. x86 emulators
+    do not replace physical testing of modern ARM boxes, TVs, cables and USB roles.
 
 When reporting a problem, include both device models, Android versions,
 connection method and the error text. In the APK, details are available through Diagnostics.
+
+
+## Development checks
+
+On `dev`, CI builds desktop for Windows, Linux and macOS, checks the Python
+package and native ADB, and runs tests. Android CI builds debug and unsigned
+release APKs, runs unit tests, Lint, and emulator UI tests. Release publication
+depends on Android and dependency checks for the same source revision.
+
+Android dependency versions are locked in `android/app/gradle.lockfile`, with
+SHA-256 verification in `android/gradle/verification-metadata.xml`. For an
+intentional update, run `./gradlew --refresh-dependencies --write-locks :app:dependencies`
+from `android`, then use `--refresh-dependencies --write-verification-metadata sha256`
+for build and Lint tasks. Refresh metadata explicitly: a warm cache can hide parent
+POMs and alternative `.module` files. Hash generation
+alone does not verify provenance: compare new artifacts with official repositories
+and review the file changes. A normal build must then pass without these flags.
+Signing secrets are not needed for these checks. Configuration cache is disabled;
+signed builds must also use `--no-build-cache`.
+
+`python3 scripts/check_dependencies.py` checks locked Python and Maven dependencies
+with OSV, including test and build tools; CI also runs it on a schedule. Service
+unavailability means the check is incomplete. `python3 scripts/verify_android_apk.py <APK>`
+checks native ABIs and alignment. These checks complement functional app testing.
+
 
 ## License
 

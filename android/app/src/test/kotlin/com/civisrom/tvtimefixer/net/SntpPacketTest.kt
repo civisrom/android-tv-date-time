@@ -16,6 +16,15 @@ import org.junit.Test
  */
 class SntpPacketTest {
 
+    @Test fun `timestamps before after and across the 2036 era boundary stay in this century`() {
+        val boundary = (0x100000000L - 2_208_988_800L) * 1000L
+        for (now in listOf(boundary - 10_000, boundary + 10_000, boundary - 20)) {
+            val result = SntpPacket.parse(serverReply(receiveMs = now + 10, transmitMs = now + 30), now, now + 50)!!
+            assertTrue(kotlin.math.abs(result.referenceTimeMillis!! - now - 45) <= 2)
+            assertTrue(kotlin.math.abs(result.offsetSeconds) < 1)
+        }
+    }
+
     @Test fun `network reference remains correct when local wall clock is far behind`() {
         val local = 946_684_800_000L
         val network = 1_800_000_000_000L

@@ -27,6 +27,10 @@ private class FakeDevice(
                 }
                 ""
             }
+            command == "settings delete global ntp_server" -> {
+                if (!ignoreWrites) ntpServer = ""
+                "Deleted 1 rows"
+            }
             command == "getprop" -> GETPROP
             command == "dumpsys battery" -> DUMPSYS_BATTERY
             command == "cat /proc/meminfo" -> MEMINFO
@@ -76,6 +80,21 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `system reset and undo preserve a modern multi-server setting`() {
+        val raw = "ntp://time.example.org:1123|ntp://other.example.org"
+        val device = FakeDevice(ntpServer = raw)
+        val repository = DeviceRepository(device)
+        val reset = repository.resetNtpServer() as NtpUpdateResult.Applied
+        assertEquals("null", repository.currentNtpServer())
+        assertEquals(raw, reset.previous)
+        val undo = repository.undoNtpServer(reset) as NtpUpdateResult.Applied
+        assertEquals(raw, undo.server)
+        assertEquals(raw, repository.currentNtpServer())
+        device.ntpServer = "external.example.org"
+        val count = device.commands.count { it.startsWith("settings put") || it.startsWith("settings delete") }
+        assertTrue(repository.undoNtpServer(undo) is NtpUpdateResult.NotConfirmed)
+        assertEquals(count, device.commands.count { it.startsWith("settings put") || it.startsWith("settings delete") })
+    }
     @Test fun `Android 6 storage falls back when df rejects the k option`() {
         val target = object : AdbClient {
             override fun isAlive() = true
@@ -185,7 +204,7 @@ class DeviceRepositoryTest {
         val device = FakeDevice()
         val result = DeviceRepository(device).setNtpServer("ru.pool.ntp.org")
 
-        assertEquals(NtpUpdateResult.Applied("ru.pool.ntp.org"), result)
+        assertEquals(NtpUpdateResult.Applied("ru.pool.ntp.org", previous = "time.android.com"), result)
         assertEquals("ru.pool.ntp.org", device.ntpServer)
         // Значение обязательно перечитывается: settings put завершается
         // успешно и тогда, когда запись не произошла
@@ -222,8 +241,8 @@ class DeviceRepositoryTest {
     }
 
     @Test
-    fun `пустая настройка читается как пустая строка, а не как null`() {
-        assertEquals("", DeviceRepository(FakeDevice(ntpServer = "")).currentNtpServer())
+    fun `отсутствующая настройка означает системный источник`() {
+        assertEquals("null", DeviceRepository(FakeDevice(ntpServer = "")).currentNtpServer())
     }
 
     @Test

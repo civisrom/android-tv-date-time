@@ -9,6 +9,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.android_time_fixer import adb_env, parse_usb_devices, read_adb_device_list
+from src.adb_server import ADBServerLease
 
 
 def main():
@@ -21,14 +22,16 @@ def main():
             port_reservation.bind(('127.0.0.1', 0))
             port = port_reservation.getsockname()[1]
         env = adb_env(Path(directory), port)
+        lease = ADBServerLease(adb, env, Path(directory) / 'leases')
         try:
-            subprocess.run([adb, 'start-server'], env=env, check=True, capture_output=True, timeout=20)
+            lease.ensure()
             devices = parse_usb_devices(read_adb_device_list(port))
             version = subprocess.check_output([adb, 'version'], env=env, timeout=10, text=True).splitlines()[1]
             print(json.dumps({'platform': sys.platform, 'adb': version,
                               'usb_devices': len(devices), 'snapshot': 'ok'}))
         finally:
-            subprocess.run([adb, 'kill-server'], env=env, check=False, capture_output=True, timeout=10)
+            lease.release()
+        assert not lease._listening(), 'Owned ADB server was not released'
 
 
 if __name__ == '__main__':

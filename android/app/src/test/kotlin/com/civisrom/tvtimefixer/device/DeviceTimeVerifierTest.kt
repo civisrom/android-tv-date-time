@@ -47,7 +47,7 @@ class DeviceTimeVerifierTest {
     private val query = object : SntpQuery {
         override fun query(host: String): SntpResult {
             queryCount++
-            assertEquals(server, host)
+            assertEquals(NtpConfiguration(server).endpoints.first().host, host)
             queryFailure?.let { throw it }
             return reference
         }
@@ -156,11 +156,19 @@ class DeviceTimeVerifierTest {
     }
 
     @Test fun `no configured server or invalid value never triggers a network request`() {
-        for (value in listOf("null", "", "$(reboot)", "127.0.0.1;reboot", "ntp://pool.ntp.org")) {
+        for (value in listOf("", "$(reboot)", "127.0.0.1;reboot")) {
             server = value
             assertEquals(DeviceTimeStatus.NO_SERVER, verify().status)
         }
+        server = "null"
+        assertEquals(DeviceTimeStatus.SYSTEM_DEFAULT, verify().status)
         assertEquals(0, queryCount)
+    }
+
+    @Test fun `modern URI configuration is usable for time comparison`() {
+        server = "ntp://pool.ntp.org"
+        assertEquals(DeviceTimeStatus.MATCH, verify().status)
+        assertEquals(1, queryCount)
     }
 
     @Test fun `NTP failure is explicitly unavailable`() {

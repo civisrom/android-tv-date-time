@@ -1,12 +1,15 @@
 [tool.poetry]
 name = "androidtvtimefixer"
-version = "2.6.3"
+version = "2.6.4"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
 license = "Apache-2.0"
 packages = [
     {include = "android_time_fixer.py", from = "src"},
+    {include = "adb_server.py", from = "src"},
+    {include = "ntp_network.py", from = "src"},
+    {include = "process_env.py", from = "src"},
     {include = "locales.py"}
 ]
 classifiers = [

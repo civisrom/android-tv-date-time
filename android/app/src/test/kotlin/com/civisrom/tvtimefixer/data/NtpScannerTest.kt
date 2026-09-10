@@ -5,11 +5,34 @@ import com.civisrom.tvtimefixer.net.SntpResult
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NtpScannerTest {
+
+    @Test fun `cancelling scan interrupts active probe without counting it as checked`() = runBlocking {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val interrupted = java.util.concurrent.CountDownLatch(1)
+        val query = object : SntpQuery {
+            override fun query(host: String): SntpResult {
+                started.countDown()
+                try { Thread.sleep(30_000) } catch (e: InterruptedException) { interrupted.countDown(); throw e }
+                error("Probe was not cancelled")
+            }
+        }
+        val updates = mutableListOf<ScanProgress>()
+        val scan = NtpScanner(NtpProbe(query, attempts = 1), concurrency = 1)
+        val job = launch(kotlinx.coroutines.Dispatchers.Default) {
+            scan.scan(listOf("one.example", "two.example")).toList(updates)
+        }
+        assertTrue(started.await(2, java.util.concurrent.TimeUnit.SECONDS))
+        job.cancel()
+        kotlinx.coroutines.withTimeout(2_000) { job.join() }
+        assertTrue(interrupted.await(1, java.util.concurrent.TimeUnit.SECONDS))
+        assertEquals(listOf(0), updates.map { it.checked })
+    }
 
     @Test fun `selection requires four of five replies and checks duplicate names only once`() = runBlocking {
         val calls = mutableMapOf<String, Int>()

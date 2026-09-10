@@ -5,6 +5,10 @@ plugins {
 
 import groovy.json.JsonSlurper
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 android {
     namespace = "com.civisrom.tvtimefixer"
     compileSdk = 37
@@ -19,7 +23,7 @@ android {
 
         // CI подставляет github.run_number: Android требует монотонного роста
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: "2.6.3-dev"
+        versionName = System.getenv("VERSION_NAME") ?: "2.6.4-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,13 +44,9 @@ android {
                 keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
 
                 // v1 и v2 нужны для установки: v1 — на Android 6, v2 — начиная
-                // с 7. v3 на установку не влияет вовсе, но без неё невозможна
-                // ротация ключа: потеряв ключ подписи, обновить уже
-                // установленное приложение будет нечем — Android принимает
-                // обновление только от того же ключа либо от его законного
-                // преемника, а преемственность объявляется именно в v3.
-                // Включать её нужно заранее: задним числом к выпущенному
-                // приложению это не применить.
+                // с 7. v3 поддерживается с Android 9. Сам флаг v3 не создаёт
+                // преемственности сертификатов и не позволяет восстановить
+                // потерянный ключ; для ротации отдельно нужна signing lineage.
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true
@@ -206,6 +206,8 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
+    // Compose's older transitive Espresso reflects an InputManager API removed in Android 17.
+    androidTestImplementation(libs.androidx.test.espresso)
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kadb.android)
@@ -214,7 +216,9 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
     // JVM-only TLS exporter for protocol fixtures; never packaged into the APK.
-    testImplementation("org.conscrypt:conscrypt-openjdk-uber:2.5.2")
-    testImplementation("com.github.Flyfish233:spake2-java:1.1.1")
-    testImplementation("org.bouncycastle:bcprov-jdk18on:1.84")
+    testImplementation(libs.conscrypt.fixture)
+    testImplementation(libs.spake2)
+    testImplementation(libs.bouncycastle)
+    androidTestImplementation(libs.spake2)
+    androidTestImplementation(libs.bouncycastle)
 }

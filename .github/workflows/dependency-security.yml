@@ -1,0 +1,42 @@
+name: Dependency security
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
+  push:
+    branches: [dev, main]
+    paths:
+      - 'poetry.lock'
+      - 'android/app/gradle.lockfile'
+      - 'android/gradle/verification-metadata.xml'
+      - 'scripts/check_dependencies.py'
+      - '.github/workflows/dependency-security.yml'
+  pull_request:
+    paths:
+      - 'poetry.lock'
+      - 'android/app/gradle.lockfile'
+      - 'android/gradle/verification-metadata.xml'
+      - 'scripts/check_dependencies.py'
+      - '.github/workflows/dependency-security.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Check locked dependencies
+        run: python scripts/check_dependencies.py
