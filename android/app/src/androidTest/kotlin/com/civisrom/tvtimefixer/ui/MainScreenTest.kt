@@ -482,10 +482,12 @@ class MainScreenTest {
 
     @Test fun ntp_input_survives_diagnostics_and_only_explicit_apply_executes() {
         screen(connected)
-        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+        // Semantics text input does not promise to show the IME; open it with a real tap.
+        compose.onNodeWithTag("ntp-address").performScrollTo().performClick()
+        waitForKeyboard()
+        compose.onNodeWithTag("ntp-address").performTextInput("pool.ntp.org")
         // Здесь проверяем сохранение формы; касания с IME проверяются отдельно
         // в narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable.
-        waitForKeyboard()
         compose.onNodeWithTag("diagnostics-open").performScrollTo()
             .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("diagnostics-back")
@@ -953,19 +955,37 @@ class MainScreenTest {
 
     private fun waitForKeyboard(visible: Boolean = true) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        compose.waitUntil(5_000) {
-            if (Build.VERSION.SDK_INT >= 30) {
-                compose.runOnUiThread { hostView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
-            } else {
-                // Legacy Insets infer visibility from window geometry, which changes during rotation.
-                val windows = automation.windows
-                try {
-                    windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
-                } finally {
-                    @Suppress("DEPRECATION")
-                    windows.forEach { it.recycle() }
+        try {
+            compose.waitUntil(5_000) {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    compose.runOnUiThread { hostView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
+                } else {
+                    // Legacy Insets infer visibility from window geometry, which changes during rotation.
+                    val windows = automation.windows
+                    try {
+                        windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
+                    } finally {
+                        @Suppress("DEPRECATION")
+                        windows.forEach { it.recycle() }
+                    }
                 }
             }
+        } catch (failure: Throwable) {
+            // Keep evidence while the failing Activity is still alive, before rule teardown.
+            runCatching {
+                val name = "ime-timeout-$visible-${android.os.SystemClock.uptimeMillis()}"
+                val folder = File(context.filesDir, "ui-screenshots").apply { mkdirs() }
+                val state = compose.runOnUiThread {
+                    val frame = android.graphics.Rect()
+                    hostView.getWindowVisibleDisplayFrame(frame)
+                    "expected=$visible windowFocus=${hostView.hasWindowFocus()} " +
+                        "root=${hostView.rootView.width}x${hostView.rootView.height} " +
+                        "visibleFrame=$frame insets=${hostView.rootWindowInsets}"
+                }
+                File(folder, "$name.txt").writeText(state)
+                screenshot(name)
+            }.onFailure { failure.addSuppressed(it) }
+            throw failure
         }
         compose.waitForIdle()
         automation.waitForIdle(300, 3_000)
