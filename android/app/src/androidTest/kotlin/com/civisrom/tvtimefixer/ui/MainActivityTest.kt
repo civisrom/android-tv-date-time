@@ -2,14 +2,20 @@ package com.civisrom.tvtimefixer.ui
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
+import android.os.Build
 import android.system.Os
 import android.system.OsConstants
 import android.view.KeyEvent
+import android.view.View
+import android.view.WindowInsets
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.MainActivity
 import com.civisrom.tvtimefixer.DeviceMode
@@ -95,15 +101,20 @@ class MainActivityTest {
             automation.serviceInfo = automation.serviceInfo.apply {
                 flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             }
-            fun waitForKeyboard(visible: Boolean) {
+            fun waitForKeyboard(visible: Boolean, root: View = compose.activity.window.decorView) {
                 compose.waitUntil(5_000) {
-                    // Insets on a floating dialog can report no IME on API 23–29 while it is visible.
-                    val windows = automation.windows
-                    try {
-                        windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
-                    } finally {
-                        @Suppress("DEPRECATION")
-                        windows.forEach { it.recycle() }
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        // Read the actual input window; the accessibility window list can lag on API 31.
+                        compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
+                    } else {
+                        // Legacy Insets only estimate IME visibility and miss floating dialogs.
+                        val windows = automation.windows
+                        try {
+                            windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
+                        } finally {
+                            @Suppress("DEPRECATION")
+                            windows.forEach { it.recycle() }
+                        }
                     }
                 }
                 automation.waitForIdle(300, 3_000)
@@ -116,10 +127,16 @@ class MainActivityTest {
                 compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
                 compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
                 compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-name").fetchSemanticsNodes().isNotEmpty() }
+                var dialogRoot: View? = null
+                onView(isRoot()).inRoot(isDialog()).check { view, error ->
+                    if (error != null) throw error
+                    dialogRoot = view
+                }
+                val inputRoot = checkNotNull(dialogRoot)
                 compose.onNodeWithTag("favorite-name").performClick()
-                waitForKeyboard(true)
+                waitForKeyboard(true, inputRoot)
                 compose.onNodeWithTag("favorite-name").performImeAction()
-                waitForKeyboard(false)
+                waitForKeyboard(false, inputRoot)
             } finally { screenshot("favorite-dialog") }
             compose.onNodeWithTag("favorite-confirm").assertIsFocused().performClick()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }

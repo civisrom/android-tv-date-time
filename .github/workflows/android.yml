@@ -253,6 +253,9 @@ jobs:
             sed -i 's/^target=.*/target=android-37/' "$ANDROID_AVD_HOME/ui-test.ini" "$ANDROID_AVD_HOME/ui-test.avd/config.ini"
             grep -qx 'target=android-37' "$ANDROID_AVD_HOME/ui-test.ini"
             emulator_features=(-verbose)
+          elif [[ "$UI_TEST_IMAGE" == *';google-tv-ps16k;'* ]]; then
+            # With 2 GiB this image's first-boot services trigger LMK killing the IME.
+            emulator_memory=4096
           fi
           "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
             -no-boot-anim -no-snapshot -gpu swiftshader -memory "$emulator_memory" -cores 2 -partition-size 4096 \
@@ -358,6 +361,7 @@ jobs:
           timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys display > "$RUNNER_TEMP/ui-display.txt" || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys window > "$RUNNER_TEMP/ui-window.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell cat /proc/meminfo > "$RUNNER_TEMP/ui-memory.txt" || true
           timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out screencap -p > ui-screenshots/emulator-final.png || true
           if [[ -f "$RUNNER_TEMP/ui-logcat.pid" ]]; then
             kill "$(cat "$RUNNER_TEMP/ui-logcat.pid")" || true
@@ -377,6 +381,7 @@ jobs:
             ${{ runner.temp }}/ui-crashes.txt
             ${{ runner.temp }}/ui-display.txt
             ${{ runner.temp }}/ui-window.txt
+            ${{ runner.temp }}/ui-memory.txt
             ${{ runner.temp }}/ui-live-logcat.txt
           if-no-files-found: ignore
           retention-days: 7
