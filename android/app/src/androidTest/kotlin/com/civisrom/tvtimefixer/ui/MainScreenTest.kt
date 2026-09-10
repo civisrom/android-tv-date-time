@@ -8,7 +8,9 @@ import android.hardware.usb.UsbManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.os.Build
 import android.view.View
+import android.view.WindowInsets
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.foundation.layout.Box
@@ -57,8 +59,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.adb.ConnectionError
 import com.civisrom.tvtimefixer.adb.ConnectionState
@@ -269,9 +269,7 @@ class MainScreenTest {
         waitForKeyboard()
         compose.onNodeWithTag("time-zone-option-Europe/Moscow").performScrollTo().performClick()
         compose.onNodeWithTag("time-zone-apply").assertIsDisplayed().assertIsFocused()
-        compose.waitUntil(5_000) {
-            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
-        }
+        waitForKeyboard(false)
         screenshot("time-zone-selected")
         assertTrue(actions.calls.isEmpty())
         compose.onNodeWithTag("section-timezone").performScrollTo().performClick()
@@ -585,9 +583,7 @@ class MainScreenTest {
             compose.onNodeWithText("time.cloudflare.com").performScrollTo().performClick()
             compose.onNodeWithTag("ntp-address").assertTextContains("time.cloudflare.com").assertIsNotFocused()
             compose.onNodeWithTag("ntp-search").assertIsNotFocused()
-            compose.waitUntil(5_000) {
-                ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
-            }
+            waitForKeyboard(false)
             compose.onNodeWithTag("ntp-address").assertIsDisplayed()
             compose.onNodeWithTag("ntp-apply").assertIsDisplayed().also {
                 if (state.connected) it.assertIsEnabled() else it.assertIsNotEnabled()
@@ -853,15 +849,17 @@ class MainScreenTest {
             if (!television) automation.setRotation(UiAutomation.ROTATION_FREEZE_90)
             compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
             screen(connected, width = 640)
-            compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
-            waitForKeyboard()
-            compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
-            screenshot("landscape-ntp")
+            try {
+                compose.waitUntil(10_000) {
+                    compose.runOnUiThread { hostView.hasWindowFocus() && hostView.rootView.width > hostView.rootView.height }
+                }
+                compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
+                waitForKeyboard()
+                compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
+            } finally { screenshot("landscape-ntp") }
             compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
             try {
-                compose.waitUntil(5_000) {
-                    ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
-                }
+                waitForKeyboard(false)
                 compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
             } finally {
                 screenshot("landscape-diagnostics")
@@ -954,11 +952,23 @@ class MainScreenTest {
     }
 
     private fun waitForKeyboard(visible: Boolean = true) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         compose.waitUntil(5_000) {
-            ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) == visible
+            if (Build.VERSION.SDK_INT >= 30) {
+                compose.runOnUiThread { hostView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
+            } else {
+                // Legacy Insets infer visibility from window geometry, which changes during rotation.
+                val windows = automation.windows
+                try {
+                    windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
+                } finally {
+                    @Suppress("DEPRECATION")
+                    windows.forEach { it.recycle() }
+                }
+            }
         }
         compose.waitForIdle()
-        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
+        automation.waitForIdle(300, 3_000)
     }
 
     private fun screenshot(name: String) {
