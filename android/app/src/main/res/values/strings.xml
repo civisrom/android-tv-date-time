@@ -44,7 +44,7 @@
     <string name="address_copied">Address copied</string>
     <string name="address_paste">Paste address</string>
     <string name="usb_title">USB debugging</string>
-    <string name="usb_setup_hint">Connect this phone/tablet as a USB host (OTG) to the target device’s supported device/OTG port using a data cable. Enable USB debugging on the target. A host-only TV USB port cannot be used for this connection.</string>
+    <string name="usb_setup_hint">Connect the device running this app as a USB host (OTG) to another device’s supported device/OTG port using a data cable. Enable USB debugging on the target. A host-only port on the target cannot be used for this connection. To configure the device running this app, use a network connection.</string>
     <string name="usb_authorize_hint">Allow USB access on this device, then unlock the target and confirm its RSA debugging prompt. Authorization may take up to a minute.</string>
     <string name="usb_refresh">Refresh USB devices</string>
     <string name="usb_connect">Connect via USB</string>
@@ -268,7 +268,7 @@
     <string name="usb_no_adb">Android sees a USB device but no ADB interface. Enable USB debugging on the target and reconnect the cable. If using a hub, the detected device may be only the hub.</string>
     <string name="usb_scan_failed">Could not read the USB device list. Refresh it; error details are available in Diagnostics.</string>
     <string name="usb_detected">Devices with ADB found: %1$d. Select a device below to request access.</string>
-    <string name="usb_shield_hint">SHIELD without micro-USB: for ADB, use the USB port furthest from HDMI. The phone must remain the host; a regular USB-A to USB-C cable may select the opposite role.</string>
+    <string name="usb_shield_hint">SHIELD without micro-USB: for ADB, use the USB port furthest from HDMI. The device running this app must remain the USB host; a regular USB-A to USB-C cable may select the opposite role.</string>
     <string name="diagnostics_ntp_unreachable">The time server did not respond to the check.</string>
     <string name="diagnostics_ntp_not_confirmed">The device did not confirm the time server setting.</string>
     <string name="usb_connection_help">If USB is not detected</string>

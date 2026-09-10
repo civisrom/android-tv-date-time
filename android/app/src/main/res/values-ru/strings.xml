@@ -44,7 +44,7 @@
     <string name="address_copied">Адрес скопирован</string>
     <string name="address_paste">Вставить адрес</string>
     <string name="usb_title">Отладка по USB</string>
-    <string name="usb_setup_hint">Подключите этот телефон или планшет в роли USB host (OTG) к поддерживаемому порту device/OTG целевого устройства кабелем передачи данных. Включите USB-отладку на целевом устройстве. Порт телевизора, работающий только как USB host, для этого не подходит.</string>
+    <string name="usb_setup_hint">Подключите устройство с этим приложением в роли USB host (OTG) к поддерживаемому порту device/OTG другого устройства кабелем передачи данных. Включите USB-отладку на целевом устройстве. Его порт, работающий только как USB host, для этого не подходит. Для настройки устройства, на котором запущено приложение, используйте сетевое подключение.</string>
     <string name="usb_authorize_hint">Разрешите доступ к USB на этом устройстве, затем разблокируйте целевое устройство и подтвердите на нём запрос RSA для отладки. Авторизация может занять до минуты.</string>
     <string name="usb_refresh">Обновить USB-устройства</string>
     <string name="usb_connect">Подключиться по USB</string>
@@ -268,7 +268,7 @@
     <string name="usb_no_adb">Android видит USB-устройство, но интерфейс ADB не найден. Включите USB-отладку на целевом устройстве и переподключите кабель. Если подключён хаб, это сообщение может относиться только к нему.</string>
     <string name="usb_scan_failed">Не удалось прочитать список USB-устройств. Обновите список; сведения об ошибке доступны в диагностике.</string>
     <string name="usb_detected">Найдено устройств с ADB: %1$d. Выберите устройство ниже, чтобы запросить доступ.</string>
-    <string name="usb_shield_hint">SHIELD без micro-USB: для ADB используйте USB-порт, дальний от HDMI. Телефон должен оставаться хостом; обычный кабель USB-A → USB-C может задавать обратную роль.</string>
+    <string name="usb_shield_hint">SHIELD без micro-USB: для ADB используйте USB-порт, дальний от HDMI. Устройство с этим приложением должно оставаться USB host; обычный кабель USB-A → USB-C может задавать обратную роль.</string>
     <string name="diagnostics_ntp_unreachable">Сервер времени не ответил на проверку.</string>
     <string name="diagnostics_ntp_not_confirmed">Устройство не подтвердило сохранение сервера времени.</string>
     <string name="usb_connection_help">Если USB не обнаружено</string>
