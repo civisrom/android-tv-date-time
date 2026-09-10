@@ -154,8 +154,10 @@ jobs:
         run: |
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             ./dist/${{ env.APP_NAME }}.exe --version
+            poetry run python scripts/smoke_desktop.py ./dist/${{ env.APP_NAME }}.exe
           else
             ./dist/${{ env.APP_NAME }} --version
+            poetry run python scripts/smoke_desktop.py ./dist/${{ env.APP_NAME }}
           fi
         shell: bash
 
