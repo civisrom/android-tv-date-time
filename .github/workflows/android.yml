@@ -291,7 +291,10 @@ jobs:
                 continue
               fi
               test "$("$ANDROID_HOME/platform-tools/adb" shell getprop ro.build.version.sdk | tr -d '\r')" = "$expected_api"
-              "$ANDROID_HOME/platform-tools/adb" shell input keyevent 82
+              # MENU can trigger a launcher input ANR during first-boot work.
+              # Wake/unlock through system services without sending a key to an app.
+              "$ANDROID_HOME/platform-tools/adb" shell svc power stayon true
+              "$ANDROID_HOME/platform-tools/adb" shell wm dismiss-keyguard
               "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
               "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
