@@ -88,6 +88,8 @@
     <string name="project_source_code">Исходный код проекта:</string>
     <string name="project_repository_open">Открыть репозиторий проекта на GitHub</string>
     <string name="project_repository_unavailable">Не удалось открыть ссылку. На устройстве может отсутствовать браузер.</string>
+    <string name="usage_terms_title">Условия использования</string>
+    <string name="usage_terms_body">Программа Android TV Time Fixer предоставляется «как есть» (as is), без каких-либо гарантий, в пределах, допускаемых применимым законодательством. Вы используете программу на свой риск.</string>
 
     <!-- Спаривание -->
     <string name="pairing_title">Спаривание · новая беспроводная отладка Android 11+</string>

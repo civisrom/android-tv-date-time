@@ -1,7 +1,9 @@
 package com.civisrom.tvtimefixer.ui
 
 import android.os.Build
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +53,7 @@ import androidx.core.os.ConfigurationCompat
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -202,6 +206,7 @@ private fun MainContent(
 ) {
     val uriHandler = LocalUriHandler.current
     var repositoryLinkFailed by remember { mutableStateOf(false) }
+    var usageTermsFocused by remember { mutableStateOf(false) }
     val openRepository = stringResource(R.string.project_repository_open)
     var pairingAddress by rememberSaveable { mutableStateOf("") }
     var pairingExpanded by rememberSaveable { mutableStateOf(false) }
@@ -314,6 +319,21 @@ private fun MainContent(
             }
         }
         if (state.connected) DeviceInfoSection(state, actions)
+        HorizontalDivider()
+        Column(
+            Modifier.fillMaxWidth().testTag("usage-terms")
+                .semantics(mergeDescendants = true) {}
+                .onFocusChanged { usageTermsFocused = it.isFocused }
+                .focusable()
+                .border(2.dp, if (usageTermsFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    MaterialTheme.shapes.medium)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(stringResource(R.string.usage_terms_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.usage_terms_body), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

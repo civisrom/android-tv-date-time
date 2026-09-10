@@ -376,7 +376,8 @@ jobs:
         with:
           files: |
             dist/*.zip
-            dist/*.sha256
+            dist/*.zip.sha256
+            dist/*.apk.sha256
             dist/AndroidTVTimeFixer-*.apk
             dist/LICENSE
             dist/LICENSE-GPL-3.0.txt

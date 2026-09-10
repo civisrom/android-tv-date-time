@@ -1202,7 +1202,11 @@ class AndroidTVTimeFixer:
                         self.process_manager.cleanup()
                         break
                     elif command.lower() in ['help', '?']:
-                        print(Fore.YELLOW + locales.get("terminal_mode_commands"))
+                        for line in locales.get("terminal_mode_commands").splitlines():
+                            is_command = line.startswith('    adb ') or line in (
+                                '    help / ?', '    clear', '    exit / quit / q',
+                            )
+                            print((Fore.GREEN if is_command else Fore.RESET) + line + Fore.RESET)
                         continue
                     elif command.lower() == 'clear':
                         os.system('cls' if platform.system() == 'Windows' else 'clear')
