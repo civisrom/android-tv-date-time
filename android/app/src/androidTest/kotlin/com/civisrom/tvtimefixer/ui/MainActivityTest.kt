@@ -1,19 +1,15 @@
 package com.civisrom.tvtimefixer.ui
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
 import android.system.Os
 import android.system.OsConstants
 import android.view.KeyEvent
-import android.view.View
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.MainActivity
 import com.civisrom.tvtimefixer.DeviceMode
@@ -91,31 +87,36 @@ class MainActivityTest {
 
     @Test fun favorite_server_is_saved_by_the_real_activity_and_restored_after_recreation() {
         val app = compose.activity.application as com.civisrom.tvtimefixer.TimeFixerApplication
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
         try {
+            automation.serviceInfo = automation.serviceInfo.apply {
+                flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            }
+            fun waitForKeyboard(visible: Boolean) {
+                compose.waitUntil(5_000) {
+                    // Insets on a floating dialog can report no IME on API 23–29 while it is visible.
+                    val windows = automation.windows
+                    try {
+                        windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
+                    } finally {
+                        @Suppress("DEPRECATION")
+                        windows.forEach { it.recycle() }
+                    }
+                }
+            }
             compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
             compose.onNodeWithTag("ntp-address").performImeAction()
-            compose.waitUntil(5_000) {
-                ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
-                    ?.isVisible(WindowInsetsCompat.Type.ime()) != true
-            }
-            InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
+            waitForKeyboard(false)
+            automation.waitForIdle(300, 3_000)
             compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
             compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
             try {
                 compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-name").fetchSemanticsNodes().isNotEmpty() }
-                lateinit var dialogView: View
-                onView(isRoot()).inRoot(isDialog()).check { view, error ->
-                    if (error != null) throw error
-                    dialogView = checkNotNull(view)
-                }
                 compose.onNodeWithTag("favorite-name").performClick()
-                compose.waitUntil(5_000) {
-                    ViewCompat.getRootWindowInsets(dialogView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
-                }
+                waitForKeyboard(true)
                 compose.onNodeWithTag("favorite-name").performImeAction()
-                compose.waitUntil(5_000) {
-                    ViewCompat.getRootWindowInsets(dialogView)?.isVisible(WindowInsetsCompat.Type.ime()) == false
-                }
+                waitForKeyboard(false)
             } finally { screenshot("favorite-dialog") }
             compose.onNodeWithTag("favorite-confirm").assertIsFocused().performClick()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-ntp-pool.ntp.org").fetchSemanticsNodes().isNotEmpty() }
@@ -125,7 +126,10 @@ class MainActivityTest {
             compose.onNodeWithTag("ntp-address").assertTextContains("pool.ntp.org")
             compose.onNodeWithTag("ntp-apply").assertIsNotEnabled()
             screenshot("favorite-restored")
-        } finally { app.favorites.write(com.civisrom.tvtimefixer.data.Favorites()) }
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+            app.favorites.write(com.civisrom.tvtimefixer.data.Favorites())
+        }
     }
 
     @Test fun TV_setup_is_navigable_with_actual_remote_events_and_survives_resume() {
