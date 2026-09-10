@@ -396,17 +396,22 @@ class MainScreenTest {
     @Test fun pairing_collapses_without_losing_inputs_or_running_actions() {
         screen()
         compose.onNodeWithTag("pairing-code").assertDoesNotExist()
-        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
-        compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
-        compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
-        compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
-        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
-        compose.onNodeWithTag("pairing-code").assertDoesNotExist()
-        compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
-        compose.onNodeWithTag("pairing-address").assertTextContains("192.0.2.10:37123")
-        compose.onNodeWithTag("pairing-code").assertTextContains("123456")
-        compose.onNodeWithTag("pairing-connect-address").assertTextContains("192.0.2.10:37124")
-        assertTrue(actions.calls.isEmpty())
+        try {
+            compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+            compose.onNodeWithTag("pairing-address").performScrollTo().performTextInput("192.0.2.10:37123")
+            compose.onNodeWithTag("pairing-code").performScrollTo().performTextInput("123456")
+            compose.onNodeWithTag("pairing-connect-address").performScrollTo().performTextInput("192.0.2.10:37124")
+            waitForKeyboard()
+            compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+            compose.onNodeWithTag("pairing-code").assertDoesNotExist()
+            // Collapsing hides the IME; wait for the window to settle before the next tap.
+            waitForKeyboard(false)
+            compose.onNodeWithTag("section-pairing").performScrollTo().performClick()
+            compose.onNodeWithTag("pairing-address").assertTextContains("192.0.2.10:37123")
+            compose.onNodeWithTag("pairing-code").assertTextContains("123456")
+            compose.onNodeWithTag("pairing-connect-address").assertTextContains("192.0.2.10:37124")
+            assertTrue(actions.calls.isEmpty())
+        } finally { screenshot("pairing-expanded-again") }
     }
 
     @Test fun connecting_keeps_primary_inputs_and_enables_ntp_writes_only_while_connected() {
@@ -953,6 +958,7 @@ class MainScreenTest {
             ViewCompat.getRootWindowInsets(hostView)?.isVisible(WindowInsetsCompat.Type.ime()) == visible
         }
         compose.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
     }
 
     private fun screenshot(name: String) {

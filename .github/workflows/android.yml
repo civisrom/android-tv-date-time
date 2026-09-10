@@ -115,6 +115,16 @@ jobs:
       max-parallel: 4
       matrix:
         include:
+          - name: phone-28
+            image: system-images;android-28;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: phone-31
+            image: system-images;android-31;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
           - name: phone-37.0
             image: system-images;android-37.0;google_apis;x86_64
             device: pixel_2
@@ -165,11 +175,6 @@ jobs:
             device: tv_1080p
             tv: true
             page_size: 4096
-          - name: phone-31
-            image: system-images;android-31;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
           - name: phone-29
             image: system-images;android-29;google_apis;x86_64
             device: pixel_2
@@ -192,11 +197,6 @@ jobs:
             page_size: 4096
           - name: phone-36
             image: system-images;android-36;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-28
-            image: system-images;android-28;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
