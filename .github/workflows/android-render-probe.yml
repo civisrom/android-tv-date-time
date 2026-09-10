@@ -1,0 +1,193 @@
+name: Android rendering probe
+
+# Temporary A/B diagnosis for the recorded Android 17 modal-background artifact.
+# All modes use the identical APK pair already built and checked by Android CI.
+on:
+  push:
+    branches: [dev]
+    paths: ['.github/workflows/android-render-probe.yml']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  render:
+    name: Android 17 rendering — ${{ matrix.mode }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        mode: [default, full-redraw, vulkan]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download the recorded Android CI APK pair
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: android-ui-inputs
+          run-id: 34420044903
+          github-token: ${{ github.token }}
+          path: android/app/build/outputs/apk
+
+      - name: Verify identical inputs
+        working-directory: android/app/build/outputs/apk
+        run: |
+          sha256sum -c ui-inputs.sha256
+          echo 'ea1a8c897161ef5c1fca316e9bdb38ba89111a9726a349cc1bc31e26b2af4182  debug/app-debug.apk' | sha256sum -c -
+          echo '9e0431c70ed4c705eaa2cd5a9fb8d7fec0cf9867bac57e5406145fcf62f958bc  androidTest/debug/app-debug-androidTest.apk' | sha256sum -c -
+
+      - name: Start Android emulator
+        env:
+          UI_TEST_IMAGE: system-images;android-37.0;google_apis;x86_64
+          UI_TEST_DEVICE: pixel_2
+        run: |
+          set -o pipefail
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/ui-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          { yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > "$RUNNER_TEMP/sdk-licenses.log"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "$UI_TEST_IMAGE"
+          # The emulator must see the runner's ephemeral ADB identity at boot.
+          "$ANDROID_HOME/platform-tools/adb" start-server
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name ui-test \
+            --package "$UI_TEST_IMAGE" --device "$UI_TEST_DEVICE" \
+            --path "$ANDROID_AVD_HOME/ui-test.avd"
+          test -f "$ANDROID_AVD_HOME/ui-test.ini"
+          emulator_features=()
+          emulator_memory=2048
+          if [[ "$UI_TEST_IMAGE" == *'android-37.0;'* ]]; then
+            emulator_memory=4096
+            # Older avdmanager misreads the SDK's decimal api-level 37.0 as 0.
+            # Correct only AVD metadata; keep the installed Android 17 system image.
+            sed -n '/^target=/p' "$ANDROID_AVD_HOME/ui-test.ini"
+            sed -i 's/^target=.*/target=android-37/' "$ANDROID_AVD_HOME/ui-test.ini" "$ANDROID_AVD_HOME/ui-test.avd/config.ini"
+            grep -qx 'target=android-37' "$ANDROID_AVD_HOME/ui-test.ini"
+            emulator_features=(-verbose)
+          fi
+          "$ANDROID_HOME/emulator/emulator" -avd ui-test -no-window -no-audio \
+            -no-boot-anim -no-snapshot -gpu swiftshader -memory "$emulator_memory" -cores 2 -partition-size 4096 \
+            "${emulator_features[@]}" \
+            > "$RUNNER_TEMP/ui-emulator.log" 2>&1 &
+          timeout 180 "$ANDROID_HOME/platform-tools/adb" wait-for-device
+          expected_api=${UI_TEST_IMAGE#*android-}
+          expected_api=${expected_api%%;*}
+          expected_api=${expected_api%%.*}
+          ready_samples=0
+          for attempt in $(seq 1 120); do
+            if [[ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
+              if [[ "$expected_api" == 23 ]]; then
+                # First-boot encryption also sets boot_completed in a temporary framework.
+                # Installing there races vold stopping main services and remounting /data.
+                decrypt_state=$("$ANDROID_HOME/platform-tools/adb" shell getprop vold.decrypt | tr -d '\r')
+                if [[ -n "$decrypt_state" && "$decrypt_state" != trigger_restart_framework ]]; then
+                  ready_samples=0
+                  sleep 2
+                  continue
+                fi
+              fi
+              # TV images can lose ADB transport just after boot_completed. Require a
+              # stable read-only connection before the first (single) APK install.
+              if ! timeout 10 "$ANDROID_HOME/platform-tools/adb" shell pm path android | grep -q '^package:'; then
+                ready_samples=0
+                sleep 2
+                continue
+              fi
+              ready_samples=$((ready_samples + 1))
+              if (( ready_samples < 4 )); then
+                sleep 2
+                continue
+              fi
+              test "$("$ANDROID_HOME/platform-tools/adb" shell getprop ro.build.version.sdk | tr -d '\r')" = "$expected_api"
+              "$ANDROID_HOME/platform-tools/adb" shell input keyevent 82
+              "$ANDROID_HOME/platform-tools/adb" shell settings put global window_animation_scale 0
+              "$ANDROID_HOME/platform-tools/adb" shell settings put global transition_animation_scale 0
+              "$ANDROID_HOME/platform-tools/adb" shell settings put global animator_duration_scale 0
+              if [[ "$expected_api" == 24 ]]; then
+                # This image's unrelated Messenger crashes at boot and covers the test UI.
+                "$ANDROID_HOME/platform-tools/adb" shell pm disable-user --user 0 com.google.android.apps.messaging
+                "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.google.android.apps.messaging
+              fi
+              timeout 1500 "$ANDROID_HOME/platform-tools/adb" logcat -v threadtime > "$RUNNER_TEMP/ui-live-logcat.txt" 2>&1 &
+              echo $! > "$RUNNER_TEMP/ui-logcat.pid"
+              exit 0
+            else
+              ready_samples=0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Run one unchanged shard with the selected renderer
+        env:
+          PROBE_RENDER_MODE: ${{ matrix.mode }}
+        working-directory: android
+        run: |
+          set -o pipefail
+          if [[ "$PROBE_RENDER_MODE" == full-redraw ]]; then
+            "$ANDROID_HOME/platform-tools/adb" shell setprop debug.hwui.use_partial_updates false
+          elif [[ "$PROBE_RENDER_MODE" == vulkan ]]; then
+            "$ANDROID_HOME/platform-tools/adb" shell setprop debug.hwui.renderer skiavk
+          fi
+          "$ANDROID_HOME/platform-tools/adb" shell getprop debug.hwui.use_partial_updates
+          "$ANDROID_HOME/platform-tools/adb" shell getprop debug.hwui.renderer
+          "$ANDROID_HOME/platform-tools/adb" shell getprop ro.hwui.use_vulkan
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          timeout 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+            -e numShards 3 -e shardIndex 0 -e expected_tv false -e expected_page_size 4096 \
+            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/ui-instrumentation.log"
+          grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/ui-instrumentation.log"
+
+      - name: Collect UI screenshots
+        if: always()
+        run: |
+          mkdir -p ui-screenshots
+          # Scoped storage blocks shell access on some TV builds; debug run-as uses the app UID.
+          if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
+            while IFS= read -r name; do
+              name=${name//$'\r'/}
+              [[ "$name" =~ ^[a-zA-Z0-9._-]+\.png$ ]] || continue
+              if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
+                cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
+                rm -f -- "ui-screenshots/$name"
+              fi
+            done <<< "$names"
+          fi
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -d -t 1000 > "$RUNNER_TEMP/ui-logcat.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" logcat -b crash -d > "$RUNNER_TEMP/ui-crashes.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys display > "$RUNNER_TEMP/ui-display.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" shell dumpsys window > "$RUNNER_TEMP/ui-window.txt" || true
+          timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out screencap -p > ui-screenshots/emulator-final.png || true
+          if [[ -f "$RUNNER_TEMP/ui-logcat.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/ui-logcat.pid")" || true
+          fi
+          timeout 10 "$ANDROID_HOME/platform-tools/adb" emu kill || true
+
+      - name: Upload UI test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-render-${{ matrix.mode }}
+          path: |
+            ui-screenshots/
+            ${{ runner.temp }}/ui-instrumentation.log
+            ${{ runner.temp }}/ui-emulator.log
+            ${{ runner.temp }}/ui-logcat.txt
+            ${{ runner.temp }}/ui-crashes.txt
+            ${{ runner.temp }}/ui-display.txt
+            ${{ runner.temp }}/ui-window.txt
+            ${{ runner.temp }}/ui-live-logcat.txt
+          if-no-files-found: ignore
+          retention-days: 7
