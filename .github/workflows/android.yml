@@ -357,7 +357,7 @@ jobs:
           done
           exit "$ui_failed"
 
-      - name: Collect UI screenshots
+      - name: Collect UI screenshots and IME timeout details
         if: always()
         run: |
           mkdir -p ui-screenshots
@@ -365,7 +365,7 @@ jobs:
           if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
             while IFS= read -r name; do
               name=${name//$'\r'/}
-              [[ "$name" =~ ^[a-zA-Z0-9._-]+\.png$ ]] || continue
+              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt)$ ]] || continue
               if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
                 cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
                 rm -f -- "ui-screenshots/$name"
