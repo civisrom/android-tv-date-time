@@ -88,6 +88,8 @@
     <string name="project_source_code">Project source code:</string>
     <string name="project_repository_open">Open the project repository on GitHub</string>
     <string name="project_repository_unavailable">Could not open the link. This device may not have a browser.</string>
+    <string name="usage_terms_title">Terms of use</string>
+    <string name="usage_terms_body">Android TV Time Fixer is provided “as is”, without any warranties, to the extent permitted by applicable law. You use the program at your own risk.</string>
 
     <!-- Спаривание -->
     <string name="pairing_title">Pairing · new wireless debugging on Android 11+</string>
