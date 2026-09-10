@@ -963,7 +963,9 @@ class MainScreenTest {
         val folder = File(context.filesDir, "ui-screenshots").apply { mkdirs() }
         val bitmap = automation.takeScreenshot()
         checkNotNull(bitmap)
-        File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
+        try {
+            File(folder, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            checkScreenshotContent(bitmap)
+        } finally { bitmap.recycle() }
     }
 }

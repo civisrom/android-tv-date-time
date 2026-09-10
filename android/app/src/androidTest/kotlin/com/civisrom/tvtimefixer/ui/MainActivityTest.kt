@@ -32,8 +32,10 @@ class MainActivityTest {
         file.parentFile!!.mkdirs()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         checkNotNull(bitmap)
-        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
+        try {
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            checkScreenshotContent(bitmap)
+        } finally { bitmap.recycle() }
     }
 
     @Test fun installed_APK_detects_the_actual_form_factor_and_page_size() {
@@ -104,14 +106,15 @@ class MainActivityTest {
                         windows.forEach { it.recycle() }
                     }
                 }
+                automation.waitForIdle(300, 3_000)
             }
-            compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
-            compose.onNodeWithTag("ntp-address").performImeAction()
-            waitForKeyboard(false)
-            automation.waitForIdle(300, 3_000)
-            compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
-            compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
             try {
+                compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+                waitForKeyboard(true)
+                compose.onNodeWithTag("ntp-address").performImeAction()
+                waitForKeyboard(false)
+                compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("favorite-ntp-save").assertIsEnabled() }.isSuccess }
+                compose.onNodeWithTag("favorite-ntp-save").performScrollTo().performClick()
                 compose.waitUntil(5_000) { compose.onAllNodesWithTag("favorite-name").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithTag("favorite-name").performClick()
                 waitForKeyboard(true)
