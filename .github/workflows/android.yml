@@ -300,6 +300,18 @@ jobs:
                 "$ANDROID_HOME/platform-tools/adb" shell pm disable-user --user 0 com.google.android.apps.messaging
                 "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.google.android.apps.messaging
               fi
+              # Separate short probes can reconnect silently during TV first-boot setup.
+              # Keep one transport alive after setup before the first APK installation.
+              if ! timeout 30 "$ANDROID_HOME/platform-tools/adb" shell '
+                for sample in 1 2 3 4 5 6 7 8; do
+                  pm path android | grep -q "^package:" || exit 1
+                  sleep 2
+                done
+              '; then
+                ready_samples=0
+                sleep 2
+                continue
+              fi
               timeout 1500 "$ANDROID_HOME/platform-tools/adb" logcat -v threadtime > "$RUNNER_TEMP/ui-live-logcat.txt" 2>&1 &
               echo $! > "$RUNNER_TEMP/ui-logcat.pid"
               exit 0
