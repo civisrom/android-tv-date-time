@@ -264,9 +264,6 @@ private fun MainContent(
             }
         }
         ConnectionStatus(mode, state, actions)
-        FunctionCard("favorites") {
-            ExpandableSection(stringResource(R.string.favorite_devices), "favorites") { DeviceFavorites(state, actions) }
-        }
         FunctionCard("discovery") {
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {
@@ -274,6 +271,9 @@ private fun MainContent(
                     pairingAddress = it; pairingExpanded = true; focusPairing = true
                 })
             }
+        }
+        FunctionCard("favorites") {
+            ExpandableSection(stringResource(R.string.favorite_devices), "favorites") { DeviceFavorites(state, actions) }
         }
         if (state.busy) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
