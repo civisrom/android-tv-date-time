@@ -18,7 +18,17 @@ on:
       - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+    inputs:
+      full_checks:
+        description: 'Полная проверка: тесты, lint и матрица виртуальных устройств'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      full_checks:
+        type: boolean
+        # Release workflow callers retain the complete validation gate.
+        default: true
 
 permissions:
   contents: read
@@ -49,24 +59,34 @@ jobs:
         with:
           build-scan-publish: false
 
-      - name: Assemble debug and UI test APKs
+      - name: Assemble debug APK
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 assembleDebug assembleDebugAndroidTest
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+
+      - name: Assemble UI test APK
+        if: inputs.full_checks == true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebugAndroidTest
 
       - name: Assemble unsigned release APK
+        if: inputs.full_checks == true
         working-directory: android
         run: ./gradlew --no-daemon --no-configuration-cache --no-build-cache assembleRelease
 
       - name: Unit tests
+        if: inputs.full_checks == true
         working-directory: android
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Verify APK architectures and memory page alignment
-        run: |
-          python3 scripts/verify_android_apk.py android/app/build/outputs/apk/debug/app-debug.apk
-          python3 scripts/verify_android_apk.py android/app/build/outputs/apk/release/app-release-unsigned.apk
+        run: python3 scripts/verify_android_apk.py android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Verify release APK
+        if: inputs.full_checks == true
+        run: python3 scripts/verify_android_apk.py android/app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Lint
+        if: inputs.full_checks == true
         working-directory: android
         run: ./gradlew --no-daemon lintDebug
 
@@ -79,10 +99,12 @@ jobs:
           retention-days: 14
 
       - name: Record UI input checksums
+        if: inputs.full_checks == true
         working-directory: android/app/build/outputs/apk
         run: sha256sum debug/app-debug.apk androidTest/debug/app-debug-androidTest.apk > ui-inputs.sha256
 
       - name: Upload identical APKs for the emulator matrix
+        if: inputs.full_checks == true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: android-ui-inputs
@@ -94,7 +116,7 @@ jobs:
           retention-days: 7
 
       - name: Upload reports on failure
-        if: failure()
+        if: failure() && inputs.full_checks == true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: android-reports
@@ -108,6 +130,7 @@ jobs:
   ui:
     name: APK — ${{ matrix.name }}
     needs: build
+    if: inputs.full_checks == true
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:

@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -50,19 +51,24 @@ class TerminalScreenTest {
         override fun exportFile(name: String) { calls += "export:$name" }
     }
 
-    private fun screen(mode: DeviceMode = DeviceMode.HANDHELD, busy: Boolean = false, scale: Float = 1f, width: Int = 360) {
+    private var hideKeyboard: () -> Unit = {}
+
+    private fun screen(mode: DeviceMode = DeviceMode.HANDHELD, busy: Boolean = false, scale: Float = 1f, width: Int = 360,
+        target: String = "192.0.2.1:5555", name: String = "NVIDIA SHIELD") {
         compose.setContent {
             val context = LocalContext.current
             val baseConfig = LocalConfiguration.current
             val config = remember(baseConfig) { Configuration(baseConfig).apply { setLocale(Locale.forLanguageTag("ru")) } }
             val ru = remember(context, config) { context.createConfigurationContext(config) }
             inputMode = LocalInputModeManager.current
+            val keyboard = LocalSoftwareKeyboardController.current
+            hideKeyboard = { keyboard?.hide() }
             CompositionLocalProvider(LocalContext provides ru, LocalConfiguration provides config,
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 MaterialTheme { Surface {
                     val state by session.state.collectAsState()
                     Box(Modifier.requiredWidth(width.dp).fillMaxSize()) {
-                        TerminalScreen(mode, state, "Target TV · 192.0.2.1:5555", busy, actions, { calls += "back" })
+                        TerminalScreen(mode, state, target, busy, actions, { calls += "back" }, deviceName = name)
                     }
                 } }
             }
@@ -110,6 +116,15 @@ class TerminalScreenTest {
         scroll("terminal-example-time_1").assertIsDisplayed()
     }
 
+    @Test fun desktop_only_syntax_can_be_copied_but_is_not_offered_for_execution() {
+        screen()
+        compose.onNodeWithTag("terminal-tab-help").performClick()
+        scroll("terminal-category-pc_options").performClick()
+        scroll("terminal-insert-reference_18").assertIsNotEnabled()
+        scroll("terminal-copy-reference_18").assertIsEnabled()
+        assertTrue(calls.isEmpty())
+    }
+
     @Test fun copy_reference_command_does_not_change_the_editor_or_execute() {
         session.edit("existing command")
         screen()
@@ -132,7 +147,7 @@ class TerminalScreenTest {
         compose.onNodeWithTag("terminal-input").assertTextContains("adb install -r 'my app.apk'")
         assertTrue(calls.isEmpty())
         // Verify explicit execution separately from the IME transition caused by focusing the draft.
-        scroll("terminal-run").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.onNodeWithTag("terminal-run").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.runOnIdle { assertEquals(listOf("run"), calls) }
     }
 
@@ -143,6 +158,8 @@ class TerminalScreenTest {
         compose.onNodeWithTag("terminal-tab-history").performClick()
         compose.onNodeWithText("getprop ro.product.model").performClick()
         compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
+        compose.runOnIdle { hideKeyboard() }
+        compose.waitUntil(5000) { compose.onAllNodesWithTag("terminal-tab-files").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("terminal-tab-files").performClick()
         compose.onNodeWithTag("terminal-tab-console").performClick()
         compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
@@ -152,7 +169,7 @@ class TerminalScreenTest {
     @Test fun execution_is_disabled_during_another_device_operation() {
         session.edit("reboot")
         screen(busy = true)
-        scroll("terminal-run").assertIsNotEnabled()
+        compose.onNodeWithTag("terminal-run").assertIsNotEnabled()
     }
 
     @Test fun stop_is_available_from_help_and_files_while_the_command_runs() {
@@ -200,5 +217,103 @@ class TerminalScreenTest {
         screen()
         scroll("terminal-status").assertTextContains("17", substring = true)
         scroll("terminal-output-0").assertTextContains("Permission denied")
+    }
+
+    @Test fun scrolling_long_output_keeps_editor_run_and_clear_controls_in_place() {
+        session.edit("logcat -d"); session.start("TV")
+        repeat(200) { session.append("Line $it: " + "output ".repeat(20) + "\n") }
+        session.finish(0)
+        screen()
+        val tags = listOf("terminal-input", "terminal-run", "terminal-clear", "terminal-follow")
+        val positions = tags.associateWith { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
+        compose.onNodeWithTag("terminal-follow").performClick()
+        compose.onNodeWithTag("terminal-list").performScrollToIndex(0)
+        tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }
+        compose.onNodeWithTag("terminal-list").performScrollToIndex(session.state.value.output.size)
+        tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }
+        compose.onNodeWithTag("terminal-clear").performClick()
+        assertTrue(session.state.value.output.isEmpty())
+        assertEquals("logcat -d", session.state.value.draft)
+    }
+
+    @Test fun manually_scrolling_output_pauses_following_new_lines() {
+        session.edit("logcat -d"); session.start("TV")
+        session.append("line\n".repeat(500)); session.finish(0)
+        screen()
+        compose.onNodeWithTag("terminal-follow").assertIsSelected()
+        compose.onNodeWithTag("terminal-list").performTouchInput { swipeDown() }
+        compose.onNodeWithTag("terminal-follow").assertIsNotSelected()
+        compose.onNodeWithTag("terminal-clear").assertIsDisplayed()
+    }
+
+    @Test fun clearing_the_command_line_preserves_the_result_and_history() {
+        session.edit("echo previous"); session.start("TV"); session.append("previous"); session.finish(0)
+        session.edit("unfinished command")
+        screen()
+        compose.onNodeWithTag("terminal-clear-input").performClick()
+        compose.runOnIdle {
+            assertEquals("", session.state.value.draft)
+            assertEquals("previous", session.state.value.output.single().text)
+            assertEquals(listOf("echo previous"), session.state.value.history)
+        }
+        compose.onNodeWithTag("terminal-run").assertIsNotEnabled()
+        compose.onNodeWithTag("terminal-follow").assertIsSelected()
+    }
+
+    @Test fun connection_header_shows_the_connected_target_model() {
+        screen()
+        compose.onNodeWithTag("terminal-connection-status").assertTextEquals("Подключено")
+        compose.onNodeWithTag("terminal-device-name").assertTextEquals("Модель устройства: NVIDIA SHIELD")
+    }
+
+    @Test fun disconnected_header_does_not_show_a_stale_model_or_allow_download() {
+        screen(target = "")
+        compose.onNodeWithTag("terminal-connection-status").assertTextEquals("Не подключено")
+        compose.onNodeWithTag("terminal-device-name").assertDoesNotExist()
+        compose.onNodeWithTag("terminal-tab-files").performClick()
+        scroll("terminal-download").assertIsNotEnabled()
+    }
+
+    @Test fun completed_small_upload_shows_exact_bytes_and_the_remote_directory() {
+        session.edit("adb push tiny.txt /sdcard/Download/tiny.txt"); session.start("TV")
+        session.transferring("/sdcard/Download/tiny.txt", "tiny.txt", false)
+        session.progress(684); session.finish(0)
+        screen()
+        scroll("terminal-transfer-size").assertTextEquals("Передано: 684 Б")
+        scroll("terminal-transfer-path").assertTextContains("/sdcard/Download/tiny.txt", substring = true)
+        scroll("terminal-transfer-result").assertTextContains("Файл отправлен", substring = true)
+    }
+
+    @Test fun download_requires_a_file_path_and_explicit_confirmation() {
+        screen()
+        compose.onNodeWithTag("terminal-tab-files").performClick()
+        scroll("terminal-download").performClick()
+        compose.onNodeWithTag("terminal-download-confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("terminal-remote-path").performTextInput("/sdcard/Download/")
+        compose.onNodeWithTag("terminal-download-confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("terminal-remote-path").performTextReplacement("/sdcard/Download/my file.txt")
+        assertTrue(calls.isEmpty())
+        compose.onNodeWithTag("terminal-download-confirm").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.runOnIdle {
+            assertEquals("adb pull '/sdcard/Download/my file.txt'", session.state.value.draft)
+            assertEquals(listOf("run"), calls)
+        }
+    }
+
+    @Test fun category_titles_and_history_rows_use_compact_left_aligned_text() {
+        session.edit("echo short"); session.start("TV"); session.finish(0)
+        session.edit("echo a longer command"); session.start("TV"); session.finish(0)
+        screen()
+        compose.onNodeWithTag("terminal-tab-history").performClick()
+        val first = compose.onNodeWithText("echo a longer command", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val second = compose.onNodeWithText("echo short", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(first.left, second.left, 1f)
+        val historyRow = compose.onNodeWithTag("terminal-history-echo a longer command").fetchSemanticsNode().boundsInRoot
+        val nextRow = compose.onNodeWithTag("terminal-history-echo short").fetchSemanticsNode().boundsInRoot
+        assertTrue(nextRow.top - historyRow.bottom <= 1f)
+        compose.onNodeWithTag("terminal-tab-help").performClick()
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        scroll("terminal-category-connection").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(androidx.compose.ui.text.style.TextAlign.Start, layouts.single().layoutInput.style.textAlign)
     }
 }

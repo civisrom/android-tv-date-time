@@ -173,7 +173,7 @@ fun MainScreen(
         holder.SaveableStateProvider("terminal") {
             TerminalScreen(mode, terminal, state.connection.takeIf { state.connected }?.targetOrNull()?.toString().orEmpty(),
                 state.busy, terminalActions, onBack = { showTerminal = false; returnFocus = "terminal-open" },
-                fileBusy = terminalFileBusy, fileMessage = terminalFileMessage)
+                fileBusy = terminalFileBusy, fileMessage = terminalFileMessage, deviceName = state.deviceName)
         }
     } else if (showSetup) {
         SetupScreen(state, actions, onBack = { showSetup = false; returnFocus = "setup-open" })
@@ -283,7 +283,19 @@ private fun MainContent(
             style = MaterialTheme.typography.bodySmall)
         Text(stringResource(if (mode == DeviceMode.TELEVISION) R.string.mode_television else R.string.mode_handheld),
             style = MaterialTheme.typography.bodyMedium)
-        DiagnosticLink(null, "diagnostics-open", onDiagnostics, returnFocus, onFocusRestored, R.string.diagnostics_title)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DiagnosticLink(null, "diagnostics-open", onDiagnostics, returnFocus, onFocusRestored, R.string.diagnostics_title)
+            if (onTerminal != null) {
+                val terminalFocus = remember { FocusRequester() }
+                LaunchedEffect(returnFocus) {
+                    if (returnFocus == "terminal-open") { terminalFocus.requestFocus(); onFocusRestored() }
+                }
+                FilledTonalButton(onClick = onTerminal, shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.focusRequester(terminalFocus).focusProperties { canFocus = true }.testTag("terminal-open")) {
+                    Text(stringResource(R.string.terminal_title))
+                }
+            }
+        }
         if (mode == DeviceMode.TELEVISION) {
             val setupFocus = remember { FocusRequester() }
             LaunchedEffect(returnFocus) {
@@ -303,16 +315,6 @@ private fun MainContent(
             }
         }
         ConnectionStatus(mode, state, actions)
-        if (onTerminal != null) {
-            val terminalFocus = remember { FocusRequester() }
-            LaunchedEffect(returnFocus) {
-                if (returnFocus == "terminal-open") { terminalFocus.requestFocus(); onFocusRestored() }
-            }
-            FilledTonalButton(onClick = onTerminal, shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.focusRequester(terminalFocus).focusProperties { canFocus = true }.testTag("terminal-open")) {
-                Text(stringResource(R.string.terminal_title))
-            }
-        }
         FunctionCard("discovery") {
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {

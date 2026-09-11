@@ -2,7 +2,7 @@ package com.civisrom.tvtimefixer.terminal
 
 import com.civisrom.tvtimefixer.R
 
-data class CommandExample(val id: String, val titleRes: Int, val command: String)
+data class CommandExample(val id: String, val titleRes: Int, val command: String, val availableInApp: Boolean = true)
 data class CommandCategory(val id: String, val titleRes: Int, val examples: List<CommandExample>)
 
 val terminalCatalog: List<CommandCategory> = listOf(
@@ -95,4 +95,4 @@ val terminalCatalog: List<CommandCategory> = listOf(
         CommandExample("services_10", R.string.terminal_example_services_10, "am help"),
         CommandExample("services_11", R.string.terminal_example_services_11, "settings help"),
     )),
-)
+).map { category -> category.copy(examples = category.examples + additionalTerminalExamples[category.id].orEmpty()) } + additionalTerminalCategories

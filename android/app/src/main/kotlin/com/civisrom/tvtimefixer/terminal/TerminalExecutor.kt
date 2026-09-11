@@ -43,12 +43,14 @@ internal class TerminalExecutor(private val files: TerminalFiles, private val se
                 if (args.size != 2) invalid()
                 val local = inputFile(args[0])
                 val remote = if (args[1].endsWith('/')) args[1] + local.name else args[1]
+                session.transferring(remote, local.name, false)
                 local.inputStream().use { AdbFileTransfer(client).push(it, remote, session::progress) }
                 return 0
             }
             "pull" -> {
                 if (args.size !in 1..2) invalid()
                 val name = args.getOrElse(1) { args[0].substringAfterLast('/') }
+                session.transferring(args[0], name, true)
                 files.receive(name) { AdbFileTransfer(client).pull(args[0], it, session::progress) }
                 return 0
             }

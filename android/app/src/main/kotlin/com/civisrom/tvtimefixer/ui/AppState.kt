@@ -42,6 +42,7 @@ data class AppState(
     val usbScanFailed: Boolean = false,
     val usbSystemState: UsbSystemState = UsbSystemState(),
     val deviceInfo: DeviceInfo? = null,
+    val deviceName: String = "",
     val message: UiMessage? = null,
     /**
      * Итог смены сервера времени — отдельно от [message] намеренно.
@@ -78,6 +79,7 @@ data class AppState(
     /** После потери связи сведения и подтверждения от прежнего устройства больше не актуальны. */
     fun connectionLost(): AppState = copy(
         connection = ConnectionState.Disconnected,
+        deviceName = "",
         deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
         ntpChange = null, ntpBeforeTime = null,
         timeCheck = null, timeDiagnosticEventId = null,

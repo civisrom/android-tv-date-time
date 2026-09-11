@@ -46,7 +46,6 @@ class MainActivityTest {
         compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
         compose.onNodeWithTag("terminal-warning-accept").performClick()
         compose.onNodeWithTag("terminal-input").performTextInput("echo terminal-test")
-        compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-run"))
         compose.onNodeWithTag("terminal-run").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("terminal-stop").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-status"))

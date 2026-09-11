@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="error_connection_refused">The connection to this port was refused. Check the current connection port on the TV and enable network debugging; a pairing port cannot be used for connection.</string>
     <string name="error_connection_timeout">The device did not answer in time. Check the address, the authorization prompt on the TV, the shared network and router client isolation. Then reconnect.</string>
     <string name="error_network_unavailable">No route to the device or its address could not be resolved. Connect both devices to an accessible shared network and check the IP address.</string>
@@ -342,7 +342,6 @@
     <string name="terminal_target">Target: %1$s</string>
     <string name="terminal_disconnected">Connect a device on the main screen, or enter adb connect IP:PORT.</string>
     <string name="terminal_draft">Command</string>
-    <string name="terminal_hint">Enter an Android command or adb shell COMMAND.</string>
     <string name="terminal_run">Run</string>
     <string name="terminal_stop">Stop</string>
     <string name="terminal_running">Running…</string>
@@ -357,21 +356,22 @@
     <string name="terminal_copy_failed">Could not copy to clipboard</string>
     <string name="terminal_insert">Insert</string>
     <string name="terminal_copy">Copy command</string>
-    <string name="terminal_follow">Follow output</string>
+    <string name="terminal_follow" formatted="false">Auto-scroll</string>
     <string name="terminal_truncated">Only the latest 65,536 text characters are retained.</string>
-    <string name="terminal_progress">Transferred: %1$d KiB</string>
+    <string name="terminal_progress">Transferred: %1$s (%2$d B)</string>
+    <string name="terminal_progress_bytes">Transferred: %1$d B</string>
     <string name="terminal_search">Find a command or description</string>
     <string name="terminal_no_matches">No commands found</string>
     <string name="terminal_history_empty">Commands from this session will appear here. Selecting one only fills the editor.</string>
     <string name="terminal_history_clear">Clear history</string>
-    <string name="terminal_help_intro">Examples are grouped below. Expand a category; Insert opens the command for editing, without running it. Replace PACKAGE, IP:PORT and example paths. Shell tools and permissions depend on the target firmware.</string>
-    <string name="terminal_limits">Each command uses a new non-interactive shell on the selected device. Pipes, quotes and scripts work there; cd does not carry over. No interactive stdin or binary output in the console. Commands stop after 5 minutes. Use logcat -d or top -b -n 1 for snapshots. The app implements shell, file transfer, APK installation and device services; desktop ADB server options, forward/reverse, fastboot and sideload file flashing are not implemented. devices lists only the connection selected in this app; disconnect closes that connection, including USB. File transfer supports individual files without compression. Installation supports -r, -t, -d, -g, --user, --abi, -i, --instant, --full, --dont-kill and --streaming.</string>
-    <string name="terminal_import">Choose files / APK</string>
-    <string name="terminal_files_hint">Choose documents on this phone or tablet. Their copies are stored in this app. Insert a file name into push/install, or choose Prepare install. pull saves a file here; Export opens the system save dialog. APKs are installed on the selected connected device.</string>
+    <string name="terminal_help_intro" formatted="false">Find a command or expand a category. Insert fills the editor without running. Replace parameters and paths with your own values.</string>
+    <string name="terminal_limits">The reference includes desktop examples and commands from the official ADB reference. Shell commands depend on the firmware: query them using Device command help. Each command uses a new non-interactive shell on the selected device. Pipes, quotes and scripts work there; cd does not carry over. No interactive stdin or binary output in the console. Commands stop after 5 minutes. Use logcat -d or top -b -n 1 for snapshots. The app implements shell, file transfer, APK installation and device services; desktop ADB server options, forward/reverse, fastboot and sideload file flashing are not implemented. devices lists only the connection selected in this app; disconnect closes that connection, including USB. File transfer supports individual files without compression. Installation supports -r, -t, -d, -g, --user, --abi, -i, --instant, --full, --dont-kill and --streaming.</string>
+    <string name="terminal_import" formatted="false">Add files from this device</string>
+    <string name="terminal_files_hint" formatted="false">These are files added from this phone or received from the connected device. Adding a file does not send or install it. Choose an install or send command, review it in the console, then press Run.</string>
     <string name="terminal_files_empty">No imported or received files</string>
-    <string name="terminal_install">Prepare install</string>
-    <string name="terminal_push">Prepare send</string>
-    <string name="terminal_export">Export</string>
+    <string name="terminal_install" formatted="false">APK install command</string>
+    <string name="terminal_push" formatted="false">Send file command</string>
+    <string name="terminal_export" formatted="false">Save to this device</string>
     <string name="terminal_file_busy">Copying document…</string>
     <string name="terminal_file_done">Document copied</string>
     <string name="terminal_file_failed">Could not copy the document. Check access and available space.</string>
@@ -473,4 +473,126 @@
     <string name="terminal_warning_body">Commands run on the selected connected device and can change system settings, install or remove apps, and erase data. An incorrect command may disrupt the device or cause data loss. Check the target device and only run commands whose effects you understand.</string>
     <string name="terminal_warning_accept">Open terminal</string>
     <string name="terminal_warning_cancel">Cancel</string>
+    <string name="terminal_connected" formatted="false">Connected</string>
+    <string name="terminal_not_connected" formatted="false">Not connected</string>
+    <string name="terminal_connect_success">Connected to %1$s.</string>
+    <string name="terminal_connect_failed">Connection failed: %1$s</string>
+    <string name="terminal_device_name">Device model: %1$s</string>
+    <string name="terminal_device_unknown" formatted="false">not reported by the device</string>
+    <string name="terminal_clear_input" formatted="false">Clear command input</string>
+    <string name="terminal_follow_hint" formatted="false">Auto-scroll follows new output. Turn it off to read earlier lines.</string>
+    <string name="terminal_insert_filename" formatted="false">Insert name into command</string>
+    <string name="terminal_files_help_title" formatted="false">What the buttons do</string>
+    <string name="terminal_files_help" formatted="false">Add files from this device opens the system document picker and copies the selected documents or APKs into this list.\n\nAPK install command fills the console with adb install. Run installs the app on the connected device.\n\nSend file command fills the console with adb push. The default destination is /sdcard/Download on the connected device; edit the path before running if needed.\n\nInsert name into command appends the selected file name to the current input without running anything.\n\nDownload from connected device asks for the full remote file path and starts the download after confirmation. The received file appears here.\n\nSave to this device opens the system save dialog and saves a copy from this list to your phone. It does not access the connected device.</string>
+    <string name="terminal_download" formatted="false">Download from connected device…</string>
+    <string name="terminal_download_start" formatted="false">Download</string>
+    <string name="terminal_download_hint" formatted="false">Enter the full path of a file on the connected device. Download copies it into Files and APK. Then use Save to this device to choose a folder on your phone.</string>
+    <string name="terminal_remote_path" formatted="false">File path on the connected device</string>
+    <string name="terminal_external_command" formatted="false">Not executable in this version of the built-in terminal. Copy it for an external ADB client.</string>
+    <string name="terminal_category_help_device" formatted="false">Device command help</string>
+    <string name="terminal_category_pc_options" formatted="false">External ADB: global options</string>
+    <string name="terminal_category_pc_ports" formatted="false">External ADB: port forwarding</string>
+    <string name="terminal_category_pc_tools" formatted="false">External ADB: server and additional commands</string>
+    <string name="terminal_reference_1" formatted="false">Show the selected app connection. device indicates a confirmed connection.</string>
+    <string name="terminal_reference_3" formatted="false">Select one device when several are connected. Copy SERIAL from devices; for a network connection it is normally IP:PORT.</string>
+    <string name="terminal_reference_4" formatted="false">Select the single USB device. USB does not need adb connect.</string>
+    <string name="terminal_reference_5" formatted="false">Disconnect this network device.</string>
+    <string name="terminal_reference_9" formatted="false">Show its transport path, not a directory on the Android filesystem.</string>
+    <string name="terminal_reference_10" formatted="false">Check the ADB mDNS discovery backend.</string>
+    <string name="terminal_reference_11" formatted="false">List advertised debugging addresses and ports; this is not a subnet scan.</string>
+    <string name="terminal_reference_12" formatted="false">Pair for wireless debugging. In this app use the pairing form on the main screen; pairing and connection ports differ.</string>
+    <string name="terminal_reference_13" formatted="false">Switch an already authorized USB device to classic TCP/IP debugging. Requires firmware support; then use adb connect IP:5555.</string>
+    <string name="terminal_reference_14" formatted="false">Restart the device\'s adbd in USB mode; its TCP/IP connection will be lost.</string>
+    <string name="terminal_reference_15" formatted="false">Open this built-in terminal reference.</string>
+    <string name="terminal_reference_16" formatted="false">Open the command reference.</string>
+    <string name="terminal_reference_17" formatted="false">Show the ADB version, not the application or Android version.</string>
+    <string name="terminal_reference_18" formatted="false">-d: single USB device; -e: single TCP/IP device; -s: device identifier; -t: transport_id from devices -l.</string>
+    <string name="terminal_reference_19" formatted="false">Select an ADB server on a computer. PORT is the server port, not the debugging port of the connected device.</string>
+    <string name="terminal_reference_20" formatted="false">Choose a server listening socket, for example tcp:localhost:5039.</string>
+    <string name="terminal_reference_21" formatted="false">Allow the server to listen on all network interfaces.</string>
+    <string name="terminal_reference_22" formatted="false">Restrict a newly started external ADB server to one USB device by serial number or USB address.</string>
+    <string name="terminal_reference_23" formatted="false">Exit if the command\'s stdout is closed.</string>
+    <string name="terminal_reference_24" formatted="false">Copy a local file to the device.</string>
+    <string name="terminal_reference_25" formatted="false">Receive a file from the connected device into Files and APK, then save it to your phone.</string>
+    <string name="terminal_reference_26" formatted="false">--sync: transfer changed files; -n: dry run without storing them; -q: quiet progress; -z: compression; -Z: no compression.</string>
+    <string name="terminal_reference_27" formatted="false">-a: preserve timestamps and modes; -q: hide progress; -z: compression (any, none, brotli, lz4, zstd); -Z: no compression. Requires device support.</string>
+    <string name="terminal_reference_28" formatted="false">List files in this directory.</string>
+    <string name="terminal_reference_30" formatted="false">Rename or move a file; an existing destination may be overwritten.</string>
+    <string name="terminal_reference_31" formatted="false">Delete this file. Plain rm does not remove directories recursively.</string>
+    <string name="terminal_reference_32" formatted="false">Remove an empty directory.</string>
+    <string name="terminal_reference_33" formatted="false">Save a PNG screenshot on the connected device.</string>
+    <string name="terminal_reference_34" formatted="false">Download the previously captured screenshot into Files and APK.</string>
+    <string name="terminal_reference_35" formatted="false">Record 30 seconds of screen video without audio; requires device support.</string>
+    <string name="terminal_reference_36" formatted="false">Download the completed recording. Protected content may not be captured.</string>
+    <string name="terminal_reference_37" formatted="false">Install an APK compatible with this device.</string>
+    <string name="terminal_reference_38" formatted="false">Update an installed app while keeping data; a compatible signature is required.</string>
+    <string name="terminal_reference_39" formatted="false">Install one app from its complete, matching set of split APKs.</string>
+    <string name="terminal_reference_40" formatted="false">Install several packages atomically when supported by the device.</string>
+    <string name="terminal_reference_41" formatted="false">Uninstall an app; -k retains its data and cache. Use adb uninstall -k PACKAGE in the console.</string>
+    <string name="terminal_reference_42" formatted="false">List package identifiers; add -s for system apps or -3 for third-party apps.</string>
+    <string name="terminal_reference_45" formatted="false">Remove the app for that user. User 0 is the owner, not always the active user.</string>
+    <string name="terminal_reference_46" formatted="false">Disable an app for that user, subject to firmware permissions.</string>
+    <string name="terminal_reference_47" formatted="false">Enable the app again for the same user.</string>
+    <string name="terminal_reference_48" formatted="false">Delete the app\'s data for that user, including settings and sign-ins.</string>
+    <string name="terminal_reference_49" formatted="false">Launch the specified accessible activity.</string>
+    <string name="terminal_reference_52" formatted="false">Send a broadcast; protected actions can be denied by Android.</string>
+    <string name="terminal_reference_57" formatted="false">Tap screen coordinates, where supported.</string>
+    <string name="terminal_reference_58" formatted="false">Swipe between coordinates; duration is in milliseconds.</string>
+    <string name="terminal_reference_66" formatted="false">Remove the override so the firmware can use its configured default.</string>
+    <string name="terminal_reference_73" formatted="false">Inspect one listed service, for example display, power or meminfo. network_time_update_service and time_detector can explain time sync if present.</string>
+    <string name="terminal_reference_75" formatted="false">Print the crash buffer and exit.</string>
+    <string name="terminal_reference_76" formatted="false">Stream logs until interrupted; the application\'s 300-second limit applies.</string>
+    <string name="terminal_reference_77" formatted="false">Save a ZIP report with an external ADB client. The built-in console supports textual adb bugreport; reports may contain device and account information.</string>
+    <string name="terminal_reference_78" formatted="false">List processes exposing the Java debugger transport.</string>
+    <string name="terminal_reference_79" formatted="false">List features of the PC\'s ADB server.</string>
+    <string name="terminal_reference_80" formatted="false">List features shared by the server and selected device.</string>
+    <string name="terminal_reference_81" formatted="false">Show the server\'s configuration, backends and paths.</string>
+    <string name="terminal_reference_82" formatted="false">List PC-to-device forwarding rules.</string>
+    <string name="terminal_reference_83" formatted="false" tools:ignore="TypographyDashes">Forward PC port 6100 to device port 7100; --no-rebind rejects an existing rule.</string>
+    <string name="terminal_reference_84" formatted="false">Remove that PC-side forwarding rule.</string>
+    <string name="terminal_reference_85" formatted="false">Remove all forward rules.</string>
+    <string name="terminal_reference_86" formatted="false">List device-to-PC forwarding rules.</string>
+    <string name="terminal_reference_87" formatted="false">Forward device port 7100 to PC port 6100.</string>
+    <string name="terminal_reference_88" formatted="false">Remove that device-side reverse rule.</string>
+    <string name="terminal_reference_89" formatted="false">Remove reverse rules on the selected device.</string>
+    <string name="terminal_reference_90" formatted="false">Start the external ADB server on the computer.</string>
+    <string name="terminal_reference_91" formatted="false">Stop the external ADB server and disconnect all its devices. Affects other applications using that server.</string>
+    <string name="terminal_reference_92" formatted="false">Reconnect the selected transport from the PC side.</string>
+    <string name="terminal_reference_93" formatted="false">Request reconnection from the device side.</string>
+    <string name="terminal_reference_94" formatted="false">Reset offline/unauthorized transports. This does not approve RSA access.</string>
+    <string name="terminal_reference_95" formatted="false">Wait for a device transport in an external ADB client. This does not create a connection or confirm that Android has finished booting.</string>
+    <string name="terminal_reference_96" formatted="false">TRANSPORT: usb, local (TCP/IP), any. STATE: device, recovery, rescue, sideload, bootloader, disconnect. For example wait-for-usb-device. Waiting does not establish a connection or confirm that Android has booted.</string>
+    <string name="terminal_reference_97" formatted="false">Reattach a detached USB device; requires the libusb backend.</string>
+    <string name="terminal_reference_98" formatted="false">Release a USB device for another process; requires libusb.</string>
+    <string name="terminal_reference_100" formatted="false">Reboot into the bootloader, where normal ADB commands are usually unavailable.</string>
+    <string name="terminal_reference_102" formatted="false">Reboot into recovery\'s OTA sideload mode.</string>
+    <string name="terminal_reference_103" formatted="false">Enter sideload mode and reboot automatically after sideloading.</string>
+    <string name="terminal_reference_104" formatted="false">Send and install a compatible OTA package in recovery sideload mode.</string>
+    <string name="terminal_reference_107" formatted="false">Remount applicable partitions writable; -R permits a required reboot.</string>
+    <string name="terminal_reference_108" formatted="false">Disable dm-verity verification on a supported developer build.</string>
+    <string name="terminal_reference_109" formatted="false">Re-enable dm-verity on that build; follow the device\'s reboot instructions.</string>
+    <string name="terminal_reference_110" formatted="false">Generate an ADB private/public key pair on the PC. This does not pair or authorize a TV. The private key must remain private.</string>
+    <string name="terminal_reference_111" formatted="false">Sync an Android build from ANDROID_PRODUCT_OUT, not an arbitrary folder. PARTITION: all, data, odm, oem, product, system, system_ext, vendor. -l lists pending copies; -n dry run; -q quiet. Intended for OS developers with writable targets and a configured external build environment.</string>
+    <string name="terminal_reference_112" formatted="false">Show emulator console commands; only for an Android emulator, not a TV.</string>
+    <string name="terminal_reference_113" formatted="false">Send a command from that console reference to the selected emulator.</string>
+    <string name="terminal_reference_114" formatted="false">Run an Android shell command. -n disables stdin; -T disables PTY; -t requests PTY when attached to a terminal; -tt forces PTY; -e chooses an escape character (or none); -x disables remote exit codes and stdout/stderr separation. Without COMMAND the shell is interactive: use an external terminal for that mode.</string>
+    <string name="terminal_reference_115" formatted="false">Read raw command output. Binary output needs an external terminal; do not use this terminal to redirect a PNG or other binary stream.</string>
+    <string name="terminal_reference_116" formatted="false">Feed stdin to a device command; use an external terminal for file/pipe input.</string>
+    <string name="terminal_reference_118" formatted="false">List Toybox utilities when Toybox is included in the firmware.</string>
+    <string name="terminal_reference_122" formatted="false">Show the selected service\'s own command reference.</string>
+    <string name="terminal_reference_124" formatted="false">Show available input commands; older versions may show help with input alone.</string>
+    <string name="terminal_reference_125" formatted="false">Show diagnostic command options.</string>
+    <string name="terminal_reference_126" formatted="false">Check process-monitor options for this firmware.</string>
+    <string name="terminal_reference_127" formatted="false">Check screen recording options and device limitations.</string>
+    <string name="terminal_reference_128" formatted="false">Show log options for the connected Android version.</string>
+    <string name="terminal_reference_extra_0" formatted="false">Remount supported partitions read-write, usually on an eng/userdebug build.</string>
+    <string name="terminal_reference_extra_1" formatted="false">Read a textual system report; it may include device and account data.</string>
+    <string name="terminal_reference_extra_2" formatted="false">Uninstall an app while retaining data and cache.</string>
+    <string name="terminal_reference_extra_3" formatted="false">Attach the USB device to an external server using libusb.</string>
+    <string name="terminal_reference_extra_4" formatted="false">Release a USB device from an external server for another process.</string>
+    <string name="terminal_reference_extra_5" formatted="false">All package manager commands of this Android version.</string>
+    <string name="terminal_push_complete">File sent to the connected device.</string>
+    <string name="terminal_pull_complete">File downloaded into Files and APK. Use Save to this device to choose a folder.</string>
+    <string name="terminal_remote_file">Path on the connected device: %1$s</string>
+    <string name="terminal_local_file">File in this app: %1$s</string>
 </resources>

@@ -40,6 +40,14 @@ private const val NTP_SETTING = "global ntp_server"
 class DeviceRepository(private val client: AdbClient, private val onFailure: (Exception) -> Unit = {}) {
     private var infoDeadline: Long? = null
 
+    fun readDeviceName(): String {
+        val result = client.shell("getprop")
+        if (result.exitCode != 0) return "" // Model metadata is optional; connection was already probed.
+        val props = parseGetProp(result.output)
+        return DeviceInfo(model = props["ro.product.model"].orEmpty(),
+            manufacturer = props["ro.product.manufacturer"].orEmpty()).displayName
+    }
+
     fun currentNtpServer(): String = client.shell("settings get $NTP_SETTING").let {
         check(it.exitCode == 0 && it.errorOutput.isBlank() && it.trimmedOutput.isNotEmpty()) { "NTP setting read failed" }
         it.trimmedOutput

@@ -80,6 +80,32 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `terminal identification reads only target properties without running full diagnostics`() {
+        val client = FakeDevice()
+        assertEquals("Sony BRAVIA 4K GB", DeviceRepository(client).readDeviceName())
+        assertEquals(listOf("getprop"), client.commands)
+    }
+
+    @Test fun `device display name combines manufacturer and model without duplicating the brand`() {
+        assertEquals("NVIDIA SHIELD Android TV", DeviceInfo(manufacturer = " NVIDIA ", model = "SHIELD Android TV").displayName)
+        assertEquals("NVIDIA SHIELD", DeviceInfo(manufacturer = "nvidia", model = "NVIDIA SHIELD").displayName)
+        assertEquals("SHIELD", DeviceInfo(model = "SHIELD").displayName)
+        assertEquals("NVIDIA", DeviceInfo(manufacturer = "NVIDIA").displayName)
+        assertEquals("", DeviceInfo().displayName)
+        assertEquals("", DeviceInfo(manufacturer = "unknown", model = "null").displayName)
+    }
+
+    @Test fun `missing or rejected model metadata does not turn a confirmed connection into a failure`() {
+        listOf(ShellResult("unavailable", "", 1), ShellResult("[other]: [property]", "", 0)).forEach { result ->
+            val client = object : AdbClient {
+                override fun shell(command: String) = result
+                override fun isAlive() = true
+                override fun close() = error("Metadata lookup must not close the connection")
+            }
+            assertEquals("", DeviceRepository(client).readDeviceName())
+        }
+    }
+
     @Test fun `system reset and undo preserve a modern multi-server setting`() {
         val raw = "ntp://time.example.org:1123|ntp://other.example.org"
         val device = FakeDevice(ntpServer = raw)

@@ -130,12 +130,16 @@ replace troubleshooting other network faults.
     a Stop button, and a choice of domain name or resolved IP address.
 *   USB host/OTG with device selection and discovery diagnostics.
 *   An ADB terminal with Android shell commands, streaming output, Stop,
-    session history, and searchable help in nine collapsible categories.
+    session history, and 169 examples in 13 collapsible reference categories.
+    Output scrolls independently of the editor and controls; history and category
+    titles are left aligned. Connection status and the device model are visible.
     A warning appears before entry; inserting an example never runs it.
 *   Install APKs and split APKs from a phone or tablet on the connected device
     over network ADB or USB. Choose documents in Files and APK, prepare the
     installation command, then press Run. `adb push` and `adb pull` support
-    individual files; received files can be exported.
+    individual files; results show the remote path and exact byte count.
+    Download from device asks for the remote path; Save to phone exports the
+    received file through the system document dialog.
 *   A local operation history through Diagnostics, report copying and clearing.
     Logs are never sent automatically.
 *   Android TV remote navigation, large fonts and landscape layouts.
@@ -148,6 +152,8 @@ refer to documents in Files and APK. This is an embedded client: interactive
 TTY, desktop ADB server options, `forward/reverse`, `fastboot`, `sideload`
 flashing, recursive directory transfers, and all Platform Tools flags are
 not implemented. The reference explains supported syntax and compatibility.
+Auto-scroll follows the latest lines; manual scrolling pauses it. The cross in
+the editor clears the draft; Clear output clears the command result.
 
 ## Getting started
 

@@ -42,13 +42,30 @@ class TerminalCommandTest {
         assertEquals(TerminalCommand.Shell("clear; echo ok"), parseTerminalCommand("clear; echo ok"))
     }
 
-    @Test fun `every catalog example is accepted and IDs and commands are unique`() {
+    @Test fun `executable catalog examples are accepted and reference identifiers are unique`() {
         val examples = terminalCatalog.flatMap { it.examples }
         assertTrue(examples.size >= 60)
         assertEquals(examples.size, examples.map { it.id }.toSet().size)
         assertEquals(examples.size, examples.map { it.command }.toSet().size)
-        examples.forEach { parseTerminalCommand(it.command) }
-        assertEquals(9, terminalCatalog.size)
+        examples.filter { it.availableInApp }.forEach { parseTerminalCommand(it.command) }
+        assertEquals(terminalCatalog.size, terminalCatalog.map { it.id }.toSet().size)
+        assertTrue(terminalCatalog.filter { it.id.startsWith("pc_") }.flatMap { it.examples }.all { !it.availableInApp })
+    }
+
+    @Test fun `reference covers the public host commands listed by Platform Tools 37 and AOSP adb manpage`() {
+        val commands = terminalCatalog.flatMap { it.examples }.map { it.command }
+        val publicCommands = listOf("devices", "help", "version", "connect", "disconnect", "pair", "forward", "reverse",
+            "mdns", "push", "pull", "sync", "shell", "emu", "install", "install-multiple", "install-multi-package",
+            "uninstall", "bugreport", "jdwp", "logcat", "disable-verity", "enable-verity", "keygen", "wait-for-device",
+            "get-state", "get-serialno", "get-devpath", "remount", "reboot", "sideload", "root", "unroot", "usb", "tcpip",
+            "start-server", "kill-server", "reconnect", "attach", "detach", "host-features", "features", "server-status")
+        publicCommands.forEach { name ->
+            assertTrue("Missing ADB reference: $name", commands.any { it == "adb $name" || it.startsWith("adb $name ") })
+        }
+        // Device-provided help is needed because Android versions and vendor firmware expose different shell tools.
+        listOf("cmd -l", "pm help", "am help", "toybox").forEach { name ->
+            assertTrue("Missing device help: $name", commands.any { it.removePrefix("adb shell ") == name })
+        }
     }
 
     @Test fun `shell quoting roundtrips local filenames including apostrophes`() {

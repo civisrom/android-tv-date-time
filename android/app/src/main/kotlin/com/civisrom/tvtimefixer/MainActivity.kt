@@ -57,6 +57,7 @@ import com.civisrom.tvtimefixer.ui.AppState
 import com.civisrom.tvtimefixer.ui.MainScreen
 import com.civisrom.tvtimefixer.ui.UiMessage
 import com.civisrom.tvtimefixer.ui.toUiMessage
+import com.civisrom.tvtimefixer.ui.messageRes
 import com.civisrom.tvtimefixer.ui.rejectionMessageRes
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
@@ -179,7 +180,7 @@ class MainActivity : ComponentActivity() {
             if (state.busy || terminalFileBusy) return
             if (state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress && !networkAllowed()) return
             val command = terminal.start(state.connection.takeIf { state.connected }?.targetOrNull()?.toString()
-                ?: getString(R.string.terminal_unknown_target)) ?: return
+                ?: getString(R.string.terminal_unknown_target), state.deviceName) ?: return
             val generation = ++actionGeneration
             state = state.copy(busy = true, operation = Operation.TERMINAL, message = null, diagnosticEventId = null)
             actionJob = lifecycleScope.launch {
@@ -195,8 +196,20 @@ class MainActivity : ComponentActivity() {
                                 if (!networkAllowed()) throw TerminalException(TerminalProblem.CONNECTION)
                                 val connection = runInterruptible(Dispatchers.IO) { connector.connect(adb.arguments.single()) }
                                 state = state.connectionLost().copy(connection = connection)
-                                if (connection !is ConnectionState.Connected) throw TerminalException(TerminalProblem.CONNECTION)
-                                terminal.append(connection.address.toString())
+                                if (connection !is ConnectionState.Connected) {
+                                    val reason = (connection as? ConnectionState.Failed)?.reason
+                                    terminal.append(getString(R.string.terminal_connect_failed,
+                                        getString(reason?.messageRes() ?: R.string.terminal_connection_error)) + "\n", true)
+                                    throw TerminalException(TerminalProblem.CONNECTION)
+                                }
+                                terminal.append(getString(R.string.terminal_connect_success, connection.address.toString()) + "\n")
+                                val name = runInterruptible(Dispatchers.IO) {
+                                    val client = connector.activeClient ?: throw TerminalException(TerminalProblem.CONNECTION)
+                                    DeviceRepository(client).readDeviceName()
+                                }
+                                state = state.copy(deviceName = name)
+                                terminal.identifyTarget(connection.address.toString(), name)
+                                if (name.isNotBlank()) terminal.append(getString(R.string.terminal_device_name, name) + "\n")
                                 terminal.finish(0)
                             }
                             "disconnect" -> {
@@ -233,7 +246,7 @@ class MainActivity : ComponentActivity() {
                             else -> {
                                 if (!state.connected) throw TerminalException(TerminalProblem.CONNECTION)
                                 // Arbitrary shell commands can change any cached setting.
-                                state = state.connectionLost().copy(connection = state.connection)
+                                state = state.connectionLost().copy(connection = state.connection, deviceName = state.deviceName)
                                 val exit = runInterruptible(Dispatchers.IO) {
                                     val client = connector.activeClient ?: throw TerminalException(TerminalProblem.CONNECTION)
                                     TerminalExecutor(terminalFiles, terminal).execute(client, command)
@@ -935,7 +948,7 @@ class MainActivity : ComponentActivity() {
      * ненажатой — отличить одно от другого было нечем.
      */
     private suspend fun AppState.withDeviceData(trace: OperationTrace): AppState {
-        val clean = copy(deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
+        val clean = copy(deviceInfo = null, deviceName = "", ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
             timeZoneResult = null, timeZoneDiagnosticEventId = null, timeCheck = null, timeDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
         return runInterruptible(Dispatchers.IO) {
@@ -944,7 +957,7 @@ class MainActivity : ComponentActivity() {
                 message = UiMessage(R.string.error_unreachable),
             )
             runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
-                onSuccess = { clean.copy(deviceInfo = it) },
+                onSuccess = { clean.copy(deviceInfo = it, deviceName = it.displayName) },
                 onFailure = {
                     if (it is CancellationException) throw it
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,

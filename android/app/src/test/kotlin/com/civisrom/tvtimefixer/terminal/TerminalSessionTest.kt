@@ -6,6 +6,32 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TerminalSessionTest {
+    @Test fun `successful connect identifies the new target without changing the command history`() {
+        val session = TerminalSession().apply { edit("adb connect 192.0.2.1:5555"); start("not connected") }
+        session.identifyTarget("192.0.2.1:5555", "NVIDIA SHIELD")
+        session.append("Connected"); session.finish(0)
+        assertEquals("192.0.2.1:5555", session.state.value.target)
+        assertEquals("NVIDIA SHIELD", session.state.value.targetName)
+        assertEquals(listOf("adb connect 192.0.2.1:5555"), session.state.value.history)
+        assertEquals(TerminalStatus.COMPLETE, session.state.value.status)
+    }
+
+    @Test fun `clearing the draft retains output history and the target of the executed command`() {
+        val session = TerminalSession().apply {
+            edit("adb push a.txt /sdcard/a.txt"); start("192.0.2.1:5555", "NVIDIA SHIELD")
+            transferring("/sdcard/a.txt", "a.txt", false); progress(7); append("Success"); finish(0)
+        }
+        val before = session.state.value
+        session.edit("")
+        assertEquals(before.copy(draft = ""), session.state.value)
+        session.clearOutput()
+        assertEquals(before.history, session.state.value.history)
+        assertTrue(session.state.value.output.isEmpty())
+        assertEquals("", session.state.value.targetName)
+        assertNull(session.state.value.transfer)
+        assertNull(session.state.value.transferred)
+    }
+
     @Test fun `IME updates and editing the next command preserve the previous failure`() {
         val session = TerminalSession()
         session.edit("echo test"); session.start("TV")

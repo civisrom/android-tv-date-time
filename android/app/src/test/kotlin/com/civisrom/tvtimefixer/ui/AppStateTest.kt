@@ -58,6 +58,7 @@ class AppStateTest {
     @Test fun `потеря связи убирает прежние сведения об устройстве и подтверждения времени`() {
         val usb = UsbDeviceAddress("/dev/bus/usb/test", "TV")
         val connected = AppState(connection = ConnectionState.Connected(address),
+            deviceName = "NVIDIA SHIELD",
             deviceInfo = DeviceInfo(model = "TV", currentNtpServer = "pool.ntp.org"),
             ntpMessage = UiMessage(R.string.ntp_applied), ntpDiagnosticEventId = 1L,
             timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH), timeDiagnosticEventId = 2L,
@@ -66,6 +67,7 @@ class AppStateTest {
         val lost = connected.connectionLost()
         assertFalse(lost.connected)
         assertNull(lost.deviceInfo)
+        assertEquals("", lost.deviceName)
         assertEquals("", lost.currentNtpServer)
         assertNull(lost.ntpMessage)
         assertNull(lost.ntpDiagnosticEventId)

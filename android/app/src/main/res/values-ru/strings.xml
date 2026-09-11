@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="error_connection_refused">Подключение к этому порту отклонено. Проверьте актуальный порт подключения на TV и включите сетевую отладку; порт спаривания для подключения не подходит.</string>
     <string name="error_connection_timeout">Устройство не ответило вовремя. Проверьте адрес, запрос разрешения на TV, общую сеть и изоляцию клиентов в роутере. Затем повторите подключение.</string>
     <string name="error_network_unavailable">Нет маршрута к устройству или не удалось определить адрес. Подключите оба устройства к одной доступной сети и проверьте IP-адрес.</string>
@@ -342,7 +342,6 @@
     <string name="terminal_target">Устройство: %1$s</string>
     <string name="terminal_disconnected">Подключите устройство на главном экране или введите adb connect IP:PORT.</string>
     <string name="terminal_draft">Команда</string>
-    <string name="terminal_hint">Введите команду Android или adb shell КОМАНДА.</string>
     <string name="terminal_run">Выполнить</string>
     <string name="terminal_stop">Остановить</string>
     <string name="terminal_running">Выполняется…</string>
@@ -357,21 +356,22 @@
     <string name="terminal_copy_failed">Не удалось скопировать в буфер</string>
     <string name="terminal_insert">Вставить</string>
     <string name="terminal_copy">Копировать команду</string>
-    <string name="terminal_follow">Следить за выводом</string>
+    <string name="terminal_follow" formatted="false">Автопрокрутка</string>
     <string name="terminal_truncated">Сохраняются последние 65 536 символов вывода.</string>
-    <string name="terminal_progress">Передано: %1$d КиБ</string>
+    <string name="terminal_progress">Передано: %1$s (%2$d Б)</string>
+    <string name="terminal_progress_bytes">Передано: %1$d Б</string>
     <string name="terminal_search">Найти команду или описание</string>
     <string name="terminal_no_matches">Команды не найдены</string>
     <string name="terminal_history_empty">Здесь появятся команды текущего сеанса. Выбор команды только заполняет поле ввода.</string>
     <string name="terminal_history_clear">Очистить историю</string>
-    <string name="terminal_help_intro">Примеры сгруппированы ниже. Раскройте категорию: «Вставить» перенесёт команду в поле для редактирования без запуска. Замените PACKAGE, IP:PORT и пути из примеров. Набор shell-команд и права зависят от прошивки устройства.</string>
-    <string name="terminal_limits">Каждая команда запускается в новой неинтерактивной оболочке выбранного устройства. Поддерживаются кавычки, конвейеры и скрипты; cd не сохраняется между запусками. В консоли нет интерактивного ввода stdin и двоичного вывода. Лимит команды — 5 минут. Для снимка состояния используйте logcat -d или top -b -n 1. Приложение реализует shell, передачу файлов, установку APK и сервисы устройства; параметры компьютерного сервера ADB, forward/reverse, fastboot и прошивка файлов через sideload не реализованы. devices показывает только выбранное в приложении подключение; disconnect закрывает его, включая USB. Передаются отдельные файлы без сжатия. Установка поддерживает -r, -t, -d, -g, --user, --abi, -i, --instant, --full, --dont-kill и --streaming.</string>
-    <string name="terminal_import">Выбрать файлы / APK</string>
-    <string name="terminal_files_hint">Выберите документы на этом смартфоне или планшете. Их копии сохраняются в приложении. Вставьте имя файла в push/install или выберите «Подготовить установку». pull сохраняет файл сюда; «Экспорт» открывает системный диалог сохранения. Команды устанавливают APK на подключённое устройство.</string>
+    <string name="terminal_help_intro" formatted="false">Найдите команду или раскройте категорию. «Вставить» заполнит строку без запуска. Замените параметры и пути своими значениями.</string>
+    <string name="terminal_limits">Справка включает примеры десктопной версии и команды официального справочника ADB. Набор shell-команд зависит от прошивки: запросите его в категории «Справка самого устройства». Каждая команда запускается в новой неинтерактивной оболочке выбранного устройства. Поддерживаются кавычки, конвейеры и скрипты; cd не сохраняется между запусками. В консоли нет интерактивного ввода stdin и двоичного вывода. Лимит команды — 5 минут. Для снимка состояния используйте logcat -d или top -b -n 1. Приложение реализует shell, передачу файлов, установку APK и сервисы устройства; параметры компьютерного сервера ADB, forward/reverse, fastboot и прошивка файлов через sideload не реализованы. devices показывает только выбранное в приложении подключение; disconnect закрывает его, включая USB. Передаются отдельные файлы без сжатия. Установка поддерживает -r, -t, -d, -g, --user, --abi, -i, --instant, --full, --dont-kill и --streaming.</string>
+    <string name="terminal_import" formatted="false">Добавить файлы с телефона</string>
+    <string name="terminal_files_hint" formatted="false">Здесь находятся файлы, добавленные с телефона или полученные с подключённого устройства. Добавление файла само по себе ничего не отправляет и не устанавливает. Для отправки или установки выберите соответствующую команду, проверьте её в консоли и нажмите «Выполнить».</string>
     <string name="terminal_files_empty">Нет импортированных или полученных файлов</string>
-    <string name="terminal_install">Подготовить установку</string>
-    <string name="terminal_push">Подготовить отправку</string>
-    <string name="terminal_export">Экспорт</string>
+    <string name="terminal_install" formatted="false">Команда установки APK</string>
+    <string name="terminal_push" formatted="false">Команда отправки</string>
+    <string name="terminal_export" formatted="false">Сохранить на телефон</string>
     <string name="terminal_file_busy">Копирование документа…</string>
     <string name="terminal_file_done">Документ скопирован</string>
     <string name="terminal_file_failed">Не удалось скопировать документ. Проверьте доступ и свободное место.</string>
@@ -473,4 +473,126 @@
     <string name="terminal_warning_body">Команды выполняются на выбранном подключённом устройстве и могут изменять системные настройки, устанавливать или удалять приложения и стирать данные. Ошибочная команда может нарушить работу устройства или привести к потере данных. Проверяйте устройство назначения и выполняйте только команды, действие которых вам понятно.</string>
     <string name="terminal_warning_accept">Открыть терминал</string>
     <string name="terminal_warning_cancel">Отмена</string>
+    <string name="terminal_connected" formatted="false">Подключено</string>
+    <string name="terminal_not_connected" formatted="false">Не подключено</string>
+    <string name="terminal_connect_success">Подключено к %1$s.</string>
+    <string name="terminal_connect_failed">Не удалось подключиться: %1$s</string>
+    <string name="terminal_device_name">Модель устройства: %1$s</string>
+    <string name="terminal_device_unknown" formatted="false">устройство не сообщило модель</string>
+    <string name="terminal_clear_input" formatted="false">Очистить командную строку</string>
+    <string name="terminal_follow_hint" formatted="false">Автопрокрутка показывает последние строки ответа. Отключите её, чтобы читать предыдущие строки.</string>
+    <string name="terminal_insert_filename" formatted="false">Вставить имя в команду</string>
+    <string name="terminal_files_help_title" formatted="false">Что делают кнопки</string>
+    <string name="terminal_files_help" formatted="false">Добавить файлы с телефона — выбрать документы или APK через системный диалог; их копии появятся в этом списке.\n\nКоманда установки APK — вставить adb install в консоль. После «Выполнить» приложение установится на подключённом устройстве.\n\nКоманда отправки — вставить adb push. По умолчанию файл отправляется в /sdcard/Download на подключённом устройстве; путь можно изменить до запуска.\n\nВставить имя в команду — дописать имя выбранного файла в текущую командную строку. Ничего не запускает.\n\nСкачать с устройства — указать полный путь к файлу на подключённом устройстве и подтвердить скачивание. Полученный файл появится здесь.\n\nСохранить на телефон — выбрать папку на телефоне и сохранить в неё копию файла из этого списка. Это действие не обращается к подключённому устройству.</string>
+    <string name="terminal_download" formatted="false">Скачать с устройства…</string>
+    <string name="terminal_download_start" formatted="false">Скачать</string>
+    <string name="terminal_download_hint" formatted="false">Укажите полный путь к файлу на подключённом устройстве. После нажатия «Скачать» файл появится в разделе «Файлы и APK». Кнопкой «Сохранить на телефон» можно затем выбрать папку на телефоне.</string>
+    <string name="terminal_remote_path" formatted="false">Путь к файлу на подключённом устройстве</string>
+    <string name="terminal_external_command" formatted="false">В этой версии встроенного терминала не выполняется. Команду можно скопировать для внешнего клиента ADB.</string>
+    <string name="terminal_category_help_device" formatted="false">Справка самого устройства</string>
+    <string name="terminal_category_pc_options" formatted="false">Внешний ADB: общие параметры</string>
+    <string name="terminal_category_pc_ports" formatted="false">Внешний ADB: перенаправление портов</string>
+    <string name="terminal_category_pc_tools" formatted="false">Внешний ADB: сервер и дополнительные команды</string>
+    <string name="terminal_reference_1" formatted="false">Показать выбранное подключение приложения. device означает, что связь подтверждена.</string>
+    <string name="terminal_reference_3" formatted="false">Выбрать устройство, если подключено несколько. SERIAL возьмите из devices; для сетевого подключения это обычно IP:PORT.</string>
+    <string name="terminal_reference_4" formatted="false">Выбрать единственное USB-устройство. Для USB команда adb connect не нужна.</string>
+    <string name="terminal_reference_5" formatted="false">Отключить это сетевое устройство.</string>
+    <string name="terminal_reference_9" formatted="false">Показать путь транспорта, а не каталог в файловой системе Android.</string>
+    <string name="terminal_reference_10" formatted="false">Проверить доступность механизма обнаружения mDNS в ADB.</string>
+    <string name="terminal_reference_11" formatted="false">Показать объявленные адреса и порты отладки; это не сканирование подсети.</string>
+    <string name="terminal_reference_12" formatted="false">Спаривание для беспроводной отладки. Во встроенном приложении используйте форму спаривания на главном экране; порт спаривания отличается от порта подключения.</string>
+    <string name="terminal_reference_13" formatted="false">Переключить уже авторизованное USB-устройство на классическую отладку TCP/IP. Требуется поддержка прошивки; после этого выполните adb connect IP:5555.</string>
+    <string name="terminal_reference_14" formatted="false">Перезапустить adbd устройства в режиме USB; соединение TCP/IP разорвётся.</string>
+    <string name="terminal_reference_15" formatted="false">Открыть эту справку встроенного терминала.</string>
+    <string name="terminal_reference_16" formatted="false">Открыть справку команд.</string>
+    <string name="terminal_reference_17" formatted="false">Версия ADB, а не программы или Android.</string>
+    <string name="terminal_reference_18" formatted="false">-d: единственное USB; -e: единственное TCP/IP-устройство; -s: идентификатор устройства; -t: transport_id из devices -l.</string>
+    <string name="terminal_reference_19" formatted="false">Выбрать ADB-сервер на компьютере. PORT — порт сервера, а не порт отладки подключённого устройства.</string>
+    <string name="terminal_reference_20" formatted="false">Выбрать сокет сервера, например tcp:localhost:5039.</string>
+    <string name="terminal_reference_21" formatted="false">Разрешить серверу слушать все сетевые интерфейсы.</string>
+    <string name="terminal_reference_22" formatted="false">Ограничить новый сервер одним USB-устройством по серийному номеру или USB-адресу. Параметр применяется при запуске внешнего сервера.</string>
+    <string name="terminal_reference_23" formatted="false">Завершить команду, если её поток stdout закрыт.</string>
+    <string name="terminal_reference_24" formatted="false">Скопировать локальный файл на устройство.</string>
+    <string name="terminal_reference_25" formatted="false">Получить файл с подключённого устройства в раздел «Файлы и APK»; затем его можно сохранить на телефон.</string>
+    <string name="terminal_reference_26" formatted="false">--sync: передавать изменившиеся файлы; -n: проба без сохранения файлов; -q: скрыть прогресс; -z: выбрать сжатие; -Z: отключить сжатие.</string>
+    <string name="terminal_reference_27" formatted="false">-a: сохранить время и права доступа; -q: скрыть прогресс; -z: сжатие (any, none, brotli, lz4, zstd); -Z: без сжатия. Нужна поддержка устройства.</string>
+    <string name="terminal_reference_28" formatted="false">Показать файлы в этом каталоге.</string>
+    <string name="terminal_reference_30" formatted="false">Переместить или переименовать файл; существующий целевой файл может замениться.</string>
+    <string name="terminal_reference_31" formatted="false">Удалить этот файл. Обычный rm не удаляет каталоги рекурсивно.</string>
+    <string name="terminal_reference_32" formatted="false">Удалить пустой каталог.</string>
+    <string name="terminal_reference_33" formatted="false">Сохранить снимок экрана PNG на подключённом устройстве.</string>
+    <string name="terminal_reference_34" formatted="false">Скачать ранее созданный снимок экрана в «Файлы и APK».</string>
+    <string name="terminal_reference_35" formatted="false">Записать 30 секунд экрана без звука; нужна поддержка устройства.</string>
+    <string name="terminal_reference_36" formatted="false">Скачать завершённую запись. Защищённое содержимое может не попасть в кадр.</string>
+    <string name="terminal_reference_37" formatted="false">Установить совместимый с устройством APK.</string>
+    <string name="terminal_reference_38" formatted="false">Обновить приложение с сохранением данных; требуется совместимая подпись.</string>
+    <string name="terminal_reference_39" formatted="false">Установить одно приложение из полного набора совместимых split APK.</string>
+    <string name="terminal_reference_40" formatted="false">Атомарно установить несколько пакетов, если это поддерживает устройство.</string>
+    <string name="terminal_reference_41" formatted="false">Удалить приложение; -k сохраняет его данные и кэш. В консоли можно использовать adb uninstall -k PACKAGE.</string>
+    <string name="terminal_reference_42" formatted="false">Показать имена пакетов; добавьте -s для системных или -3 для сторонних.</string>
+    <string name="terminal_reference_45" formatted="false">Удалить приложение для этого пользователя. 0 — владелец, не всегда текущий.</string>
+    <string name="terminal_reference_46" formatted="false">Отключить приложение для пользователя, если прошивка разрешает.</string>
+    <string name="terminal_reference_47" formatted="false">Снова включить приложение для того же пользователя.</string>
+    <string name="terminal_reference_48" formatted="false">Стереть данные приложения для пользователя, включая настройки и входы.</string>
+    <string name="terminal_reference_49" formatted="false">Запустить указанную доступную Activity приложения.</string>
+    <string name="terminal_reference_52" formatted="false">Отправить широковещательное сообщение; защищённые действия Android отклонит.</string>
+    <string name="terminal_reference_57" formatted="false">Нажать в координатах экрана, если устройство поддерживает.</string>
+    <string name="terminal_reference_58" formatted="false">Провести между координатами; длительность задаётся в миллисекундах.</string>
+    <string name="terminal_reference_66" formatted="false">Удалить переопределение, чтобы прошивка использовала своё значение по умолчанию.</string>
+    <string name="terminal_reference_73" formatted="false">Диагностика выбранной службы, например display, power или meminfo. network_time_update_service и time_detector помогают проверить время, если есть.</string>
+    <string name="terminal_reference_75" formatted="false">Вывести буфер ошибок приложений и завершиться.</string>
+    <string name="terminal_reference_76" formatted="false">Непрерывный журнал до прерывания; действует лимит программы 300 секунд.</string>
+    <string name="terminal_reference_77" formatted="false">Сохранить ZIP-отчёт через внешний клиент ADB. Во встроенной консоли доступен текстовый adb bugreport; он может содержать данные устройства и аккаунтов.</string>
+    <string name="terminal_reference_78" formatted="false">Список процессов, предоставляющих транспорт отладчика Java.</string>
+    <string name="terminal_reference_79" formatted="false">Возможности ADB-сервера на ПК.</string>
+    <string name="terminal_reference_80" formatted="false">Общие возможности сервера и выбранного устройства.</string>
+    <string name="terminal_reference_81" formatted="false">Конфигурация сервера, его механизмы USB/mDNS и используемые пути.</string>
+    <string name="terminal_reference_82" formatted="false">Список перенаправлений с ПК на устройство.</string>
+    <string name="terminal_reference_83" formatted="false" tools:ignore="TypographyDashes">Порт 6100 ПК на порт 7100 устройства; --no-rebind запрещает замену правила.</string>
+    <string name="terminal_reference_84" formatted="false">Удалить это перенаправление со стороны ПК.</string>
+    <string name="terminal_reference_85" formatted="false">Удалить все правила forward.</string>
+    <string name="terminal_reference_86" formatted="false">Список перенаправлений с устройства на ПК.</string>
+    <string name="terminal_reference_87" formatted="false">Порт 7100 устройства на порт 6100 ПК.</string>
+    <string name="terminal_reference_88" formatted="false">Удалить это обратное перенаправление.</string>
+    <string name="terminal_reference_89" formatted="false">Удалить правила reverse выбранного устройства.</string>
+    <string name="terminal_reference_90" formatted="false">Запустить сервер внешнего клиента ADB на компьютере.</string>
+    <string name="terminal_reference_91" formatted="false">Остановить внешний ADB-сервер и отключить все его устройства. Затрагивает другие программы, использующие этот сервер.</string>
+    <string name="terminal_reference_92" formatted="false">Переподключить выбранный транспорт со стороны ПК.</string>
+    <string name="terminal_reference_93" formatted="false">Запросить переподключение со стороны устройства.</string>
+    <string name="terminal_reference_94" formatted="false">Сбросить соединения offline/unauthorized. Это не подтверждает доступ по RSA.</string>
+    <string name="terminal_reference_95" formatted="false">Дождаться соединения во внешнем клиенте ADB. Команда не создаёт новое подключение и не означает, что Android полностью загрузился.</string>
+    <string name="terminal_reference_96" formatted="false">TRANSPORT: usb, local (TCP/IP), any. STATE: device, recovery, rescue, sideload, bootloader, disconnect. Например, wait-for-usb-device. Ожидание не создаёт соединение и не подтверждает полную загрузку Android.</string>
+    <string name="terminal_reference_97" formatted="false">Вернуть отсоединённое USB-устройство этому серверу; нужен механизм libusb.</string>
+    <string name="terminal_reference_98" formatted="false">Освободить USB-устройство для другого процесса; нужен libusb.</string>
+    <string name="terminal_reference_100" formatted="false">Перезагрузка в загрузчик; обычные команды ADB там, как правило, недоступны.</string>
+    <string name="terminal_reference_102" formatted="false">Перезагрузка в режим установки OTA через recovery.</string>
+    <string name="terminal_reference_103" formatted="false">Войти в sideload и автоматически перезагрузиться после установки.</string>
+    <string name="terminal_reference_104" formatted="false">Передать и установить совместимый пакет OTA в режиме recovery sideload.</string>
+    <string name="terminal_reference_107" formatted="false">Перемонтировать поддерживаемые разделы для записи; -R разрешает перезагрузку.</string>
+    <string name="terminal_reference_108" formatted="false">Отключить проверку dm-verity на совместимой сборке разработчика.</string>
+    <string name="terminal_reference_109" formatted="false">Включить dm-verity обратно; выполните указания устройства о перезагрузке.</string>
+    <string name="terminal_reference_110" formatted="false">Создать закрытый и открытый ADB-ключи на ПК. Команда не спаривает TV и не выдаёт доступ к нему. Закрытый ключ должен оставаться секретным.</string>
+    <string name="terminal_reference_111" formatted="false">Синхронизировать сборку Android из ANDROID_PRODUCT_OUT, не произвольную папку. PARTITION: all, data, odm, oem, product, system, system_ext, vendor. -l: список будущих копирований; -n: проба; -q: без прогресса. Для разработчиков ОС с доступными для записи разделами и настроенным внешним окружением сборки.</string>
+    <string name="terminal_reference_112" formatted="false">Справка консоли эмулятора Android; к физическому телевизору не относится.</string>
+    <string name="terminal_reference_113" formatted="false">Выполнить команду из этой справки консоли на выбранном эмуляторе.</string>
+    <string name="terminal_reference_114" formatted="false">Выполнить команду Android. -n: не читать stdin; -T: без псевдотерминала; -t: запросить его при наличии терминала; -tt: запросить принудительно; -e: символ выхода (или none); -x: отключить коды завершения Android и разделение stdout/stderr. Без COMMAND открывается интерактивная оболочка: для неё используйте внешнюю консоль.</string>
+    <string name="terminal_reference_115" formatted="false">Получить сырой вывод команды. Для двоичных данных нужна внешняя консоль; не перенаправляйте PNG и другие двоичные потоки через этот терминал.</string>
+    <string name="terminal_reference_116" formatted="false">Передать stdin команде устройства; для файла или конвейера нужна внешняя консоль.</string>
+    <string name="terminal_reference_118" formatted="false">Список утилит Toybox, если он включён в прошивку.</string>
+    <string name="terminal_reference_122" formatted="false">Справка команд выбранной службы.</string>
+    <string name="terminal_reference_124" formatted="false">Доступные команды ввода; на старых версиях справку может дать input без аргументов.</string>
+    <string name="terminal_reference_125" formatted="false">Параметры системной диагностики.</string>
+    <string name="terminal_reference_126" formatted="false">Параметры просмотра процессов именно этой прошивки.</string>
+    <string name="terminal_reference_127" formatted="false">Параметры записи экрана и ограничения устройства.</string>
+    <string name="terminal_reference_128" formatted="false">Параметры журналов подключённой версии Android.</string>
+    <string name="terminal_reference_extra_0" formatted="false">Перемонтировать поддерживаемые разделы для записи. Обычно нужна сборка eng/userdebug.</string>
+    <string name="terminal_reference_extra_1" formatted="false">Получить текстовый системный отчёт. Он может содержать данные устройства и аккаунтов.</string>
+    <string name="terminal_reference_extra_2" formatted="false">Удалить приложение, сохранив его данные и кэш.</string>
+    <string name="terminal_reference_extra_3" formatted="false">Вернуть USB-устройство внешнему серверу с механизмом libusb.</string>
+    <string name="terminal_reference_extra_4" formatted="false">Освободить USB-устройство внешнего сервера для другого процесса.</string>
+    <string name="terminal_reference_extra_5" formatted="false">Все команды менеджера пакетов этой версии Android.</string>
+    <string name="terminal_push_complete">Файл отправлен на подключённое устройство.</string>
+    <string name="terminal_pull_complete">Файл скачан в «Файлы и APK». Нажмите «Сохранить на телефон», чтобы выбрать папку.</string>
+    <string name="terminal_remote_file">Путь на подключённом устройстве: %1$s</string>
+    <string name="terminal_local_file">Файл в приложении: %1$s</string>
 </resources>

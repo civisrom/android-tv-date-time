@@ -128,6 +128,29 @@ class TerminalExecutorTest {
         assertArrayEquals(bytes, files.resolve("received.bin").readBytes())
     }
 
+    @Test fun `small and empty uploads report exact bytes and the resolved remote filename`() {
+        listOf(0, 7, 684).forEach { size ->
+            file("file $size.txt", ByteArray(size) { 42 })
+            val session = TerminalSession().apply {
+                edit("adb push 'file $size.txt' /sdcard/Download/"); start("SHIELD")
+            }
+            val client = ServiceClient().apply { responses += Buffer().writeUtf8("OKAY").writeIntLe(0) }
+            session.finish(executor(session).execute(client, parseTerminalCommand(session.state.value.draft)))
+            assertEquals(0, session.state.value.exitCode)
+            assertEquals(size.toLong(), session.state.value.transferred)
+            assertEquals(TerminalTransfer("/sdcard/Download/file $size.txt", "file $size.txt", false), session.state.value.transfer)
+        }
+    }
+
+    @Test fun `download without local argument reports the filename available for export`() {
+        val client = ServiceClient().apply { responses += response("DATA", "seven!!".toByteArray()).writeUtf8("DONE").writeIntLe(0) }
+        val session = TerminalSession().apply { edit("adb pull '/sdcard/Download/my file.txt'"); start("SHIELD") }
+        session.finish(executor(session).execute(client, parseTerminalCommand(session.state.value.draft)))
+        assertEquals(TerminalTransfer("/sdcard/Download/my file.txt", "my file.txt", true), session.state.value.transfer)
+        assertEquals(7L, session.state.value.transferred)
+        assertEquals("seven!!", files.resolve("my file.txt").readText())
+    }
+
     @Test fun `failed pull retains an existing file and removes partial local files`() {
         file("existing.txt", "old data".toByteArray())
         val client = ServiceClient().apply { responses += response("DATA", "new data".toByteArray()) }
