@@ -3,6 +3,9 @@ package com.civisrom.tvtimefixer.ui
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
+import android.view.WindowInsets
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -24,7 +27,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
@@ -37,7 +40,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class TerminalScreenTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val session = TerminalSession()
     private val calls = mutableListOf<String>()
     private lateinit var inputMode: InputModeManager
@@ -80,6 +83,24 @@ class TerminalScreenTest {
         return compose.onNodeWithTag(tag)
     }
 
+    private fun search(query: String) {
+        // Native IME window changes are not synchronized by the Compose clock.
+        val root = compose.activity.window.decorView
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        fun waitForKeyboard(visible: Boolean) {
+            if (Build.VERSION.SDK_INT >= 30) {
+                compose.waitUntil(5_000) {
+                    compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
+                }
+            }
+            automation.waitForIdle(300, 3_000)
+        }
+        scroll("terminal-search").performClick().performTextReplacement(query)
+        waitForKeyboard(true)
+        compose.onNodeWithTag("terminal-search").performImeAction()
+        waitForKeyboard(false)
+    }
+
     @Test fun categories_start_collapsed_and_opening_one_closes_the_previous_category() {
         screen()
         compose.onNodeWithTag("terminal-tab-help").performClick()
@@ -108,12 +129,11 @@ class TerminalScreenTest {
     @Test fun search_matches_localized_description_and_keeps_results_collapsed() {
         screen()
         compose.onNodeWithTag("terminal-tab-help").performClick()
-        scroll("terminal-search").performTextInput("сервер времени")
-        scroll("terminal-category-time").assertExists()
+        search("сервер времени")
+        scroll("terminal-category-time").assertIsDisplayed()
         compose.onNodeWithTag("terminal-category-apps").assertDoesNotExist()
         compose.onNodeWithTag("terminal-example-time_1").assertDoesNotExist()
-        // Exercise filtering independently of the native IME animation after text input.
-        scroll("terminal-category-time").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        scroll("terminal-category-time").performClick()
         scroll("terminal-example-time_1").assertIsDisplayed()
     }
 
@@ -121,7 +141,7 @@ class TerminalScreenTest {
         screen()
         compose.onNodeWithTag("terminal-tab-help").performClick()
         listOf("adb -L SOCKET", "adb forward", "adb start-server").forEach { query ->
-            scroll("terminal-search").performTextReplacement(query)
+            search(query)
             compose.onNodeWithTag("terminal-list").performScrollToNode(hasText("Команды не найдены"))
             compose.onNodeWithText("Команды не найдены").assertIsDisplayed()
             listOf("pc_options", "pc_ports", "pc_tools").forEach { category ->
