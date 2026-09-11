@@ -46,10 +46,22 @@ class MainActivityTest {
         compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
         compose.onNodeWithTag("terminal-warning-accept").performClick()
         compose.onNodeWithTag("terminal-input").performTextInput("echo terminal-test")
+        // The system IME moves Run after Compose text input has already returned.
+        if (Build.VERSION.SDK_INT >= 30) {
+            val root = compose.activity.window.decorView
+            compose.waitUntil(5_000) {
+                compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
+            }
+        }
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
         compose.onNodeWithTag("terminal-run").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("terminal-stop").fetchSemanticsNodes().isEmpty() }
+        val error = compose.activity.getString(R.string.terminal_connection_error)
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("terminal-status") and hasText(error, substring = true))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-status"))
-        compose.onNodeWithTag("terminal-status").assertTextContains(compose.activity.getString(R.string.terminal_connection_error))
+        compose.onNodeWithTag("terminal-status").assertTextContains(error)
         screenshot("terminal-disconnected")
     }
 
