@@ -7,6 +7,8 @@ import com.civisrom.tvtimefixer.adb.AdbClient
 import com.civisrom.tvtimefixer.adb.AdbService
 import com.civisrom.tvtimefixer.adb.ShellResult
 import java.io.File
+import okio.Buffer
+import okio.ForwardingSource
 import okio.buffer
 import okio.sink
 import okio.source
@@ -31,13 +33,25 @@ class TerminalInstallationTest {
             override fun shell(command: String): ShellResult = error("Unexpected buffered shell")
             override fun openService(destination: String, timeoutMs: Int): AdbService {
                 check(destination.startsWith("exec:"))
-                val descriptors = automation.executeShellCommandRw(destination.removePrefix("exec:"))
+                // UiAutomation uses Runtime.exec(String), whereas adbd exec uses a shell.
+                // The fixture has plain arguments; remove shell quoting before passing argv.
+                val args = splitAdbArguments(destination.removePrefix("exec:"))
+                check(args.all { it.matches(Regex("[A-Za-z0-9_.:-]+")) })
+                val descriptors = automation.executeShellCommandRw(args.joinToString(" "))
                 val input = ParcelFileDescriptor.AutoCloseInputStream(descriptors[0]).source().buffer()
                 val output = ParcelFileDescriptor.AutoCloseOutputStream(descriptors[1]).sink().buffer()
+                val response = object : ForwardingSource(input) {
+                    override fun read(sink: Buffer, byteCount: Long): Long {
+                        // UiAutomation retains its stdout pipe until the stdin copier finishes.
+                        // ADB itself closes the service when pm exits after consuming -S bytes.
+                        output.close()
+                        return super.read(sink, byteCount)
+                    }
+                }.buffer()
                 return object : AdbService {
-                    override val source = input
+                    override val source = response
                     override val sink = output
-                    override fun close() { runCatching { output.close() }; input.close() }
+                    override fun close() { runCatching { output.close() }; response.close() }
                 }
             }
         }
@@ -48,8 +62,9 @@ class TerminalInstallationTest {
                 workspace.receive("fixture.apk") { input.copyTo(it) }
             }
             val session = TerminalSession()
-            repeat(2) {
-                session.edit("adb install -r -t fixture.apk")
+            listOf("adb install -t fixture.apk", "adb install -r -t fixture.apk",
+                "adb install-multiple -r -t fixture.apk").forEach { installation ->
+                session.edit(installation)
                 val command = session.start("instrumentation target")!!
                 val exit = TerminalExecutor(workspace, session).execute(client, command)
                 session.finish(exit)

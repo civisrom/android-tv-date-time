@@ -11,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
@@ -52,8 +53,9 @@ class TerminalScreenTest {
     private fun screen(mode: DeviceMode = DeviceMode.HANDHELD, busy: Boolean = false, scale: Float = 1f, width: Int = 360) {
         compose.setContent {
             val context = LocalContext.current
-            val config = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag("ru")) }
-            val ru = context.createConfigurationContext(config)
+            val baseConfig = LocalConfiguration.current
+            val config = remember(baseConfig) { Configuration(baseConfig).apply { setLocale(Locale.forLanguageTag("ru")) } }
+            val ru = remember(context, config) { context.createConfigurationContext(config) }
             inputMode = LocalInputModeManager.current
             CompositionLocalProvider(LocalContext provides ru, LocalConfiguration provides config,
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
@@ -114,8 +116,10 @@ class TerminalScreenTest {
         compose.onNodeWithTag("terminal-tab-help").performClick()
         scroll("terminal-category-time").performClick()
         scroll("terminal-copy-time_0").performClick()
-        val clipboard = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        compose.runOnIdle { assertEquals("date", clipboard.primaryClip!!.getItemAt(0).text.toString()) }
+        compose.runOnIdle {
+            val clipboard = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals("date", clipboard.primaryClip!!.getItemAt(0).text.toString())
+        }
         assertEquals("existing command", session.state.value.draft)
         assertTrue(calls.isEmpty())
     }
@@ -127,8 +131,9 @@ class TerminalScreenTest {
         scroll("terminal-install-my app.apk").performClick()
         compose.onNodeWithTag("terminal-input").assertTextContains("adb install -r 'my app.apk'")
         assertTrue(calls.isEmpty())
-        scroll("terminal-run").performClick()
-        assertEquals(listOf("run"), calls)
+        // Verify explicit execution separately from the IME transition caused by focusing the draft.
+        scroll("terminal-run").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.runOnIdle { assertEquals(listOf("run"), calls) }
     }
 
     @Test fun history_selection_only_edits_and_survives_navigation_between_tabs() {
@@ -169,6 +174,16 @@ class TerminalScreenTest {
         compose.onNodeWithTag("terminal-back").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(listOf("back"), calls)
+    }
+
+    @Test fun TV_output_can_receive_focus_and_pause_automatic_scrolling() {
+        session.edit("logcat"); session.start("TV"); session.append("live output\n")
+        screen(mode = DeviceMode.TELEVISION, width = 960)
+        compose.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
+        scroll("terminal-block-0").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.onNodeWithTag("terminal-block-0").assertIsFocused()
+        compose.onNodeWithTag("terminal-follow").assertIsNotSelected()
+        compose.onNodeWithTag("terminal-stop").assertIsDisplayed()
     }
 
     @Test fun large_font_keeps_APK_actions_scrollable_on_a_narrow_screen() {

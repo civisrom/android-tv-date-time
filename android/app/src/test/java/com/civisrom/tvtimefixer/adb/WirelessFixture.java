@@ -141,6 +141,9 @@ public class WirelessFixture {
             .put((byte)type).putInt(data.length).array(), data);
     }
     static void connectServer(SSLContext ctx, ServerSocket listener) throws Exception {
+        connectServer(ctx, listener, 0);
+    }
+    static void connectServer(SSLContext ctx, ServerSocket listener, int terminalDelayMs) throws Exception {
         try (Socket raw = listener.accept()) {
             raw.setSoTimeout(5000);
             if (readAdb(raw.getInputStream()).command != CNXN) throw new IOException("Expected CNXN");
@@ -163,6 +166,18 @@ public class WirelessFixture {
                 writeAdb(ssl.getOutputStream(), WRTE, remote, local, output);
                 readAdb(ssl.getInputStream());
                 writeAdb(ssl.getOutputStream(), CLSE, remote, local, new byte[0]);
+                if (terminalDelayMs > 0) {
+                    do { open = readAdb(ssl.getInputStream()); } while (open.command == CLSE);
+                    if (open.command != OPEN) throw new IOException("Expected terminal OPEN");
+                    local = open.arg0;
+                    remote = 2;
+                    writeAdb(ssl.getOutputStream(), OKAY, remote, local, new byte[0]);
+                    Thread.sleep(terminalDelayMs);
+                    writeAdb(ssl.getOutputStream(), WRTE, remote, local,
+                        join(shellPacket(1, bytes("late output\n")), shellPacket(3, new byte[]{7})));
+                    readAdb(ssl.getInputStream());
+                    writeAdb(ssl.getOutputStream(), CLSE, remote, local, new byte[0]);
+                }
                 System.out.println("connect-server: TLSv1.3, matching RSA identity, shell_v2 reply sent");
             }
         }

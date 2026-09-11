@@ -186,4 +186,27 @@ class PairingClientTest {
             }
         } finally { executor.shutdownNow() }
     }
+
+    @Test fun `terminal tolerates an idle TLS stream beyond the ordinary socket timeout`() {
+        val context = WirelessFixture.serverContext()
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            WirelessFixture.listener().use { server ->
+                val peer = executor.submit { WirelessFixture.connectServer(context, server, 1_500) }
+                val client = KadbAdbClientFactory(2_000, 500)
+                    .connect(DeviceAddress("127.0.0.1", server.localPort))
+                try {
+                    val output = StringBuilder()
+                    val exit = boundedAdbCommand(5_000, client::close) {
+                        client.openService("shell,v2,raw:sleep 1; echo late output", 5_000).use {
+                            readStreamingShell(it.source, true) { text, _ -> output.append(text) }
+                        }
+                    }
+                    assertEquals(7, exit)
+                    assertEquals("late output\n", output.toString())
+                } finally { client.close() }
+                peer.get(5, TimeUnit.SECONDS)
+            }
+        } finally { executor.shutdownNow() }
+    }
 }

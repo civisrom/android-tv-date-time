@@ -6,6 +6,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TerminalSessionTest {
+    @Test fun `IME updates and editing the next command preserve the previous failure`() {
+        val session = TerminalSession()
+        session.edit("echo test"); session.start("TV")
+        session.fail(TerminalException(TerminalProblem.CONNECTION))
+        session.edit("echo test")
+        assertEquals(TerminalProblem.CONNECTION, session.state.value.problem)
+        session.edit("adb connect 192.0.2.1")
+        assertEquals(TerminalStatus.FAILED, session.state.value.status)
+        assertEquals(TerminalProblem.CONNECTION, session.state.value.problem)
+        assertEquals("echo test", session.state.value.command)
+        session.start("TV")
+        assertNull(session.state.value.problem)
+    }
+
     @Test fun `history is deduplicated bounded and selection never executes a command`() {
         val session = TerminalSession()
         repeat(60) { session.edit("echo $it"); session.start("TV"); session.finish(0) }

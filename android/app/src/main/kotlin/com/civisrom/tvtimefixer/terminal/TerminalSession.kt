@@ -38,7 +38,13 @@ class TerminalSession {
     private var transferred: Long? = null
     private var escape = 0
 
-    fun edit(text: String) { mutable.update { it.copy(draft = text.take(TERMINAL_COMMAND_LIMIT + 1), problem = null) } }
+    fun edit(text: String) {
+        mutable.update {
+            // IME selection/composition updates and a new draft must retain the previous command's failure.
+            it.copy(draft = text.take(TERMINAL_COMMAND_LIMIT + 1),
+                problem = if (it.status == TerminalStatus.FAILED) it.problem else null)
+        }
+    }
     fun clearHistory() { mutable.update { it.copy(history = emptyList()) } }
     fun refreshFiles(files: List<String>) { mutable.update { it.copy(files = files) } }
     fun showHelp() { mutable.update { it.copy(helpRequest = it.helpRequest + 1) } }

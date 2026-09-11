@@ -4,9 +4,15 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -15,7 +21,9 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -37,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -44,6 +54,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -53,6 +64,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
@@ -99,6 +112,7 @@ internal fun TerminalScreen(
     val resources = LocalResources.current
     val clipboardLabel = stringResource(R.string.terminal_title)
     val keyboard = LocalSoftwareKeyboardController.current
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     var tab by rememberSaveable { mutableStateOf("console") }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
@@ -128,7 +142,7 @@ internal fun TerminalScreen(
         }
     }
     fun insert(command: String) {
-        actions.edit(command); tab = "console"; focusEditor = true; keyboard?.hide()
+        actions.edit(command); follow = false; tab = "console"; focusEditor = true; keyboard?.hide()
     }
     fun copy(text: String) {
         copied = if (runCatching {
@@ -153,11 +167,12 @@ internal fun TerminalScreen(
                 .focusProperties { canFocus = true }.testTag("terminal-back"), shape = MaterialTheme.shapes.medium) {
                 Text(stringResource(R.string.terminal_back))
             }
-            Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.headlineSmall)
+            if (!keyboardVisible) Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.headlineSmall)
         }
         Text(if (target.isBlank()) stringResource(R.string.terminal_disconnected)
-            else stringResource(R.string.terminal_target, target), style = MaterialTheme.typography.bodySmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            else stringResource(R.string.terminal_target, target), style = MaterialTheme.typography.bodySmall,
+            maxLines = if (keyboardVisible) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+        val tabs: @Composable () -> Unit = {
             listOf("console" to R.string.terminal_console, "help" to R.string.terminal_help,
                 "history" to R.string.terminal_history, "files" to R.string.terminal_files).forEach { (key, label) ->
                 FilterChip(selected = tab == key, onClick = { tab = key; keyboard?.hide() },
@@ -165,9 +180,17 @@ internal fun TerminalScreen(
                         .testTag("terminal-tab-$key"))
             }
         }
+        // A TV/landscape IME can occupy most of the height. Keep the editor scrollable.
+        if (keyboardVisible) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) { tabs() }
+        else FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { tabs() }
         if (state.running) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
-            TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
+                if (tab == "console") FilterChip(selected = follow, onClick = { follow = !follow },
+                    label = { Text(stringResource(R.string.terminal_follow)) }, modifier = Modifier.testTag("terminal-follow"))
+            }
         }
         copied?.let { Text(stringResource(it), modifier = Modifier.testTag("terminal-copy-result")) }
         LazyColumn(state = listState, modifier = Modifier.weight(1f).testTag("terminal-list"),
@@ -191,8 +214,8 @@ internal fun TerminalScreen(
                                 TerminalButton(R.string.terminal_copy_output, "terminal-copy-output", enabled = state.output.isNotEmpty()) {
                                     copy(state.output.joinToString("") { it.text })
                                 }
-                                FilterChip(selected = follow, onClick = { follow = !follow },
-                                    label = { Text(stringResource(R.string.terminal_follow)) })
+                                if (!state.running) FilterChip(selected = follow, onClick = { follow = !follow },
+                                    label = { Text(stringResource(R.string.terminal_follow)) }, modifier = Modifier.testTag("terminal-follow"))
                             }
                         }
                     }
@@ -223,8 +246,12 @@ internal fun TerminalScreen(
                     }
                     items(state.output.size) { index ->
                         val chunk = state.output[index]
+                        var focused by remember { mutableStateOf(false) }
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
-                            modifier = Modifier.fillMaxWidth()) {
+                            modifier = Modifier.fillMaxWidth().testTag("terminal-block-$index")
+                                .onFocusChanged { focused = it.isFocused; if (it.isFocused) follow = false }
+                                .focusProperties { canFocus = mode == DeviceMode.TELEVISION }.focusable()
+                                .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, MaterialTheme.shapes.medium)) {
                             SelectionContainer {
                                 Text(chunk.text, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall,
                                     color = if (chunk.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
@@ -234,10 +261,12 @@ internal fun TerminalScreen(
                     }
                 }
                 "help" -> {
+                    item { Text(stringResource(R.string.terminal_help_intro)) }
                     item {
-                        Text(stringResource(R.string.terminal_help_intro))
                         OutlinedTextField(value = query, onValueChange = { query = it; category = null },
                             label = { Text(stringResource(R.string.terminal_search)) }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                             modifier = Modifier.fillMaxWidth().testTag("terminal-search"))
                     }
                     val visible = terminalCatalog.map { group ->

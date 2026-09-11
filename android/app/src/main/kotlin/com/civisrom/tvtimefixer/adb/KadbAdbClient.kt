@@ -67,7 +67,10 @@ class KadbAdbClientFactory(
      * в этом проекте статус уже не раз означал не то, чем кажется.
      */
     override fun connect(address: DeviceAddress): AdbClient {
-        val kadb = Kadb.create(address.host, address.port, connectTimeoutMs, socketTimeoutMs)
+        // Kadb applies this timeout to every transport read, including idle shell output.
+        // Individual probes/settings still have their own 15-second boundedAdbCommand deadline.
+        val kadb = Kadb.create(address.host, address.port, connectTimeoutMs,
+            maxOf(socketTimeoutMs, com.civisrom.tvtimefixer.terminal.TERMINAL_TIMEOUT_MS))
         val client = KadbAdbClient(kadb)
         val response = try {
             client.shell(ADB_PROBE_COMMAND)
