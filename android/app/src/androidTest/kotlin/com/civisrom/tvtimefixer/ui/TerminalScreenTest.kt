@@ -1,10 +1,12 @@
 package com.civisrom.tvtimefixer.ui
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.view.WindowInsets
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,18 +89,34 @@ class TerminalScreenTest {
         // Native IME window changes are not synchronized by the Compose clock.
         val root = compose.activity.window.decorView
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        fun waitForKeyboard(visible: Boolean) {
-            if (Build.VERSION.SDK_INT >= 30) {
-                compose.waitUntil(5_000) {
-                    compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
-                }
+        val originalFlags = automation.serviceInfo.flags
+        try {
+            automation.serviceInfo = automation.serviceInfo.apply {
+                flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             }
-            automation.waitForIdle(300, 3_000)
+            fun waitForKeyboard(visible: Boolean) {
+                compose.waitUntil(5_000) {
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
+                    } else {
+                        val windows = automation.windows
+                        try {
+                            windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
+                        } finally {
+                            @Suppress("DEPRECATION")
+                            windows.forEach { it.recycle() }
+                        }
+                    }
+                }
+                automation.waitForIdle(300, 3_000)
+            }
+            scroll("terminal-search").performClick().performTextReplacement(query)
+            waitForKeyboard(true)
+            compose.onNodeWithTag("terminal-search").performImeAction()
+            waitForKeyboard(false)
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
         }
-        scroll("terminal-search").performClick().performTextReplacement(query)
-        waitForKeyboard(true)
-        compose.onNodeWithTag("terminal-search").performImeAction()
-        waitForKeyboard(false)
     }
 
     @Test fun categories_start_collapsed_and_opening_one_closes_the_previous_category() {
