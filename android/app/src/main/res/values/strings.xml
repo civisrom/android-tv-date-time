@@ -469,8 +469,8 @@
     <string name="terminal_example_services_9">Show package manager help</string>
     <string name="terminal_example_services_10">Show activity manager help</string>
     <string name="terminal_example_services_11">Show settings command help</string>
-    <string name="terminal_warning_title">Commands can affect your device</string>
-    <string name="terminal_warning_body">Commands run on the selected connected device and can change system settings, install or remove apps, and erase data. An incorrect command may disrupt the device or cause data loss. Check the target device and only run commands whose effects you understand.</string>
+    <string name="terminal_warning_title">ADB terminal: risk of data loss</string>
+    <string name="terminal_warning_body">Commands can change settings, install or remove apps, erase data, and disrupt the connected device. Available actions depend on its firmware and ADB permissions. Stop does not undo changes already made.\n\nCheck the device model and address, back up important data, and only run commands whose effects you understand. Use the terminal only on devices you are authorized to manage.\n\nOpening the terminal and inserting an example do not run a command.\n\nThe program is provided “as is”. The warranty disclaimer and limitation of liability under the license apply only to the extent permitted by applicable law. Your rights that cannot legally be limited remain unaffected.</string>
     <string name="terminal_warning_accept">Open terminal</string>
     <string name="terminal_warning_cancel">Cancel</string>
     <string name="terminal_connected" formatted="false">Connected</string>

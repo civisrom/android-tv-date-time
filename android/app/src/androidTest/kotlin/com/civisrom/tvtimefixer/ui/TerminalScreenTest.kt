@@ -232,10 +232,20 @@ class TerminalScreenTest {
         val positions = tags.associateWith { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
         val input = positions.getValue("terminal-input")
         val model = compose.onNodeWithTag("terminal-device-name").fetchSemanticsNode().boundsInRoot
-        val consoleTab = compose.onNodeWithTag("terminal-tab-console").fetchSemanticsNode().boundsInRoot
+        val tabs = listOf("console", "help", "history", "files").map {
+            compose.onNodeWithTag("terminal-tab-$it").fetchSemanticsNode().boundsInRoot
+        }
         val output = compose.onNodeWithTag("terminal-list").fetchSemanticsNode().boundsInRoot
         assertTrue("Editor must follow the device model", model.bottom <= input.top)
-        assertTrue("Editor must appear before the tabs and output", input.bottom <= consoleTab.top && input.bottom < output.top)
+        assertTrue("Editor must follow all tabs", tabs.all { it.bottom <= input.top })
+        assertEquals("Editor must use the full panel width", output.left, input.left, 1f)
+        assertEquals("Editor must use the full panel width", output.right, input.right, 1f)
+        assertTrue("Run must be on a separate row below the editor", input.bottom <= positions.getValue("terminal-run").top)
+        listOf("terminal-clear", "terminal-follow").forEach {
+            val control = positions.getValue(it)
+            assertTrue("Output controls must follow Run and precede output",
+                positions.getValue("terminal-run").bottom <= control.top && control.bottom <= output.top)
+        }
         compose.onNodeWithTag("terminal-follow").performClick()
         compose.onNodeWithTag("terminal-list").performScrollToIndex(0)
         tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }

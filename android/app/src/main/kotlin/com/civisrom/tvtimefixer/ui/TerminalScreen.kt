@@ -241,26 +241,6 @@ internal fun TerminalScreen(
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("terminal-device-name"))
             }
         }
-        if (tab == "console") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = editor, onValueChange = { editor = it; actions.edit(it.text) },
-                    label = { Text(stringResource(R.string.terminal_draft)) },
-                    placeholder = { Text("adb shell getprop ro.product.model") },
-                    minLines = 1, maxLines = if (keyboardVisible) 2 else 3,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-                    trailingIcon = {
-                        IconButton(onClick = { editor = TextFieldValue(""); actions.edit(""); editorFocus.requestFocus() },
-                            enabled = state.draft.isNotEmpty(), modifier = Modifier.testTag("terminal-clear-input")) {
-                            Icon(painterResource(R.drawable.ic_terminal_clear), stringResource(R.string.terminal_clear_input))
-                        }
-                    }, modifier = Modifier.weight(1f).focusRequester(editorFocus).testTag("terminal-input"))
-                if (state.running) TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
-                else TerminalButton(R.string.terminal_run, "terminal-run", enabled = !busy && !fileBusy && state.draft.isNotBlank()) {
-                    keyboard?.hide(); actions.run()
-                }
-            }
-        }
         val tabs: @Composable () -> Unit = {
             listOf("console" to R.string.terminal_console, "help" to R.string.terminal_help,
                 "history" to R.string.terminal_history, "files" to R.string.terminal_files).forEach { (key, label) ->
@@ -281,6 +261,22 @@ internal fun TerminalScreen(
         }
         copied?.let { Text(stringResource(it), modifier = Modifier.testTag("terminal-copy-result")) }
         if (tab == "console") {
+            OutlinedTextField(value = editor, onValueChange = { editor = it; actions.edit(it.text) },
+                label = { Text(stringResource(R.string.terminal_draft)) },
+                placeholder = { Text("adb shell getprop ro.product.model") },
+                minLines = 1, maxLines = if (keyboardVisible) 2 else 3,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                trailingIcon = {
+                    IconButton(onClick = { editor = TextFieldValue(""); actions.edit(""); editorFocus.requestFocus() },
+                        enabled = state.draft.isNotEmpty(), modifier = Modifier.testTag("terminal-clear-input")) {
+                        Icon(painterResource(R.drawable.ic_terminal_clear), stringResource(R.string.terminal_clear_input))
+                    }
+                }, modifier = Modifier.fillMaxWidth().focusRequester(editorFocus).testTag("terminal-input"))
+            if (state.running) TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
+            else TerminalButton(R.string.terminal_run, "terminal-run", enabled = !busy && !fileBusy && state.draft.isNotBlank()) {
+                keyboard?.hide(); actions.run()
+            }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(enabled = !state.running && (state.output.isNotEmpty() || state.command.isNotBlank()),
