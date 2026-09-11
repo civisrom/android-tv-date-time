@@ -58,6 +58,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -218,7 +219,8 @@ internal fun TerminalScreen(
             }
         }
         val connectionLabel = stringResource(if (target.isNotBlank()) R.string.terminal_connected else R.string.terminal_not_connected)
-        val connectionColor = if (target.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+        val connectionColor = if (target.isBlank()) MaterialTheme.colorScheme.error
+            else if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) Color(0xFF86EFAC) else Color(0xFF166534)
         if (keyboardVisible) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             backButton()
             Text(connectionLabel + if (target.isNotBlank()) " · $target" else "", color = connectionColor,
@@ -237,6 +239,26 @@ internal fun TerminalScreen(
                 if (target.isNotBlank()) Text(
                     stringResource(R.string.terminal_device_name, deviceName.ifBlank { stringResource(R.string.terminal_device_unknown) }),
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("terminal-device-name"))
+            }
+        }
+        if (tab == "console") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(value = editor, onValueChange = { editor = it; actions.edit(it.text) },
+                    label = { Text(stringResource(R.string.terminal_draft)) },
+                    placeholder = { Text("adb shell getprop ro.product.model") },
+                    minLines = 1, maxLines = if (keyboardVisible) 2 else 3,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                    trailingIcon = {
+                        IconButton(onClick = { editor = TextFieldValue(""); actions.edit(""); editorFocus.requestFocus() },
+                            enabled = state.draft.isNotEmpty(), modifier = Modifier.testTag("terminal-clear-input")) {
+                            Icon(painterResource(R.drawable.ic_terminal_clear), stringResource(R.string.terminal_clear_input))
+                        }
+                    }, modifier = Modifier.weight(1f).focusRequester(editorFocus).testTag("terminal-input"))
+                if (state.running) TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
+                else TerminalButton(R.string.terminal_run, "terminal-run", enabled = !busy && !fileBusy && state.draft.isNotBlank()) {
+                    keyboard?.hide(); actions.run()
+                }
             }
         }
         val tabs: @Composable () -> Unit = {
@@ -369,11 +391,9 @@ internal fun TerminalScreen(
                             Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("terminal-example-${example.id}")) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text(stringResource(example.titleRes), style = MaterialTheme.typography.bodyMedium)
-                                    if (!example.availableInApp) Text(stringResource(R.string.terminal_external_command),
-                                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                                     SelectionContainer { Text(example.command, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.primary) }
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TerminalButton(R.string.terminal_insert, "terminal-insert-${example.id}", enabled = example.availableInApp) { insert(example.command) }
+                                        TerminalButton(R.string.terminal_insert, "terminal-insert-${example.id}") { insert(example.command) }
                                         TerminalButton(R.string.terminal_copy, "terminal-copy-${example.id}") { copy(example.command) }
                                     }
                                 }
@@ -430,26 +450,6 @@ internal fun TerminalScreen(
                             }
                         }
                     }
-                }
-            }
-        }
-        if (tab == "console") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(value = editor, onValueChange = { editor = it; actions.edit(it.text) },
-                    label = { Text(stringResource(R.string.terminal_draft)) },
-                    placeholder = { Text("adb shell getprop ro.product.model") },
-                    minLines = 1, maxLines = if (keyboardVisible) 2 else 3,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-                    trailingIcon = {
-                        IconButton(onClick = { editor = TextFieldValue(""); actions.edit(""); editorFocus.requestFocus() },
-                            enabled = state.draft.isNotEmpty(), modifier = Modifier.testTag("terminal-clear-input")) {
-                            Icon(painterResource(R.drawable.ic_terminal_clear), stringResource(R.string.terminal_clear_input))
-                        }
-                    }, modifier = Modifier.weight(1f).focusRequester(editorFocus).testTag("terminal-input"))
-                if (state.running) TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
-                else TerminalButton(R.string.terminal_run, "terminal-run", enabled = !busy && !fileBusy && state.draft.isNotBlank()) {
-                    keyboard?.hide(); actions.run()
                 }
             }
         }

@@ -47,19 +47,20 @@ class TerminalCommandTest {
         assertTrue(examples.size >= 60)
         assertEquals(examples.size, examples.map { it.id }.toSet().size)
         assertEquals(examples.size, examples.map { it.command }.toSet().size)
-        examples.filter { it.availableInApp }.forEach { parseTerminalCommand(it.command) }
+        examples.forEach { parseTerminalCommand(it.command) }
         assertEquals(terminalCatalog.size, terminalCatalog.map { it.id }.toSet().size)
-        assertTrue(terminalCatalog.filter { it.id.startsWith("pc_") }.flatMap { it.examples }.all { !it.availableInApp })
+        assertFalse(terminalCatalog.any { it.id.startsWith("pc_") })
     }
 
-    @Test fun `reference covers the public host commands listed by Platform Tools 37 and AOSP adb manpage`() {
+    @Test fun `reference covers only host commands implemented by the embedded client and includes device help`() {
         val commands = terminalCatalog.flatMap { it.examples }.map { it.command }
-        val publicCommands = listOf("devices", "help", "version", "connect", "disconnect", "pair", "forward", "reverse",
-            "mdns", "push", "pull", "sync", "shell", "emu", "install", "install-multiple", "install-multi-package",
-            "uninstall", "bugreport", "jdwp", "logcat", "disable-verity", "enable-verity", "keygen", "wait-for-device",
-            "get-state", "get-serialno", "get-devpath", "remount", "reboot", "sideload", "root", "unroot", "usb", "tcpip",
-            "start-server", "kill-server", "reconnect", "attach", "detach", "host-features", "features", "server-status")
-        publicCommands.forEach { name ->
+        val supportedCommands = setOf("devices", "help", "connect", "disconnect", "push", "pull", "shell",
+            "install", "install-multiple", "uninstall", "bugreport", "logcat", "disable-verity", "enable-verity",
+            "get-state", "get-serialno", "remount", "reboot", "root", "unroot", "usb", "tcpip", "exec-out")
+        commands.map(::parseTerminalCommand).filterIsInstance<TerminalCommand.Adb>().forEach { command ->
+            assertTrue("Unsupported ADB reference: ${command.name}", command.name in supportedCommands)
+        }
+        supportedCommands.forEach { name ->
             assertTrue("Missing ADB reference: $name", commands.any { it == "adb $name" || it.startsWith("adb $name ") })
         }
         // Device-provided help is needed because Android versions and vendor firmware expose different shell tools.

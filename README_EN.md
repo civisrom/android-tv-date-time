@@ -130,9 +130,10 @@ replace troubleshooting other network faults.
     a Stop button, and a choice of domain name or resolved IP address.
 *   USB host/OTG with device selection and discovery diagnostics.
 *   An ADB terminal with Android shell commands, streaming output, Stop,
-    session history, and 169 examples in 13 collapsible reference categories.
-    Output scrolls independently of the editor and controls; history and category
-    titles are left aligned. Connection status and the device model are visible.
+    session history, and 118 examples in 10 collapsible reference categories.
+    The editor is fixed below the device model; output scrolls independently
+    of it and the controls. History and category titles are left aligned.
+    The Connected status is green.
     A warning appears before entry; inserting an example never runs it.
 *   Install APKs and split APKs from a phone or tablet on the connected device
     over network ADB or USB. Choose documents in Files and APK, prepare the

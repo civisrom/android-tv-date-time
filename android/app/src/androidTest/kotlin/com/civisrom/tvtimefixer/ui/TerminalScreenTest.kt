@@ -116,12 +116,16 @@ class TerminalScreenTest {
         scroll("terminal-example-time_1").assertIsDisplayed()
     }
 
-    @Test fun desktop_only_syntax_can_be_copied_but_is_not_offered_for_execution() {
+    @Test fun search_does_not_offer_external_ADB_commands() {
         screen()
         compose.onNodeWithTag("terminal-tab-help").performClick()
-        scroll("terminal-category-pc_options").performClick()
-        scroll("terminal-insert-reference_18").assertIsNotEnabled()
-        scroll("terminal-copy-reference_18").assertIsEnabled()
+        listOf("adb -L SOCKET", "adb forward", "adb start-server").forEach { query ->
+            scroll("terminal-search").performTextReplacement(query)
+            compose.onNodeWithText("Команды не найдены").assertExists()
+            listOf("pc_options", "pc_ports", "pc_tools").forEach { category ->
+                compose.onNodeWithTag("terminal-category-$category").assertDoesNotExist()
+            }
+        }
         assertTrue(calls.isEmpty())
     }
 
@@ -226,6 +230,12 @@ class TerminalScreenTest {
         screen()
         val tags = listOf("terminal-input", "terminal-run", "terminal-clear", "terminal-follow")
         val positions = tags.associateWith { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
+        val input = positions.getValue("terminal-input")
+        val model = compose.onNodeWithTag("terminal-device-name").fetchSemanticsNode().boundsInRoot
+        val consoleTab = compose.onNodeWithTag("terminal-tab-console").fetchSemanticsNode().boundsInRoot
+        val output = compose.onNodeWithTag("terminal-list").fetchSemanticsNode().boundsInRoot
+        assertTrue("Editor must follow the device model", model.bottom <= input.top)
+        assertTrue("Editor must appear before the tabs and output", input.bottom <= consoleTab.top && input.bottom < output.top)
         compose.onNodeWithTag("terminal-follow").performClick()
         compose.onNodeWithTag("terminal-list").performScrollToIndex(0)
         tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }

@@ -2,7 +2,7 @@ package com.civisrom.tvtimefixer.terminal
 
 import com.civisrom.tvtimefixer.R
 
-data class CommandExample(val id: String, val titleRes: Int, val command: String, val availableInApp: Boolean = true)
+data class CommandExample(val id: String, val titleRes: Int, val command: String)
 data class CommandCategory(val id: String, val titleRes: Int, val examples: List<CommandExample>)
 
 val terminalCatalog: List<CommandCategory> = listOf(
