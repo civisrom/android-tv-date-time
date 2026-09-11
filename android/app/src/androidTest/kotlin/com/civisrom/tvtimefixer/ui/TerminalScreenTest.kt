@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -67,7 +67,7 @@ class TerminalScreenTest {
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 MaterialTheme { Surface {
                     val state by session.state.collectAsState()
-                    Box(Modifier.requiredWidth(width.dp).fillMaxSize()) {
+                    Box(Modifier.width(width.dp).fillMaxSize()) {
                         TerminalScreen(mode, state, target, busy, actions, { calls += "back" }, deviceName = name)
                     }
                 } }
@@ -112,7 +112,8 @@ class TerminalScreenTest {
         scroll("terminal-category-time").assertExists()
         compose.onNodeWithTag("terminal-category-apps").assertDoesNotExist()
         compose.onNodeWithTag("terminal-example-time_1").assertDoesNotExist()
-        scroll("terminal-category-time").performClick()
+        // Exercise filtering independently of the native IME animation after text input.
+        scroll("terminal-category-time").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         scroll("terminal-example-time_1").assertIsDisplayed()
     }
 
@@ -330,7 +331,9 @@ class TerminalScreenTest {
         assertEquals(first.left, second.left, 1f)
         val historyRow = compose.onNodeWithTag("terminal-history-echo a longer command").fetchSemanticsNode().boundsInRoot
         val nextRow = compose.onNodeWithTag("terminal-history-echo short").fetchSemanticsNode().boundsInRoot
-        assertTrue(nextRow.top - historyRow.bottom <= 1f)
+        // Material reserves a 48 dp touch target around the shorter visible TextButton.
+        val rowHeight = maxOf(historyRow.height, with(compose.density) { 48.dp.toPx() })
+        assertEquals("History rows must not add spacing beyond the touch target", rowHeight, nextRow.top - historyRow.top, 1f)
         compose.onNodeWithTag("terminal-tab-help").performClick()
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         scroll("terminal-category-connection").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
