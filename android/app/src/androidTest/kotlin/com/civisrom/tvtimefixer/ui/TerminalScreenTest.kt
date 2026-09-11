@@ -122,7 +122,8 @@ class TerminalScreenTest {
         compose.onNodeWithTag("terminal-tab-help").performClick()
         listOf("adb -L SOCKET", "adb forward", "adb start-server").forEach { query ->
             scroll("terminal-search").performTextReplacement(query)
-            compose.onNodeWithText("Команды не найдены").assertExists()
+            compose.onNodeWithTag("terminal-list").performScrollToNode(hasText("Команды не найдены"))
+            compose.onNodeWithText("Команды не найдены").assertIsDisplayed()
             listOf("pc_options", "pc_ports", "pc_tools").forEach { category ->
                 compose.onNodeWithTag("terminal-category-$category").assertDoesNotExist()
             }
