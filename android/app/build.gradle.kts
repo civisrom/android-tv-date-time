@@ -174,8 +174,25 @@ val generateNtpData = tasks.register<GenerateNtpDataTask>("generateNtpData") {
     outputDir.set(layout.buildDirectory.dir("generated/ntpdata"))
 }
 
+abstract class TerminalTestApkTask : DefaultTask() {
+    @get:InputFile abstract val apk: RegularFileProperty
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+    @TaskAction fun copyApk() {
+        val target = outputDir.file("terminal-fixture.apk").get().asFile
+        target.parentFile.mkdirs()
+        apk.get().asFile.copyTo(target, overwrite = true)
+    }
+}
+
+val terminalTestApk = tasks.register<TerminalTestApkTask>("copyTerminalTestApk") {
+    dependsOn(":terminal-install-fixture:assembleDebug")
+    apk.set(project(":terminal-install-fixture").layout.buildDirectory.file("outputs/apk/debug/terminal-install-fixture-debug.apk"))
+    outputDir.set(layout.buildDirectory.dir("generated/terminalTestAssets"))
+}
+
 androidComponents {
     onVariants { variant ->
+        variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(terminalTestApk, TerminalTestApkTask::outputDir)
         variant.sources.kotlin?.addGeneratedSourceDirectory(
             generateNtpData,
             GenerateNtpDataTask::outputDir,

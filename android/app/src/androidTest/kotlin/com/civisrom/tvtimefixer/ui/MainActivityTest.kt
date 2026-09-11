@@ -30,6 +30,44 @@ import org.junit.Test
 class MainActivityTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun terminal_opens_from_main_and_returns_focus_to_its_entry() {
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").performClick()
+        compose.onNodeWithTag("terminal-screen").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-input").performTextInput("getprop ro.product.model")
+        compose.onNodeWithTag("terminal-back").performClick()
+        compose.onNodeWithTag("terminal-open").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("terminal-open").performClick()
+        compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
+        screenshot("terminal-draft")
+    }
+
+    @Test fun terminal_without_a_connection_reports_failure_without_running_locally() {
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").performClick()
+        compose.onNodeWithTag("terminal-input").performTextInput("echo terminal-test")
+        compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-run"))
+        compose.onNodeWithTag("terminal-run").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("terminal-stop").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-status"))
+        compose.onNodeWithTag("terminal-status").assertTextContains(compose.activity.getString(R.string.terminal_connection_error))
+        screenshot("terminal-disconnected")
+    }
+
+    @Test fun terminal_warning_can_be_cancelled_and_is_not_repeated_within_the_session() {
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.terminal_warning_body)).assertIsDisplayed()
+        screenshot("terminal-warning")
+        compose.onNodeWithTag("terminal-warning-cancel").performClick()
+        compose.onNodeWithTag("terminal-screen").assertDoesNotExist()
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").performClick()
+        compose.onNodeWithTag("terminal-back").performClick()
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").assertDoesNotExist()
+        compose.onNodeWithTag("terminal-screen").assertIsDisplayed()
+    }
+
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()

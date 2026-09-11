@@ -70,6 +70,81 @@ private class FixtureIdentity : UsbAdbIdentity {
 }
 
 class UsbAdbClientTest {
+    @Test fun `raw service reads bytes and drains close before another shell`() {
+        val io = FixtureIo().apply {
+            connection()
+            shell("raw bytes".toByteArray())
+            shell(shellFrame(1, "next".toByteArray()) + shellFrame(3, byteArrayOf(0)), id = 2)
+        }
+        val client = UsbAdbClient(io, FixtureIdentity())
+        client.connect()
+        client.openService("sync:", 5000).use { assertEquals("raw bytes", it.source.readUtf8()) }
+        assertEquals("next", client.shell("echo next").output)
+        assertTrue(client.isAlive())
+    }
+
+    @Test fun `duplex service splits writes and accepts early stdout while awaiting ACK`() {
+        val bytes = ByteArray(5003) { (it % 256).toByte() }
+        val io = FixtureIo().apply {
+            connection()
+            queue(OKAY, 55, 1)
+            queue(WRTE, 55, 1, "early response".toByteArray())
+            queue(OKAY, 55, 1)
+            queue(OKAY, 55, 1)
+            queue(CLSE, 55, 1)
+        }
+        val client = UsbAdbClient(io, FixtureIdentity())
+        client.connect()
+        client.openService("exec:pm install -S ${bytes.size}", 5000).use {
+            it.sink.write(bytes).flush()
+            assertEquals("early response", it.source.readUtf8())
+        }
+        val written = java.io.ByteArrayOutputStream()
+        var index = 0
+        while (index < io.sent.size) {
+            val header = ByteBuffer.wrap(io.sent[index++]).order(ByteOrder.LITTLE_ENDIAN)
+            val command = header.int
+            val length = header.getInt(12)
+            if (length > 0) {
+                val data = io.sent[index++]
+                if (command == WRTE) { assertTrue(length <= 4096); written.write(data) }
+            }
+        }
+        assertArrayEquals(bytes, written.toByteArray())
+        assertTrue(client.isAlive())
+    }
+
+    @Test fun `service refuses malformed destinations before touching USB`() {
+        val io = FixtureIo().apply { connection() }
+        val client = UsbAdbClient(io, FixtureIdentity())
+        client.connect()
+        val count = io.sent.size
+        assertThrows(IllegalArgumentException::class.java) { client.openService("sync:\u0000evil", 5000) }
+        assertThrows(IllegalArgumentException::class.java) { client.openService("a".repeat(5000), 5000) }
+        assertEquals(count, io.sent.size)
+        assertTrue(client.isAlive())
+    }
+
+    @Test fun `wrong stream ID during a transfer closes the transport`() {
+        val io = FixtureIo().apply { connection(); queue(OKAY, 55, 1); queue(WRTE, 99, 1, byteArrayOf(1)) }
+        val client = UsbAdbClient(io, FixtureIdentity())
+        client.connect()
+        assertThrows(IOException::class.java) { client.openService("sync:", 5000).use { it.source.readByte() } }
+        assertFalse(client.isAlive())
+    }
+
+    @Test fun `early service close drains CLSE without poisoning the next connection probe`() {
+        val io = FixtureIo().apply {
+            connection(); queue(OKAY, 55, 1); queue(CLSE, 55, 1)
+            shell(shellFrame(1, "next".toByteArray()) + shellFrame(3, byteArrayOf(0)), id = 2)
+        }
+        val client = UsbAdbClient(io, FixtureIdentity())
+        client.connect()
+        client.openService("sync:", 5000).close()
+        assertEquals("next", client.shell("echo next").output)
+        assertTrue(client.isAlive())
+    }
+
     @Test fun `AUTH signs once then publishes public key and waits for CNXN`() {
         val io = FixtureIo()
         io.queue(AUTH, 1, data = ByteArray(20))

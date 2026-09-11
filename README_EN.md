@@ -129,9 +129,25 @@ replace troubleshooting other network faults.
 *   NTP checks before connecting, a best-five server search with progress and
     a Stop button, and a choice of domain name or resolved IP address.
 *   USB host/OTG with device selection and discovery diagnostics.
+*   An ADB terminal with Android shell commands, streaming output, Stop,
+    session history, and searchable help in nine collapsible categories.
+    A warning appears before entry; inserting an example never runs it.
+*   Install APKs and split APKs from a phone or tablet on the connected device
+    over network ADB or USB. Choose documents in Files and APK, prepare the
+    installation command, then press Run. `adb push` and `adb pull` support
+    individual files; received files can be exported.
 *   A local operation history through Diagnostics, report copying and clearing.
     Logs are never sent automatically.
 *   Android TV remote navigation, large fonts and landscape layouts.
+
+The terminal accepts commands directly (`settings get global ntp_server`) or
+with an `adb shell` prefix. Each command uses a new shell on the selected
+device, with a five-minute limit and the latest 65,536 text characters retained.
+History stays in session memory. Local names in `push`, `pull`, and `install`
+refer to documents in Files and APK. This is an embedded client: interactive
+TTY, desktop ADB server options, `forward/reverse`, `fastboot`, `sideload`
+flashing, recursive directory transfers, and all Platform Tools flags are
+not implemented. The reference explains supported syntax and compatibility.
 
 ## Getting started
 

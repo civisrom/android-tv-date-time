@@ -77,6 +77,7 @@ import com.civisrom.tvtimefixer.BuildConfig
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
+import com.civisrom.tvtimefixer.adb.targetOrNull
 import com.civisrom.tvtimefixer.adb.DiscoveredDevice
 import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.diagnostics.DiagnosticSnapshot
@@ -134,9 +135,16 @@ fun MainScreen(
     diagnostics: DiagnosticSnapshot = DiagnosticSnapshot(),
     onRefreshDiagnostics: () -> Unit = {},
     onClearDiagnostics: () -> Unit = {},
+    terminal: com.civisrom.tvtimefixer.terminal.TerminalState = com.civisrom.tvtimefixer.terminal.TerminalState(),
+    terminalActions: TerminalActions? = null,
+    terminalFileBusy: Boolean = false,
+    terminalFileMessage: Int? = null,
 ) {
     var showSetup by rememberSaveable { mutableStateOf(false) }
     var showDiagnostics by rememberSaveable { mutableStateOf(false) }
+    var showTerminal by rememberSaveable { mutableStateOf(false) }
+    var terminalWarning by remember { mutableStateOf(false) }
+    var terminalAccepted by remember { mutableStateOf(false) }
     var selectedEvent by rememberSaveable { mutableStateOf<Long?>(null) }
     var returnFocus by rememberSaveable { mutableStateOf<String?>(null) }
     var origin by rememberSaveable { mutableStateOf("diagnostics-open") }
@@ -145,7 +153,29 @@ fun MainScreen(
     var pairingCode by remember { mutableStateOf("") }
     LaunchedEffect(state.connected) { if (state.connected) pairingCode = "" }
     val holder = rememberSaveableStateHolder()
-    if (showSetup) {
+    if (terminalWarning || (showTerminal && !terminalAccepted)) {
+        AlertDialog(onDismissRequest = { terminalWarning = false; showTerminal = false; returnFocus = "terminal-open" },
+            title = { Text(stringResource(R.string.terminal_warning_title)) },
+            text = { Text(stringResource(R.string.terminal_warning_body), modifier = Modifier.verticalScroll(rememberScrollState())) },
+            confirmButton = {
+                TextButton(onClick = { terminalAccepted = true; terminalWarning = false; showTerminal = true },
+                    modifier = Modifier.testTag("terminal-warning-accept")) {
+                    Text(stringResource(R.string.terminal_warning_accept))
+                }
+            }, dismissButton = {
+                TextButton(onClick = { terminalWarning = false; showTerminal = false; returnFocus = "terminal-open" },
+                    modifier = Modifier.testTag("terminal-warning-cancel")) {
+                    Text(stringResource(R.string.terminal_warning_cancel))
+                }
+            })
+    }
+    if (showTerminal && terminalAccepted && terminalActions != null) {
+        holder.SaveableStateProvider("terminal") {
+            TerminalScreen(mode, terminal, state.connection.takeIf { state.connected }?.targetOrNull()?.toString().orEmpty(),
+                state.busy, terminalActions, onBack = { showTerminal = false; returnFocus = "terminal-open" },
+                fileBusy = terminalFileBusy, fileMessage = terminalFileMessage)
+        }
+    } else if (showSetup) {
         SetupScreen(state, actions, onBack = { showSetup = false; returnFocus = "setup-open" })
     } else if (showDiagnostics) {
         DiagnosticsScreen(mode, diagnostics, selectedEvent,
@@ -166,7 +196,10 @@ fun MainScreen(
             onDiagnostics = { id, key ->
                 selectedEvent = id; origin = key; returnFocus = null
                 onRefreshDiagnostics(); showDiagnostics = true
-            }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null }, onSetup = { showSetup = true })
+            }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null }, onSetup = { showSetup = true },
+            onTerminal = if (terminalActions == null) null else ({
+                if (terminalAccepted) showTerminal = true else terminalWarning = true
+            }))
     }
 }
 
@@ -203,6 +236,7 @@ private fun MainContent(
     returnFocus: String?,
     onFocusRestored: () -> Unit,
     onSetup: () -> Unit,
+    onTerminal: (() -> Unit)?,
 ) {
     val uriHandler = LocalUriHandler.current
     var repositoryLinkFailed by remember { mutableStateOf(false) }
@@ -269,6 +303,16 @@ private fun MainContent(
             }
         }
         ConnectionStatus(mode, state, actions)
+        if (onTerminal != null) {
+            val terminalFocus = remember { FocusRequester() }
+            LaunchedEffect(returnFocus) {
+                if (returnFocus == "terminal-open") { terminalFocus.requestFocus(); onFocusRestored() }
+            }
+            FilledTonalButton(onClick = onTerminal, shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.focusRequester(terminalFocus).focusProperties { canFocus = true }.testTag("terminal-open")) {
+                Text(stringResource(R.string.terminal_title))
+            }
+        }
         FunctionCard("discovery") {
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {

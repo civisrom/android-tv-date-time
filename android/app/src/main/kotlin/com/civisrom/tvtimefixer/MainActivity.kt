@@ -10,6 +10,8 @@ import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.provider.OpenableColumns
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +72,7 @@ import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.collect
@@ -79,6 +82,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runInterruptible
 import com.civisrom.tvtimefixer.diagnostics.OperationTrace
+import com.civisrom.tvtimefixer.terminal.*
+import com.civisrom.tvtimefixer.ui.TerminalActions
 
 class MainActivity : ComponentActivity() {
 
@@ -102,6 +107,160 @@ class MainActivity : ComponentActivity() {
     private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
     private val favoritesStore get() = (application as TimeFixerApplication).favorites
+    private val terminal = TerminalSession()
+    private val terminalFiles by lazy { TerminalFiles(File(filesDir, "terminal-documents")) }
+    private var terminalFileBusy by mutableStateOf(false)
+    private var terminalFileMessage by mutableStateOf<Int?>(null)
+    private var exportDocument: String? = null
+
+    private val importDocuments = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) copyTerminalDocument {
+            for (uri in uris) {
+                val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                } ?: "document.bin"
+                val local = terminalFiles.uniqueName(name)
+                contentResolver.openInputStream(uri)?.use { input ->
+                    terminalFiles.receive(local) { output -> input.copyTo(output) }
+                } ?: throw java.io.IOException("Document unavailable")
+            }
+        }
+    }
+    private val exportDocuments = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val name = exportDocument
+        exportDocument = null
+        if (uri != null && name != null) copyTerminalDocument {
+            terminalFiles.resolve(name).inputStream().use { input ->
+                contentResolver.openOutputStream(uri, "wt")?.use { input.copyTo(it) }
+                    ?: throw java.io.IOException("Document unavailable")
+            }
+        }
+    }
+
+    private fun copyTerminalDocument(block: () -> Unit) {
+        if (terminalFileBusy || terminal.state.value.running) return
+        terminalFileBusy = true; terminalFileMessage = null
+        lifecycleScope.launch {
+            try {
+                runInterruptible(Dispatchers.IO, block)
+                terminalFileMessage = R.string.terminal_file_done
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { terminalFileMessage = R.string.terminal_file_failed
+            } finally {
+                terminalFileBusy = false
+                refreshTerminalFiles()
+            }
+        }
+    }
+
+    private suspend fun refreshTerminalFiles() {
+        val names = withContext(Dispatchers.IO) { terminalFiles.list().map { it.name } }
+        terminal.refreshFiles(names)
+    }
+
+    private val terminalActions = object : TerminalActions {
+        override fun edit(command: String) = terminal.edit(command)
+        override fun clearOutput() = terminal.clearOutput()
+        override fun clearHistory() = terminal.clearHistory()
+        override fun stop() { if (terminal.state.value.running) actionJob?.cancel() }
+        override fun importFiles() {
+            if (terminalFileBusy || state.busy) return
+            try { importDocuments.launch(arrayOf("*/*")) }
+            catch (_: android.content.ActivityNotFoundException) { terminalFileMessage = R.string.terminal_file_unavailable }
+        }
+        override fun exportFile(name: String) {
+            if (terminalFileBusy || state.busy) return
+            exportDocument = name
+            try { exportDocuments.launch(name) }
+            catch (_: android.content.ActivityNotFoundException) { exportDocument = null; terminalFileMessage = R.string.terminal_file_unavailable }
+        }
+
+        override fun run() {
+            if (state.busy || terminalFileBusy) return
+            if (state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress && !networkAllowed()) return
+            val command = terminal.start(state.connection.takeIf { state.connected }?.targetOrNull()?.toString()
+                ?: getString(R.string.terminal_unknown_target)) ?: return
+            val generation = ++actionGeneration
+            state = state.copy(busy = true, operation = Operation.TERMINAL, message = null, diagnosticEventId = null)
+            actionJob = lifecycleScope.launch {
+                try {
+                    deviceOperations.withLock {
+                        val adb = command as? TerminalCommand.Adb
+                        when (adb?.name) {
+                            "connect" -> {
+                                if (adb.arguments.size != 1) throw TerminalException(TerminalProblem.ARGUMENTS)
+                                if (com.civisrom.tvtimefixer.data.parseDeviceAddress(adb.arguments.single()) == null) {
+                                    throw TerminalException(TerminalProblem.ARGUMENTS)
+                                }
+                                if (!networkAllowed()) throw TerminalException(TerminalProblem.CONNECTION)
+                                val connection = runInterruptible(Dispatchers.IO) { connector.connect(adb.arguments.single()) }
+                                state = state.connectionLost().copy(connection = connection)
+                                if (connection !is ConnectionState.Connected) throw TerminalException(TerminalProblem.CONNECTION)
+                                terminal.append(connection.address.toString())
+                                terminal.finish(0)
+                            }
+                            "disconnect" -> {
+                                if (adb.arguments.size > 1 || (adb.arguments.isNotEmpty() &&
+                                    com.civisrom.tvtimefixer.data.parseDeviceAddress(adb.arguments.single()) != state.connectedAddress)) {
+                                    throw TerminalException(TerminalProblem.ARGUMENTS)
+                                }
+                                runInterruptible(Dispatchers.IO) { connector.disconnect() }
+                                state = state.connectionLost(); terminal.finish(0)
+                            }
+                            "devices", "get-state", "get-serialno" -> {
+                                if (adb.arguments.isNotEmpty() && !(adb.name == "devices" && adb.arguments == listOf("-l"))) {
+                                    throw TerminalException(TerminalProblem.ARGUMENTS)
+                                }
+                                val connection = runInterruptible(Dispatchers.IO) { connector.checkConnection() }
+                                if (connection is ConnectionState.Connected) {
+                                    val value = when (adb.name) {
+                                        "devices" -> "${connection.address}\tdevice\n"
+                                        "get-serialno" -> if (connection.address is com.civisrom.tvtimefixer.data.DeviceAddress) {
+                                            connection.address.toString()
+                                        } else runInterruptible(Dispatchers.IO) {
+                                            connector.activeClient?.shell("getprop ro.serialno")?.output
+                                                ?: throw TerminalException(TerminalProblem.CONNECTION)
+                                        }
+                                        else -> "device\n"
+                                    }
+                                    terminal.append(value)
+                                } else {
+                                    state = state.connectionLost()
+                                    if (adb.name != "devices") throw TerminalException(TerminalProblem.CONNECTION)
+                                }
+                                terminal.finish(0)
+                            }
+                            else -> {
+                                if (!state.connected) throw TerminalException(TerminalProblem.CONNECTION)
+                                // Arbitrary shell commands can change any cached setting.
+                                state = state.connectionLost().copy(connection = state.connection)
+                                val exit = runInterruptible(Dispatchers.IO) {
+                                    val client = connector.activeClient ?: throw TerminalException(TerminalProblem.CONNECTION)
+                                    TerminalExecutor(terminalFiles, terminal).execute(client, command)
+                                }
+                                if (adb?.name in setOf("reboot", "root", "unroot", "usb", "tcpip")) {
+                                    runInterruptible(Dispatchers.IO) { connector.disconnect() }
+                                    state = state.connectionLost()
+                                }
+                                terminal.finish(exit)
+                            }
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    terminal.fail(e)
+                    withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
+                    if (generation == actionGeneration) state = state.connectionLost()
+                    throw e
+                } catch (e: Exception) {
+                    terminal.fail(e)
+                    if (withContext(Dispatchers.IO) { connector.activeClient == null }) state = state.connectionLost()
+                } finally {
+                    if (generation == actionGeneration) state = state.copy(busy = false, operation = null)
+                    refreshTerminalFiles()
+                }
+            }
+        }
+    }
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -509,6 +668,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        exportDocument = savedInstanceState?.getString("terminalExportDocument")
         val usbFilter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -523,11 +683,15 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface {
                     val diagnostics by journal.snapshot.collectAsState()
+                    val terminalState by terminal.state.collectAsState()
                     MainScreen(mode = mode, state = state, actions = actions, diagnostics = diagnostics,
-                        onRefreshDiagnostics = journal::refresh, onClearDiagnostics = journal::clear)
+                        onRefreshDiagnostics = journal::refresh, onClearDiagnostics = journal::clear,
+                        terminal = terminalState, terminalActions = terminalActions,
+                        terminalFileBusy = terminalFileBusy, terminalFileMessage = terminalFileMessage)
                 }
             }
         }
+        lifecycleScope.launch { refreshTerminalFiles() }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var returning = true
@@ -550,6 +714,12 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         // Системный USB intent только обновляет список. ADB запускается кнопкой.
         if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) refreshUsbList(report = true)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Only a pending document name; terminal commands and output remain memory-only.
+        outState.putString("terminalExportDocument", exportDocument)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onStart() {

@@ -24,8 +24,17 @@ data class ShellResult(
  */
 interface AdbClient : AutoCloseable {
     fun shell(command: String): ShellResult
+    val shellV2Supported: Boolean get() = false
+    /** Двоичный ADB service; вызывающий владеет потоком и обязан закрыть его. */
+    fun openService(destination: String, timeoutMs: Int): AdbService =
+        throw UnsupportedOperationException("ADB services unavailable")
     /** Локальное состояние транспорта; true само по себе не подтверждает ответ устройства. */
     fun isAlive(): Boolean
+}
+
+interface AdbService : AutoCloseable {
+    val source: okio.BufferedSource
+    val sink: okio.BufferedSink
 }
 
 internal const val ADB_PROBE_TOKEN = "tvtimefixer"

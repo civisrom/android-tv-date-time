@@ -218,6 +218,7 @@ internal class AndroidUsbIo(
     private fun transfer(data: ByteArray, endpoint: UsbEndpoint, timeoutMs: Int, reading: Boolean) {
         val deadline = System.nanoTime() + timeoutMs * 1_000_000L
         fun remaining(): Int {
+            if (Thread.currentThread().isInterrupted) throw InterruptedException("USB operation cancelled")
             if (!isOpen) throw AdbConnectionException(ConnectionError.USB_DISCONNECTED)
             val left = (deadline - System.nanoTime()) / 1_000_000
             if (left <= 0) throw SocketTimeoutException("USB transfer timed out")

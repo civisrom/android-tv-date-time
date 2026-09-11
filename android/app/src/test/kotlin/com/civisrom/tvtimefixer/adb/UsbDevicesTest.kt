@@ -9,6 +9,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UsbDevicesTest {
+    @Test fun `cancellation is observed even when USB only returns zero length packets`() {
+        val connection = android.hardware.usb.UsbDeviceConnection().apply { maxRead = 0 }
+        val io = AndroidUsbIo(connection, findAdbInterface(UsbDevice(adb))!!) { true }
+        val failure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
+        val worker = Thread {
+            try { io.read(24, 300_000) } catch (e: Throwable) { failure.set(e) }
+        }
+        worker.start()
+        worker.interrupt()
+        worker.join(1500)
+        try {
+            assertFalse(worker.isAlive)
+            assertTrue(failure.get() is InterruptedException)
+        } finally { io.close(); worker.join(1500) }
+    }
     private val input = UsbEndpoint(2, 128, 512)
     private val output = UsbEndpoint(2, 0, 512)
     private val adb = UsbInterface(255, 66, 1, output, input)

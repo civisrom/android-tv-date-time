@@ -5,6 +5,11 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import okio.Buffer
+import okio.Source
+import okio.Sink
+import okio.Timeout
+import okio.buffer
 
 /** Отдельные USB transfers для заголовка и данных, как в AOSP LibUsbDevice. */
 internal interface UsbPacketIo : AutoCloseable {
@@ -32,6 +37,93 @@ internal class UsbAdbClient(
     private var peerMax = MAX_PAYLOAD
     private var shellV2 = false
     private var nextId = 1
+
+    override val shellV2Supported: Boolean get() = shellV2
+
+    /** Последовательный двунаправленный service для shell, SYNC и установки APK. */
+    @Synchronized
+    override fun openService(destination: String, timeoutMs: Int): AdbService {
+        check(isAlive()) { "USB disconnected" }
+        require('\u0000' !in destination)
+        val bytes = (destination + '\u0000').toByteArray(Charsets.UTF_8)
+        require(bytes.size <= peerMax)
+        val until = deadline(timeoutMs)
+        val localId = nextId++
+        try {
+            send(OPEN, localId, 0, bytes, until)
+            val opened = read(until)
+            if (opened.command != OKAY || opened.arg1 != localId || opened.arg0 == 0) fail("ADB service rejected")
+            return Service(localId, opened.arg0, until)
+        } catch (e: Exception) { close(); throw e }
+    }
+
+    private inner class Service(val localId: Int, val remoteId: Int, val until: Long) : AdbService {
+        private val pending = Buffer()
+        private var ended = false
+
+        private fun receive(deadline: Long = until): Int {
+            val packet = read(deadline)
+            if ((packet.arg0 != remoteId && !(packet.command == CLSE && packet.arg0 == 0)) || packet.arg1 != localId) {
+                fail("Wrong ADB stream ID")
+            }
+            when (packet.command) {
+                WRTE -> {
+                    if (pending.size + packet.data.size > MAX_OUTPUT) fail("ADB service buffer exceeded")
+                    pending.write(packet.data)
+                    send(OKAY, localId, remoteId, byteArrayOf(), deadline)
+                }
+                CLSE -> {
+                    ended = true
+                    send(CLSE, localId, remoteId, byteArrayOf(), deadline)
+                }
+                OKAY -> Unit
+                else -> fail("Unexpected ADB service packet")
+            }
+            return packet.command
+        }
+
+        private fun <T> guarded(block: () -> T): T = try { block() } catch (e: Exception) {
+            this@UsbAdbClient.close(); throw e
+        }
+
+        override val source = object : Source {
+            override fun timeout() = Timeout.NONE
+            override fun close() = this@Service.close()
+            override fun read(sink: Buffer, byteCount: Long): Long = guarded {
+                require(byteCount >= 0)
+                if (byteCount == 0L) return@guarded 0L
+                while (pending.size == 0L && !ended) receive()
+                if (pending.size == 0L) -1L else pending.read(sink, minOf(byteCount, pending.size))
+            }
+        }.buffer()
+
+        override val sink = object : Sink {
+            override fun timeout() = Timeout.NONE
+            override fun flush() = Unit
+            override fun close() = this@Service.close()
+            override fun write(source: Buffer, byteCount: Long) = guarded {
+                var left = byteCount
+                while (left > 0) {
+                    if (ended) fail("ADB service closed during write")
+                    val count = minOf(left, peerMax.toLong())
+                    send(WRTE, localId, remoteId, source.readByteArray(count), until)
+                    while (receive() != OKAY) if (ended) fail("ADB service closed before acknowledgement")
+                    left -= count
+                }
+            }
+        }.buffer()
+
+        override fun close() {
+            if (ended || !isAlive()) return
+            // Drain CLSE before another OPEN, so a late packet cannot contaminate the next operation.
+            try {
+                val closing = minOf(until, deadline(1_000))
+                send(CLSE, localId, remoteId, byteArrayOf(), closing)
+                while (!ended) receive(closing)
+            } catch (_: Exception) { this@UsbAdbClient.close() }
+            pending.clear()
+        }
+    }
 
     fun connect(authTimeoutMs: Int = 60_000) {
         val deadline = deadline(authTimeoutMs)

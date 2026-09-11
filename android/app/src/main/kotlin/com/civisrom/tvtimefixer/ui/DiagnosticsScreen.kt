@@ -72,6 +72,7 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.STORAGE -> R.string.operation_storage
     Operation.CHECK_TIME -> R.string.time_check_title
     Operation.APPLY_TIME_ZONE -> R.string.time_zone_apply
+    Operation.TERMINAL -> R.string.terminal_operation
 }
 
 private fun DiagnosticIssue.labelRes(): Int = when (this) {

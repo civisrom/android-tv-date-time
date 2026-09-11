@@ -18,6 +18,19 @@ import kotlinx.coroutines.CancellationException
 class KadbAdbClient(private val kadb: Kadb, private val commandTimeoutMs: Long = 15_000) : AdbClient {
     @Volatile private var closed = false
 
+    override val shellV2Supported: Boolean get() = kadb.supportsFeature("shell_v2")
+
+    override fun openService(destination: String, timeoutMs: Int): AdbService {
+        check(!closed) { "ADB client closed" }
+        require('\u0000' !in destination && destination.toByteArray(Charsets.UTF_8).size < 4096)
+        val stream = kadb.open(destination)
+        return object : AdbService {
+            override val source = stream.source
+            override val sink = stream.sink
+            override fun close() = stream.close()
+        }
+    }
+
     override fun shell(command: String): ShellResult = boundedAdbCommand(commandTimeoutMs, ::close) {
         check(!closed) { "ADB client closed" }
         val v2 = kadb.supportsFeature("shell_v2")
