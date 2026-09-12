@@ -1,0 +1,98 @@
+package com.civisrom.tvtimefixer.terminal
+
+import com.civisrom.tvtimefixer.R
+
+data class CommandExample(val id: String, val titleRes: Int, val command: String)
+data class CommandCategory(val id: String, val titleRes: Int, val examples: List<CommandExample>)
+
+val terminalCatalog: List<CommandCategory> = listOf(
+    CommandCategory("connection", R.string.terminal_category_connection, listOf(
+        CommandExample("connection_0", R.string.terminal_example_connection_0, "adb connect 192.168.1.100:5555"),
+        CommandExample("connection_1", R.string.terminal_example_connection_1, "adb devices"),
+        CommandExample("connection_2", R.string.terminal_example_connection_2, "adb get-state"),
+        CommandExample("connection_3", R.string.terminal_example_connection_3, "adb disconnect"),
+        CommandExample("connection_4", R.string.terminal_example_connection_4, "adb get-serialno"),
+    )),
+    CommandCategory("time", R.string.terminal_category_time, listOf(
+        CommandExample("time_0", R.string.terminal_example_time_0, "date"),
+        CommandExample("time_1", R.string.terminal_example_time_1, "settings get global ntp_server"),
+        CommandExample("time_2", R.string.terminal_example_time_2, "settings get global auto_time"),
+        CommandExample("time_3", R.string.terminal_example_time_3, "settings get global auto_time_zone"),
+        CommandExample("time_4", R.string.terminal_example_time_4, "getprop persist.sys.timezone"),
+        CommandExample("time_5", R.string.terminal_example_time_5, "settings put global ntp_server pool.ntp.org"),
+        CommandExample("time_6", R.string.terminal_example_time_6, "settings put global auto_time 1"),
+        CommandExample("time_7", R.string.terminal_example_time_7, "cmd network_time_update_service help"),
+    )),
+    CommandCategory("apps", R.string.terminal_category_apps, listOf(
+        CommandExample("apps_0", R.string.terminal_example_apps_0, "adb install -r 'application.apk'"),
+        CommandExample("apps_1", R.string.terminal_example_apps_1, "adb install-multiple -r 'base.apk' 'split.apk'"),
+        CommandExample("apps_2", R.string.terminal_example_apps_2, "pm list packages -3"),
+        CommandExample("apps_3", R.string.terminal_example_apps_3, "pm path PACKAGE"),
+        CommandExample("apps_4", R.string.terminal_example_apps_4, "adb uninstall PACKAGE"),
+        CommandExample("apps_5", R.string.terminal_example_apps_5, "pm disable-user --user 0 PACKAGE"),
+        CommandExample("apps_6", R.string.terminal_example_apps_6, "pm enable --user 0 PACKAGE"),
+        CommandExample("apps_7", R.string.terminal_example_apps_7, "pm clear --user 0 PACKAGE"),
+        CommandExample("apps_8", R.string.terminal_example_apps_8, "am force-stop PACKAGE"),
+        CommandExample("apps_9", R.string.terminal_example_apps_9, "am start -a android.settings.SETTINGS"),
+        CommandExample("apps_10", R.string.terminal_example_apps_10, "pm list users"),
+    )),
+    CommandCategory("files", R.string.terminal_category_files, listOf(
+        CommandExample("files_0", R.string.terminal_example_files_0, "adb push 'document.txt' /sdcard/Download/document.txt"),
+        CommandExample("files_1", R.string.terminal_example_files_1, "adb pull /sdcard/Download/document.txt 'received.txt'"),
+        CommandExample("files_2", R.string.terminal_example_files_2, "ls -la /sdcard/Download"),
+        CommandExample("files_3", R.string.terminal_example_files_3, "df -h"),
+        CommandExample("files_4", R.string.terminal_example_files_4, "du -h /sdcard/Download"),
+        CommandExample("files_5", R.string.terminal_example_files_5, "mkdir -p /sdcard/Download/adb-demo"),
+        CommandExample("files_6", R.string.terminal_example_files_6, "screencap -p /sdcard/Download/screen.png"),
+        CommandExample("files_7", R.string.terminal_example_files_7, "screenrecord --time-limit 30 /sdcard/Download/demo.mp4"),
+    )),
+    CommandCategory("system", R.string.terminal_category_system, listOf(
+        CommandExample("system_0", R.string.terminal_example_system_0, "getprop ro.product.model"),
+        CommandExample("system_1", R.string.terminal_example_system_1, "getprop ro.build.version.release"),
+        CommandExample("system_2", R.string.terminal_example_system_2, "getprop ro.build.version.sdk"),
+        CommandExample("system_3", R.string.terminal_example_system_3, "getprop"),
+        CommandExample("system_4", R.string.terminal_example_system_4, "cat /proc/cpuinfo"),
+        CommandExample("system_5", R.string.terminal_example_system_5, "cat /proc/meminfo"),
+        CommandExample("system_6", R.string.terminal_example_system_6, "id"),
+        CommandExample("system_7", R.string.terminal_example_system_7, "uname -a"),
+        CommandExample("system_8", R.string.terminal_example_system_8, "uptime"),
+    )),
+    CommandCategory("network", R.string.terminal_category_network, listOf(
+        CommandExample("network_0", R.string.terminal_example_network_0, "ip addr show"),
+        CommandExample("network_1", R.string.terminal_example_network_1, "ip route"),
+        CommandExample("network_2", R.string.terminal_example_network_2, "ping -c 4 1.1.1.1"),
+        CommandExample("network_3", R.string.terminal_example_network_3, "dumpsys connectivity"),
+        CommandExample("network_4", R.string.terminal_example_network_4, "dumpsys wifi"),
+    )),
+    CommandCategory("input", R.string.terminal_category_input, listOf(
+        CommandExample("input_0", R.string.terminal_example_input_0, "input keyevent KEYCODE_HOME"),
+        CommandExample("input_1", R.string.terminal_example_input_1, "input keyevent KEYCODE_BACK"),
+        CommandExample("input_2", R.string.terminal_example_input_2, "input keyevent KEYCODE_DPAD_CENTER"),
+        CommandExample("input_3", R.string.terminal_example_input_3, "input text hello%sworld"),
+        CommandExample("input_4", R.string.terminal_example_input_4, "wm size"),
+        CommandExample("input_5", R.string.terminal_example_input_5, "wm density"),
+    )),
+    CommandCategory("logs", R.string.terminal_category_logs, listOf(
+        CommandExample("logs_0", R.string.terminal_example_logs_0, "adb logcat -d -t 200"),
+        CommandExample("logs_1", R.string.terminal_example_logs_1, "logcat -v threadtime"),
+        CommandExample("logs_2", R.string.terminal_example_logs_2, "dumpsys -l"),
+        CommandExample("logs_3", R.string.terminal_example_logs_3, "dumpsys battery"),
+        CommandExample("logs_4", R.string.terminal_example_logs_4, "dumpsys meminfo"),
+        CommandExample("logs_5", R.string.terminal_example_logs_5, "ps -A"),
+        CommandExample("logs_6", R.string.terminal_example_logs_6, "top -b -n 1"),
+    )),
+    CommandCategory("services", R.string.terminal_category_services, listOf(
+        CommandExample("services_0", R.string.terminal_example_services_0, "adb reboot"),
+        CommandExample("services_1", R.string.terminal_example_services_1, "adb reboot recovery"),
+        CommandExample("services_2", R.string.terminal_example_services_2, "adb tcpip 5555"),
+        CommandExample("services_3", R.string.terminal_example_services_3, "adb usb"),
+        CommandExample("services_4", R.string.terminal_example_services_4, "adb root"),
+        CommandExample("services_5", R.string.terminal_example_services_5, "adb unroot"),
+        CommandExample("services_6", R.string.terminal_example_services_6, "ls /system/bin"),
+        CommandExample("services_7", R.string.terminal_example_services_7, "toybox --help"),
+        CommandExample("services_8", R.string.terminal_example_services_8, "cmd -l"),
+        CommandExample("services_9", R.string.terminal_example_services_9, "pm help"),
+        CommandExample("services_10", R.string.terminal_example_services_10, "am help"),
+        CommandExample("services_11", R.string.terminal_example_services_11, "settings help"),
+    )),
+).map { category -> category.copy(examples = category.examples + additionalTerminalExamples[category.id].orEmpty()) } + additionalTerminalCategories

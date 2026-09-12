@@ -26,6 +26,20 @@ import org.junit.Test
  */
 class AppStateTest {
 
+    @Test fun `connection cancellation is available only for an active connection attempt`() {
+        val connections = setOf(com.civisrom.tvtimefixer.diagnostics.Operation.CONNECT_NETWORK,
+            com.civisrom.tvtimefixer.diagnostics.Operation.CONNECT_USB,
+            com.civisrom.tvtimefixer.diagnostics.Operation.USB_PERMISSION,
+            com.civisrom.tvtimefixer.diagnostics.Operation.PAIR)
+        for (operation in com.civisrom.tvtimefixer.diagnostics.Operation.entries) {
+            val state = AppState(busy = true, operation = operation)
+            assertEquals(operation in connections, state.canCancelConnection)
+            assertFalse(state.copy(busy = false).canCancelConnection)
+            assertFalse(state.copy(connectionCancelling = true).canCancelConnection)
+        }
+        assertFalse(AppState(busy = true).canCancelConnection)
+    }
+
     @Test fun `late device read preserves discovery and a finished NTP scan`() {
         val before = AppState(discoverySearching = true)
         val latest = before.copy(discovered = listOf(com.civisrom.tvtimefixer.adb.DiscoveredDevice(
@@ -58,6 +72,7 @@ class AppStateTest {
     @Test fun `потеря связи убирает прежние сведения об устройстве и подтверждения времени`() {
         val usb = UsbDeviceAddress("/dev/bus/usb/test", "TV")
         val connected = AppState(connection = ConnectionState.Connected(address),
+            deviceName = "NVIDIA SHIELD",
             deviceInfo = DeviceInfo(model = "TV", currentNtpServer = "pool.ntp.org"),
             ntpMessage = UiMessage(R.string.ntp_applied), ntpDiagnosticEventId = 1L,
             timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH), timeDiagnosticEventId = 2L,
@@ -66,6 +81,7 @@ class AppStateTest {
         val lost = connected.connectionLost()
         assertFalse(lost.connected)
         assertNull(lost.deviceInfo)
+        assertEquals("", lost.deviceName)
         assertEquals("", lost.currentNtpServer)
         assertNull(lost.ntpMessage)
         assertNull(lost.ntpDiagnosticEventId)

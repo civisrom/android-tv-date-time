@@ -7,6 +7,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -58,6 +64,195 @@ private class FakeFactory(
 }
 
 class DeviceConnectorTest {
+    @Test fun `successful pairing waits for the device to accept its newly saved key`() = runBlocking {
+        val client = FakeClient()
+        var attempts = 0
+        var failures = 0
+        val factory = object : AdbClientFactory {
+            override suspend fun pair(address: DeviceAddress, pairingCode: String) = Unit
+            override fun connect(address: DeviceAddress): AdbClient {
+                if (++attempts == 1) throw AdbConnectionException(ConnectionError.TLS_FAILED)
+                return client
+            }
+        }
+        val connector = DeviceConnector(factory, onFailure = { _, _ -> failures++; null })
+        assertEquals(ConnectionState.Connected(DeviceAddress("192.0.2.1", 40002)),
+            connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002"))
+        assertEquals(2, attempts)
+        assertEquals(0, failures)
+        assertSame(client, connector.activeClient)
+    }
+
+    @Test fun `post pairing retry is bounded and only applies to TLS rejection`() = runBlocking {
+        for (reason in listOf(ConnectionError.TLS_FAILED, ConnectionError.CONNECTION_REFUSED)) {
+            val factory = FakeFactory(failWith = reason)
+            var failures = 0
+            val connector = DeviceConnector(factory, onFailure = { _, _ -> failures++; 42L })
+            val result = connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002")
+            assertEquals(ConnectionState.Failed(DeviceAddress("192.0.2.1", 40002), reason, 42L), result)
+            assertEquals(if (reason == ConnectionError.TLS_FAILED) 5 else 1, factory.connected.size)
+            assertEquals(1, failures)
+            assertEquals(1, factory.paired.size)
+            assertNull(connector.activeClient)
+        }
+        val unpaired = FakeFactory(failWith = ConnectionError.TLS_FAILED)
+        DeviceConnector(unpaired).connect("192.0.2.1:40002")
+        assertEquals(1, unpaired.connected.size)
+
+        var slowAttempts = 0
+        val slow = object : AdbClientFactory {
+            override suspend fun pair(address: DeviceAddress, pairingCode: String) = Unit
+            override fun connect(address: DeviceAddress): AdbClient {
+                slowAttempts++
+                Thread.sleep(5_100)
+                throw AdbConnectionException(ConnectionError.TLS_FAILED)
+            }
+        }
+        val result = DeviceConnector(slow).pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002")
+        assertEquals(ConnectionError.TLS_FAILED, (result as ConnectionState.Failed).reason)
+        assertEquals(1, slowAttempts)
+    }
+
+    @Test fun `cancelling post pairing key activation wait leaves no connection or retry`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        var attempts = 0
+        val factory = object : AdbClientFactory {
+            override suspend fun pair(address: DeviceAddress, pairingCode: String) = Unit
+            override fun connect(address: DeviceAddress): AdbClient {
+                attempts++
+                entered.complete(Unit)
+                throw AdbConnectionException(ConnectionError.TLS_FAILED)
+            }
+        }
+        val connector = DeviceConnector(factory)
+        val operation = async(Dispatchers.IO) {
+            connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002")
+        }
+        entered.await()
+        operation.cancelAndJoin()
+        assertEquals(1, attempts)
+        assertEquals(ConnectionState.Disconnected, connector.state)
+        assertNull(connector.activeClient)
+    }
+
+    @Test fun `cancellation as the paired connection opens closes the returned client`() = runBlocking {
+        val client = FakeClient()
+        lateinit var operation: Deferred<ConnectionState>
+        val factory = object : AdbClientFactory {
+            override suspend fun pair(address: DeviceAddress, pairingCode: String) = Unit
+            override fun connect(address: DeviceAddress): AdbClient {
+                operation.cancel()
+                return client
+            }
+        }
+        val connector = DeviceConnector(factory)
+        operation = async(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002")
+        }
+        operation.start()
+        operation.join()
+        assertTrue(operation.isCancelled)
+        assertEquals(ConnectionState.Disconnected, connector.state)
+        assertNull(connector.activeClient)
+        assertTrue(client.closed)
+    }
+
+    @Test fun `late post pairing TLS failure neither retries nor replaces a newer connection`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val proceed = CountDownLatch(1)
+        val client = FakeClient()
+        var oldAttempts = 0
+        var failures = 0
+        val factory = object : AdbClientFactory {
+            override suspend fun pair(address: DeviceAddress, pairingCode: String) = Unit
+            override fun connect(address: DeviceAddress): AdbClient {
+                if (address.host == "192.0.2.2") return client
+                oldAttempts++
+                entered.complete(Unit)
+                check(proceed.await(3, TimeUnit.SECONDS))
+                throw AdbConnectionException(ConnectionError.TLS_FAILED)
+            }
+        }
+        val connector = DeviceConnector(factory, onFailure = { _, _ -> failures++; null })
+        val operation = async(Dispatchers.IO) {
+            connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002")
+        }
+        val expected = ConnectionState.Connected(DeviceAddress("192.0.2.2", 40003))
+        try {
+            entered.await()
+            connector.disconnect()
+            assertEquals(expected, connector.connect("192.0.2.2:40003"))
+        } finally {
+            proceed.countDown()
+        }
+        assertEquals(expected, operation.await())
+        assertEquals(expected, connector.state)
+        assertSame(client, connector.activeClient)
+        assertEquals(1, oldAttempts)
+        assertEquals(0, failures)
+        assertFalse(client.closed)
+    }
+
+    @Test fun `invalid pairing input cannot leave an old transport hidden behind a failure`() = runBlocking {
+        for ((address, code) in listOf("192.0.2.2" to "123456", "192.0.2.2:40001" to "12345")) {
+            val factory = FakeFactory()
+            val connector = DeviceConnector(factory)
+            connector.connect("192.0.2.1")
+            assertTrue(connector.pairAndConnect(address, code, "192.0.2.2:40002") is ConnectionState.Failed)
+            assertNull(connector.activeClient)
+            assertTrue(factory.clients.single().closed)
+            assertTrue(factory.paired.isEmpty())
+        }
+    }
+
+    @Test fun `pairing requires explicit ports for both endpoints`() = runBlocking {
+        for ((pairing, connect) in listOf("192.0.2.1" to "192.0.2.1:40002", "192.0.2.1:40001" to "192.0.2.1")) {
+            val factory = FakeFactory()
+            val result = DeviceConnector(factory).pairAndConnect(pairing, "123456", connect)
+            assertEquals(ConnectionError.INVALID_ADDRESS, (result as ConnectionState.Failed).reason)
+            assertTrue(factory.paired.isEmpty())
+            assertTrue(factory.connected.isEmpty())
+        }
+    }
+
+    @Test fun `late pairing cannot reconnect or overwrite a newer connection after disconnect`() = runBlocking {
+        for (replace in listOf(false, true)) for (reject in listOf(false, true)) {
+            val entered = CompletableDeferred<Unit>()
+            val proceed = CompletableDeferred<Unit>()
+            val connected = mutableListOf<DeviceAddress>()
+            val factory = object : AdbClientFactory {
+                override fun connect(address: DeviceAddress): AdbClient {
+                    connected += address
+                    return FakeClient()
+                }
+                override suspend fun pair(address: DeviceAddress, pairingCode: String) {
+                    entered.complete(Unit)
+                    proceed.await()
+                    if (reject) throw AdbConnectionException(ConnectionError.PAIRING_REJECTED)
+                }
+            }
+            val connector = DeviceConnector(factory)
+            val pairing = async { connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002") }
+            entered.await()
+            connector.disconnect()
+            if (replace) connector.connect("192.0.2.2:40003")
+            val expected = connector.state
+            proceed.complete(Unit)
+            assertEquals(expected, pairing.await())
+            assertEquals(expected, connector.state)
+            assertTrue(connected.none { it.host == "192.0.2.1" })
+        }
+    }
+
+    @Test fun `failed pairing closes the previous transport instead of leaving it hidden`() = runBlocking {
+        val factory = FakeFactory(pairFailWith = ConnectionError.PAIRING_REJECTED)
+        val connector = DeviceConnector(factory)
+        connector.connect("192.0.2.1")
+        connector.pairAndConnect("192.0.2.2:40001", "123456", "192.0.2.2:40002")
+        assertTrue(factory.clients.single().closed)
+        assertNull(connector.activeClient)
+    }
+
     @Test fun `открытый сокет без ответа устройства больше не считается подключением`() {
         val factory = FakeFactory()
         val connector = DeviceConnector(factory)

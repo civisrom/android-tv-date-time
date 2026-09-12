@@ -16,6 +16,9 @@ sealed interface NtpUpdateResult {
     /** Адрес не прошёл проверку формата — до устройства не дошло. */
     data object InvalidServer : NtpUpdateResult
 
+    /** Целевое устройство ответило отказом прав на запись системной настройки. */
+    data object PermissionDenied : NtpUpdateResult
+
     /**
      * Команда выполнена, но устройство сообщает другое значение.
      *
@@ -39,6 +42,14 @@ private const val NTP_SETTING = "global ntp_server"
  */
 class DeviceRepository(private val client: AdbClient, private val onFailure: (Exception) -> Unit = {}) {
     private var infoDeadline: Long? = null
+
+    fun readDeviceName(): String {
+        val result = client.shell("getprop")
+        if (result.exitCode != 0) return "" // Model metadata is optional; connection was already probed.
+        val props = parseGetProp(result.output)
+        return DeviceInfo(model = props["ro.product.model"].orEmpty(),
+            manufacturer = props["ro.product.manufacturer"].orEmpty()).displayName
+    }
 
     fun currentNtpServer(): String = client.shell("settings get $NTP_SETTING").let {
         check(it.exitCode == 0 && it.errorOutput.isBlank() && it.trimmedOutput.isNotEmpty()) { "NTP setting read failed" }
@@ -67,6 +78,7 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
             val automatic = parseAutomaticSetting(optional("settings get global auto_time"))
             val result = client.shell(if (value == "null") "settings delete $NTP_SETTING"
                 else "settings put $NTP_SETTING ${shellQuote(value)}")
+            if (result.permissionDenied) return NtpUpdateResult.PermissionDenied
             check(result.exitCode == 0 && result.errorOutput.isBlank()) { "NTP setting write failed" }
             val confirmed = currentNtpServer()
             if (confirmed == value) {

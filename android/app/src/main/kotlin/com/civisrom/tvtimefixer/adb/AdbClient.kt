@@ -13,6 +13,12 @@ data class ShellResult(
 ) {
     /** Вывод без хвостовых переводов строки — команды adb почти всегда их добавляют. */
     val trimmedOutput: String get() = output.trim()
+
+    /** Старые shell-транспорты смешивают stderr/stdout и не передают код возврата. */
+    val permissionDenied: Boolean get() {
+        val text = (errorOutput.take(4096) + output.take(4096)).lowercase()
+        return "permission denied" in text || "permission denial" in text || "securityexception" in text
+    }
 }
 
 /**
@@ -24,8 +30,17 @@ data class ShellResult(
  */
 interface AdbClient : AutoCloseable {
     fun shell(command: String): ShellResult
+    val shellV2Supported: Boolean get() = false
+    /** Двоичный ADB service; вызывающий владеет потоком и обязан закрыть его. */
+    fun openService(destination: String, timeoutMs: Int): AdbService =
+        throw UnsupportedOperationException("ADB services unavailable")
     /** Локальное состояние транспорта; true само по себе не подтверждает ответ устройства. */
     fun isAlive(): Boolean
+}
+
+interface AdbService : AutoCloseable {
+    val source: okio.BufferedSource
+    val sink: okio.BufferedSink
 }
 
 internal const val ADB_PROBE_TOKEN = "tvtimefixer"

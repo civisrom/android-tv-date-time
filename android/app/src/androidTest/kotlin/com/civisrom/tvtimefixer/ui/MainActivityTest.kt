@@ -8,7 +8,6 @@ import android.system.OsConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
-import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -29,6 +28,92 @@ import org.junit.Test
 /** Настоящие Application, Activity, lifecycle и обработчики действий установленного APK. */
 class MainActivityTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+
+    @Test fun stalled_connection_can_be_cancelled_and_retried_without_leaving_a_socket_open() {
+        java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { listener ->
+            listener.soTimeout = 15_000
+            val accepted = List(2) { java.util.concurrent.CountDownLatch(1) }
+            val closed = List(2) { java.util.concurrent.CountDownLatch(1) }
+            val peer = kotlin.concurrent.thread(isDaemon = true) {
+                try {
+                    repeat(2) { attempt ->
+                        listener.accept().use { socket ->
+                            socket.soTimeout = 15_000
+                            accepted[attempt].countDown()
+                            val input = socket.getInputStream()
+                            while (input.read() != -1) { /* Consume CNXN, never authorize. */ }
+                            closed[attempt].countDown()
+                        }
+                    }
+                } catch (_: java.io.IOException) { /* Teardown closes the fixture after a failed assertion. */ }
+            }
+            compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+            compose.onNodeWithTag("network-address").performScrollTo()
+                .performTextReplacement("127.0.0.1:${listener.localPort}")
+            repeat(2) { attempt ->
+                compose.onNodeWithTag("network-connect").performScrollTo()
+                    .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+                assertTrue("Fixture was not contacted", accepted[attempt].await(5, java.util.concurrent.TimeUnit.SECONDS))
+                compose.onNodeWithTag("connection-cancel").performScrollTo().assertIsEnabled().performClick()
+                compose.waitUntil(3_000) {
+                    runCatching { compose.onNodeWithTag("network-connect").assertIsEnabled() }.isSuccess
+                }
+                assertTrue("Cancelled connection left its socket open", closed[attempt].await(1, java.util.concurrent.TimeUnit.SECONDS))
+                compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+                compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsNotEnabled()
+            }
+            peer.join(1_000)
+        }
+    }
+
+    @Test fun terminal_opens_from_main_and_returns_focus_to_its_entry() {
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").performClick()
+        compose.onNodeWithTag("terminal-screen").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-input").performTextInput("getprop ro.product.model")
+        compose.onNodeWithTag("terminal-back").performClick()
+        compose.onNodeWithTag("terminal-open").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("terminal-open").performClick()
+        compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
+        screenshot("terminal-draft")
+    }
+
+    @Test fun terminal_without_a_connection_reports_failure_without_running_locally() {
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").performClick()
+        compose.onNodeWithTag("terminal-input").performTextInput("echo terminal-test")
+        // The system IME moves Run after Compose text input has already returned.
+        if (Build.VERSION.SDK_INT >= 30) {
+            val root = compose.activity.window.decorView
+            compose.waitUntil(5_000) {
+                compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
+            }
+        }
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
+        compose.onNodeWithTag("terminal-run").performClick()
+        val error = compose.activity.getString(R.string.terminal_connection_error)
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("terminal-status") and hasText(error, substring = true))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-status"))
+        compose.onNodeWithTag("terminal-status").assertTextContains(error)
+        screenshot("terminal-disconnected")
+    }
+
+    @Test fun terminal_warning_can_be_cancelled_and_is_not_repeated_within_the_session() {
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.terminal_warning_body)).assertIsDisplayed()
+        screenshot("terminal-warning")
+        compose.onNodeWithTag("terminal-warning-cancel").performClick()
+        compose.onNodeWithTag("terminal-screen").assertDoesNotExist()
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").performClick()
+        compose.onNodeWithTag("terminal-back").performClick()
+        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+        compose.onNodeWithTag("terminal-warning-accept").assertDoesNotExist()
+        compose.onNodeWithTag("terminal-screen").assertIsDisplayed()
+    }
 
     private fun screenshot(name: String) {
         compose.waitForIdle()
@@ -108,19 +193,17 @@ class MainActivityTest {
                         compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
                     } else {
                         // Legacy Insets only estimate IME visibility and miss floating dialogs.
-                        val windows = automation.windows
-                        try {
-                            windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
-                        } finally {
-                            @Suppress("DEPRECATION")
-                            windows.forEach { it.recycle() }
-                        }
+                        hasLegacyImeWindow(automation) == visible
                     }
                 }
                 automation.waitForIdle(300, 3_000)
             }
             try {
-                compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+                compose.waitUntil(5_000) {
+                    compose.runOnUiThread { compose.activity.window.decorView.hasWindowFocus() }
+                }
+                // Semantics text input alone does not promise to open the software keyboard.
+                compose.onNodeWithTag("ntp-address").performScrollTo().performClick().performTextInput("pool.ntp.org")
                 waitForKeyboard(true)
                 compose.onNodeWithTag("ntp-address").performImeAction()
                 waitForKeyboard(false)

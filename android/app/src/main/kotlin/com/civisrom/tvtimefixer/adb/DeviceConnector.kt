@@ -6,6 +6,9 @@ import com.civisrom.tvtimefixer.data.DEFAULT_ADB_PORT
 import com.civisrom.tvtimefixer.data.isValidPairingCode
 import com.civisrom.tvtimefixer.data.parseDeviceAddress
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
 
 /** Состояние подключения к устройству. */
 sealed interface ConnectionState {
@@ -84,8 +87,7 @@ class DeviceConnector(
     fun connect(input: String): ConnectionState {
         val address = parseDeviceAddress(input)
         if (address == null) {
-            state = ConnectionState.Failed(null, ConnectionError.INVALID_ADDRESS)
-            return state
+            return failInput(null, ConnectionError.INVALID_ADDRESS)
         }
         return connect(address)
     }
@@ -94,21 +96,54 @@ class DeviceConnector(
 
     fun connectUsb(address: UsbDeviceAddress): ConnectionState = connectTarget(address) { usbConnect(address) }
 
-    private fun connectTarget(address: DeviceTarget, open: () -> AdbClient): ConnectionState {
+    private fun failInput(address: DeviceTarget?, reason: ConnectionError): ConnectionState {
+        val previous = synchronized(lock) {
+            val previous = client
+            client = null
+            generation++
+            state = ConnectionState.Failed(address, reason)
+            previous
+        }
+        previous?.close()
+        return state
+    }
+
+    private fun connectTarget(address: DeviceTarget, expectedGeneration: Int? = null, open: () -> AdbClient): ConnectionState {
         val (previous, attempt) = synchronized(lock) {
+            if (expectedGeneration != null && generation != expectedGeneration) return state
             val existing = client
             if (existing != null && state.targetOrNull() == address && existing.isAlive()) {
                 state = ConnectionState.Connected(address)
                 return state
             }
             client = null
-            generation++
+            // The post-pair connection belongs to the same cancellable attempt.
+            if (expectedGeneration == null) generation++
             state = ConnectionState.Connecting(address)
             existing to generation
         }
         previous?.close()
         return try {
-            val opened = open()
+            var opened: AdbClient
+            var retries = 0
+            val retryStarted = System.nanoTime()
+            while (true) {
+                try {
+                    opened = open()
+                    break
+                } catch (e: AdbConnectionException) {
+                    if (synchronized(lock) { generation != attempt }) return state
+                    // Android persists a paired key asynchronously after the exchange.
+                    // Only this initial connection may briefly retry TLS rejection;
+                    // a wrong code and ordinary connections never enter this path.
+                    val delayMs = 250L shl minOf(retries, 2)
+                    if (expectedGeneration == null || e.reason != ConnectionError.TLS_FAILED || retries == 4 ||
+                        System.nanoTime() - retryStarted + delayMs * 1_000_000 > 5_000_000_000L) throw e
+                    retries++
+                    Thread.sleep(delayMs)
+                    if (synchronized(lock) { generation != attempt }) return state
+                }
+            }
             val accepted = synchronized(lock) {
                 if (generation != attempt) false else {
                     client = opened
@@ -140,23 +175,47 @@ class DeviceConnector(
         pairingCode: String,
         connectInput: String,
     ): ConnectionState {
-        val pairingAddress = parseDeviceAddress(pairingInput)
-        val connectAddress = parseDeviceAddress(connectInput)
+        // Wireless debugging advertises both ports; the legacy default 5555 is not a substitute.
+        val pairingAddress = parseDeviceAddress(pairingInput).takeIf { ':' in pairingInput }
+        val connectAddress = parseDeviceAddress(connectInput).takeIf { ':' in connectInput }
         if (pairingAddress == null || connectAddress == null) {
-            state = ConnectionState.Failed(null, ConnectionError.INVALID_ADDRESS)
-            return state
+            return failInput(null, ConnectionError.INVALID_ADDRESS)
         }
         if (!isValidPairingCode(pairingCode)) {
-            state = ConnectionState.Failed(pairingAddress, ConnectionError.PAIRING_REJECTED)
-            return state
+            return failInput(pairingAddress, ConnectionError.PAIRING_REJECTED)
         }
 
+        val (previous, attempt) = synchronized(lock) {
+            val previous = client
+            client = null
+            generation++
+            state = ConnectionState.Connecting(connectAddress)
+            previous to generation
+        }
+        previous?.close()
         return try {
             factory.pair(pairingAddress, pairingCode.trim())
-            connect(connectAddress)
+            currentCoroutineContext().ensureActive()
+            runInterruptible {
+                connectTarget(connectAddress, attempt) { factory.connect(connectAddress) }
+            }
+        } catch (e: CancellationException) {
+            val abandoned = synchronized(lock) {
+                if (generation == attempt) {
+                    generation++
+                    val abandoned = client
+                    client = null
+                    state = ConnectionState.Disconnected
+                    abandoned
+                } else null
+            }
+            runCatching { abandoned?.close() }
+            throw e
         } catch (e: AdbConnectionException) {
             val diagnosticId = runCatching { onFailure(pairingAddress, e) }.getOrNull()
-            state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
+            synchronized(lock) {
+                if (generation == attempt) state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
+            }
             state
         }
     }

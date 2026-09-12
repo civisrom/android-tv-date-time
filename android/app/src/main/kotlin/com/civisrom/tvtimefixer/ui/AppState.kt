@@ -26,6 +26,7 @@ data class AppState(
     val favoritesBusy: Boolean = false,
     val connection: ConnectionState = ConnectionState.Disconnected,
     val busy: Boolean = false,
+    val connectionCancelling: Boolean = false,
     val operation: Operation? = null,
     val diagnosticEventId: Long? = null,
     val ntpDiagnosticEventId: Long? = null,
@@ -42,6 +43,7 @@ data class AppState(
     val usbScanFailed: Boolean = false,
     val usbSystemState: UsbSystemState = UsbSystemState(),
     val deviceInfo: DeviceInfo? = null,
+    val deviceName: String = "",
     val message: UiMessage? = null,
     /**
      * Итог смены сервера времени — отдельно от [message] намеренно.
@@ -78,6 +80,7 @@ data class AppState(
     /** После потери связи сведения и подтверждения от прежнего устройства больше не актуальны. */
     fun connectionLost(): AppState = copy(
         connection = ConnectionState.Disconnected,
+        deviceName = "",
         deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
         ntpChange = null, ntpBeforeTime = null,
         timeCheck = null, timeDiagnosticEventId = null,
@@ -85,6 +88,11 @@ data class AppState(
     )
 
     val connected: Boolean get() = connection is ConnectionState.Connected
+
+    val connectionInProgress: Boolean get() = busy && operation in setOf(
+        Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.USB_PERMISSION, Operation.PAIR,
+    )
+    val canCancelConnection: Boolean get() = connectionInProgress && !connectionCancelling
 
     /**
      * Адрес, с которым связь **действительно установлена**, иначе null.

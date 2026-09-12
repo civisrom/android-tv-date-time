@@ -48,6 +48,7 @@ class OperationTrace {
         is NtpUpdateResult.Applied -> "ntp.write_confirmed=true"
         is NtpUpdateResult.NotConfirmed -> "ntp.write_confirmed=false; response=mismatched_value"
         is NtpUpdateResult.InvalidServer -> "ntp.write_attempted=false; reason=invalid_address"
+        NtpUpdateResult.PermissionDenied -> "ntp.write_confirmed=false; response=permission_denied"
         is NtpUpdateResult.Failed -> "ntp.write_confirmed=false; response=exception"
     })
 
@@ -94,8 +95,7 @@ class OperationTrace {
         val output = result.trimmedOutput
         val diagnosticText = (result.errorOutput.take(4096) + result.output.take(4096)).lowercase()
         val error = when {
-            "permission denied" in diagnosticText || "permission denial" in diagnosticText ||
-                "securityexception" in diagnosticText -> "permission_denied"
+            result.permissionDenied -> "permission_denied"
             "unknown command" in diagnosticText -> "unknown_command"
             "can't find service" in diagnosticText -> "service_missing"
             "not found" in diagnosticText -> "not_found"

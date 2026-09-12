@@ -71,6 +71,7 @@ fun NtpUpdateResult.toUiMessage(): UiMessage = when (this) {
     is NtpUpdateResult.Applied -> if (server == "null") UiMessage(R.string.ntp_default_applied)
         else UiMessage(R.string.ntp_applied, listOf(server))
     NtpUpdateResult.InvalidServer -> UiMessage(R.string.ntp_invalid)
+    NtpUpdateResult.PermissionDenied -> UiMessage(R.string.ntp_permission_denied)
     is NtpUpdateResult.NotConfirmed -> UiMessage(
         R.string.ntp_not_confirmed,
         listOf(actual.ifEmpty { "—" }),

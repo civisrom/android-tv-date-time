@@ -10,6 +10,8 @@ import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.provider.OpenableColumns
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -55,6 +57,7 @@ import com.civisrom.tvtimefixer.ui.AppState
 import com.civisrom.tvtimefixer.ui.MainScreen
 import com.civisrom.tvtimefixer.ui.UiMessage
 import com.civisrom.tvtimefixer.ui.toUiMessage
+import com.civisrom.tvtimefixer.ui.messageRes
 import com.civisrom.tvtimefixer.ui.rejectionMessageRes
 import com.civisrom.tvtimefixer.diagnostics.Operation
 import com.civisrom.tvtimefixer.diagnostics.Outcome
@@ -70,6 +73,7 @@ import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.collect
@@ -79,6 +83,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runInterruptible
 import com.civisrom.tvtimefixer.diagnostics.OperationTrace
+import com.civisrom.tvtimefixer.terminal.*
+import com.civisrom.tvtimefixer.ui.TerminalActions
 
 class MainActivity : ComponentActivity() {
 
@@ -88,7 +94,7 @@ class MainActivity : ComponentActivity() {
     private val connector by lazy {
         DeviceConnector(factory, usbConnect = usb::connect, onFailure = { target, error ->
             val operation = when {
-                error.reason.name.startsWith("PAIRING") || error.reason == ConnectionError.TLS_FAILED -> Operation.PAIR
+                state.operation == Operation.PAIR || error.reason.name.startsWith("PAIRING") -> Operation.PAIR
                 target is UsbDeviceAddress -> Operation.CONNECT_USB
                 else -> Operation.CONNECT_NETWORK
             }
@@ -102,6 +108,182 @@ class MainActivity : ComponentActivity() {
     private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
     private val favoritesStore get() = (application as TimeFixerApplication).favorites
+    private val terminal = TerminalSession()
+    private val terminalFiles by lazy { TerminalFiles(File(filesDir, "terminal-documents")) }
+    private var terminalFileBusy by mutableStateOf(false)
+    private var terminalFileMessage by mutableStateOf<Int?>(null)
+    private var exportDocument: String? = null
+
+    private val importDocuments = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) runTerminalFileOperation {
+            for (uri in uris) {
+                val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                } ?: "document.bin"
+                val local = terminalFiles.uniqueName(name)
+                contentResolver.openInputStream(uri)?.use { input ->
+                    terminalFiles.receive(local) { output -> input.copyTo(output) }
+                } ?: throw java.io.IOException("Document unavailable")
+            }
+        }
+    }
+    private val exportDocuments = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val name = exportDocument
+        exportDocument = null
+        if (uri != null && name != null) runTerminalFileOperation {
+            terminalFiles.resolve(name).inputStream().use { input ->
+                contentResolver.openOutputStream(uri, "wt")?.use { input.copyTo(it) }
+                    ?: throw java.io.IOException("Document unavailable")
+            }
+        }
+    }
+
+    private fun runTerminalFileOperation(
+        successMessage: Int = R.string.terminal_file_done,
+        failureMessage: Int = R.string.terminal_file_failed,
+        block: () -> Unit,
+    ) {
+        if (terminalFileBusy || terminal.state.value.running || state.busy) return
+        terminalFileBusy = true; terminalFileMessage = null
+        lifecycleScope.launch {
+            try {
+                runInterruptible(Dispatchers.IO, block)
+                terminalFileMessage = successMessage
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { terminalFileMessage = failureMessage
+            } finally {
+                terminalFileBusy = false
+                refreshTerminalFiles()
+            }
+        }
+    }
+
+    private suspend fun refreshTerminalFiles() {
+        val names = withContext(Dispatchers.IO) { terminalFiles.list().map { it.name } }
+        terminal.refreshFiles(names)
+    }
+
+    private val terminalActions = object : TerminalActions {
+        override fun edit(command: String) = terminal.edit(command)
+        override fun clearOutput() = terminal.clearOutput()
+        override fun clearHistory() = terminal.clearHistory()
+        override fun stop() { if (terminal.state.value.running) actionJob?.cancel() }
+        override fun importFiles() {
+            if (terminalFileBusy || state.busy) return
+            try { importDocuments.launch(arrayOf("*/*")) }
+            catch (_: android.content.ActivityNotFoundException) { terminalFileMessage = R.string.terminal_file_unavailable }
+        }
+        override fun exportFile(name: String) {
+            if (terminalFileBusy || state.busy) return
+            exportDocument = name
+            try { exportDocuments.launch(name) }
+            catch (_: android.content.ActivityNotFoundException) { exportDocument = null; terminalFileMessage = R.string.terminal_file_unavailable }
+        }
+
+        override fun removeFile(name: String) {
+            runTerminalFileOperation(R.string.terminal_remove_done, R.string.terminal_remove_failed) {
+                terminalFiles.remove(name)
+            }
+        }
+
+        override fun run() {
+            if (state.busy || terminalFileBusy) return
+            if (state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress && !networkAllowed()) return
+            val command = terminal.start(state.connection.takeIf { state.connected }?.targetOrNull()?.toString()
+                ?: getString(R.string.terminal_unknown_target), state.deviceName) ?: return
+            val generation = ++actionGeneration
+            state = state.copy(busy = true, operation = Operation.TERMINAL, message = null, diagnosticEventId = null)
+            actionJob = lifecycleScope.launch {
+                try {
+                    deviceOperations.withLock {
+                        val adb = command as? TerminalCommand.Adb
+                        when (adb?.name) {
+                            "connect" -> {
+                                if (adb.arguments.size != 1) throw TerminalException(TerminalProblem.ARGUMENTS)
+                                if (com.civisrom.tvtimefixer.data.parseDeviceAddress(adb.arguments.single()) == null) {
+                                    throw TerminalException(TerminalProblem.ARGUMENTS)
+                                }
+                                if (!networkAllowed()) throw TerminalException(TerminalProblem.CONNECTION)
+                                val connection = runInterruptible(Dispatchers.IO) { connector.connect(adb.arguments.single()) }
+                                state = state.connectionLost().copy(connection = connection)
+                                if (connection !is ConnectionState.Connected) {
+                                    val reason = (connection as? ConnectionState.Failed)?.reason
+                                    terminal.append(getString(R.string.terminal_connect_failed,
+                                        getString(reason?.messageRes() ?: R.string.terminal_connection_error)) + "\n", true)
+                                    throw TerminalException(TerminalProblem.CONNECTION)
+                                }
+                                terminal.append(getString(R.string.terminal_connect_success, connection.address.toString()) + "\n")
+                                val name = runInterruptible(Dispatchers.IO) {
+                                    val client = connector.activeClient ?: throw TerminalException(TerminalProblem.CONNECTION)
+                                    DeviceRepository(client).readDeviceName()
+                                }
+                                state = state.copy(deviceName = name)
+                                terminal.identifyTarget(connection.address.toString(), name)
+                                if (name.isNotBlank()) terminal.append(getString(R.string.terminal_device_name, name) + "\n")
+                                terminal.finish(0)
+                            }
+                            "disconnect" -> {
+                                if (adb.arguments.size > 1 || (adb.arguments.isNotEmpty() &&
+                                    com.civisrom.tvtimefixer.data.parseDeviceAddress(adb.arguments.single()) != state.connectedAddress)) {
+                                    throw TerminalException(TerminalProblem.ARGUMENTS)
+                                }
+                                runInterruptible(Dispatchers.IO) { connector.disconnect() }
+                                state = state.connectionLost(); terminal.finish(0)
+                            }
+                            "devices", "get-state", "get-serialno" -> {
+                                if (adb.arguments.isNotEmpty() && !(adb.name == "devices" && adb.arguments == listOf("-l"))) {
+                                    throw TerminalException(TerminalProblem.ARGUMENTS)
+                                }
+                                val connection = runInterruptible(Dispatchers.IO) { connector.checkConnection() }
+                                if (connection is ConnectionState.Connected) {
+                                    val value = when (adb.name) {
+                                        "devices" -> "${connection.address}\tdevice\n"
+                                        "get-serialno" -> if (connection.address is com.civisrom.tvtimefixer.data.DeviceAddress) {
+                                            connection.address.toString()
+                                        } else runInterruptible(Dispatchers.IO) {
+                                            connector.activeClient?.shell("getprop ro.serialno")?.output
+                                                ?: throw TerminalException(TerminalProblem.CONNECTION)
+                                        }
+                                        else -> "device\n"
+                                    }
+                                    terminal.append(value)
+                                } else {
+                                    state = state.connectionLost()
+                                    if (adb.name != "devices") throw TerminalException(TerminalProblem.CONNECTION)
+                                }
+                                terminal.finish(0)
+                            }
+                            else -> {
+                                if (!state.connected) throw TerminalException(TerminalProblem.CONNECTION)
+                                // Arbitrary shell commands can change any cached setting.
+                                state = state.connectionLost().copy(connection = state.connection, deviceName = state.deviceName)
+                                val exit = runInterruptible(Dispatchers.IO) {
+                                    val client = connector.activeClient ?: throw TerminalException(TerminalProblem.CONNECTION)
+                                    TerminalExecutor(terminalFiles, terminal).execute(client, command)
+                                }
+                                if (adb?.name in setOf("reboot", "root", "unroot", "usb", "tcpip")) {
+                                    runInterruptible(Dispatchers.IO) { connector.disconnect() }
+                                    state = state.connectionLost()
+                                }
+                                terminal.finish(exit)
+                            }
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    terminal.fail(e)
+                    withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
+                    if (generation == actionGeneration) state = state.connectionLost()
+                    throw e
+                } catch (e: Exception) {
+                    terminal.fail(e)
+                    if (withContext(Dispatchers.IO) { connector.activeClient == null }) state = state.connectionLost()
+                } finally {
+                    if (generation == actionGeneration) state = state.copy(busy = false, operation = null)
+                    refreshTerminalFiles()
+                }
+            }
+        }
+    }
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -161,6 +343,12 @@ class MainActivity : ComponentActivity() {
 
     private val actions = object : AppActions {
 
+        override fun cancelConnection() {
+            if (!state.canCancelConnection) return
+            state = state.copy(connectionCancelling = true)
+            actionJob?.cancel()
+        }
+
         private fun run(operation: Operation, block: suspend (OperationTrace) -> AppState) {
             if (state.busy) return
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.PAIR, Operation.CHECK_NTP,
@@ -184,7 +372,7 @@ class MainActivity : ComponentActivity() {
                 Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE)
             val resetZone = zoneAction || operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
                 Operation.PAIR, Operation.READ_DEVICE)
-            state = state.copy(busy = true, operation = operation, diagnosticEventId = null,
+            state = state.copy(busy = true, connectionCancelling = false, operation = operation, diagnosticEventId = null,
                 timeZoneResult = if (resetZone) null else state.timeZoneResult,
                 timeZoneDiagnosticEventId = if (resetZone) null else state.timeZoneDiagnosticEventId,
                 timeCheck = if (resetTime) null else state.timeCheck,
@@ -221,6 +409,7 @@ class MainActivity : ComponentActivity() {
                             ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
                             ntpAction && result.ntpCheck?.isUsable() == false -> DiagnosticIssue.NTP_UNUSABLE
                             result.ntpMessage?.res == R.string.ntp_not_confirmed -> DiagnosticIssue.NTP_NOT_CONFIRMED
+                            result.ntpMessage?.res == R.string.ntp_permission_denied -> DiagnosticIssue.NTP_PERMISSION_DENIED
                             result.ntpMessage?.res == R.string.ntp_invalid -> DiagnosticIssue.INVALID_NTP
                             else -> null
                         })
@@ -232,6 +421,11 @@ class MainActivity : ComponentActivity() {
                     ).withLatestBackground(state)
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
+                    if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
+                        withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
+                        if (generation == actionGeneration) state = state.connectionLost().copy(
+                            message = UiMessage(R.string.connect_cancelled))
+                    }
                     throw e
                 } catch (e: Exception) {
                     val event = journal.record(operation, Outcome.FAILED, transport,
@@ -244,7 +438,7 @@ class MainActivity : ComponentActivity() {
                         ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
                     ) else state.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
                 } finally {
-                    if (generation == actionGeneration) state = state.copy(busy = false, operation = null)
+                    if (generation == actionGeneration) state = state.copy(busy = false, connectionCancelling = false, operation = null)
                 }
             }
         }
@@ -509,6 +703,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        exportDocument = savedInstanceState?.getString("terminalExportDocument")
         val usbFilter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -523,11 +718,15 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface {
                     val diagnostics by journal.snapshot.collectAsState()
+                    val terminalState by terminal.state.collectAsState()
                     MainScreen(mode = mode, state = state, actions = actions, diagnostics = diagnostics,
-                        onRefreshDiagnostics = journal::refresh, onClearDiagnostics = journal::clear)
+                        onRefreshDiagnostics = journal::refresh, onClearDiagnostics = journal::clear,
+                        terminal = terminalState, terminalActions = terminalActions,
+                        terminalFileBusy = terminalFileBusy, terminalFileMessage = terminalFileMessage)
                 }
             }
         }
+        lifecycleScope.launch { refreshTerminalFiles() }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var returning = true
@@ -550,6 +749,12 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         // Системный USB intent только обновляет список. ADB запускается кнопкой.
         if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) refreshUsbList(report = true)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Only a pending document name; terminal commands and output remain memory-only.
+        outState.putString("terminalExportDocument", exportDocument)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onStart() {
@@ -644,19 +849,20 @@ class MainActivity : ComponentActivity() {
         val generation = ++actionGeneration
         // Обычная проверка не меняет busy: иначе каждые 10 секунд мигают
         // кнопки и появляется полоса загрузки, сдвигающая поля ввода.
-        if (returning) state = state.copy(busy = true, connection = ConnectionState.Checking(target))
+        if (returning) state = state.copy(busy = true, operation = Operation.CHECK_CONNECTION, connection = ConnectionState.Checking(target))
         try {
             val result = runInterruptible(Dispatchers.IO) { connector.checkConnection() }
             // Новая команда пока ждёт Mutex. Ей нужен актуальный результат
             // проверки, но отключённое через USB receiver устройство не восстанавливаем.
             if (state.connection.targetOrNull() != target) return@withLock
             state = if (result is ConnectionState.Connected) state.copy(connection = result) else {
-                val event = journal.record(Operation.DISCONNECT, Outcome.FAILED, diagnosticTransport(target),
+                val event = journal.record(Operation.CHECK_CONNECTION, Outcome.FAILED, diagnosticTransport(target),
+                    issue = DiagnosticIssue.CONNECTION_LOST,
                     reason = if (target is UsbDeviceAddress) ConnectionError.USB_DISCONNECTED else ConnectionError.UNREACHABLE)
                 state.connectionLost().copy(message = UiMessage(R.string.connect_connection_lost), diagnosticEventId = event)
             }
         } finally {
-            if (returning && generation == actionGeneration) state = state.copy(busy = false)
+            if (returning && generation == actionGeneration) state = state.copy(busy = false, operation = null)
         }
     }
 
@@ -765,7 +971,7 @@ class MainActivity : ComponentActivity() {
      * ненажатой — отличить одно от другого было нечем.
      */
     private suspend fun AppState.withDeviceData(trace: OperationTrace): AppState {
-        val clean = copy(deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
+        val clean = copy(deviceInfo = null, deviceName = "", ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
             timeZoneResult = null, timeZoneDiagnosticEventId = null, timeCheck = null, timeDiagnosticEventId = null)
         if (connection !is ConnectionState.Connected) return clean
         return runInterruptible(Dispatchers.IO) {
@@ -774,7 +980,7 @@ class MainActivity : ComponentActivity() {
                 message = UiMessage(R.string.error_unreachable),
             )
             runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
-                onSuccess = { clean.copy(deviceInfo = it) },
+                onSuccess = { clean.copy(deviceInfo = it, deviceName = it.displayName) },
                 onFailure = {
                     if (it is CancellationException) throw it
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,

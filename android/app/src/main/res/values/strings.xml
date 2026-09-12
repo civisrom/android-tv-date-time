@@ -70,6 +70,8 @@
     <string name="connect_state_connected">Connected to %1$s</string>
     <string name="connect_state_checking">Checking connection to %1$s…</string>
     <string name="connect_connection_lost">Connection to the device was lost. Connect to it again.</string>
+    <string name="connect_cancelling">Cancelling connection…</string>
+    <string name="connect_cancelled">Connection cancelled. You can try again.</string>
     <string name="connect_state_disconnected">Not connected</string>
     <string name="connect_try_loopback">Connect to this device</string>
 
@@ -97,7 +99,7 @@
     <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-digit code</string>
     <string name="pairing_connect_address_hint">Connection address (a different port)</string>
-    <string name="pairing_port_warning">The pairing port and the connection port are different. Both are shown on the TV.</string>
+    <string name="pairing_port_warning">Enter both IP:port addresses from the target device: the pairing port from the code dialog, and the connection port from the main Wireless debugging screen. These are different ports.</string>
     <string name="pairing_action">Pair and connect</string>
 
     <!-- Обнаружение по mDNS -->
@@ -128,6 +130,7 @@
     <string name="ntp_invalid">Invalid time server address. Enter a domain or IPv4 without a port, spaces, or http://.</string>
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
+    <string name="ntp_permission_denied">The connected device denied permission to change the time server via ADB. Check debugging restrictions in its developer options.</string>
     <string name="time_check_title">Device time verification</string>
     <string name="time_check_action">Verify device time</string>
     <string name="time_check_working">Verifying device time…</string>
@@ -246,6 +249,7 @@
     <string name="operation_connect_usb">USB connection</string>
     <string name="operation_pair">Code pairing</string>
     <string name="operation_disconnect">Disconnecting device</string>
+    <string name="operation_check_connection">Checking connection</string>
     <string name="operation_usb_permission">USB access permission</string>
     <string name="operation_usb_scan">USB device search</string>
     <string name="diagnostics_usb_none">No USB devices detected</string>
@@ -332,4 +336,217 @@
     <string name="ntp_activation_unknown">Setting saved. This firmware may require a restart before the time service reloads it.</string>
     <string name="ntp_auto_on">Automatic date and time: enabled</string>
     <string name="time_check_system_default">Android uses its system time configuration. Its actual server is not exposed by this setting; this does not mean automatic synchronization is disabled.</string>
+
+    <string name="terminal_title">ADB terminal</string>
+    <string name="terminal_console">Console</string>
+    <string name="terminal_help">Command reference</string>
+    <string name="terminal_history">History</string>
+    <string name="terminal_files">Files and APK</string>
+    <string name="terminal_back">Back to main screen</string>
+    <string name="terminal_target">Target: %1$s</string>
+    <string name="terminal_disconnected">Connect a device on the main screen, or enter adb connect IP:PORT.</string>
+    <string name="terminal_draft">Command</string>
+    <string name="terminal_run">Run</string>
+    <string name="terminal_stop">Stop</string>
+    <string name="terminal_running">Running…</string>
+    <string name="terminal_complete">Finished · exit code %1$d</string>
+    <string name="terminal_no_exit">Stream closed. This service does not report an exit code; check its output.</string>
+    <string name="terminal_cancelled">Stopped. The connection was closed; reconnect before the next command.</string>
+    <string name="terminal_timeout">The 5-minute limit was reached. Partial output is retained; reconnect to continue.</string>
+    <string name="terminal_ready">The command output will appear here.</string>
+    <string name="terminal_clear">Clear output</string>
+    <string name="terminal_copy_output">Copy output</string>
+    <string name="terminal_copied">Copied</string>
+    <string name="terminal_copy_failed">Could not copy to clipboard</string>
+    <string name="terminal_insert">Insert</string>
+    <string name="terminal_copy">Copy command</string>
+    <string name="terminal_follow" formatted="false">Auto-scroll</string>
+    <string name="terminal_truncated">Only the latest 65,536 text characters are retained.</string>
+    <string name="terminal_progress">Transferred: %1$s (%2$d B)</string>
+    <string name="terminal_progress_bytes">Transferred: %1$d B</string>
+    <string name="terminal_search">Find a command or description</string>
+    <string name="terminal_no_matches">No commands found</string>
+    <string name="terminal_history_empty">Commands from this session will appear here. Selecting one only fills the editor.</string>
+    <string name="terminal_history_clear">Clear history</string>
+    <string name="terminal_help_intro" formatted="false">Find a command or expand a category. Insert fills the editor without running. Replace parameters and paths with your own values.</string>
+    <string name="terminal_limits">The reference contains commands supported by the embedded client and Android shell examples. Shell commands depend on the firmware: query them using Device command help. Each command uses a new non-interactive shell on the selected device. Pipes, quotes and scripts work there; cd does not carry over. No interactive stdin or binary output in the console. Commands stop after 5 minutes. Use logcat -d or top -b -n 1 for snapshots. The app implements shell, file transfer, APK installation and device services; desktop ADB server options, forward/reverse, fastboot and sideload file flashing are not implemented. devices lists only the connection selected in this app; disconnect closes that connection, including USB. File transfer supports individual files without compression. Installation supports -r, -t, -d, -g, --user, --abi, -i, --instant, --full, --dont-kill and --streaming.</string>
+    <string name="terminal_import" formatted="false">Add files from this device</string>
+    <string name="terminal_files_hint" formatted="false">These are files added from this phone or received from the connected device. Adding a file does not send or install it. Choose an install or send command, review it in the console, then press Run.</string>
+    <string name="terminal_files_empty">No imported or received files</string>
+    <string name="terminal_install" formatted="false">APK install command</string>
+    <string name="terminal_push" formatted="false">Send file command</string>
+    <string name="terminal_export" formatted="false">Save to this device</string>
+    <string name="terminal_file_busy">Processing file…</string>
+    <string name="terminal_file_done">Document copied</string>
+    <string name="terminal_file_failed">Could not copy the document. Check access and available space.</string>
+    <string name="terminal_file_unavailable">No document picker is available on this device.</string>
+    <string name="terminal_empty">Enter a command.</string>
+    <string name="terminal_too_long">The command exceeds 4000 UTF-8 bytes.</string>
+    <string name="terminal_invalid_text">Remove control characters from the command.</string>
+    <string name="terminal_quotes">Close quotes and check backslash escaping.</string>
+    <string name="terminal_interactive">Use adb shell COMMAND without interactive shell options.</string>
+    <string name="terminal_host_command">This ADB client command is not implemented here. See the compatibility note in the reference. Android shell commands can be entered directly.</string>
+    <string name="terminal_arguments">Check the command arguments in the reference. Select the target on the main screen.</string>
+    <string name="terminal_file_error">File not found. Import it in Files and APK and use its displayed name; local paths stay within this app’s document folder.</string>
+    <string name="terminal_connection_error">No active connection. Connect the target first.</string>
+    <string name="terminal_io_error">The operation failed or the connection was interrupted. Check the partial output and reconnect if needed.</string>
+    <string name="terminal_install_error">APK installation failed. Check the package manager response.</string>
+    <string name="terminal_unknown_target">No selected device</string>
+    <string name="terminal_operation">Running terminal command</string>
+    <string name="terminal_category_connection">Connection</string>
+    <string name="terminal_example_connection_0">Connect to a device; replace the address</string>
+    <string name="terminal_example_connection_1">Show the connection selected in this app</string>
+    <string name="terminal_example_connection_2">Read the current connection state</string>
+    <string name="terminal_example_connection_3">Disconnect the selected device</string>
+    <string name="terminal_example_connection_4">Show the ADB identifier of the selected connection</string>
+    <string name="terminal_category_time">Date and time</string>
+    <string name="terminal_example_time_0">Show device date and time</string>
+    <string name="terminal_example_time_1">Read the time server</string>
+    <string name="terminal_example_time_2">Read automatic time setting</string>
+    <string name="terminal_example_time_3">Read automatic time zone setting</string>
+    <string name="terminal_example_time_4">Read the current time zone</string>
+    <string name="terminal_example_time_5">Set a time server; activation depends on firmware</string>
+    <string name="terminal_example_time_6">Enable automatic time</string>
+    <string name="terminal_example_time_7">Discover supported time service commands</string>
+    <string name="terminal_category_apps">Apps and APK installation</string>
+    <string name="terminal_example_apps_0">Install an imported APK on the connected device; -r allows an update</string>
+    <string name="terminal_example_apps_1">Install imported split APK files from one package</string>
+    <string name="terminal_example_apps_2">List installed third-party packages</string>
+    <string name="terminal_example_apps_3">Read APK paths for a package</string>
+    <string name="terminal_example_apps_4">Remove a package from the target</string>
+    <string name="terminal_example_apps_5">Disable a package for user 0</string>
+    <string name="terminal_example_apps_6">Enable a package for user 0</string>
+    <string name="terminal_example_apps_7">Delete package data for user 0</string>
+    <string name="terminal_example_apps_8">Stop an application</string>
+    <string name="terminal_example_apps_9">Open device settings</string>
+    <string name="terminal_example_apps_10">List device users</string>
+    <string name="terminal_category_files">Files and storage</string>
+    <string name="terminal_example_files_0">Send an imported document to the device</string>
+    <string name="terminal_example_files_1">Receive a file; export it from Files and APK</string>
+    <string name="terminal_example_files_2">List downloaded files on the target</string>
+    <string name="terminal_example_files_3">Check free space</string>
+    <string name="terminal_example_files_4">Read directory sizes</string>
+    <string name="terminal_example_files_5">Create a directory</string>
+    <string name="terminal_example_files_6">Save a screenshot on the target; receive it with adb pull</string>
+    <string name="terminal_example_files_7">Record 30 seconds on supported firmware</string>
+    <string name="terminal_category_system">Device information</string>
+    <string name="terminal_example_system_0">Read device model</string>
+    <string name="terminal_example_system_1">Read Android version</string>
+    <string name="terminal_example_system_2">Read Android API level</string>
+    <string name="terminal_example_system_3">List system properties</string>
+    <string name="terminal_example_system_4">Read processor information</string>
+    <string name="terminal_example_system_5">Read memory information</string>
+    <string name="terminal_example_system_6">Check shell user and groups</string>
+    <string name="terminal_example_system_7">Read kernel information</string>
+    <string name="terminal_example_system_8">Read uptime and load</string>
+    <string name="terminal_category_network">Network</string>
+    <string name="terminal_example_network_0">List interfaces and addresses</string>
+    <string name="terminal_example_network_1">Show routing table</string>
+    <string name="terminal_example_network_2">Send four connectivity probes</string>
+    <string name="terminal_example_network_3">Inspect network service state</string>
+    <string name="terminal_example_network_4">Inspect Wi-Fi state</string>
+    <string name="terminal_category_input">Remote control and display</string>
+    <string name="terminal_example_input_0">Go to the launcher</string>
+    <string name="terminal_example_input_1">Send Back</string>
+    <string name="terminal_example_input_2">Press the remote confirmation key</string>
+    <string name="terminal_example_input_3">Enter sample text; %s inserts a space</string>
+    <string name="terminal_example_input_4">Read display size</string>
+    <string name="terminal_example_input_5">Read display density</string>
+    <string name="terminal_category_logs">Logs and diagnostics</string>
+    <string name="terminal_example_logs_0">Read the latest 200 log lines</string>
+    <string name="terminal_example_logs_1">Stream logs until Stop or the time limit</string>
+    <string name="terminal_example_logs_2">List services that support diagnostics</string>
+    <string name="terminal_example_logs_3">Read battery and power state</string>
+    <string name="terminal_example_logs_4">Read process memory summary</string>
+    <string name="terminal_example_logs_5">List processes</string>
+    <string name="terminal_example_logs_6">Take one process load snapshot</string>
+    <string name="terminal_category_services">Device services and command discovery</string>
+    <string name="terminal_example_services_0">Reboot the target; the connection will close</string>
+    <string name="terminal_example_services_1">Reboot into recovery</string>
+    <string name="terminal_example_services_2">Restart adbd in TCP mode if firmware permits</string>
+    <string name="terminal_example_services_3">Restart adbd in USB mode</string>
+    <string name="terminal_example_services_4">Request root adbd on an engineering firmware</string>
+    <string name="terminal_example_services_5">Restart adbd without root</string>
+    <string name="terminal_example_services_6">Discover commands actually present on the device</string>
+    <string name="terminal_example_services_7">Show built-in shell utilities</string>
+    <string name="terminal_example_services_8">List command services</string>
+    <string name="terminal_example_services_9">Show package manager help</string>
+    <string name="terminal_example_services_10">Show activity manager help</string>
+    <string name="terminal_example_services_11">Show settings command help</string>
+    <string name="terminal_warning_title">ADB terminal</string>
+    <string name="terminal_warning_body">Terminal commands can change settings, install or remove apps, erase data, and disrupt the connected device. Available actions depend on its firmware and ADB permissions.\n\nCheck the device model and address, back up important data, and only run commands whose effects you understand. Use the terminal only on devices you are authorized to manage.\n\nOpening the terminal and inserting an example do not run a command. Stop does not undo changes already made.\n\nThe terminal is provided “as is”, without warranties. By continuing, you acknowledge that you have been warned about these risks and understand them.</string>
+    <string name="terminal_warning_accept">Open terminal</string>
+    <string name="terminal_warning_cancel">Cancel</string>
+    <string name="terminal_connected" formatted="false">Connected</string>
+    <string name="terminal_not_connected" formatted="false">Not connected</string>
+    <string name="terminal_connect_success">Connected to %1$s.</string>
+    <string name="terminal_connect_failed">Connection failed: %1$s</string>
+    <string name="terminal_device_name">Device model: %1$s</string>
+    <string name="terminal_device_unknown" formatted="false">not reported by the device</string>
+    <string name="terminal_clear_input" formatted="false">Clear command input</string>
+    <string name="terminal_follow_hint" formatted="false">Auto-scroll follows new output. Turn it off to read earlier lines.</string>
+    <string name="terminal_insert_filename" formatted="false">Insert name into command</string>
+    <string name="terminal_files_help_title" formatted="false">What the buttons do</string>
+    <string name="terminal_files_help" formatted="false">Add files from this device opens the system document picker and copies the selected documents or APKs into this list.\n\nAPK install command fills the console with adb install. Run installs the app on the connected device.\n\nSend file command fills the console with adb push. The default destination is /sdcard/Download on the connected device; edit the path before running if needed.\n\nInsert name into command appends the selected file name to the current input without running anything.\n\nDownload from connected device asks for the full remote file path and starts the download after confirmation. The received file appears here.\n\nSave to this device opens the system save dialog and saves a copy from this list to your phone. It does not access the connected device.\n\nDelete copy — remove an unneeded file from this list and app storage. The original file and installed app are kept.</string>
+    <string name="terminal_download" formatted="false">Download from connected device…</string>
+    <string name="terminal_download_start" formatted="false">Download</string>
+    <string name="terminal_download_hint" formatted="false">Enter the full path of a file on the connected device. Download copies it into Files and APK. Then use Save to this device to choose a folder on your phone.</string>
+    <string name="terminal_remote_path" formatted="false">File path on the connected device</string>
+    <string name="terminal_category_help_device" formatted="false">Device command help</string>
+    <string name="terminal_reference_1" formatted="false">Show the selected app connection. device indicates a confirmed connection.</string>
+    <string name="terminal_reference_5" formatted="false">Disconnect this network device.</string>
+    <string name="terminal_reference_15" formatted="false">Open this built-in terminal reference.</string>
+    <string name="terminal_reference_16" formatted="false">Open the command reference.</string>
+    <string name="terminal_reference_24" formatted="false">Copy a local file to the device.</string>
+    <string name="terminal_reference_25" formatted="false">Receive a file from the connected device into Files and APK, then save it to your phone.</string>
+    <string name="terminal_reference_28" formatted="false">List files in this directory.</string>
+    <string name="terminal_reference_30" formatted="false">Rename or move a file; an existing destination may be overwritten.</string>
+    <string name="terminal_reference_31" formatted="false">Delete this file. Plain rm does not remove directories recursively.</string>
+    <string name="terminal_reference_32" formatted="false">Remove an empty directory.</string>
+    <string name="terminal_reference_33" formatted="false">Save a PNG screenshot on the connected device.</string>
+    <string name="terminal_reference_34" formatted="false">Download the previously captured screenshot into Files and APK.</string>
+    <string name="terminal_reference_35" formatted="false">Record 30 seconds of screen video without audio; requires device support.</string>
+    <string name="terminal_reference_36" formatted="false">Download the completed recording. Protected content may not be captured.</string>
+    <string name="terminal_reference_37" formatted="false">Install an APK compatible with this device.</string>
+    <string name="terminal_reference_38" formatted="false">Update an installed app while keeping data; a compatible signature is required.</string>
+    <string name="terminal_reference_39" formatted="false">Install one app from its complete, matching set of split APKs.</string>
+    <string name="terminal_reference_42" formatted="false">List package identifiers; add -s for system apps or -3 for third-party apps.</string>
+    <string name="terminal_reference_45" formatted="false">Remove the app for that user. User 0 is the owner, not always the active user.</string>
+    <string name="terminal_reference_46" formatted="false">Disable an app for that user, subject to firmware permissions.</string>
+    <string name="terminal_reference_47" formatted="false">Enable the app again for the same user.</string>
+    <string name="terminal_reference_48" formatted="false">Delete the app\'s data for that user, including settings and sign-ins.</string>
+    <string name="terminal_reference_49" formatted="false">Launch the specified accessible activity.</string>
+    <string name="terminal_reference_52" formatted="false">Send a broadcast; protected actions can be denied by Android.</string>
+    <string name="terminal_reference_57" formatted="false">Tap screen coordinates, where supported.</string>
+    <string name="terminal_reference_58" formatted="false">Swipe between coordinates; duration is in milliseconds.</string>
+    <string name="terminal_reference_66" formatted="false">Remove the override so the firmware can use its configured default.</string>
+    <string name="terminal_reference_73" formatted="false">Inspect one listed service, for example display, power or meminfo. network_time_update_service and time_detector can explain time sync if present.</string>
+    <string name="terminal_reference_75" formatted="false">Print the crash buffer and exit.</string>
+    <string name="terminal_reference_76" formatted="false">Stream logs until interrupted; the application\'s 300-second limit applies.</string>
+    <string name="terminal_reference_100" formatted="false">Reboot into the bootloader, where normal ADB commands are usually unavailable.</string>
+    <string name="terminal_reference_102" formatted="false">Reboot into recovery\'s OTA sideload mode.</string>
+    <string name="terminal_reference_103" formatted="false">Enter sideload mode and reboot automatically after sideloading.</string>
+    <string name="terminal_reference_108" formatted="false">Disable dm-verity verification on a supported developer build.</string>
+    <string name="terminal_reference_109" formatted="false">Re-enable dm-verity on that build; follow the device\'s reboot instructions.</string>
+    <string name="terminal_reference_115" formatted="false">Read raw command output. Binary output needs an external terminal; do not use this terminal to redirect a PNG or other binary stream.</string>
+    <string name="terminal_reference_118" formatted="false">List Toybox utilities when Toybox is included in the firmware.</string>
+    <string name="terminal_reference_122" formatted="false">Show the selected service\'s own command reference.</string>
+    <string name="terminal_reference_124" formatted="false">Show available input commands; older versions may show help with input alone.</string>
+    <string name="terminal_reference_125" formatted="false">Show diagnostic command options.</string>
+    <string name="terminal_reference_126" formatted="false">Check process-monitor options for this firmware.</string>
+    <string name="terminal_reference_127" formatted="false">Check screen recording options and device limitations.</string>
+    <string name="terminal_reference_128" formatted="false">Show log options for the connected Android version.</string>
+    <string name="terminal_reference_extra_0" formatted="false">Remount supported partitions read-write, usually on an eng/userdebug build.</string>
+    <string name="terminal_reference_extra_1" formatted="false">Read a textual system report; it may include device and account data.</string>
+    <string name="terminal_reference_extra_2" formatted="false">Uninstall an app while retaining data and cache.</string>
+    <string name="terminal_reference_extra_5" formatted="false">All package manager commands of this Android version.</string>
+    <string name="terminal_push_complete">File sent to the connected device.</string>
+    <string name="terminal_pull_complete">File downloaded into Files and APK. Use Save to this device to choose a folder.</string>
+    <string name="terminal_remote_file">Path on the connected device: %1$s</string>
+    <string name="terminal_local_file">File in this app: %1$s</string>
+    <string name="terminal_remove">Delete copy</string>
+    <string name="terminal_remove_done">Copy removed from the list</string>
+    <string name="terminal_remove_failed">Could not delete the file copy. Try again.</string>
+    <string name="terminal_remove_title">Delete file from the list?</string>
+    <string name="terminal_remove_hint">The copy “%1$s” will be deleted from app storage. The original file and the app on the connected device will be kept.</string>
 </resources>

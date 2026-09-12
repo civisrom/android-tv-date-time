@@ -23,7 +23,7 @@ android {
 
         // CI подставляет github.run_number: Android требует монотонного роста
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: "2.6.4-dev"
+        versionName = System.getenv("VERSION_NAME") ?: "2.6.5-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -174,8 +174,28 @@ val generateNtpData = tasks.register<GenerateNtpDataTask>("generateNtpData") {
     outputDir.set(layout.buildDirectory.dir("generated/ntpdata"))
 }
 
+abstract class TerminalTestApkTask : DefaultTask() {
+    @get:InputFile abstract val apk: RegularFileProperty
+    @get:InputFile abstract val splitApk: RegularFileProperty
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+    @TaskAction fun copyApk() {
+        val target = outputDir.file("terminal-fixture.apk").get().asFile
+        target.parentFile.mkdirs()
+        apk.get().asFile.copyTo(target, overwrite = true)
+        splitApk.get().asFile.copyTo(outputDir.file("terminal-fixture-split.apk").get().asFile, overwrite = true)
+    }
+}
+
+val terminalTestApk = tasks.register<TerminalTestApkTask>("copyTerminalTestApk") {
+    dependsOn(":terminal-install-fixture:assembleDebug", ":terminal_install_split:assembleDebug")
+    apk.set(project(":terminal-install-fixture").layout.buildDirectory.file("outputs/apk/debug/terminal-install-fixture-debug.apk"))
+    splitApk.set(project(":terminal_install_split").layout.buildDirectory.file("outputs/apk/debug/terminal_install_split-debug.apk"))
+    outputDir.set(layout.buildDirectory.dir("generated/terminalTestAssets"))
+}
+
 androidComponents {
     onVariants { variant ->
+        variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(terminalTestApk, TerminalTestApkTask::outputDir)
         variant.sources.kotlin?.addGeneratedSourceDirectory(
             generateNtpData,
             GenerateNtpDataTask::outputDir,

@@ -43,7 +43,14 @@ data class DeviceInfo(
     val videoDecoders: String = "",
     val audioDecoders: String = "",
     val networkAddresses: String = "",
-)
+) {
+    val displayName: String get() {
+        val maker = manufacturer.trim().takeUnless { it in listOf("unknown", "null") }.orEmpty()
+        val product = model.trim().takeUnless { it in listOf("unknown", "null") }.orEmpty()
+        return if (product.startsWith(maker, ignoreCase = true)) product
+            else listOf(maker, product).filter(String::isNotBlank).joinToString(" ")
+    }
+}
 
 /**
  * Разбирает вывод `getprop`.

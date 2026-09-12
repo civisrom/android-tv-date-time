@@ -1,0 +1,127 @@
+package com.civisrom.tvtimefixer.terminal
+
+import java.net.SocketTimeoutException
+import kotlinx.coroutines.CancellationException
+import org.junit.Assert.*
+import org.junit.Test
+
+class TerminalSessionTest {
+    @Test fun `successful connect identifies the new target without changing the command history`() {
+        val session = TerminalSession().apply { edit("adb connect 192.0.2.1:5555"); start("not connected") }
+        session.identifyTarget("192.0.2.1:5555", "NVIDIA SHIELD")
+        session.append("Connected"); session.finish(0)
+        assertEquals("192.0.2.1:5555", session.state.value.target)
+        assertEquals("NVIDIA SHIELD", session.state.value.targetName)
+        assertEquals(listOf("adb connect 192.0.2.1:5555"), session.state.value.history)
+        assertEquals(TerminalStatus.COMPLETE, session.state.value.status)
+    }
+
+    @Test fun `clearing the draft retains output history and the target of the executed command`() {
+        val session = TerminalSession().apply {
+            edit("adb push a.txt /sdcard/a.txt"); start("192.0.2.1:5555", "NVIDIA SHIELD")
+            transferring("/sdcard/a.txt", "a.txt", false); progress(7); append("Success"); finish(0)
+        }
+        val before = session.state.value
+        session.edit("")
+        assertEquals(before.copy(draft = ""), session.state.value)
+        session.clearOutput()
+        assertEquals(before.history, session.state.value.history)
+        assertTrue(session.state.value.output.isEmpty())
+        assertEquals("", session.state.value.targetName)
+        assertNull(session.state.value.transfer)
+        assertNull(session.state.value.transferred)
+    }
+
+    @Test fun `IME updates and editing the next command preserve the previous failure`() {
+        val session = TerminalSession()
+        session.edit("echo test"); session.start("TV")
+        session.fail(TerminalException(TerminalProblem.CONNECTION))
+        session.edit("echo test")
+        assertEquals(TerminalProblem.CONNECTION, session.state.value.problem)
+        session.edit("adb connect 192.0.2.1")
+        assertEquals(TerminalStatus.FAILED, session.state.value.status)
+        assertEquals(TerminalProblem.CONNECTION, session.state.value.problem)
+        assertEquals("echo test", session.state.value.command)
+        session.start("TV")
+        assertNull(session.state.value.problem)
+    }
+
+    @Test fun `history is deduplicated bounded and selection never executes a command`() {
+        val session = TerminalSession()
+        repeat(60) { session.edit("echo $it"); session.start("TV"); session.finish(0) }
+        assertEquals(50, session.state.value.history.size)
+        session.edit("echo 40")
+        assertFalse(session.state.value.running)
+        session.start("TV"); session.finish(0)
+        assertEquals("echo 40", session.state.value.history.first())
+        assertEquals(1, session.state.value.history.count { it == "echo 40" })
+        session.clearHistory()
+        assertTrue(session.state.value.history.isEmpty())
+    }
+
+    @Test fun `repeated start and clear cannot replace an active command`() {
+        val session = TerminalSession()
+        session.edit("logcat"); session.start("first TV")
+        session.append("early output")
+        session.edit("reboot"); assertNull(session.start("second TV"))
+        session.clearOutput()
+        session.fail(CancellationException("test"))
+        assertEquals(TerminalStatus.CANCELLED, session.state.value.status)
+        assertEquals("logcat", session.state.value.command)
+        assertEquals("first TV", session.state.value.target)
+        assertEquals("early output", session.state.value.output.joinToString("") { it.text })
+    }
+
+    @Test fun `endless output has bounded text and blocks with visible truncation`() {
+        val session = TerminalSession()
+        session.edit("logcat"); session.start("TV")
+        repeat(10000) { session.append("line".repeat(300), it % 2 == 0) }
+        session.append("last output")
+        session.finish(null)
+        val state = session.state.value
+        assertTrue(state.truncated)
+        assertTrue(state.output.sumOf { it.text.length } <= TERMINAL_OUTPUT_LIMIT)
+        assertTrue(state.output.all { it.text.length <= 1024 })
+        assertTrue(state.output.joinToString("") { it.text }.endsWith("last output"))
+        assertNull(state.exitCode)
+    }
+
+    @Test fun `ANSI OSC and bidi controls cannot rewrite displayed output`() {
+        val session = TerminalSession()
+        session.edit("id"); session.start("TV")
+        session.append("before\u001b["); session.append("31mred\u001b[0m\u001b]52;c;hidden")
+        session.append("\u0007after\u202efake\u0000")
+        session.finish(2)
+        assertEquals("beforeredafterfake", session.state.value.output.joinToString("") { it.text })
+        assertEquals(2, session.state.value.exitCode)
+    }
+
+    @Test fun `display blocks never split an emoji surrogate pair`() {
+        val session = TerminalSession().apply { edit("echo"); start("TV") }
+        val text = "a".repeat(1023) + "🌍" + "b".repeat(1023) + "🚀"
+        session.append(text); session.finish(0)
+        assertEquals(text, session.state.value.output.joinToString("") { it.text })
+        assertTrue(session.state.value.output.none { it.text.last().isHighSurrogate() || it.text.first().isLowSurrogate() })
+    }
+
+    @Test fun `timeout preserves partial output and distinguishes a remote failure exit`() {
+        val session = TerminalSession()
+        session.edit("sleep 900"); session.start("TV"); session.append("partial")
+        session.fail(SocketTimeoutException())
+        assertEquals(TerminalStatus.TIMEOUT, session.state.value.status)
+        assertEquals("partial", session.state.value.output.single().text)
+        session.edit("false"); session.start("TV"); session.finish(1)
+        assertEquals(TerminalStatus.COMPLETE, session.state.value.status)
+        assertEquals(1, session.state.value.exitCode)
+    }
+
+    @Test fun `help clear and validation are local and never enter history`() {
+        val session = TerminalSession()
+        session.edit("help"); assertNull(session.start("TV"))
+        assertEquals(1, session.state.value.helpRequest)
+        session.edit("clear"); assertNull(session.start("TV"))
+        session.edit("adb shell"); assertNull(session.start("TV"))
+        assertEquals(TerminalProblem.INTERACTIVE, session.state.value.problem)
+        assertTrue(session.state.value.history.isEmpty())
+    }
+}

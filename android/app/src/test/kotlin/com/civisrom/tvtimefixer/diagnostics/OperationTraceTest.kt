@@ -8,6 +8,8 @@ import com.civisrom.tvtimefixer.data.NtpProbeResult
 import com.civisrom.tvtimefixer.device.TimeZoneFailure
 import com.civisrom.tvtimefixer.device.TimeZoneRestoration
 import com.civisrom.tvtimefixer.device.TimeZoneUpdateResult
+import com.civisrom.tvtimefixer.device.DeviceRepository
+import com.civisrom.tvtimefixer.device.NtpUpdateResult
 import java.io.IOException
 import java.nio.file.Files
 import org.junit.Assert.*
@@ -50,6 +52,25 @@ class OperationTraceTest {
         assertTrue(trace.details().contains("target_api=30"))
         assertFalse(trace.details().contains("SECRET_SERIAL"))
         assertFalse(trace.details().contains("ro.serialno"))
+    }
+
+    @Test fun `denied NTP update retains its result and shell status without raw device output`() {
+        val trace = OperationTrace()
+        val repository = DeviceRepository(trace.client(client { command ->
+            when (command) {
+                "settings get global ntp_server" -> ShellResult("null\n", "", 0)
+                "getprop ro.build.version.sdk" -> ShellResult("30\n", "", 0)
+                "settings get global auto_time" -> ShellResult("1\n", "", 0)
+                else -> ShellResult("", "SecurityException: Permission denial SECRET_DEVICE_DATA", 255)
+            }
+        }))
+        val result = repository.setNtpServer("private.example")
+        trace.ntpUpdate(result)
+        assertEquals(NtpUpdateResult.PermissionDenied, result)
+        assertTrue(trace.details().contains("exit=255"))
+        assertTrue(trace.details().contains("ntp.write_confirmed=false; response=permission_denied"))
+        assertFalse(trace.details().contains("SECRET_DEVICE_DATA"))
+        assertFalse(trace.details().contains("private.example"))
     }
 
     @Test fun `capability reads keep command metrics without raw device data`() {

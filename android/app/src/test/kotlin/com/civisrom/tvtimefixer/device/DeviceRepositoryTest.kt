@@ -80,6 +80,63 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `ADB permission denial is distinct from a connection failure for set reset and undo`() {
+        val denials = listOf(
+            ShellResult("", "java.lang.SecurityException: Permission denial: writing settings requires android.permission.WRITE_SECURE_SETTINGS", 255),
+            ShellResult("Permission denied", "", 1),
+            ShellResult("java.lang.SecurityException: Permission denial", "", 0),
+        )
+        val changes = listOf<(DeviceRepository) -> NtpUpdateResult>(
+            { it.setNtpServer("pool.ntp.org") },
+            { it.resetNtpServer() },
+            { it.undoNtpServer(NtpUpdateResult.Applied("time.android.com", previous = "previous.example")) },
+        )
+        for (denial in denials) for (change in changes) {
+            val device = FakeDevice()
+            val writes = mutableListOf<String>()
+            val client = object : AdbClient by device {
+                override fun shell(command: String): ShellResult {
+                    if (command.startsWith("settings put ") || command.startsWith("settings delete ")) {
+                        writes += command
+                        return denial
+                    }
+                    return device.shell(command)
+                }
+            }
+            val result = change(DeviceRepository(client))
+            assertEquals(NtpUpdateResult.PermissionDenied, result)
+            assertEquals(1, writes.size)
+            assertEquals("time.android.com", device.ntpServer)
+            assertTrue(client.isAlive())
+        }
+    }
+
+    @Test fun `terminal identification reads only target properties without running full diagnostics`() {
+        val client = FakeDevice()
+        assertEquals("Sony BRAVIA 4K GB", DeviceRepository(client).readDeviceName())
+        assertEquals(listOf("getprop"), client.commands)
+    }
+
+    @Test fun `device display name combines manufacturer and model without duplicating the brand`() {
+        assertEquals("NVIDIA SHIELD Android TV", DeviceInfo(manufacturer = " NVIDIA ", model = "SHIELD Android TV").displayName)
+        assertEquals("NVIDIA SHIELD", DeviceInfo(manufacturer = "nvidia", model = "NVIDIA SHIELD").displayName)
+        assertEquals("SHIELD", DeviceInfo(model = "SHIELD").displayName)
+        assertEquals("NVIDIA", DeviceInfo(manufacturer = "NVIDIA").displayName)
+        assertEquals("", DeviceInfo().displayName)
+        assertEquals("", DeviceInfo(manufacturer = "unknown", model = "null").displayName)
+    }
+
+    @Test fun `missing or rejected model metadata does not turn a confirmed connection into a failure`() {
+        listOf(ShellResult("unavailable", "", 1), ShellResult("[other]: [property]", "", 0)).forEach { result ->
+            val client = object : AdbClient {
+                override fun shell(command: String) = result
+                override fun isAlive() = true
+                override fun close() = error("Metadata lookup must not close the connection")
+            }
+            assertEquals("", DeviceRepository(client).readDeviceName())
+        }
+    }
+
     @Test fun `system reset and undo preserve a modern multi-server setting`() {
         val raw = "ntp://time.example.org:1123|ntp://other.example.org"
         val device = FakeDevice(ntpServer = raw)

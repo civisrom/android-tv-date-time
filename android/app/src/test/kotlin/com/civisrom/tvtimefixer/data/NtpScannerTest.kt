@@ -4,6 +4,8 @@ import com.civisrom.tvtimefixer.net.SntpQuery
 import com.civisrom.tvtimefixer.net.SntpResult
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
@@ -23,10 +25,14 @@ class NtpScannerTest {
             }
         }
         val updates = mutableListOf<ScanProgress>()
+        val initialProgress = CompletableDeferred<Unit>()
         val scan = NtpScanner(NtpProbe(query, attempts = 1), concurrency = 1)
         val job = launch(kotlinx.coroutines.Dispatchers.Default) {
-            scan.scan(listOf("one.example", "two.example")).toList(updates)
+            scan.scan(listOf("one.example", "two.example"))
+                .onEach { initialProgress.complete(Unit) }.toList(updates)
         }
+        // channelFlow may start the probe before its initial event reaches the collector.
+        kotlinx.coroutines.withTimeout(2_000) { initialProgress.await() }
         assertTrue(started.await(2, java.util.concurrent.TimeUnit.SECONDS))
         job.cancel()
         kotlinx.coroutines.withTimeout(2_000) { job.join() }
