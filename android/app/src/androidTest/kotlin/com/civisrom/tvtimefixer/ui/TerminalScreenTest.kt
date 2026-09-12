@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.view.WindowInsets
-import android.view.accessibility.AccessibilityWindowInfo
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,13 +104,7 @@ class TerminalScreenTest {
                     if (Build.VERSION.SDK_INT >= 30) {
                         compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
                     } else {
-                        val windows = automation.windows
-                        try {
-                            windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
-                        } finally {
-                            @Suppress("DEPRECATION")
-                            windows.forEach { it.recycle() }
-                        }
+                        hasLegacyImeWindow(automation) == visible
                     }
                 }
                 automation.waitForIdle(300, 3_000)

@@ -323,6 +323,7 @@ class MainScreenTest {
                 }
             }
         }
+        compose.waitUntil(5_000) { compose.runOnUiThread { hostView.hasWindowFocus() } }
     }
 
     @Test fun repository_link_opens_project_without_connecting() {
@@ -657,7 +658,8 @@ class MainScreenTest {
 
     @Test fun narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable() {
         screen(connected, scale = 2f, width = 320)
-        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
+        // A real tap requests the IME; semantics text input alone does not guarantee it.
+        compose.onNodeWithTag("ntp-address").performScrollTo().performClick().performTextInput("time.example.org")
         waitForKeyboard()
         compose.onNodeWithTag("ntp-address").performImeAction()
         waitForKeyboard(false)
@@ -1002,13 +1004,7 @@ class MainScreenTest {
                     compose.runOnUiThread { hostView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
                 } else {
                     // Legacy Insets infer visibility from window geometry, which changes during rotation.
-                    val windows = automation.windows
-                    try {
-                        windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
-                    } finally {
-                        @Suppress("DEPRECATION")
-                        windows.forEach { it.recycle() }
-                    }
+                    hasLegacyImeWindow(automation) == visible
                 }
             }
         } catch (failure: Throwable) {

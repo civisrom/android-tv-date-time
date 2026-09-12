@@ -8,7 +8,6 @@ import android.system.OsConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
-import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -194,13 +193,7 @@ class MainActivityTest {
                         compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
                     } else {
                         // Legacy Insets only estimate IME visibility and miss floating dialogs.
-                        val windows = automation.windows
-                        try {
-                            windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } == visible
-                        } finally {
-                            @Suppress("DEPRECATION")
-                            windows.forEach { it.recycle() }
-                        }
+                        hasLegacyImeWindow(automation) == visible
                     }
                 }
                 automation.waitForIdle(300, 3_000)
