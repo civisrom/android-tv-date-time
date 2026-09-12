@@ -82,6 +82,8 @@ class TerminalScreenTest {
                 } }
             }
         }
+        // Native window focus arrives independently of Compose idleness on older Android.
+        compose.waitUntil(5_000) { compose.runOnUiThread { compose.activity.window.decorView.hasWindowFocus() } }
     }
 
     private fun scroll(tag: String): SemanticsNodeInteraction {
@@ -287,6 +289,7 @@ class TerminalScreenTest {
         session.refreshFiles(listOf("app.apk"))
         screen(scale = 2f, width = 480)
         compose.onNodeWithTag("terminal-tab-files").performClick()
+        compose.onNodeWithTag("terminal-tab-files").assertIsSelected()
         scroll("terminal-install-app.apk").assertIsDisplayed()
         scroll("terminal-export-app.apk").assertIsDisplayed().performClick()
         assertEquals(listOf("export:app.apk"), calls)

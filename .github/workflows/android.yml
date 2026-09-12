@@ -348,8 +348,30 @@ jobs:
           done
           exit 1
 
+      - name: Install APKs for device tests
+        id: install_apks
+        timeout-minutes: 10
+        working-directory: android
+        run: |
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+      - name: Verify real wireless pairing, reconnect, file transfer and APK installation
+        if: ${{ !cancelled() && matrix.name == 'phone-36' && steps.install_apks.outcome == 'success' }}
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
+          timeout 240 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r \
+            -e timeout_msec 180000 -e real_wireless_pairing true \
+            -e class com.civisrom.tvtimefixer.adb.WirelessAdbIntegrationTest \
+            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/ui-wireless.log"
+          grep -Eq '^OK \(1 test\)' "$RUNNER_TEMP/ui-wireless.log"
+          ! grep -Eq '^INSTRUMENTATION_STATUS_CODE: -[1-4][[:space:]]*$' "$RUNNER_TEMP/ui-wireless.log"
+
       - name: Run Compose UI regression tests
-        id: ui_tests
+        if: ${{ !cancelled() && steps.install_apks.outcome == 'success' }}
         timeout-minutes: 20
         working-directory: android
         env:
@@ -359,8 +381,6 @@ jobs:
         # APK остаются установленными до сбора скриншотов.
         run: |
           set -o pipefail
-          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
-          timeout 300 "$ANDROID_HOME/platform-tools/adb" install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           # Отдельные процессы ограничивают накопление Surface/IME в старых
           # системных образах. Каждый тест выполняется один раз; сбои не скрываем повтором.
           ui_failed=0
@@ -381,20 +401,6 @@ jobs:
             fi
           done
           exit "$ui_failed"
-
-      - name: Verify real wireless pairing, reconnect, file transfer and APK installation
-        if: ${{ !cancelled() && matrix.name == 'phone-36' && steps.ui_tests.outcome != 'skipped' }}
-        timeout-minutes: 5
-        run: |
-          set -o pipefail
-          "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
-          timeout 240 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r \
-            -e timeout_msec 180000 -e real_wireless_pairing true \
-            -e class com.civisrom.tvtimefixer.adb.WirelessAdbIntegrationTest \
-            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
-            | tee "$RUNNER_TEMP/ui-wireless.log"
-          grep -Eq '^OK \(1 test\)' "$RUNNER_TEMP/ui-wireless.log"
-          ! grep -Eq '^INSTRUMENTATION_STATUS_CODE: -[1-4][[:space:]]*$' "$RUNNER_TEMP/ui-wireless.log"
 
       - name: Collect UI screenshots and IME timeout details
         if: always()

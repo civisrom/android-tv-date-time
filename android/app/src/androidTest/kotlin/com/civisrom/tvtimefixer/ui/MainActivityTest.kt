@@ -30,6 +30,43 @@ import org.junit.Test
 class MainActivityTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun stalled_connection_can_be_cancelled_and_retried_without_leaving_a_socket_open() {
+        java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { listener ->
+            listener.soTimeout = 15_000
+            val accepted = List(2) { java.util.concurrent.CountDownLatch(1) }
+            val closed = List(2) { java.util.concurrent.CountDownLatch(1) }
+            val peer = kotlin.concurrent.thread(isDaemon = true) {
+                try {
+                    repeat(2) { attempt ->
+                        listener.accept().use { socket ->
+                            socket.soTimeout = 15_000
+                            accepted[attempt].countDown()
+                            val input = socket.getInputStream()
+                            while (input.read() != -1) { /* Consume CNXN, never authorize. */ }
+                            closed[attempt].countDown()
+                        }
+                    }
+                } catch (_: java.io.IOException) { /* Teardown closes the fixture after a failed assertion. */ }
+            }
+            compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+            compose.onNodeWithTag("network-address").performScrollTo()
+                .performTextReplacement("127.0.0.1:${listener.localPort}")
+            repeat(2) { attempt ->
+                compose.onNodeWithTag("network-connect").performScrollTo()
+                    .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+                assertTrue("Fixture was not contacted", accepted[attempt].await(5, java.util.concurrent.TimeUnit.SECONDS))
+                compose.onNodeWithTag("connection-cancel").performScrollTo().assertIsEnabled().performClick()
+                compose.waitUntil(3_000) {
+                    runCatching { compose.onNodeWithTag("network-connect").assertIsEnabled() }.isSuccess
+                }
+                assertTrue("Cancelled connection left its socket open", closed[attempt].await(1, java.util.concurrent.TimeUnit.SECONDS))
+                compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+                compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsNotEnabled()
+            }
+            peer.join(1_000)
+        }
+    }
+
     @Test fun terminal_opens_from_main_and_returns_focus_to_its_entry() {
         compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
         compose.onNodeWithTag("terminal-warning-accept").performClick()

@@ -1,7 +1,9 @@
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
 package com.civisrom.tvtimefixer.adb
 
 import com.civisrom.tvtimefixer.data.DeviceAddress
-import com.flyfishxu.kadb.Kadb
+import com.flyfishxu.kadb.core.AdbConnection
 import com.flyfishxu.kadb.exception.AdbAuthException
 import com.flyfishxu.kadb.exception.AdbPairAuthException
 import android.os.Build
@@ -15,15 +17,19 @@ import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 
 /** Реализация поверх Kadb. Вся сетевая работа уходит на Dispatchers.IO. */
-class KadbAdbClient(private val kadb: Kadb, private val commandTimeoutMs: Long = 15_000) : AdbClient {
+internal class KadbAdbClient(
+    private val connection: AdbConnection,
+    private val session: AdbConnectSession,
+    private val commandTimeoutMs: Long = 15_000,
+) : AdbClient {
     @Volatile private var closed = false
 
-    override val shellV2Supported: Boolean get() = kadb.supportsFeature("shell_v2")
+    override val shellV2Supported: Boolean get() = connection.supportsFeature("shell_v2")
 
     override fun openService(destination: String, timeoutMs: Int): AdbService {
         check(!closed) { "ADB client closed" }
         require('\u0000' !in destination && destination.toByteArray(Charsets.UTF_8).size < 4096)
-        val stream = kadb.open(destination)
+        val stream = connection.open(destination)
         return object : AdbService {
             override val source = stream.source
             override val sink = stream.sink
@@ -33,17 +39,18 @@ class KadbAdbClient(private val kadb: Kadb, private val commandTimeoutMs: Long =
 
     override fun shell(command: String): ShellResult = boundedAdbCommand(commandTimeoutMs, ::close) {
         check(!closed) { "ADB client closed" }
-        val v2 = kadb.supportsFeature("shell_v2")
+        val v2 = connection.supportsFeature("shell_v2")
         val service = if (v2) "shell,v2,raw:$command" else "shell:$command"
         require(service.toByteArray(Charsets.UTF_8).size < 4096) { "ADB command too long" }
-        kadb.open(service).use { readBoundedShell(it.source, v2) }
+        connection.open(service).use { readBoundedShell(it.source, v2) }
     }
 
-    override fun isAlive(): Boolean = !closed && runCatching { kadb.connectionCheck() }.getOrDefault(false)
+    override fun isAlive(): Boolean = !closed && session.isOpen
 
     override fun close() {
         closed = true
-        runCatching { kadb.close() }
+        session.close()
+        runCatching { connection.close() }
     }
 }
 
@@ -53,39 +60,32 @@ class KadbAdbClientFactory(
 ) : AdbClientFactory {
     private val pairing = PairingClient(connectTimeoutMs, socketTimeoutMs, exporter = ::exportAndroidPairingKey)
 
-    /**
-     * Открывает соединение и **проверяет его настоящей командой**.
-     *
-     * `Kadb.create` только запоминает адрес: ни сокета, ни рукопожатия оно не
-     * делает и потому не падает никогда — даже на заведомо чужом адресе.
-     * Соединение возникает лениво, при первой операции. Без пробы «Подключено»
-     * означало бы лишь, что адрес разобран: `connectionCheck()` возвращал бы
-     * false, `activeClient` — null, и каждая следующая команда тихо не
-     * выполнялась бы.
-     *
-     * Успех определяется по выводу пробы, а не по тому, что вызов вернулся:
-     * в этом проекте статус уже не раз означал не то, чем кажется.
-     */
+    /** Соединение считается установленным только после AUTH/TLS и успешной shell-пробы. */
     override fun connect(address: DeviceAddress): AdbClient {
-        // Kadb applies this timeout to every transport read, including idle shell output.
-        // Individual probes/settings still have their own 15-second boundedAdbCommand deadline.
-        val kadb = Kadb.create(address.host, address.port, connectTimeoutMs,
+        // AUTH/TLS has its own overall deadline. Terminal reads may remain silent for longer.
+        val session = AdbConnectSession(address.host, address.port, connectTimeoutMs,
             maxOf(socketTimeoutMs, com.civisrom.tvtimefixer.terminal.TERMINAL_TIMEOUT_MS))
-        val client = KadbAdbClient(kadb)
-        val response = try {
-            client.shell(ADB_PROBE_COMMAND)
+        return try {
+            cancellableAdbConnect(60_000, session::close) {
+                val client = session.connect()
+                try {
+                    val response = client.shell(ADB_PROBE_COMMAND)
+                    if (response.output.trim() != ADB_PROBE_TOKEN || response.exitCode != 0) {
+                        throw AdbConnectionException(ConnectionError.UNREACHABLE)
+                    }
+                    client
+                } catch (error: Exception) {
+                    client.close()
+                    throw error
+                }
+            }
         } catch (e: CancellationException) {
-            runCatching { kadb.close() }
+            throw e
+        } catch (e: AdbConnectionException) {
             throw e
         } catch (e: Exception) {
-            runCatching { kadb.close() }
             throw AdbConnectionException(classify(e), e)
         }
-        if (response.output.trim() != ADB_PROBE_TOKEN || response.exitCode != 0) {
-            runCatching { kadb.close() }
-            throw AdbConnectionException(ConnectionError.UNREACHABLE)
-        }
-        return client
     }
 
     override suspend fun pair(address: DeviceAddress, pairingCode: String) {

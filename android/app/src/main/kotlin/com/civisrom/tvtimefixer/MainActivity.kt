@@ -343,6 +343,12 @@ class MainActivity : ComponentActivity() {
 
     private val actions = object : AppActions {
 
+        override fun cancelConnection() {
+            if (!state.canCancelConnection) return
+            state = state.copy(connectionCancelling = true)
+            actionJob?.cancel()
+        }
+
         private fun run(operation: Operation, block: suspend (OperationTrace) -> AppState) {
             if (state.busy) return
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.PAIR, Operation.CHECK_NTP,
@@ -366,7 +372,7 @@ class MainActivity : ComponentActivity() {
                 Operation.PAIR, Operation.APPLY_NTP, Operation.CHECK_TIME, Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE)
             val resetZone = zoneAction || operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
                 Operation.PAIR, Operation.READ_DEVICE)
-            state = state.copy(busy = true, operation = operation, diagnosticEventId = null,
+            state = state.copy(busy = true, connectionCancelling = false, operation = operation, diagnosticEventId = null,
                 timeZoneResult = if (resetZone) null else state.timeZoneResult,
                 timeZoneDiagnosticEventId = if (resetZone) null else state.timeZoneDiagnosticEventId,
                 timeCheck = if (resetTime) null else state.timeCheck,
@@ -415,6 +421,11 @@ class MainActivity : ComponentActivity() {
                     ).withLatestBackground(state)
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
+                    if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
+                        withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
+                        if (generation == actionGeneration) state = state.connectionLost().copy(
+                            message = UiMessage(R.string.connect_cancelled))
+                    }
                     throw e
                 } catch (e: Exception) {
                     val event = journal.record(operation, Outcome.FAILED, transport,
@@ -427,7 +438,7 @@ class MainActivity : ComponentActivity() {
                         ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
                     ) else state.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
                 } finally {
-                    if (generation == actionGeneration) state = state.copy(busy = false, operation = null)
+                    if (generation == actionGeneration) state = state.copy(busy = false, connectionCancelling = false, operation = null)
                 }
             }
         }
@@ -838,7 +849,7 @@ class MainActivity : ComponentActivity() {
         val generation = ++actionGeneration
         // Обычная проверка не меняет busy: иначе каждые 10 секунд мигают
         // кнопки и появляется полоса загрузки, сдвигающая поля ввода.
-        if (returning) state = state.copy(busy = true, connection = ConnectionState.Checking(target))
+        if (returning) state = state.copy(busy = true, operation = Operation.CHECK_CONNECTION, connection = ConnectionState.Checking(target))
         try {
             val result = runInterruptible(Dispatchers.IO) { connector.checkConnection() }
             // Новая команда пока ждёт Mutex. Ей нужен актуальный результат
@@ -851,7 +862,7 @@ class MainActivity : ComponentActivity() {
                 state.connectionLost().copy(message = UiMessage(R.string.connect_connection_lost), diagnosticEventId = event)
             }
         } finally {
-            if (returning && generation == actionGeneration) state = state.copy(busy = false)
+            if (returning && generation == actionGeneration) state = state.copy(busy = false, operation = null)
         }
     }
 

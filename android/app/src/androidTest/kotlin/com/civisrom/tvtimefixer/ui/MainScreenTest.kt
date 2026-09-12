@@ -36,6 +36,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -102,6 +104,7 @@ private class ScreenActions : AppActions {
     override fun removeFavoriteNtp(server: String) { calls += "delete-ntp:$server" }
     override fun openSetupSettings(action: String) { calls += "settings:$action" }
     override fun connect(address: String) { calls += "connect:$address" }
+    override fun cancelConnection() { calls += "cancel-connection" }
     override fun connectLoopback() { calls += "loopback" }
     override fun disconnect() { calls += "disconnect" }
     override fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String) {
@@ -725,6 +728,46 @@ class MainScreenTest {
         compose.onNodeWithTag("pairing-code").performScrollTo().assertIsFocused()
         compose.onNodeWithTag("pairing-address").performScrollTo().assertTextContains("192.0.2.10:37123")
         assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun connection_progress_and_cancel_follow_the_section_that_started_the_attempt() {
+        val address = DeviceAddress("192.0.2.10", 37123)
+        val favorite = com.civisrom.tvtimefixer.data.FavoriteDevice("TV", address, "fixture", "TV")
+        val idle = AppState(discovered = listOf(DiscoveredDevice("TV", address, DiscoveredDevice.Kind.READY_TO_CONNECT)),
+            favoritesReady = true, favorites = com.civisrom.tvtimefixer.data.Favorites(devices = listOf(favorite)))
+        val state = mutableStateOf(idle)
+        val connectingActions = object : AppActions by actions {
+            override fun connect(address: String) { state.value = idle.copy(busy = true, operation = Operation.CONNECT_NETWORK) }
+            override fun connectFavorite(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice) = connect(favorite.address.toString())
+            override fun cancelConnection() { state.value = state.value.copy(connectionCancelling = true) }
+        }
+        compose.setContent { MaterialTheme { MainScreen(DeviceMode.HANDHELD, state.value, connectingActions) } }
+        compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+        for ((section, button) in listOf("discovery" to "discovered-connect-$address", "favorites" to "favorite-connect-fixture",
+                "network" to "network-connect")) {
+            if (section == "favorites") compose.onNodeWithTag("section-favorites").performScrollTo().performClick()
+            if (section == "network") compose.onNodeWithTag("network-address").performSemanticsAction(SemanticsActions.SetText) {
+                it(androidx.compose.ui.text.AnnotatedString(address.toString()))
+            }
+            compose.onNodeWithTag(button).performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+            compose.onNodeWithTag("operation-progress-$section").performScrollTo().assertIsDisplayed()
+            (setOf("discovery", "favorites", "network") - section).forEach {
+                compose.onNodeWithTag("operation-progress-$it").assertDoesNotExist()
+            }
+            compose.onNodeWithTag("connection-cancel").assert(hasAnyAncestor(hasTestTag("operation-progress-$section")))
+                .performScrollTo().assertIsEnabled().performClick()
+            compose.onNodeWithTag("connection-cancel").assertIsNotEnabled()
+            compose.runOnIdle { state.value = idle }
+            compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+        }
+        for ((operation, section) in listOf(Operation.PAIR to "pairing", Operation.CONNECT_USB to "usb",
+                Operation.USB_PERMISSION to "usb", Operation.APPLY_TIME_ZONE to "timezone", Operation.CHECK_NTP to "ntp",
+                Operation.APPLY_NTP to "ntp", Operation.READ_DEVICE to "device-info")) {
+            compose.runOnIdle { state.value = connected.copy(busy = true, operation = operation, deviceInfo = DeviceInfo()) }
+            compose.onNodeWithTag("operation-progress-$section").performScrollTo().assertIsDisplayed()
+            if (state.value.connectionInProgress) compose.onNodeWithTag("connection-cancel").assertIsEnabled()
+            else compose.onNodeWithTag("connection-cancel").assertDoesNotExist()
+        }
     }
 
     @Test fun a_discovered_address_can_be_copied_with_its_port_and_pasted_into_input_fields() {

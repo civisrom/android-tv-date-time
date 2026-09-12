@@ -111,6 +111,7 @@ interface AppActions {
     fun connect(address: String)
     fun connectLoopback()
     fun disconnect()
+    fun cancelConnection()
     fun pairAndConnect(pairingAddress: String, code: String, connectAddress: String)
     fun checkNtpServer(server: String)
     fun applyNtpServer(server: String, allowUnverified: Boolean = false)
@@ -148,6 +149,7 @@ fun MainScreen(
     var selectedEvent by rememberSaveable { mutableStateOf<Long?>(null) }
     var returnFocus by rememberSaveable { mutableStateOf<String?>(null) }
     var origin by rememberSaveable { mutableStateOf("diagnostics-open") }
+    var connectionSection by rememberSaveable { mutableStateOf("network") }
     // Код не попадает в savedInstanceState и сохраняется только на время
     // текущего процесса, в том числе при просмотре диагностики.
     var pairingCode by remember { mutableStateOf("") }
@@ -176,7 +178,9 @@ fun MainScreen(
                 fileBusy = terminalFileBusy, fileMessage = terminalFileMessage, deviceName = state.deviceName)
         }
     } else if (showSetup) {
-        SetupScreen(state, actions, onBack = { showSetup = false; returnFocus = "setup-open" })
+        SetupScreen(state, object : AppActions by actions {
+            override fun connectLoopback() { connectionSection = "network"; actions.connectLoopback() }
+        }, onBack = { showSetup = false; returnFocus = "setup-open" })
     } else if (showDiagnostics) {
         DiagnosticsScreen(mode, diagnostics, selectedEvent,
             onBack = {
@@ -193,6 +197,7 @@ fun MainScreen(
             }, onClear = onClearDiagnostics)
     } else holder.SaveableStateProvider("main") {
         MainContent(mode, state, actions, diagnostics, pairingCode, { pairingCode = it },
+            connectionSection, { connectionSection = it },
             onDiagnostics = { id, key ->
                 selectedEvent = id; origin = key; returnFocus = null
                 onRefreshDiagnostics(); showDiagnostics = true
@@ -232,6 +237,8 @@ private fun MainContent(
     diagnostics: DiagnosticSnapshot,
     pairingCode: String,
     onPairingCode: (String) -> Unit,
+    connectionSection: String,
+    onConnectionSection: (String) -> Unit,
     onDiagnostics: (Long?, String) -> Unit,
     returnFocus: String?,
     onFocusRestored: () -> Unit,
@@ -246,6 +253,14 @@ private fun MainContent(
     var pairingExpanded by rememberSaveable { mutableStateOf(false) }
     var discoveryExpanded by rememberSaveable { mutableStateOf(state.discovered.isNotEmpty()) }
     var lastDiscoveredCount by rememberSaveable { mutableIntStateOf(state.discovered.size) }
+    fun connectionActions(section: String): AppActions = object : AppActions by actions {
+        override fun connect(address: String) { onConnectionSection(section); actions.connect(address) }
+        override fun connectLoopback() { onConnectionSection(section); actions.connectLoopback() }
+        override fun connectFavorite(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice) {
+            onConnectionSection(section); actions.connectFavorite(favorite)
+        }
+        override fun disconnect() { onConnectionSection(section); actions.disconnect() }
+    }
     LaunchedEffect(state.discovered.size, state.discoveryPermissionNeeded) {
         if (state.discovered.size > lastDiscoveredCount || state.discoveryPermissionNeeded) discoveryExpanded = true
         lastDiscoveredCount = state.discovered.size
@@ -314,21 +329,21 @@ private fun MainContent(
                 }
             }
         }
-        ConnectionStatus(mode, state, actions)
+        ConnectionStatus(mode, state, connectionActions("network"), connectionSection == "network")
         FunctionCard("discovery") {
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {
-                DiscoverySection(state, actions, onPair = {
+                DiscoverySection(state, connectionActions("discovery"), onPair = {
                     pairingAddress = it; pairingExpanded = true; focusPairing = true
                 })
             }
+            if (connectionSection == "discovery") OperationProgress(state, actions, "discovery", Operation.CONNECT_NETWORK)
         }
         FunctionCard("favorites") {
-            ExpandableSection(stringResource(R.string.favorite_devices), "favorites") { DeviceFavorites(state, actions) }
-        }
-        if (state.busy) {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.operation?.let { Text(stringResource(R.string.operation_working, stringResource(it.labelRes()))) }
+            ExpandableSection(stringResource(R.string.favorite_devices), "favorites") {
+                DeviceFavorites(state, connectionActions("favorites"))
+            }
+            if (connectionSection == "favorites") OperationProgress(state, actions, "favorites", Operation.CONNECT_NETWORK)
         }
         state.message?.let { message ->
             Card(Modifier.fillMaxWidth()) {
@@ -350,6 +365,7 @@ private fun MainContent(
             ExpandableSection(stringResource(R.string.time_zone_title), "timezone") {
                 TimeZoneSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
             }
+            OperationProgress(state, actions, "timezone", Operation.APPLY_TIME_ZONE)
         }
         FunctionCard("pairing") {
             ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
@@ -357,12 +373,14 @@ private fun MainContent(
                 PairingSection(state, actions, pairingAddress, { pairingAddress = it },
                     pairingCode, onPairingCode, pairingRequester)
             }
+            OperationProgress(state, actions, "pairing", Operation.PAIR)
         }
         FunctionCard("usb") {
             ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
                 onExpanded = { usbExpanded = it }) {
                 UsbSection(state, actions)
             }
+            OperationProgress(state, actions, "usb", Operation.CONNECT_USB, Operation.USB_PERMISSION)
         }
         if (state.connected) DeviceInfoSection(state, actions)
         HorizontalDivider()
@@ -379,6 +397,24 @@ private fun MainContent(
             Text(stringResource(R.string.usage_terms_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.usage_terms_body), style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+internal fun OperationProgress(state: AppState, actions: AppActions, location: String, vararg operations: Operation) {
+    val operation = state.operation ?: return
+    if (!state.busy || operation !in operations) return
+    Column(Modifier.fillMaxWidth().testTag("operation-progress-$location"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+        Text(if (state.connectionInProgress && state.connectionCancelling) stringResource(R.string.connect_cancelling)
+            else if (operation == Operation.APPLY_TIME_ZONE) stringResource(R.string.time_zone_working)
+            else stringResource(R.string.operation_working, stringResource(operation.labelRes())))
+        if (state.connectionInProgress) {
+            Button(shape = MaterialTheme.shapes.medium, onClick = actions::cancelConnection,
+                enabled = state.canCancelConnection, modifier = Modifier.testTag("connection-cancel")) {
+                Text(stringResource(R.string.diagnostics_cancel))
+            }
         }
     }
 }
@@ -479,7 +515,7 @@ private fun UsbSection(state: AppState, actions: AppActions) {
 }
 
 @Composable
-private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActions) {
+private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActions, showProgress: Boolean) {
     Card(Modifier.fillMaxWidth().testTag("connection-status")) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.connect_title), style = MaterialTheme.typography.titleMedium)
@@ -498,6 +534,8 @@ private fun ConnectionStatus(mode: DeviceMode, state: AppState, actions: AppActi
                 Text(stringResource(R.string.connect_disconnect))
             }
             NetworkAddressSection(mode, state, actions)
+            if (showProgress) OperationProgress(state, actions, "network", Operation.CONNECT_NETWORK, Operation.DISCONNECT)
+            OperationProgress(state, actions, "connection-check", Operation.CHECK_CONNECTION)
         }
     }
 }
@@ -584,7 +622,7 @@ private fun DiscoveredRow(
                 Text(
                     stringResource(R.string.discovery_connected),
                     color = ConnectedColor,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else if (awaitingPairing) {
@@ -595,7 +633,8 @@ private fun DiscoveredRow(
                     Text(stringResource(R.string.discovery_pair_action))
                 }
             } else {
-                Button(shape = MaterialTheme.shapes.medium, onClick = { onConnect(device.address.toString()) }, enabled = enabled) {
+                Button(shape = MaterialTheme.shapes.medium, onClick = { onConnect(device.address.toString()) }, enabled = enabled,
+                    modifier = Modifier.testTag("discovered-connect-${device.address}")) {
                     Text(stringResource(R.string.connect_action))
                 }
             }
@@ -821,6 +860,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
             }
         }
 
+        OperationProgress(state, actions, "ntp", Operation.CHECK_NTP, Operation.APPLY_NTP)
+
         // Итог показывается здесь, а не в карточке вверху экрана: раздел
         // находится далеко внизу, и подтверждение там не видно
         state.ntpMessage?.let { message ->
@@ -850,8 +891,8 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 modifier = Modifier.testTag("time-check")) {
                 Text(stringResource(R.string.time_check_action))
             }
-            if (state.operation == Operation.CHECK_TIME) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (state.busy && state.operation == Operation.CHECK_TIME) {
+                LinearProgressIndicator(Modifier.fillMaxWidth().testTag("operation-progress-time"))
                 Text(stringResource(R.string.time_check_working), modifier = Modifier.testTag("time-check-working"))
             }
             state.timeCheck?.let { DeviceTimeCard(it) }
@@ -1038,10 +1079,6 @@ private fun TimeZoneSection(state: AppState, actions: AppActions,
             if (matches.size > 20) Text(stringResource(R.string.time_zone_refine))
         }
     } else Text(stringResource(R.string.time_zone_connect_first))
-    if (state.operation == Operation.APPLY_TIME_ZONE) {
-        LinearProgressIndicator(Modifier.fillMaxWidth())
-        Text(stringResource(R.string.time_zone_working))
-    }
     when (val result = state.timeZoneResult) {
         is TimeZoneUpdateResult.Applied -> CopyableText(stringResource(R.string.time_zone_applied, result.zoneId), color = ConnectedColor)
         is TimeZoneUpdateResult.Failed -> {
@@ -1301,6 +1338,7 @@ private fun DeviceInfoSection(state: AppState, actions: AppActions) {
         Button(shape = MaterialTheme.shapes.medium, onClick = actions::refreshDeviceInfo, enabled = !state.busy) {
             Text(stringResource(R.string.info_refresh))
         }
+        OperationProgress(state, actions, "device-info", Operation.READ_DEVICE)
     }
 }
 

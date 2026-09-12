@@ -61,7 +61,8 @@ internal fun SetupScreen(state: AppState, actions: AppActions, onBack: () -> Uni
                 Button(shape = MaterialTheme.shapes.medium, onClick = actions::connectLoopback, enabled = !state.busy, modifier = Modifier.testTag("setup-connect")) {
                     Text(stringResource(R.string.connect_try_loopback))
                 }
-                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                OperationProgress(state, actions, "setup", com.civisrom.tvtimefixer.diagnostics.Operation.CONNECT_NETWORK,
+                    com.civisrom.tvtimefixer.diagnostics.Operation.CHECK_CONNECTION)
                 Text(when (val connection = state.connection) {
                     is com.civisrom.tvtimefixer.adb.ConnectionState.Connected -> stringResource(R.string.connect_state_connected, connection.address.toString())
                     is com.civisrom.tvtimefixer.adb.ConnectionState.Failed -> stringResource(connection.reason.messageRes())

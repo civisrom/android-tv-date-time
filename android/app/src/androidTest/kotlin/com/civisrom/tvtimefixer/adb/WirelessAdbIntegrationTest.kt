@@ -4,9 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.wifi.WifiManager
 import android.os.Build
-import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Settings
@@ -37,15 +35,31 @@ class WirelessAdbIntegrationTest {
 
         // Same system service as Settings/CTS. These exemptions and shell permissions
         // belong to test setup only; the production client still uses its normal identity.
-        check(HiddenApiBypass.addHiddenApiExemptions("Landroid/os/ServiceManager;", "Landroid/debug/"))
-        val binder = Class.forName("android.os.ServiceManager").getMethod("getService", String::class.java)
-            .invoke(null, "adb") as IBinder
-        val manager = Class.forName("android.debug.IAdbManager\$Stub").getMethod("asInterface", IBinder::class.java)
-            .invoke(null, binder)
-        val managerType = Class.forName("android.debug.IAdbManager")
-        fun manage(name: String, vararg args: Any): Any? = privileged {
-            val method = managerType.methods.single { it.name == name && it.parameterCount == args.size }
-            method.invoke(manager, *args)
+        check(HiddenApiBypass.addHiddenApiExemptions("Landroid/debug/"))
+        val managerType = Class.forName("android.debug.IAdbManager\$Stub")
+        fun manage(name: String, vararg args: Any): Any? {
+            // SELinux forbids an ordinary app from finding the adb Binder service,
+            // even after adopting shell permissions. Execute setup as the shell UID.
+            val transaction = managerType.getDeclaredField("TRANSACTION_$name").apply { isAccessible = true }.getInt(null)
+            val arguments = args.joinToString(" ") { value ->
+                when (value) {
+                    is Boolean -> "i32 ${if (value) 1 else 0}"
+                    is String -> {
+                        check(value.matches(Regex("(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")))
+                        // UiAutomation uses Runtime.exec, so shell quotes would become part of the BSSID.
+                        "s16 $value"
+                    }
+                    else -> error("Unsupported emulator setup argument")
+                }
+            }
+            val response = shell("service call adb $transaction $arguments")
+            val words = Regex("\\b[0-9a-fA-F]{8}\\b").findAll(response).map { it.value.toLong(16).toInt() }.toList()
+            check(words.firstOrNull() == 0) { "Emulator ADB service rejected $name" }
+            return when (name) {
+                "isAdbWifiSupported" -> words[1] != 0
+                "getAdbWirelessPort" -> words[1]
+                else -> null
+            }
         }
         val events = LinkedBlockingQueue<Intent>()
         val receiver = object : BroadcastReceiver() {
@@ -64,7 +78,7 @@ class WirelessAdbIntegrationTest {
         var connectionPort = 0
         fun beginPairing(): Pair<DeviceAddress, String> = privileged {
             events.clear()
-            managerType.getMethod("enablePairingByPairingCode").invoke(manager)
+            manage("enablePairingByPairingCode")
             var code: String? = null
             var port = 0
             val deadline = SystemClock.elapsedRealtime() + 20_000
@@ -87,10 +101,8 @@ class WirelessAdbIntegrationTest {
             assertEquals(true, manage("isAdbWifiSupported"))
             shell("svc wifi enable")
             var bssid: String? = null
-            val wifi = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
             waitFor("Emulator Wi-Fi did not connect") {
-                @Suppress("DEPRECATION")
-                bssid = privileged { wifi.connectionInfo.bssid }
+                bssid = Regex("BSSID: ([0-9a-fA-F:]{17})").find(shell("cmd wifi status"))?.groupValues?.get(1)
                 bssid != null && bssid != "02:00:00:00:00:00"
             }
             manage("allowWirelessDebugging", false, checkNotNull(bssid))
