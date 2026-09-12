@@ -349,6 +349,7 @@ jobs:
           exit 1
 
       - name: Run Compose UI regression tests
+        id: ui_tests
         timeout-minutes: 20
         working-directory: android
         env:
@@ -382,7 +383,7 @@ jobs:
           exit "$ui_failed"
 
       - name: Verify real wireless pairing, reconnect, file transfer and APK installation
-        if: matrix.name == 'phone-36'
+        if: ${{ !cancelled() && matrix.name == 'phone-36' && steps.ui_tests.outcome != 'skipped' }}
         timeout-minutes: 5
         run: |
           set -o pipefail

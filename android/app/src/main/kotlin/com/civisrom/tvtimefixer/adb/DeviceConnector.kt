@@ -87,8 +87,7 @@ class DeviceConnector(
     fun connect(input: String): ConnectionState {
         val address = parseDeviceAddress(input)
         if (address == null) {
-            state = ConnectionState.Failed(null, ConnectionError.INVALID_ADDRESS)
-            return state
+            return failInput(null, ConnectionError.INVALID_ADDRESS)
         }
         return connect(address)
     }
@@ -96,6 +95,18 @@ class DeviceConnector(
     fun connect(address: DeviceAddress): ConnectionState = connectTarget(address) { factory.connect(address) }
 
     fun connectUsb(address: UsbDeviceAddress): ConnectionState = connectTarget(address) { usbConnect(address) }
+
+    private fun failInput(address: DeviceTarget?, reason: ConnectionError): ConnectionState {
+        val previous = synchronized(lock) {
+            val previous = client
+            client = null
+            generation++
+            state = ConnectionState.Failed(address, reason)
+            previous
+        }
+        previous?.close()
+        return state
+    }
 
     private fun connectTarget(address: DeviceTarget, expectedGeneration: Int? = null, open: () -> AdbClient): ConnectionState {
         val (previous, attempt) = synchronized(lock) {
@@ -148,12 +159,10 @@ class DeviceConnector(
         val pairingAddress = parseDeviceAddress(pairingInput).takeIf { ':' in pairingInput }
         val connectAddress = parseDeviceAddress(connectInput).takeIf { ':' in connectInput }
         if (pairingAddress == null || connectAddress == null) {
-            state = ConnectionState.Failed(null, ConnectionError.INVALID_ADDRESS)
-            return state
+            return failInput(null, ConnectionError.INVALID_ADDRESS)
         }
         if (!isValidPairingCode(pairingCode)) {
-            state = ConnectionState.Failed(pairingAddress, ConnectionError.PAIRING_REJECTED)
-            return state
+            return failInput(pairingAddress, ConnectionError.PAIRING_REJECTED)
         }
 
         val (previous, attempt) = synchronized(lock) {

@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
     private var exportDocument: String? = null
 
     private val importDocuments = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) copyTerminalDocument {
+        if (uris.isNotEmpty()) runTerminalFileOperation {
             for (uri in uris) {
                 val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
                     if (it.moveToFirst()) it.getString(0) else null
@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
     private val exportDocuments = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val name = exportDocument
         exportDocument = null
-        if (uri != null && name != null) copyTerminalDocument {
+        if (uri != null && name != null) runTerminalFileOperation {
             terminalFiles.resolve(name).inputStream().use { input ->
                 contentResolver.openOutputStream(uri, "wt")?.use { input.copyTo(it) }
                     ?: throw java.io.IOException("Document unavailable")
@@ -138,15 +138,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun copyTerminalDocument(block: () -> Unit) {
+    private fun runTerminalFileOperation(
+        successMessage: Int = R.string.terminal_file_done,
+        failureMessage: Int = R.string.terminal_file_failed,
+        block: () -> Unit,
+    ) {
         if (terminalFileBusy || terminal.state.value.running || state.busy) return
         terminalFileBusy = true; terminalFileMessage = null
         lifecycleScope.launch {
             try {
                 runInterruptible(Dispatchers.IO, block)
-                terminalFileMessage = R.string.terminal_file_done
+                terminalFileMessage = successMessage
             } catch (e: CancellationException) { throw e
-            } catch (_: Exception) { terminalFileMessage = R.string.terminal_file_failed
+            } catch (_: Exception) { terminalFileMessage = failureMessage
             } finally {
                 terminalFileBusy = false
                 refreshTerminalFiles()
@@ -177,7 +181,9 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun removeFile(name: String) {
-            copyTerminalDocument { terminalFiles.remove(name) }
+            runTerminalFileOperation(R.string.terminal_remove_done, R.string.terminal_remove_failed) {
+                terminalFiles.remove(name)
+            }
         }
 
         override fun run() {
@@ -397,6 +403,7 @@ class MainActivity : ComponentActivity() {
                             ntpAction && result.ntpCheck?.reachable == false -> DiagnosticIssue.NTP_UNREACHABLE
                             ntpAction && result.ntpCheck?.isUsable() == false -> DiagnosticIssue.NTP_UNUSABLE
                             result.ntpMessage?.res == R.string.ntp_not_confirmed -> DiagnosticIssue.NTP_NOT_CONFIRMED
+                            result.ntpMessage?.res == R.string.ntp_permission_denied -> DiagnosticIssue.NTP_PERMISSION_DENIED
                             result.ntpMessage?.res == R.string.ntp_invalid -> DiagnosticIssue.INVALID_NTP
                             else -> null
                         })
@@ -838,7 +845,8 @@ class MainActivity : ComponentActivity() {
             // проверки, но отключённое через USB receiver устройство не восстанавливаем.
             if (state.connection.targetOrNull() != target) return@withLock
             state = if (result is ConnectionState.Connected) state.copy(connection = result) else {
-                val event = journal.record(Operation.DISCONNECT, Outcome.FAILED, diagnosticTransport(target),
+                val event = journal.record(Operation.CHECK_CONNECTION, Outcome.FAILED, diagnosticTransport(target),
+                    issue = DiagnosticIssue.CONNECTION_LOST,
                     reason = if (target is UsbDeviceAddress) ConnectionError.USB_DISCONNECTED else ConnectionError.UNREACHABLE)
                 state.connectionLost().copy(message = UiMessage(R.string.connect_connection_lost), diagnosticEventId = event)
             }

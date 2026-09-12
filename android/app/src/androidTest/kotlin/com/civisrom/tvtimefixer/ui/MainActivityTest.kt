@@ -169,7 +169,11 @@ class MainActivityTest {
                 automation.waitForIdle(300, 3_000)
             }
             try {
-                compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
+                compose.waitUntil(5_000) {
+                    compose.runOnUiThread { compose.activity.window.decorView.hasWindowFocus() }
+                }
+                // Semantics text input alone does not promise to open the software keyboard.
+                compose.onNodeWithTag("ntp-address").performScrollTo().performClick().performTextInput("pool.ntp.org")
                 waitForKeyboard(true)
                 compose.onNodeWithTag("ntp-address").performImeAction()
                 waitForKeyboard(false)

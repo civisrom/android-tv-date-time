@@ -16,6 +16,9 @@ sealed interface NtpUpdateResult {
     /** Адрес не прошёл проверку формата — до устройства не дошло. */
     data object InvalidServer : NtpUpdateResult
 
+    /** Целевое устройство ответило отказом прав на запись системной настройки. */
+    data object PermissionDenied : NtpUpdateResult
+
     /**
      * Команда выполнена, но устройство сообщает другое значение.
      *
@@ -75,6 +78,7 @@ class DeviceRepository(private val client: AdbClient, private val onFailure: (Ex
             val automatic = parseAutomaticSetting(optional("settings get global auto_time"))
             val result = client.shell(if (value == "null") "settings delete $NTP_SETTING"
                 else "settings put $NTP_SETTING ${shellQuote(value)}")
+            if (result.permissionDenied) return NtpUpdateResult.PermissionDenied
             check(result.exitCode == 0 && result.errorOutput.isBlank()) { "NTP setting write failed" }
             val confirmed = currentNtpServer()
             if (confirmed == value) {

@@ -58,6 +58,11 @@ class MessagesTest {
 
         val failed = NtpUpdateResult.Failed("timeout").toUiMessage()
         assertEquals(listOf("timeout"), failed.args)
+
+        val denied = NtpUpdateResult.PermissionDenied.toUiMessage()
+        assertTrue(denied.args.isEmpty())
+        assertNotEquals(failed.res, denied.res)
+        assertNotEquals(notConfirmed.res, denied.res)
     }
 
     @Test

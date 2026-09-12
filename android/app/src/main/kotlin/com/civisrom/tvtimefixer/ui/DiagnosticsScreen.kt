@@ -60,6 +60,7 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.CONNECT_USB -> R.string.operation_connect_usb
     Operation.PAIR -> R.string.operation_pair
     Operation.DISCONNECT -> R.string.operation_disconnect
+    Operation.CHECK_CONNECTION -> R.string.operation_check_connection
     Operation.USB_PERMISSION -> R.string.operation_usb_permission
     Operation.USB_SCAN -> R.string.operation_usb_scan
     Operation.USB_DETACHED -> R.string.operation_usb_detached
@@ -79,6 +80,8 @@ private fun DiagnosticIssue.labelRes(): Int = when (this) {
     DiagnosticIssue.NTP_UNREACHABLE -> R.string.diagnostics_ntp_unreachable
     DiagnosticIssue.NTP_UNUSABLE -> R.string.ntp_check_invalid_response
     DiagnosticIssue.NTP_NOT_CONFIRMED -> R.string.diagnostics_ntp_not_confirmed
+    DiagnosticIssue.NTP_PERMISSION_DENIED -> R.string.ntp_permission_denied
+    DiagnosticIssue.CONNECTION_LOST -> R.string.connect_connection_lost
     DiagnosticIssue.INVALID_NTP -> R.string.ntp_invalid
     DiagnosticIssue.TIME_MISMATCH -> R.string.time_check_mismatch
     DiagnosticIssue.TIME_UNCERTAIN -> R.string.time_check_uncertain

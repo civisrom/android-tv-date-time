@@ -482,19 +482,17 @@ class MainScreenTest {
 
     @Test fun ntp_input_survives_diagnostics_and_only_explicit_apply_executes() {
         screen(connected)
-        // Semantics text input does not promise to show the IME; open it with a real tap.
-        compose.onNodeWithTag("ntp-address").performScrollTo().performClick()
-        waitForKeyboard()
-        compose.onNodeWithTag("ntp-address").performTextInput("pool.ntp.org")
         // Здесь проверяем сохранение формы; касания с IME проверяются отдельно
         // в narrow_screen_at_double_font_keeps_ntp_actions_and_diagnostics_reachable.
+        compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("pool.ntp.org")
         compose.onNodeWithTag("diagnostics-open").performScrollTo()
             .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("diagnostics-back")
             .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.onNodeWithTag("ntp-address").performScrollTo().assertTextContains("pool.ntp.org")
         assertTrue(actions.calls.isEmpty())
-        compose.onNodeWithTag("ntp-apply").performScrollTo().performClick()
+        compose.onNodeWithTag("ntp-apply").performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         assertEquals(listOf("apply:pool.ntp.org"), actions.calls)
     }
 

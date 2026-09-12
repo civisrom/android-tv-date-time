@@ -80,6 +80,37 @@ private class FakeDevice(
 }
 
 class DeviceRepositoryTest {
+    @Test fun `ADB permission denial is distinct from a connection failure for set reset and undo`() {
+        val denials = listOf(
+            ShellResult("", "java.lang.SecurityException: Permission denial: writing settings requires android.permission.WRITE_SECURE_SETTINGS", 255),
+            ShellResult("Permission denied", "", 1),
+            ShellResult("java.lang.SecurityException: Permission denial", "", 0),
+        )
+        val changes = listOf<(DeviceRepository) -> NtpUpdateResult>(
+            { it.setNtpServer("pool.ntp.org") },
+            { it.resetNtpServer() },
+            { it.undoNtpServer(NtpUpdateResult.Applied("time.android.com", previous = "previous.example")) },
+        )
+        for (denial in denials) for (change in changes) {
+            val device = FakeDevice()
+            val writes = mutableListOf<String>()
+            val client = object : AdbClient by device {
+                override fun shell(command: String): ShellResult {
+                    if (command.startsWith("settings put ") || command.startsWith("settings delete ")) {
+                        writes += command
+                        return denial
+                    }
+                    return device.shell(command)
+                }
+            }
+            val result = change(DeviceRepository(client))
+            assertEquals(NtpUpdateResult.PermissionDenied, result)
+            assertEquals(1, writes.size)
+            assertEquals("time.android.com", device.ntpServer)
+            assertTrue(client.isAlive())
+        }
+    }
+
     @Test fun `terminal identification reads only target properties without running full diagnostics`() {
         val client = FakeDevice()
         assertEquals("Sony BRAVIA 4K GB", DeviceRepository(client).readDeviceName())

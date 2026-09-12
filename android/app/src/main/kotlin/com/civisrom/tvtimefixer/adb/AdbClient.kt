@@ -13,6 +13,12 @@ data class ShellResult(
 ) {
     /** Вывод без хвостовых переводов строки — команды adb почти всегда их добавляют. */
     val trimmedOutput: String get() = output.trim()
+
+    /** Старые shell-транспорты смешивают stderr/stdout и не передают код возврата. */
+    val permissionDenied: Boolean get() {
+        val text = (errorOutput.take(4096) + output.take(4096)).lowercase()
+        return "permission denied" in text || "permission denial" in text || "securityexception" in text
+    }
 }
 
 /**

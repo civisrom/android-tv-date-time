@@ -128,6 +128,7 @@
     <string name="ntp_invalid">Invalid time server address. Enter a domain or IPv4 without a port, spaces, or http://.</string>
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
+    <string name="ntp_permission_denied">The connected device denied permission to change the time server via ADB. Check debugging restrictions in its developer options.</string>
     <string name="time_check_title">Device time verification</string>
     <string name="time_check_action">Verify device time</string>
     <string name="time_check_working">Verifying device time…</string>
@@ -246,6 +247,7 @@
     <string name="operation_connect_usb">USB connection</string>
     <string name="operation_pair">Code pairing</string>
     <string name="operation_disconnect">Disconnecting device</string>
+    <string name="operation_check_connection">Checking connection</string>
     <string name="operation_usb_permission">USB access permission</string>
     <string name="operation_usb_scan">USB device search</string>
     <string name="diagnostics_usb_none">No USB devices detected</string>
@@ -372,7 +374,7 @@
     <string name="terminal_install" formatted="false">APK install command</string>
     <string name="terminal_push" formatted="false">Send file command</string>
     <string name="terminal_export" formatted="false">Save to this device</string>
-    <string name="terminal_file_busy">Copying document…</string>
+    <string name="terminal_file_busy">Processing file…</string>
     <string name="terminal_file_done">Document copied</string>
     <string name="terminal_file_failed">Could not copy the document. Check access and available space.</string>
     <string name="terminal_file_unavailable">No document picker is available on this device.</string>
@@ -541,6 +543,8 @@
     <string name="terminal_remote_file">Path on the connected device: %1$s</string>
     <string name="terminal_local_file">File in this app: %1$s</string>
     <string name="terminal_remove">Delete copy</string>
+    <string name="terminal_remove_done">Copy removed from the list</string>
+    <string name="terminal_remove_failed">Could not delete the file copy. Try again.</string>
     <string name="terminal_remove_title">Delete file from the list?</string>
     <string name="terminal_remove_hint">The copy “%1$s” will be deleted from app storage. The original file and the app on the connected device will be kept.</string>
 </resources>

@@ -60,6 +60,18 @@ private class FakeFactory(
 }
 
 class DeviceConnectorTest {
+    @Test fun `invalid pairing input cannot leave an old transport hidden behind a failure`() = runBlocking {
+        for ((address, code) in listOf("192.0.2.2" to "123456", "192.0.2.2:40001" to "12345")) {
+            val factory = FakeFactory()
+            val connector = DeviceConnector(factory)
+            connector.connect("192.0.2.1")
+            assertTrue(connector.pairAndConnect(address, code, "192.0.2.2:40002") is ConnectionState.Failed)
+            assertNull(connector.activeClient)
+            assertTrue(factory.clients.single().closed)
+            assertTrue(factory.paired.isEmpty())
+        }
+    }
+
     @Test fun `pairing requires explicit ports for both endpoints`() = runBlocking {
         for ((pairing, connect) in listOf("192.0.2.1" to "192.0.2.1:40002", "192.0.2.1:40001" to "192.0.2.1")) {
             val factory = FakeFactory()

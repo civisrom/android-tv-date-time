@@ -103,7 +103,7 @@ class KadbAdbClientFactory(
         }
     }
 
-    private companion object {
+    internal companion object {
         /**
          * Раскладывает исключение на понятную пользователю причину.
          *
@@ -118,6 +118,7 @@ class KadbAdbClientFactory(
             is SocketTimeoutException -> ConnectionError.CONNECTION_TIMEOUT
             is ConnectException -> ConnectionError.CONNECTION_REFUSED
             is NoRouteToHostException, is UnknownHostException -> ConnectionError.NETWORK_UNAVAILABLE
+            is SSLException -> ConnectionError.TLS_FAILED
             is IOException -> ConnectionError.UNREACHABLE
             else -> ConnectionError.UNKNOWN
         }
