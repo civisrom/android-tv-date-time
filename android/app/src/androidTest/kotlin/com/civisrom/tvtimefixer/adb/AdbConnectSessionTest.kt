@@ -2,6 +2,7 @@ package com.civisrom.tvtimefixer.adb
 
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import java.io.DataInputStream
+import java.io.EOFException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.nio.ByteBuffer
@@ -14,12 +15,13 @@ import org.junit.Test
 class AdbConnectSessionTest {
     @Test fun legacy_authorization_accepts_a_known_key_or_requests_confirmation_then_probes_shell() {
         // A deterministic peer covers both AUTH branches and old-protocol checksums.
-        for (knownKey in listOf(true, false)) {
+        for (authorization in listOf("known", "confirm", "reject")) {
+            println("Legacy ADB authorization: $authorization")
             ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
-                listener.soTimeout = 5_000
+                listener.soTimeout = 30_000 // First use may initialize crypto on a busy emulator.
                 val peer = FutureTask {
                     listener.accept().use { socket ->
-                        socket.soTimeout = 5_000
+                        socket.soTimeout = 10_000
                         val input = DataInputStream(socket.getInputStream())
                         fun read(): Packet {
                             val header = ByteArray(24).also(input::readFully)
@@ -46,7 +48,7 @@ class AdbConnectSessionTest {
                         assertEquals(AUTH, auth.command)
                         assertEquals(2, auth.first)
                         assertTrue(auth.payload.size >= 256)
-                        if (!knownKey) {
+                        if (authorization != "known") {
                             repeat(8) {
                                 if (auth.first != 3) {
                                     write(AUTH, 1, 0, challenge)
@@ -57,22 +59,28 @@ class AdbConnectSessionTest {
                             assertEquals(3, auth.first)
                             assertEquals(0.toByte(), auth.payload.last())
                         }
-                        write(CNXN, 0x01000000, 4096, "device::\u0000".toByteArray())
-                        val opened = read()
-                        assertEquals(OPEN, opened.command)
-                        assertEquals("shell:$ADB_PROBE_COMMAND\u0000", opened.payload.toString(Charsets.UTF_8))
-                        write(OKAY, 1, opened.first)
-                        write(WRTE, 1, opened.first, "$ADB_PROBE_TOKEN\n".toByteArray())
-                        assertEquals(OKAY, read().command)
-                        write(CLSE, 1, opened.first)
-                        assertEquals(CLSE, read().command)
+                        if (authorization == "reject") write(AUTH, 1, 0, challenge)
+                        else {
+                            write(CNXN, 0x01000000, 4096, "device::\u0000".toByteArray())
+                            val opened = read()
+                            assertEquals(OPEN, opened.command)
+                            assertEquals("shell:$ADB_PROBE_COMMAND\u0000", opened.payload.toString(Charsets.UTF_8))
+                            write(OKAY, 1, opened.first)
+                            write(WRTE, 1, opened.first, "$ADB_PROBE_TOKEN\n".toByteArray())
+                            assertEquals(OKAY, read().command)
+                            write(CLSE, 1, opened.first)
+                            // Closing the whole transport can replace the stream's CLSE reply.
+                            try { assertEquals(CLSE, read().command) } catch (_: EOFException) { }
+                        }
                     }
                 }
                 Thread(peer, "legacy-adb-test").apply { isDaemon = true; start() }
                 try {
-                    KadbAdbClientFactory(2_000, 3_000).connect(DeviceAddress("127.0.0.1", listener.localPort)).use { client ->
-                        assertFalse(client.shellV2Supported)
-                    }
+                    val factory = KadbAdbClientFactory(2_000, 3_000)
+                    val address = DeviceAddress("127.0.0.1", listener.localPort)
+                    if (authorization == "reject") assertEquals(ConnectionError.NOT_AUTHORIZED,
+                        assertThrows(AdbConnectionException::class.java) { factory.connect(address).close() }.reason)
+                    else factory.connect(address).use { client -> assertFalse(client.shellV2Supported) }
                     peer.get(5, TimeUnit.SECONDS)
                 } finally { peer.cancel(true) }
             }

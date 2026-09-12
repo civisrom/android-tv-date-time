@@ -139,7 +139,8 @@ jobs:
       matrix:
         include:
           - name: phone-36
-            image: system-images;android-36;google_apis;x86_64
+            # A production image enforces ADB authentication, including unknown TLS clients.
+            image: system-images;android-36;google_apis_playstore;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
@@ -276,7 +277,7 @@ jobs:
             sed -i 's/^target=.*/target=android-37/' "$ANDROID_AVD_HOME/ui-test.ini" "$ANDROID_AVD_HOME/ui-test.avd/config.ini"
             grep -qx 'target=android-37' "$ANDROID_AVD_HOME/ui-test.ini"
             emulator_features=(-verbose)
-          elif [[ "$UI_TEST_IMAGE" == *';google-tv-ps16k;'* ]]; then
+          elif [[ "$UI_TEST_IMAGE" == *';google-tv-ps16k;'* || "$UI_TEST_IMAGE" == *';google_apis_playstore;'* ]]; then
             # With 2 GiB this image's first-boot services trigger LMK killing the IME.
             emulator_memory=4096
           fi
@@ -369,6 +370,15 @@ jobs:
             | tee "$RUNNER_TEMP/ui-wireless.log"
           grep -Eq '^OK \(1 test\)' "$RUNNER_TEMP/ui-wireless.log"
           ! grep -Eq '^INSTRUMENTATION_STATUS_CODE: -[1-4][[:space:]]*$' "$RUNNER_TEMP/ui-wireless.log"
+
+      - name: Upload wireless test result
+        if: ${{ !cancelled() && matrix.name == 'phone-36' && steps.install_apks.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-wireless-phone-36
+          path: ${{ runner.temp }}/ui-wireless.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run Compose UI regression tests
         if: ${{ !cancelled() && steps.install_apks.outcome == 'success' }}

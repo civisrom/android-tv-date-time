@@ -32,6 +32,7 @@ class WirelessAdbIntegrationTest {
             InstrumentationRegistry.getArguments().getString("real_wireless_pairing") == "true")
         check(Build.VERSION.SDK_INT >= 30)
         check(shell("getprop ro.kernel.qemu").trim() == "1") { "Only disposable emulators are supported" }
+        check(shell("getprop ro.adb.secure").trim() == "1") { "Wireless security tests require ADB authentication enabled" }
 
         // Same system service as Settings/CTS. These exemptions and shell permissions
         // belong to test setup only; the production client still uses its normal identity.
@@ -113,7 +114,8 @@ class WirelessAdbIntegrationTest {
             val address = DeviceAddress("127.0.0.1", connectionPort)
             val factory = KadbAdbClientFactory(5_000, 8_000)
             val unpaired = runCatching { factory.connect(address).close() }.exceptionOrNull()
-            assertTrue("Unpaired ADB clients must be rejected", unpaired is AdbConnectionException)
+            if (unpaired !is AdbConnectionException) throw AssertionError("Unpaired ADB client was not rejected", unpaired)
+            println("Wireless ADB: unknown key rejected")
 
             val (wrongEndpoint, actualCode) = beginPairing()
             val wrongCode = (if (actualCode[0] == '0') "1" else "0") + actualCode.drop(1)
@@ -121,12 +123,14 @@ class WirelessAdbIntegrationTest {
             assertTrue("Wrong pairing code was accepted", rejected is AdbConnectionException)
             assertTrue("Wrong code must fail authentication/protocol exchange",
                 (rejected as AdbConnectionException).reason in setOf(ConnectionError.PAIRING_REJECTED, ConnectionError.PAIRING_FAILED))
+            println("Wireless ADB: wrong pairing code rejected")
             manage("disablePairing")
 
             val (endpoint, code) = beginPairing()
             assertEquals(ConnectionState.Connected(address), connector.pairAndConnect(endpoint.toString(), code, address.toString()))
             connector.disconnect()
             assertEquals(ConnectionState.Connected(address), connector.connect(address))
+            println("Wireless ADB: paired and reconnected without a code")
             val client = checkNotNull(connector.activeClient)
             val session = TerminalSession()
             fun execute(command: String, expected: Int = 0) {
@@ -154,6 +158,7 @@ class WirelessAdbIntegrationTest {
             assertEquals(2, client.shell("pm path $packageName").output.lineSequence().count { it.startsWith("package:") })
             execute("adb uninstall $packageName")
             assertFalse(client.shell("pm path $packageName").output.startsWith("package:"))
+            println("Wireless ADB: shell, files, APK and split APK verified")
         } finally {
             connector.disconnect()
             runCatching { manage("disablePairing") }
