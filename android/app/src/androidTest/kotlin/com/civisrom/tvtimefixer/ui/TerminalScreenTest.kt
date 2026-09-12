@@ -114,6 +114,11 @@ class TerminalScreenTest {
             waitForKeyboard(true)
             compose.onNodeWithTag("terminal-search").performImeAction()
             waitForKeyboard(false)
+            // The full header replaces its compact IME variant when Compose Insets settle.
+            compose.waitUntil(5_000) {
+                compose.runOnUiThread { root.hasWindowFocus() } &&
+                    compose.onAllNodesWithTag("terminal-device-name").fetchSemanticsNodes().isNotEmpty()
+            }
             // Keep focus on a concrete control; TV can restore it after clearFocus().
             compose.onNodeWithTag("terminal-back").performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
             compose.onNodeWithTag("terminal-back").assertIsFocused()
