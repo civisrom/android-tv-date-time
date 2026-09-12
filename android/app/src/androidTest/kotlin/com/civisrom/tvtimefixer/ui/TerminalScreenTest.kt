@@ -18,14 +18,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.SemanticsActions
@@ -47,7 +45,6 @@ class TerminalScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val session = TerminalSession()
     private val calls = mutableListOf<String>()
-    private lateinit var focusManager: FocusManager
     private lateinit var inputMode: InputModeManager
     private val actions = object : TerminalActions {
         override fun edit(command: String) = session.edit(command)
@@ -68,7 +65,6 @@ class TerminalScreenTest {
             val baseConfig = LocalConfiguration.current
             val config = remember(baseConfig) { Configuration(baseConfig).apply { setLocale(Locale.forLanguageTag("ru")) } }
             val ru = remember(context, config) { context.createConfigurationContext(config) }
-            focusManager = LocalFocusManager.current
             inputMode = LocalInputModeManager.current
             val keyboard = LocalSoftwareKeyboardController.current
             hideKeyboard = { keyboard?.hide() }
@@ -118,8 +114,9 @@ class TerminalScreenTest {
             waitForKeyboard(true)
             compose.onNodeWithTag("terminal-search").performImeAction()
             waitForKeyboard(false)
-            // End this input session so the next query can open the keyboard again.
-            compose.runOnIdle { focusManager.clearFocus() }
+            // Keep focus on a concrete control; TV can restore it after clearFocus().
+            compose.onNodeWithTag("terminal-back").performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+            compose.onNodeWithTag("terminal-back").assertIsFocused()
             compose.onNodeWithTag("terminal-search").assertIsNotFocused()
         } finally {
             automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
