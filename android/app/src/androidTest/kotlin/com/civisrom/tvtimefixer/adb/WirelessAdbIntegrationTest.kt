@@ -124,7 +124,21 @@ class WirelessAdbIntegrationTest {
             assertTrue("Wrong code must fail authentication/protocol exchange",
                 (rejected as AdbConnectionException).reason in setOf(ConnectionError.PAIRING_REJECTED, ConnectionError.PAIRING_FAILED))
             println("Wireless ADB: wrong pairing code rejected")
-            manage("disablePairing")
+            privileged {
+                manage("disablePairing")
+                // Cancellation joins the native server and then broadcasts its result.
+                // Consume that result before starting the next server, or its delayed FAIL
+                // would incorrectly be attributed to the new pairing code.
+                val deadline = SystemClock.elapsedRealtime() + 20_000
+                while (true) {
+                    val remaining = deadline - SystemClock.elapsedRealtime()
+                    check(remaining > 0) { "Previous pairing server did not stop" }
+                    val event = checkNotNull(events.poll(remaining, TimeUnit.MILLISECONDS)) { "No pairing cancellation result" }
+                    val status = event.getIntExtra("status", -1)
+                    check(status != 1) { "Wrong pairing code unexpectedly succeeded" }
+                    if (status == 0 || status == 2) break
+                }
+            }
 
             val (endpoint, code) = beginPairing()
             assertEquals(ConnectionState.Connected(address), connector.pairAndConnect(endpoint.toString(), code, address.toString()))
