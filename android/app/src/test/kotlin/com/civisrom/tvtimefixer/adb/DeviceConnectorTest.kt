@@ -7,6 +7,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -58,6 +60,54 @@ private class FakeFactory(
 }
 
 class DeviceConnectorTest {
+    @Test fun `pairing requires explicit ports for both endpoints`() = runBlocking {
+        for ((pairing, connect) in listOf("192.0.2.1" to "192.0.2.1:40002", "192.0.2.1:40001" to "192.0.2.1")) {
+            val factory = FakeFactory()
+            val result = DeviceConnector(factory).pairAndConnect(pairing, "123456", connect)
+            assertEquals(ConnectionError.INVALID_ADDRESS, (result as ConnectionState.Failed).reason)
+            assertTrue(factory.paired.isEmpty())
+            assertTrue(factory.connected.isEmpty())
+        }
+    }
+
+    @Test fun `late pairing cannot reconnect or overwrite a newer connection after disconnect`() = runBlocking {
+        for (replace in listOf(false, true)) for (reject in listOf(false, true)) {
+            val entered = CompletableDeferred<Unit>()
+            val proceed = CompletableDeferred<Unit>()
+            val connected = mutableListOf<DeviceAddress>()
+            val factory = object : AdbClientFactory {
+                override fun connect(address: DeviceAddress): AdbClient {
+                    connected += address
+                    return FakeClient()
+                }
+                override suspend fun pair(address: DeviceAddress, pairingCode: String) {
+                    entered.complete(Unit)
+                    proceed.await()
+                    if (reject) throw AdbConnectionException(ConnectionError.PAIRING_REJECTED)
+                }
+            }
+            val connector = DeviceConnector(factory)
+            val pairing = async { connector.pairAndConnect("192.0.2.1:40001", "123456", "192.0.2.1:40002") }
+            entered.await()
+            connector.disconnect()
+            if (replace) connector.connect("192.0.2.2:40003")
+            val expected = connector.state
+            proceed.complete(Unit)
+            assertEquals(expected, pairing.await())
+            assertEquals(expected, connector.state)
+            assertTrue(connected.none { it.host == "192.0.2.1" })
+        }
+    }
+
+    @Test fun `failed pairing closes the previous transport instead of leaving it hidden`() = runBlocking {
+        val factory = FakeFactory(pairFailWith = ConnectionError.PAIRING_REJECTED)
+        val connector = DeviceConnector(factory)
+        connector.connect("192.0.2.1")
+        connector.pairAndConnect("192.0.2.2:40001", "123456", "192.0.2.2:40002")
+        assertTrue(factory.clients.single().closed)
+        assertNull(connector.activeClient)
+    }
+
     @Test fun `открытый сокет без ответа устройства больше не считается подключением`() {
         val factory = FakeFactory()
         val connector = DeviceConnector(factory)

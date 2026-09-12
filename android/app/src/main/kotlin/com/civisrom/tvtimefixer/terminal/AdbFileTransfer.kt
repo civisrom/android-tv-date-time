@@ -90,11 +90,25 @@ class TerminalFiles(val directory: File) {
 
     fun uniqueName(proposed: String): String {
         val base = proposed.substringAfterLast('/').substringAfterLast('\\').filter { it.code >= 32 }
-            .take(120).trim().takeUnless { it.isBlank() || it.startsWith('.') } ?: "document.bin"
-        var candidate = base
-        var index = 1
-        while (resolve(candidate).exists()) { candidate = "${index++}-$base" }
-        return candidate
+            .trim().takeUnless { it.isBlank() || it.startsWith('.') } ?: "document.bin"
+        val extension = base.substringAfterLast('.', "").takeIf { it.length in 1..16 }?.let { ".$it" }.orEmpty()
+        val stem = base.removeSuffix(extension)
+        var index = 0
+        while (true) {
+            val prefix = if (index == 0) "" else "$index-"
+            // Android filenames are bounded in UTF-8 bytes, not Kotlin characters.
+            // Leave room for both the extension and a collision prefix.
+            val candidate = prefix + stem.takeUtf8(240 - prefix.length - extension.toByteArray(Charsets.UTF_8).size) + extension
+            if (!resolve(candidate).exists()) return candidate
+            index++
+        }
+    }
+
+    private fun String.takeUtf8(limit: Int): String {
+        var end = minOf(length, limit)
+        while (substring(0, end).toByteArray(Charsets.UTF_8).size > limit) end--
+        if (end in 1 until length && this[end - 1].isHighSurrogate() && this[end].isLowSurrogate()) end--
+        return substring(0, end)
     }
 
     fun receive(name: String, writer: (OutputStream) -> Unit): File {
@@ -104,8 +118,14 @@ class TerminalFiles(val directory: File) {
         val temp = File.createTempFile(".transfer-", ".tmp", directory)
         try {
             temp.outputStream().use(writer)
+            interrupted()
             if (!temp.renameTo(destination)) throw IOException("Document commit failed")
             return destination
         } finally { temp.delete() }
+    }
+
+    fun remove(name: String) {
+        val file = resolve(name)
+        if (!file.isFile || !file.delete()) throw TerminalException(TerminalProblem.FILE)
     }
 }

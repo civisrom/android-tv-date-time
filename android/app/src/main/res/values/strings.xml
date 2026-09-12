@@ -97,7 +97,7 @@
     <string name="pairing_address_hint">Pairing address, for example 192.168.1.20:41234</string>
     <string name="pairing_code_hint">6-digit code</string>
     <string name="pairing_connect_address_hint">Connection address (a different port)</string>
-    <string name="pairing_port_warning">The pairing port and the connection port are different. Both are shown on the TV.</string>
+    <string name="pairing_port_warning">Enter both IP:port addresses from the target device: the pairing port from the code dialog, and the connection port from the main Wireless debugging screen. These are different ports.</string>
     <string name="pairing_action">Pair and connect</string>
 
     <!-- Обнаружение по mDNS -->
@@ -469,8 +469,8 @@
     <string name="terminal_example_services_9">Show package manager help</string>
     <string name="terminal_example_services_10">Show activity manager help</string>
     <string name="terminal_example_services_11">Show settings command help</string>
-    <string name="terminal_warning_title">ADB terminal: risk of data loss</string>
-    <string name="terminal_warning_body">Commands can change settings, install or remove apps, erase data, and disrupt the connected device. Available actions depend on its firmware and ADB permissions. Stop does not undo changes already made.\n\nCheck the device model and address, back up important data, and only run commands whose effects you understand. Use the terminal only on devices you are authorized to manage.\n\nOpening the terminal and inserting an example do not run a command.\n\nThe program is provided “as is”. The warranty disclaimer and limitation of liability under the license apply only to the extent permitted by applicable law. Your rights that cannot legally be limited remain unaffected.</string>
+    <string name="terminal_warning_title">ADB terminal</string>
+    <string name="terminal_warning_body">Terminal commands can change settings, install or remove apps, erase data, and disrupt the connected device. Available actions depend on its firmware and ADB permissions.\n\nCheck the device model and address, back up important data, and only run commands whose effects you understand. Use the terminal only on devices you are authorized to manage.\n\nOpening the terminal and inserting an example do not run a command. Stop does not undo changes already made.\n\nThe terminal is provided “as is”, without warranties. By continuing, you acknowledge that you have been warned about these risks and understand them.</string>
     <string name="terminal_warning_accept">Open terminal</string>
     <string name="terminal_warning_cancel">Cancel</string>
     <string name="terminal_connected" formatted="false">Connected</string>
@@ -483,7 +483,7 @@
     <string name="terminal_follow_hint" formatted="false">Auto-scroll follows new output. Turn it off to read earlier lines.</string>
     <string name="terminal_insert_filename" formatted="false">Insert name into command</string>
     <string name="terminal_files_help_title" formatted="false">What the buttons do</string>
-    <string name="terminal_files_help" formatted="false">Add files from this device opens the system document picker and copies the selected documents or APKs into this list.\n\nAPK install command fills the console with adb install. Run installs the app on the connected device.\n\nSend file command fills the console with adb push. The default destination is /sdcard/Download on the connected device; edit the path before running if needed.\n\nInsert name into command appends the selected file name to the current input without running anything.\n\nDownload from connected device asks for the full remote file path and starts the download after confirmation. The received file appears here.\n\nSave to this device opens the system save dialog and saves a copy from this list to your phone. It does not access the connected device.</string>
+    <string name="terminal_files_help" formatted="false">Add files from this device opens the system document picker and copies the selected documents or APKs into this list.\n\nAPK install command fills the console with adb install. Run installs the app on the connected device.\n\nSend file command fills the console with adb push. The default destination is /sdcard/Download on the connected device; edit the path before running if needed.\n\nInsert name into command appends the selected file name to the current input without running anything.\n\nDownload from connected device asks for the full remote file path and starts the download after confirmation. The received file appears here.\n\nSave to this device opens the system save dialog and saves a copy from this list to your phone. It does not access the connected device.\n\nDelete copy — remove an unneeded file from this list and app storage. The original file and installed app are kept.</string>
     <string name="terminal_download" formatted="false">Download from connected device…</string>
     <string name="terminal_download_start" formatted="false">Download</string>
     <string name="terminal_download_hint" formatted="false">Enter the full path of a file on the connected device. Download copies it into Files and APK. Then use Save to this device to choose a folder on your phone.</string>
@@ -540,4 +540,7 @@
     <string name="terminal_pull_complete">File downloaded into Files and APK. Use Save to this device to choose a folder.</string>
     <string name="terminal_remote_file">Path on the connected device: %1$s</string>
     <string name="terminal_local_file">File in this app: %1$s</string>
+    <string name="terminal_remove">Delete copy</string>
+    <string name="terminal_remove_title">Delete file from the list?</string>
+    <string name="terminal_remove_hint">The copy “%1$s” will be deleted from app storage. The original file and the app on the connected device will be kept.</string>
 </resources>

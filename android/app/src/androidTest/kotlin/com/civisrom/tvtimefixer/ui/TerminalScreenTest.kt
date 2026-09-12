@@ -54,6 +54,10 @@ class TerminalScreenTest {
         override fun clearHistory() = session.clearHistory()
         override fun importFiles() { calls += "import" }
         override fun exportFile(name: String) { calls += "export:$name" }
+        override fun removeFile(name: String) {
+            calls += "remove:$name"
+            session.refreshFiles(session.state.value.files - name)
+        }
     }
 
     private var hideKeyboard: () -> Unit = {}
@@ -202,6 +206,29 @@ class TerminalScreenTest {
         // Verify explicit execution separately from the IME transition caused by focusing the draft.
         compose.onNodeWithTag("terminal-run").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.runOnIdle { assertEquals(listOf("run"), calls) }
+    }
+
+    @Test fun APK_name_starting_with_a_dash_prepares_an_unambiguous_local_path() {
+        session.refreshFiles(listOf("-demo.apk"))
+        screen()
+        compose.onNodeWithTag("terminal-tab-files").performClick()
+        scroll("terminal-install--demo.apk").performClick()
+        compose.onNodeWithTag("terminal-input").assertTextContains("adb install -r './-demo.apk'")
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun removing_an_old_APK_requires_confirmation_and_clears_its_row() {
+        session.refreshFiles(listOf("old.apk"))
+        screen(target = "")
+        compose.onNodeWithTag("terminal-tab-files").performClick()
+        scroll("terminal-remove-old.apk").performClick()
+        compose.onNodeWithTag("terminal-remove-cancel").performClick()
+        assertTrue(calls.isEmpty())
+        scroll("terminal-remove-old.apk").performClick()
+        compose.onNodeWithTag("terminal-remove-confirm").performClick()
+        compose.runOnIdle { assertEquals(listOf("remove:old.apk"), calls) }
+        compose.onNodeWithTag("terminal-remove-old.apk").assertDoesNotExist()
+        assertTrue(session.state.value.files.isEmpty())
     }
 
     @Test fun history_selection_only_edits_and_survives_navigation_between_tabs() {

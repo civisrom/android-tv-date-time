@@ -61,19 +61,28 @@ class TerminalInstallationTest {
             instrumentation.context.assets.open("terminal-fixture.apk").use { input ->
                 workspace.receive("fixture.apk") { input.copyTo(it) }
             }
+            instrumentation.context.assets.open("terminal-fixture-split.apk").use { input ->
+                workspace.receive("split.apk") { input.copyTo(it) }
+            }
             val session = TerminalSession()
             listOf("adb install -t fixture.apk", "adb install -r -t fixture.apk",
-                "adb install-multiple -r -t fixture.apk").forEach { installation ->
+                "adb install-multiple -r -t fixture.apk split.apk").forEach { installation ->
                 session.edit(installation)
                 val command = session.start("instrumentation target")!!
                 val exit = TerminalExecutor(workspace, session).execute(client, command)
                 session.finish(exit)
                 assertEquals(session.state.value.output.joinToString("") { it.text }, 0, exit)
                 assertTrue(shell("pm path $packageName").startsWith("package:"))
+                if (installation.startsWith("adb install-multiple")) {
+                    assertEquals(2, shell("pm path $packageName").lineSequence().count { it.startsWith("package:") })
+                    assertEquals(workspace.resolve("fixture.apk").length() + workspace.resolve("split.apk").length(),
+                        session.state.value.transferred)
+                }
             }
         } finally {
             shell("pm uninstall $packageName")
             workspace.resolve("fixture.apk").delete()
+            workspace.resolve("split.apk").delete()
         }
         assertFalse(shell("pm path $packageName").startsWith("package:"))
     }

@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun copyTerminalDocument(block: () -> Unit) {
-        if (terminalFileBusy || terminal.state.value.running) return
+        if (terminalFileBusy || terminal.state.value.running || state.busy) return
         terminalFileBusy = true; terminalFileMessage = null
         lifecycleScope.launch {
             try {
@@ -174,6 +174,10 @@ class MainActivity : ComponentActivity() {
             exportDocument = name
             try { exportDocuments.launch(name) }
             catch (_: android.content.ActivityNotFoundException) { exportDocument = null; terminalFileMessage = R.string.terminal_file_unavailable }
+        }
+
+        override fun removeFile(name: String) {
+            copyTerminalDocument { terminalFiles.remove(name) }
         }
 
         override fun run() {

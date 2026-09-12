@@ -93,6 +93,7 @@ interface TerminalActions {
     fun clearHistory()
     fun importFiles()
     fun exportFile(name: String)
+    fun removeFile(name: String)
 }
 
 internal fun TerminalProblem.labelRes(): Int = when (this) {
@@ -137,6 +138,7 @@ internal fun TerminalScreen(
     var filesHelp by rememberSaveable { mutableStateOf(false) }
     var downloadDialog by rememberSaveable { mutableStateOf(false) }
     var remoteFile by rememberSaveable { mutableStateOf("") }
+    var removeFile by rememberSaveable { mutableStateOf<String?>(null) }
     val editorFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val listState = rememberLazyListState()
@@ -173,6 +175,23 @@ internal fun TerminalScreen(
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText(clipboardLabel, text))
         }.isSuccess) R.string.terminal_copied else R.string.terminal_copy_failed
+    }
+    removeFile?.let { name ->
+        AlertDialog(onDismissRequest = { removeFile = null },
+            title = { Text(stringResource(R.string.terminal_remove_title)) },
+            text = { Text(stringResource(R.string.terminal_remove_hint, name)) },
+            confirmButton = {
+                TextButton(enabled = !fileBusy && !state.running && !busy, onClick = {
+                    removeFile = null
+                    actions.removeFile(name)
+                }, modifier = Modifier.testTag("terminal-remove-confirm")) {
+                    Text(stringResource(R.string.terminal_remove))
+                }
+            }, dismissButton = {
+                TextButton(onClick = { removeFile = null }, modifier = Modifier.testTag("terminal-remove-cancel")) {
+                    Text(stringResource(R.string.terminal_warning_cancel))
+                }
+            })
     }
     if (downloadDialog) {
         AlertDialog(onDismissRequest = { downloadDialog = false },
@@ -435,13 +454,16 @@ internal fun TerminalScreen(
                                 Text(name, fontFamily = FontFamily.Monospace)
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (name.endsWith(".apk", true)) TerminalButton(R.string.terminal_install, "terminal-install-$name") {
-                                        insert("adb install -r " + shellQuote(name))
+                                        insert("adb install -r " + shellQuote(if (name.startsWith('-')) "./$name" else name))
                                     }
                                     TerminalButton(R.string.terminal_push, "terminal-push-$name") {
                                         insert("adb push ${shellQuote(name)} ${shellQuote("/sdcard/Download/$name")}")
                                     }
-                                    TerminalButton(R.string.terminal_insert_filename, "terminal-file-insert-$name") { insert(state.draft + " " + shellQuote(name)) }
+                                    TerminalButton(R.string.terminal_insert_filename, "terminal-file-insert-$name") {
+                                        insert(state.draft + " " + shellQuote(if (name.startsWith('-')) "./$name" else name))
+                                    }
                                     TerminalButton(R.string.terminal_export, "terminal-export-$name", enabled = !fileBusy && !state.running && !busy) { actions.exportFile(name) }
+                                    TerminalButton(R.string.terminal_remove, "terminal-remove-$name", enabled = !fileBusy && !state.running && !busy) { removeFile = name }
                                 }
                             }
                         }

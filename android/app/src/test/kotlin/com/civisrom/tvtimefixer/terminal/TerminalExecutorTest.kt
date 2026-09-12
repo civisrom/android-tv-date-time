@@ -76,15 +76,20 @@ class TerminalExecutorTest {
     }
 
     @Test fun `split APK transaction commits only after every write succeeds`() {
-        file("base.apk"); file("split.apk")
+        file("base.apk", ByteArray(1000)); file("split.apk", ByteArray(700))
         val client = ServiceClient().apply {
             shellResults += ShellResult("Success: created install session [123]\n", "", 0)
             shellResults += ShellResult("Success\n", "", 0)
             responses += Buffer().writeUtf8("Success: streamed 11 bytes\n")
             responses += Buffer().writeUtf8("Success: streamed 11 bytes\n")
         }
-        assertEquals(0, executor().execute(client, parseTerminalCommand("adb install-multiple -r base.apk split.apk")))
+        val session = TerminalSession().apply { edit("adb install-multiple -r base.apk split.apk"); start("TV") }
+        session.finish(executor(session).execute(client, parseTerminalCommand(session.state.value.draft)))
+        assertEquals(0, session.state.value.exitCode)
+        assertEquals(1700L, session.state.value.transferred)
         assertEquals(2, client.sent.count { it.first.startsWith("exec:pm install-write") })
+        assertTrue(client.sent.any { it.first == "exec:pm install-write -S 1000 123 split0 -" })
+        assertTrue(client.sent.any { it.first == "exec:pm install-write -S 700 123 split1 -" })
         assertTrue(client.shellCommands.last().startsWith("pm install-commit 123"))
         assertTrue(client.shellCommands.none { "abandon" in it })
     }
@@ -151,6 +156,30 @@ class TerminalExecutorTest {
         assertEquals("seven!!", files.resolve("my file.txt").readText())
     }
 
+    @Test fun `download without a destination preserves existing copies and reports the new name`() {
+        file("app.apk", "previous".toByteArray())
+        val client = ServiceClient().apply { responses += response("DATA", "new".toByteArray()).writeUtf8("DONE").writeIntLe(0) }
+        val session = TerminalSession().apply { edit("adb pull /sdcard/app.apk"); start("TV") }
+        session.finish(executor(session).execute(client, parseTerminalCommand(session.state.value.draft)))
+        assertEquals("previous", files.resolve("app.apk").readText())
+        assertEquals("new", files.resolve("1-app.apk").readText())
+        assertEquals("1-app.apk", session.state.value.transfer?.localName)
+    }
+
+    @Test fun `explicit download destination can still replace an existing document`() {
+        file("app.apk", "previous".toByteArray())
+        val client = ServiceClient().apply { responses += response("DATA", "new".toByteArray()).writeUtf8("DONE").writeIntLe(0) }
+        assertEquals(0, executor().execute(client, parseTerminalCommand("adb pull /sdcard/app.apk app.apk")))
+        assertEquals("new", files.resolve("app.apk").readText())
+    }
+
+    @Test fun `APK names starting with a dash work with an explicit local path`() {
+        val apk = file("-demo.apk")
+        val client = ServiceClient().apply { responses += Buffer().writeUtf8("Success\n") }
+        assertEquals(0, executor().execute(client, parseTerminalCommand("adb install -r './-demo.apk'")))
+        assertArrayEquals(apk.readBytes(), client.sent.single().second.readByteArray())
+    }
+
     @Test fun `failed pull retains an existing file and removes partial local files`() {
         file("existing.txt", "old data".toByteArray())
         val client = ServiceClient().apply { responses += response("DATA", "new data".toByteArray()) }
@@ -213,5 +242,42 @@ class TerminalExecutorTest {
         }
         assertFalse(files.resolve("new.apk").exists())
         assertTrue(files.directory.listFiles()!!.none { it.name.startsWith('.') })
+    }
+
+    @Test fun `long imported names keep their extension and fit a UTF8 filename even after collisions`() {
+        for (base in listOf("a".repeat(280), "文".repeat(110), "😀".repeat(110))) {
+            repeat(12) {
+                val name = files.uniqueName("$base.apk")
+                assertTrue(name.endsWith(".apk"))
+                assertTrue(name.toByteArray(Charsets.UTF_8).size <= 255)
+                assertEquals(name, String(name.toByteArray(Charsets.UTF_8), Charsets.UTF_8))
+                assertEquals(name, file(name).name)
+            }
+        }
+        assertEquals(36, files.list().size)
+    }
+
+    @Test fun `removing a document only deletes that local copy and rejects external paths`() {
+        file("old.apk"); file("keep.apk")
+        val outside = temporary.newFile("outside.apk")
+        files.remove("old.apk")
+        assertEquals(listOf("keep.apk"), files.list().map { it.name })
+        assertThrows(TerminalException::class.java) { files.remove("../outside.apk") }
+        assertThrows(TerminalException::class.java) { files.remove("missing.apk") }
+        assertTrue(outside.isFile)
+    }
+
+    @Test fun `cancelled document import cannot publish a partially copied file`() {
+        file("keep.apk")
+        try {
+            assertThrows(InterruptedException::class.java) {
+                files.receive("keep.apk") {
+                    it.write(byteArrayOf(1))
+                    Thread.currentThread().interrupt()
+                }
+            }
+        } finally { Thread.interrupted() }
+        assertEquals("fixture APK", files.resolve("keep.apk").readText())
+        assertEquals(listOf("keep.apk"), files.directory.listFiles()!!.map { it.name })
     }
 }

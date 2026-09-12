@@ -49,7 +49,7 @@ internal class TerminalExecutor(private val files: TerminalFiles, private val se
             }
             "pull" -> {
                 if (args.size !in 1..2) invalid()
-                val name = args.getOrElse(1) { args[0].substringAfterLast('/') }
+                val name = args.getOrElse(1) { files.uniqueName(args[0].substringAfterLast('/')) }
                 session.transferring(args[0], name, true)
                 files.receive(name) { AdbFileTransfer(client).pull(args[0], it, session::progress) }
                 return 0
@@ -107,11 +107,13 @@ internal class TerminalExecutor(private val files: TerminalFiles, private val se
             ?: return 1
         var committed = false
         var cancelled = false
+        var transferred = 0L
         try {
             apks.forEachIndexed { index, file ->
-                val result = installStream(client, "pm install-write -S ${file.length()} $id split$index -", file)
+                val result = installStream(client, "pm install-write -S ${file.length()} $id split$index -", file, transferred)
                 session.append(result)
                 if (!result.trimStart().startsWith("Success")) return 1
+                transferred += file.length()
             }
             val result = packageCommand(client, "pm install-commit $id")
             session.append(result)
@@ -130,7 +132,7 @@ internal class TerminalExecutor(private val files: TerminalFiles, private val se
     private fun packageCommand(client: AdbClient, command: String): String =
         client.openService("exec:$command", TERMINAL_TIMEOUT_MS).use { readPackageResponse(it.source) }
 
-    private fun installStream(client: AdbClient, command: String, file: File): String =
+    private fun installStream(client: AdbClient, command: String, file: File, previousBytes: Long = 0): String =
         client.openService("exec:$command", TERMINAL_TIMEOUT_MS).use { service ->
             file.inputStream().use { input ->
                 val buffer = ByteArray(32 * 1024)
@@ -140,7 +142,7 @@ internal class TerminalExecutor(private val files: TerminalFiles, private val se
                     val count = input.read(buffer)
                     if (count == -1) break
                     service.sink.write(buffer, 0, count).flush()
-                    total += count; session.progress(total)
+                    total += count; session.progress(previousBytes + total)
                 }
             }
             readPackageResponse(service.source)

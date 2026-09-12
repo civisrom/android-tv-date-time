@@ -138,6 +138,11 @@ jobs:
       max-parallel: 4
       matrix:
         include:
+          - name: phone-36
+            image: system-images;android-36;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
           - name: phone-28
             image: system-images;android-28;google_apis;x86_64
             device: pixel_2
@@ -215,11 +220,6 @@ jobs:
             page_size: 4096
           - name: phone-35
             image: system-images;android-35;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-36
-            image: system-images;android-36;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096
@@ -366,6 +366,7 @@ jobs:
           for shard in 0 1 2; do
             "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
             if ! timeout 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r -e timeout_msec 60000 \
+              -e notClass com.civisrom.tvtimefixer.adb.WirelessAdbIntegrationTest \
               -e numShards 3 -e shardIndex "$shard" \
               -e expected_tv "$UI_TEST_TV" -e expected_page_size "$UI_TEST_PAGE_SIZE" \
               com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
@@ -379,6 +380,20 @@ jobs:
             fi
           done
           exit "$ui_failed"
+
+      - name: Verify real wireless pairing, reconnect, file transfer and APK installation
+        if: matrix.name == 'phone-36'
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
+          timeout 240 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r \
+            -e timeout_msec 180000 -e real_wireless_pairing true \
+            -e class com.civisrom.tvtimefixer.adb.WirelessAdbIntegrationTest \
+            com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/ui-wireless.log"
+          grep -Eq '^OK \(1 test\)' "$RUNNER_TEMP/ui-wireless.log"
+          ! grep -Eq '^INSTRUMENTATION_STATUS_CODE: -[1-4][[:space:]]*$' "$RUNNER_TEMP/ui-wireless.log"
 
       - name: Collect UI screenshots and IME timeout details
         if: always()
@@ -414,6 +429,7 @@ jobs:
           path: |
             ui-screenshots/
             ${{ runner.temp }}/ui-instrumentation.log
+            ${{ runner.temp }}/ui-wireless.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt
             ${{ runner.temp }}/ui-crashes.txt

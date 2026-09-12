@@ -43,6 +43,7 @@ dependencyResolutionManagement {
 rootProject.name = "AndroidTVTimeFixer"
 include(":app")
 include(":terminal-install-fixture")
+include(":terminal_install_split")
 
 // Security fixes for transitive build tools. Match audited old requests only,
 // so a future plugin update can select a newer version without being downgraded.

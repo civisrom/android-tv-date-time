@@ -6,6 +6,9 @@ import com.civisrom.tvtimefixer.data.DEFAULT_ADB_PORT
 import com.civisrom.tvtimefixer.data.isValidPairingCode
 import com.civisrom.tvtimefixer.data.parseDeviceAddress
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
 
 /** Состояние подключения к устройству. */
 sealed interface ConnectionState {
@@ -94,8 +97,9 @@ class DeviceConnector(
 
     fun connectUsb(address: UsbDeviceAddress): ConnectionState = connectTarget(address) { usbConnect(address) }
 
-    private fun connectTarget(address: DeviceTarget, open: () -> AdbClient): ConnectionState {
+    private fun connectTarget(address: DeviceTarget, expectedGeneration: Int? = null, open: () -> AdbClient): ConnectionState {
         val (previous, attempt) = synchronized(lock) {
+            if (expectedGeneration != null && generation != expectedGeneration) return state
             val existing = client
             if (existing != null && state.targetOrNull() == address && existing.isAlive()) {
                 state = ConnectionState.Connected(address)
@@ -140,8 +144,9 @@ class DeviceConnector(
         pairingCode: String,
         connectInput: String,
     ): ConnectionState {
-        val pairingAddress = parseDeviceAddress(pairingInput)
-        val connectAddress = parseDeviceAddress(connectInput)
+        // Wireless debugging advertises both ports; the legacy default 5555 is not a substitute.
+        val pairingAddress = parseDeviceAddress(pairingInput).takeIf { ':' in pairingInput }
+        val connectAddress = parseDeviceAddress(connectInput).takeIf { ':' in connectInput }
         if (pairingAddress == null || connectAddress == null) {
             state = ConnectionState.Failed(null, ConnectionError.INVALID_ADDRESS)
             return state
@@ -151,12 +156,33 @@ class DeviceConnector(
             return state
         }
 
+        val (previous, attempt) = synchronized(lock) {
+            val previous = client
+            client = null
+            generation++
+            state = ConnectionState.Connecting(connectAddress)
+            previous to generation
+        }
+        previous?.close()
         return try {
             factory.pair(pairingAddress, pairingCode.trim())
-            connect(connectAddress)
+            currentCoroutineContext().ensureActive()
+            runInterruptible {
+                connectTarget(connectAddress, attempt) { factory.connect(connectAddress) }
+            }
+        } catch (e: CancellationException) {
+            synchronized(lock) {
+                if (generation == attempt) {
+                    generation++
+                    state = ConnectionState.Disconnected
+                }
+            }
+            throw e
         } catch (e: AdbConnectionException) {
             val diagnosticId = runCatching { onFailure(pairingAddress, e) }.getOrNull()
-            state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
+            synchronized(lock) {
+                if (generation == attempt) state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
+            }
             state
         }
     }

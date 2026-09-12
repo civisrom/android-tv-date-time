@@ -4,6 +4,7 @@ plugins { alias(libs.plugins.android.application) }
 android {
     namespace = "com.civisrom.tvtimefixer.terminalfixture"
     compileSdk = 37
+    dynamicFeatures += setOf(":terminal_install_split")
     defaultConfig {
         applicationId = "com.civisrom.tvtimefixer.terminalfixture"
         minSdk = 23

@@ -142,6 +142,9 @@ replace troubleshooting other network faults.
     individual files; results show the remote path and exact byte count.
     Download from device asks for the remote path; Save to phone exports the
     received file through the system document dialog.
+    Delete copy removes an unneeded file from the list and app storage while
+    keeping the original file and installed app. Repeated downloads get a free
+    filename; an explicit local destination in `adb pull` can replace a copy.
 *   A local operation history through Diagnostics, report copying and clearing.
     Logs are never sent automatically.
 *   Android TV remote navigation, large fonts and landscape layouts.
