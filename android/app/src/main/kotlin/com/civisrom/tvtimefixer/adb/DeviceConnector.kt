@@ -117,13 +117,33 @@ class DeviceConnector(
                 return state
             }
             client = null
-            generation++
+            // The post-pair connection belongs to the same cancellable attempt.
+            if (expectedGeneration == null) generation++
             state = ConnectionState.Connecting(address)
             existing to generation
         }
         previous?.close()
         return try {
-            val opened = open()
+            var opened: AdbClient
+            var retries = 0
+            val retryStarted = System.nanoTime()
+            while (true) {
+                try {
+                    opened = open()
+                    break
+                } catch (e: AdbConnectionException) {
+                    if (synchronized(lock) { generation != attempt }) return state
+                    // Android persists a paired key asynchronously after the exchange.
+                    // Only this initial connection may briefly retry TLS rejection;
+                    // a wrong code and ordinary connections never enter this path.
+                    val delayMs = 250L shl minOf(retries, 2)
+                    if (expectedGeneration == null || e.reason != ConnectionError.TLS_FAILED || retries == 4 ||
+                        System.nanoTime() - retryStarted + delayMs * 1_000_000 > 5_000_000_000L) throw e
+                    retries++
+                    Thread.sleep(delayMs)
+                    if (synchronized(lock) { generation != attempt }) return state
+                }
+            }
             val accepted = synchronized(lock) {
                 if (generation != attempt) false else {
                     client = opened
@@ -180,12 +200,16 @@ class DeviceConnector(
                 connectTarget(connectAddress, attempt) { factory.connect(connectAddress) }
             }
         } catch (e: CancellationException) {
-            synchronized(lock) {
+            val abandoned = synchronized(lock) {
                 if (generation == attempt) {
                     generation++
+                    val abandoned = client
+                    client = null
                     state = ConnectionState.Disconnected
-                }
+                    abandoned
+                } else null
             }
+            runCatching { abandoned?.close() }
             throw e
         } catch (e: AdbConnectionException) {
             val diagnosticId = runCatching { onFailure(pairingAddress, e) }.getOrNull()

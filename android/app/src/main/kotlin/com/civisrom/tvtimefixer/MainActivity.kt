@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
     private val connector by lazy {
         DeviceConnector(factory, usbConnect = usb::connect, onFailure = { target, error ->
             val operation = when {
-                error.reason.name.startsWith("PAIRING") || error.reason == ConnectionError.TLS_FAILED -> Operation.PAIR
+                state.operation == Operation.PAIR || error.reason.name.startsWith("PAIRING") -> Operation.PAIR
                 target is UsbDeviceAddress -> Operation.CONNECT_USB
                 else -> Operation.CONNECT_NETWORK
             }
