@@ -52,7 +52,7 @@ init(autoreset=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.propagate = False
-APP_VERSION = '2.6.4'
+APP_VERSION = '2.6.5'
 PROJECT_REPOSITORY_URL = 'https://github.com/civisrom/android-tv-date-time'
 
 

@@ -230,20 +230,22 @@ Run via PowerShell
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.4.apk` from [release 2.6.4](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.4). [What's new](release-notes/v2.6.4-en.md).
+1.  Download `AndroidTVTimeFixer-2.6.5.apk` from [prerelease 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5). [What's new](release-notes/v2.6.5-en.md).
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.4.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.5.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.4.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.5.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
 Requires **Android 6.0** or newer. See
 [Android application](#android-application) for details.
+
+The latest stable release is [2.6.4](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.4).
 
 **Google Play Protect.** This APK is distributed through GitHub Releases.
 Installing outside Google Play may trigger a scan prompt or warning; not every
@@ -1040,8 +1042,8 @@ inactivity and 60 seconds for the overall pairing operation. App addresses
 currently support IPv4 only.
 
 Change history: [2.6.1](release-notes/v2.6.1-en.md),
-[2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md)
-and [2.6.4](release-notes/v2.6.4-en.md).
+[2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),
+[2.6.4](release-notes/v2.6.4-en.md), and [2.6.5 (prerelease)](release-notes/v2.6.5-en.md).
 
 #### 8. USB debugging
 

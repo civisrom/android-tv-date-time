@@ -234,20 +234,22 @@ VPN или фильтрация multicast могут мешать связи и 
 
 ### Android (APK)
 
-1.  Скачайте `AndroidTVTimeFixer-2.6.4.apk` из [выпуска 2.6.4](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.4). [Что изменилось](release-notes/v2.6.4-ru.md).
+1.  Скачайте `AndroidTVTimeFixer-2.6.5.apk` из [предварительного выпуска 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5). [Что изменилось](release-notes/v2.6.5-ru.md).
 2.  Сверьте контрольную сумму с файлом `.apk.sha256` рядом:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.4.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.5.apk.sha256
     ```
 3.  Установите:
     *   **На телефон** — откройте файл и разрешите установку из неизвестных
         источников для файлового менеджера или браузера.
-    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.4.apk`
+    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.5.apk`
         с компьютера, либо любым файловым менеджером на телевизоре. Иконка
         появится и в обычном лаунчере, и в лаунчере Android TV.
 
 Требуется **Android 6.0** или новее. Подробности — в разделе
 [Приложение для Android](#приложение-для-android).
+
+Последний стабильный выпуск — [2.6.4](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.4).
 
 **Google Play Защита.** APK распространяется через GitHub Releases.
 При установке не из Google Play система может предложить проверку или показать
@@ -1080,8 +1082,8 @@ ADB-ключ APK сохраняется в приватном каталоге �
 сопряжения 60 секунд. Для адресов приложения пока используется IPv4.
 
 История изменений: [2.6.1](release-notes/v2.6.1-ru.md),
-[2.6.2](release-notes/v2.6.2-ru.md), [2.6.3](release-notes/v2.6.3-ru.md)
-и [2.6.4](release-notes/v2.6.4-ru.md).
+[2.6.2](release-notes/v2.6.2-ru.md), [2.6.3](release-notes/v2.6.3-ru.md),
+[2.6.4](release-notes/v2.6.4-ru.md) и [2.6.5 (предварительный выпуск)](release-notes/v2.6.5-ru.md).
 
 #### 8. «Отладка по USB»
 
