@@ -218,6 +218,10 @@ class MainActivityTest {
                     dialogRoot = view
                 }
                 val inputRoot = checkNotNull(dialogRoot)
+                // The dialog's semantics can exist before WindowManager makes
+                // it the input target; an early tap can lose the IME request.
+                compose.waitUntil(5_000) { compose.runOnUiThread { inputRoot.hasWindowFocus() } }
+                automation.waitForIdle(300, 3_000)
                 compose.onNodeWithTag("favorite-name").performClick()
                 waitForKeyboard(true, inputRoot)
                 compose.onNodeWithTag("favorite-name").performImeAction()
