@@ -231,9 +231,9 @@ arising from the use of this program.
                 en="Connected to {ip} over an encrypted connection.",
                 ru="Подключено к {ip} по шифрованному соединению."
             ),
-            "adb_tls_pairing_required": Translation(
-                en="Could not connect to {ip}: the device requires pairing with a code. Use main menu item 11 (Wireless debugging) to pair it. Details: {error}",
-                ru="Не удалось подключиться к {ip}: устройство требует спаривания по коду. Спарьте его через пункт 11 главного меню («Беспроводная отладка»). Подробности: {error}"
+            "adb_tls_connect_failed": Translation(
+                en="Could not establish an encrypted connection to {ip}. Check the connection port, make sure wireless debugging is enabled, and retry. If this computer is not paired with the device, use main menu item 11 (Wireless debugging). Details: {error}",
+                ru="Не удалось установить шифрованное соединение с {ip}. Проверьте порт подключения, убедитесь, что беспроводная отладка включена, и повторите попытку. Если этот компьютер ещё не сопряжён с устройством, используйте пункт 11 главного меню («Беспроводная отладка»). Подробности: {error}"
             ),
             "wireless_menu": Translation(
                 en="\nWireless debugging (Android 11+):",

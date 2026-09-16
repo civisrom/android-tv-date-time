@@ -2365,7 +2365,7 @@ class AndroidTVTimeFixer:
             )
         except Exception as e:
             raise AndroidTVTimeFixerError(
-                locales.get('adb_tls_pairing_required', ip=serial, error=str(e))
+                locales.get('adb_tls_connect_failed', ip=serial, error=str(e))
             )
 
         output = (result.stdout or '').strip()
@@ -2378,7 +2378,7 @@ class AndroidTVTimeFixer:
         if (result.returncode != 0 or not confirmed
                 or any(err in lowered for err in ADB_CONNECTION_ERRORS)):
             raise AndroidTVTimeFixerError(
-                locales.get('adb_tls_pairing_required', ip=serial, error=output)
+                locales.get('adb_tls_connect_failed', ip=serial, error=output)
             )
 
         transport = PlatformToolsTransport(self.get_adb_path(), serial, env=self.adb_env)
