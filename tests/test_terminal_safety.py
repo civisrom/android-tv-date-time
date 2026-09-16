@@ -106,6 +106,25 @@ class TerminalSafetyTests(unittest.TestCase):
         self.assertIn('Package manager commands:', output.getvalue())
         fixer.logger.error.assert_not_called()
 
+    def test_invalid_utf8_does_not_discard_terminal_output_or_stop_draining(self):
+        fixer = self.fixer()
+        fixer.get_adb_path = lambda: 'adb'
+        fixer.adb_env = os.environ.copy()
+        spawn = subprocess.Popen
+        drain = fixer._process_command_output
+        child = ("import sys; sys.stdout.buffer.write(b'\\xff' + b'a'*200000 + b'OUT_END\\n'); "
+                 "sys.stderr.buffer.write(b'warning\\xffERR_END\\n')")
+        output = io.StringIO()
+        with mock.patch('src.android_time_fixer.Popen',
+                        side_effect=lambda _args, **kwargs: spawn([sys.executable, '-c', child], **kwargs)), \
+                mock.patch.object(fixer, '_process_command_output',
+                                  side_effect=lambda process: drain(process, timeout=3)), \
+                contextlib.redirect_stdout(output):
+            fixer.execute_terminal_command('adb shell cat /data/local/tmp/terminal-output.bin')
+        self.assertIn('OUT_END', output.getvalue())
+        self.assertIn('warning\ufffdERR_END', output.getvalue())
+        fixer.logger.error.assert_not_called()
+
     def test_application_log_rotates_with_a_finite_number_of_backups(self):
         fixer = self.fixer()
         app_logger = logging.getLogger('src.android_time_fixer')

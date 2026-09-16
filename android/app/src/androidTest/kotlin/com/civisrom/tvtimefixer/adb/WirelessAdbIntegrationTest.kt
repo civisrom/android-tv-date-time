@@ -31,7 +31,9 @@ class WirelessAdbIntegrationTest {
         assumeTrue("Requires the dedicated wireless CI step",
             InstrumentationRegistry.getArguments().getString("real_wireless_pairing") == "true")
         check(Build.VERSION.SDK_INT >= 30)
-        check(shell("getprop ro.kernel.qemu").trim() == "1") { "Only disposable emulators are supported" }
+        val redroid = InstrumentationRegistry.getArguments().getString("redroid_wireless_fixture") == "true" &&
+            shell("getprop ro.hardware").trim() == "redroid"
+        check(redroid || shell("getprop ro.kernel.qemu").trim() == "1") { "Only disposable test devices are supported" }
         check(shell("getprop ro.adb.secure").trim() == "1") { "Wireless security tests require ADB authentication enabled" }
 
         // Same system service as Settings/CTS. These exemptions and shell permissions
@@ -99,17 +101,24 @@ class WirelessAdbIntegrationTest {
             DeviceAddress("127.0.0.1", port) to pairingCode
         }
         try {
-            assertEquals(true, manage("isAdbWifiSupported"))
-            shell("svc wifi enable")
-            var bssid: String? = null
-            waitFor("Emulator Wi-Fi did not connect") {
-                bssid = Regex("BSSID: ([0-9a-fA-F:]{17})").find(shell("cmd wifi status"))?.groupValues?.get(1)
-                bssid != null && bssid != "02:00:00:00:00:00"
-            }
-            manage("allowWirelessDebugging", false, checkNotNull(bssid))
-            waitFor("Wireless ADB connection port was not opened") {
-                connectionPort = manage("getAdbWirelessPort") as Int
-                connectionPort in 1..65535
+            if (redroid) {
+                // The isolated Ethernet-only fixture starts the real authenticated adbd TLS
+                // listener externally. Pairing still uses Android's system pairing service.
+                connectionPort = shell("getprop service.adb.tls.port").trim().toInt()
+                check(connectionPort in 1..65535)
+            } else {
+                assertEquals(true, manage("isAdbWifiSupported"))
+                shell("svc wifi enable")
+                var bssid: String? = null
+                waitFor("Emulator Wi-Fi did not connect") {
+                    bssid = Regex("BSSID: ([0-9a-fA-F:]{17})").find(shell("cmd wifi status"))?.groupValues?.get(1)
+                    bssid != null && bssid != "02:00:00:00:00:00"
+                }
+                manage("allowWirelessDebugging", false, checkNotNull(bssid))
+                waitFor("Wireless ADB connection port was not opened") {
+                    connectionPort = manage("getAdbWirelessPort") as Int
+                    connectionPort in 1..65535
+                }
             }
             val address = DeviceAddress("127.0.0.1", connectionPort)
             val factory = KadbAdbClientFactory(5_000, 8_000)
@@ -173,6 +182,33 @@ class WirelessAdbIntegrationTest {
             execute("adb uninstall $packageName")
             assertFalse(client.shell("pm path $packageName").output.startsWith("package:"))
             println("Wireless ADB: shell, files, APK and split APK verified")
+
+            session.edit("echo terminal-cancel-ready; sleep 60")
+            val blocked = checkNotNull(session.start(address.toString()))
+            val stopped = java.util.concurrent.CountDownLatch(1)
+            val failure = java.util.concurrent.atomic.AtomicReference<Exception>()
+            val caller = kotlin.concurrent.thread(isDaemon = true) {
+                try { TerminalExecutor(files, session).execute(client, blocked) }
+                catch (error: Exception) { failure.set(error) }
+                finally { stopped.countDown() }
+            }
+            try {
+                waitFor("Silent command did not start") {
+                    session.state.value.output.any { "terminal-cancel-ready" in it.text }
+                }
+                caller.interrupt()
+                assertTrue("Terminal cancellation did not close the socket", stopped.await(3, TimeUnit.SECONDS))
+                assertTrue(failure.get() is kotlinx.coroutines.CancellationException)
+                assertFalse(client.isAlive())
+            } finally {
+                client.close()
+                caller.interrupt()
+                caller.join(3_000)
+            }
+            connector.disconnect()
+            assertEquals(ConnectionState.Connected(address), connector.connect(address))
+            assertEquals("after-cancel", connector.activeClient!!.shell("echo after-cancel").trimmedOutput)
+            println("Wireless ADB: silent command cancellation and reconnect verified")
         } finally {
             connector.disconnect()
             runCatching { manage("disablePairing") }

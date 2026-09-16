@@ -3,39 +3,33 @@ package com.civisrom.tvtimefixer.adb
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
-import java.util.concurrent.Executors
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlinx.coroutines.CancellationException
 import okio.BufferedSource
 
 internal const val SHELL_OUTPUT_LIMIT = 4 * 1024 * 1024
-private val deadlines = Executors.newSingleThreadScheduledExecutor { task ->
-    Thread(task, "adb-command-deadline").apply { isDaemon = true }
-}
-
-/** Kadb Source.timeout() == NONE; interrupt также прерывает его ожидание очереди. */
+/** Socket reads can ignore thread interruption; cancellation must close the transport. */
 internal fun <T> boundedAdbCommand(timeoutMs: Long, close: () -> Unit, block: () -> T): T {
-    val owner = Thread.currentThread()
-    val lock = Any()
-    var active = true
-    var expired = false
-    val timer = deadlines.schedule({ synchronized(lock) {
-        if (active) { expired = true; owner.interrupt() }
-    } }, timeoutMs, TimeUnit.MILLISECONDS)
+    val pending = FutureTask(block)
+    Thread(pending, "adb-command").apply { isDaemon = true; start() }
     try {
-        return block().also { synchronized(lock) { if (expired) throw SocketTimeoutException("ADB command deadline") } }
-    } catch (error: Exception) {
-        val interrupted = Thread.interrupted()
+        return pending.get(timeoutMs, TimeUnit.MILLISECONDS)
+    } catch (error: InterruptedException) {
         runCatching(close)
-        if (synchronized(lock) { expired }) throw SocketTimeoutException("ADB command deadline")
-        if (interrupted || error is InterruptedException) throw CancellationException("ADB cancelled", error)
-        throw error
-    } finally {
-        synchronized(lock) {
-            active = false
-            timer.cancel(false)
-            if (expired) Thread.interrupted()
-        }
+        pending.cancel(true)
+        throw CancellationException("ADB cancelled", error)
+    } catch (_: TimeoutException) {
+        runCatching(close)
+        pending.cancel(true)
+        throw SocketTimeoutException("ADB command deadline")
+    } catch (error: ExecutionException) {
+        runCatching(close)
+        val cause = error.cause ?: error
+        if (cause is InterruptedException) throw CancellationException("ADB cancelled", cause)
+        throw cause
     }
 }
 

@@ -239,6 +239,7 @@ class PlatformToolsTransport:
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             encoding=_subprocess_encoding(),
+            errors='replace',
             timeout=self.timeout,
             check=False,
             env=self.env
@@ -1054,6 +1055,7 @@ class AndroidTVTimeFixer:
                     stderr=PIPE,
                     universal_newlines=True,
                     encoding=encoding,
+                    errors='replace',
                     bufsize=1,
                     env=self.adb_env,
                     **self._popen_group_options()
@@ -1136,6 +1138,7 @@ class AndroidTVTimeFixer:
                         encoding=_subprocess_encoding() if first_token in ('adb', 'adb.exe') else (
                             'utf-8' if sys.platform != 'win32' else 'cp866'
                         ),
+                        errors='replace',
                         bufsize=1,
                         env=environment,
                         **self._popen_group_options()
@@ -2355,6 +2358,7 @@ class AndroidTVTimeFixer:
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
                 encoding=_subprocess_encoding(),
+                errors='replace',
                 timeout=30,
                 check=False,
                 env=self.adb_env
@@ -2406,6 +2410,7 @@ class AndroidTVTimeFixer:
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             encoding=_subprocess_encoding(),
+            errors='replace',
             timeout=timeout,
             check=False,
             input=input_text,
