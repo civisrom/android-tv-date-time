@@ -31,7 +31,8 @@ class MainActivityTest {
 
     @Test fun stalled_connection_can_be_cancelled_and_retried_without_leaving_a_socket_open() {
         java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { listener ->
-            listener.soTimeout = 15_000
+            // UI setup can exceed 15 seconds on a slow device. Teardown closes
+            // the listener, so accept must remain available until the click.
             val accepted = List(2) { java.util.concurrent.CountDownLatch(1) }
             val closed = List(2) { java.util.concurrent.CountDownLatch(1) }
             val peer = kotlin.concurrent.thread(isDaemon = true) {
@@ -53,7 +54,8 @@ class MainActivityTest {
             repeat(2) { attempt ->
                 compose.onNodeWithTag("network-connect").performScrollTo()
                     .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-                assertTrue("Fixture was not contacted", accepted[attempt].await(5, java.util.concurrent.TimeUnit.SECONDS))
+                // The first connection also initializes the cryptography provider.
+                compose.waitUntil(45_000) { accepted[attempt].count == 0L }
                 compose.onNodeWithTag("connection-cancel").performScrollTo().assertIsEnabled().performClick()
                 compose.waitUntil(3_000) {
                     runCatching { compose.onNodeWithTag("network-connect").assertIsEnabled() }.isSuccess
@@ -216,6 +218,10 @@ class MainActivityTest {
                     dialogRoot = view
                 }
                 val inputRoot = checkNotNull(dialogRoot)
+                // The dialog's semantics can exist before WindowManager makes
+                // it the input target; an early tap can lose the IME request.
+                compose.waitUntil(5_000) { compose.runOnUiThread { inputRoot.hasWindowFocus() } }
+                automation.waitForIdle(300, 3_000)
                 compose.onNodeWithTag("favorite-name").performClick()
                 waitForKeyboard(true, inputRoot)
                 compose.onNodeWithTag("favorite-name").performImeAction()

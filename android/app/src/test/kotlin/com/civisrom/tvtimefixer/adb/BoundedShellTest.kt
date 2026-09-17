@@ -2,12 +2,59 @@ package com.civisrom.tvtimefixer.adb
 
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
+import kotlinx.coroutines.CancellationException
 import okio.Buffer
 import org.junit.Assert.*
 import org.junit.Test
 
 class BoundedShellTest {
+    @Test fun `cancellation closes a socket whose read ignores thread interruption`() = blockedSocket(cancel = true)
+
+    @Test fun `deadline closes a socket whose read ignores thread interruption`() = blockedSocket(cancel = false)
+
+    private fun blockedSocket(cancel: Boolean) {
+        ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
+            listener.soTimeout = 3_000
+            Socket().use { socket ->
+                val error = AtomicReference<Throwable>()
+                val finished = CountDownLatch(1)
+                val workerStopped = CountDownLatch(1)
+                val caller = thread {
+                    try {
+                        boundedAdbCommand(if (cancel) 30_000 else 1_000, socket::close) {
+                            try {
+                                socket.connect(listener.localSocketAddress, 2_000)
+                                socket.getInputStream().read()
+                            } finally { workerStopped.countDown() }
+                        }
+                    } catch (caught: Throwable) { error.set(caught)
+                    } finally { finished.countDown() }
+                }
+                try {
+                    listener.accept().use { peer ->
+                        peer.soTimeout = 2_000
+                        if (cancel) caller.interrupt()
+                        assertTrue("Blocked command did not stop", finished.await(2, TimeUnit.SECONDS))
+                        if (cancel) assertTrue(error.get() is CancellationException)
+                        else assertTrue(error.get() is SocketTimeoutException)
+                        assertEquals(-1, peer.getInputStream().read())
+                        assertTrue(workerStopped.await(2, TimeUnit.SECONDS))
+                    }
+                } finally {
+                    socket.close()
+                    caller.join(3_000)
+                }
+            }
+        }
+    }
+
     @Test fun `shell v2 handles fragmented UTF8 and stderr with an exact exit code`() {
         val bytes = "Привет".toByteArray()
         val source = Buffer()

@@ -239,6 +239,7 @@ class PlatformToolsTransport:
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             encoding=_subprocess_encoding(),
+            errors='replace',
             timeout=self.timeout,
             check=False,
             env=self.env
@@ -1054,6 +1055,7 @@ class AndroidTVTimeFixer:
                     stderr=PIPE,
                     universal_newlines=True,
                     encoding=encoding,
+                    errors='replace',
                     bufsize=1,
                     env=self.adb_env,
                     **self._popen_group_options()
@@ -1136,6 +1138,7 @@ class AndroidTVTimeFixer:
                         encoding=_subprocess_encoding() if first_token in ('adb', 'adb.exe') else (
                             'utf-8' if sys.platform != 'win32' else 'cp866'
                         ),
+                        errors='replace',
                         bufsize=1,
                         env=environment,
                         **self._popen_group_options()
@@ -2355,13 +2358,14 @@ class AndroidTVTimeFixer:
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
                 encoding=_subprocess_encoding(),
+                errors='replace',
                 timeout=30,
                 check=False,
                 env=self.adb_env
             )
         except Exception as e:
             raise AndroidTVTimeFixerError(
-                locales.get('adb_tls_pairing_required', ip=serial, error=str(e))
+                locales.get('adb_tls_connect_failed', ip=serial, error=str(e))
             )
 
         output = (result.stdout or '').strip()
@@ -2374,7 +2378,7 @@ class AndroidTVTimeFixer:
         if (result.returncode != 0 or not confirmed
                 or any(err in lowered for err in ADB_CONNECTION_ERRORS)):
             raise AndroidTVTimeFixerError(
-                locales.get('adb_tls_pairing_required', ip=serial, error=output)
+                locales.get('adb_tls_connect_failed', ip=serial, error=output)
             )
 
         transport = PlatformToolsTransport(self.get_adb_path(), serial, env=self.adb_env)
@@ -2406,6 +2410,7 @@ class AndroidTVTimeFixer:
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             encoding=_subprocess_encoding(),
+            errors='replace',
             timeout=timeout,
             check=False,
             input=input_text,
