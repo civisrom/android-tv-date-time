@@ -101,6 +101,16 @@
       "file": "LICENSE.zlib.txt",
       "sha256": "818922b2620f12801a12bf78e399644a30990e66824abd8ca8ec24d451d6f92c",
       "source": "https://raw.githubusercontent.com/astral-sh/python-build-standalone/4bb01f09aaf362c71e891be4a41cb6d6ddf830b3/LICENSE.zlib.txt"
+    },
+    {
+      "file": "LICENSE.cpython-3.12.14.txt",
+      "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+      "source": "https://raw.githubusercontent.com/python/cpython/v3.12.14/LICENSE"
+    },
+    {
+      "file": "NOTICE.cpython-3.12.14.rst",
+      "sha256": "341832873fd316a37927e79385093fbbfd40a467428480835fe435a80cadf4e5",
+      "source": "https://raw.githubusercontent.com/python/cpython/v3.12.14/Doc/license.rst"
     }
   ]
 }

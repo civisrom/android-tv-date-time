@@ -8,9 +8,11 @@ import android.hardware.usb.UsbManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Point
 import android.os.Build
 import android.view.View
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.foundation.layout.Box
@@ -407,6 +409,25 @@ class MainScreenTest {
         screenshot("primary-connection")
     }
 
+    private fun assertTimeToolsSectionOrder() {
+        val order = listOf("function-pairing", "function-timezone", "function-usb", "function-device-info", "function-time-tools")
+        // These eager Column children retain their un-clipped layout positions off screen.
+        val positions = order.map { compose.onNodeWithTag(it).fetchSemanticsNode().positionInRoot.y }
+        order.zipWithNext().forEachIndexed { index, (before, after) ->
+            assertTrue("$before must precede $after: $positions", positions[index] < positions[index + 1])
+        }
+    }
+
+    @Test fun time_tools_are_last_after_USB_and_device_info_and_open_by_touch() {
+        screen(connected, width = 320, scale = 1.5f)
+        assertTimeToolsSectionOrder()
+        compose.onNodeWithTag("time-tools-refresh").assertDoesNotExist()
+        compose.onNodeWithTag("section-time-tools").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithTag("time-tools-refresh").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        assertTrue(actions.calls.isEmpty())
+        screenshot("phone-time-tools-last")
+    }
+
     @Test fun pairing_collapses_without_losing_inputs_or_running_actions() {
         screen()
         compose.onNodeWithTag("pairing-code").assertDoesNotExist()
@@ -652,7 +673,7 @@ class MainScreenTest {
     @Test fun remote_control_can_open_diagnostics_and_focus_returns() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         try {
-            screen(mode = DeviceMode.TELEVISION)
+            screen(connected, mode = DeviceMode.TELEVISION)
             // Переключаем уже созданный Compose view, как в тестах AndroidX.
             compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
             compose.onNodeWithTag("diagnostics-open").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
@@ -663,6 +684,19 @@ class MainScreenTest {
             compose.onNodeWithTag("diagnostics-open").assertIsFocused()
             assertTrue(actions.calls.isEmpty())
             screenshot("tv-focus")
+            assertTimeToolsSectionOrder()
+            val usb = compose.onNodeWithTag("section-usb")
+            usb.performScrollTo().performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+            usb.assertIsFocused()
+            val tools = compose.onNodeWithTag("section-time-tools")
+            for (step in 0 until 16) {
+                if (runCatching { tools.assertIsFocused() }.isSuccess) break
+                usb.performKeyInput { pressKey(Key.DirectionDown) }
+            }
+            tools.assertIsDisplayed().assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("time-tools-refresh").performScrollTo().assertIsDisplayed().assertIsEnabled()
+            assertTrue(actions.calls.isEmpty())
+            screenshot("tv-time-tools-last")
         } finally {
             instrumentation.setInTouchMode(true)
         }
@@ -898,19 +932,29 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
+    @Suppress("DEPRECATION") // Display realSize/rotation also work on the API 23 test profile.
     @Test fun landscape_keeps_the_main_actions_reachable() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val television = com.civisrom.tvtimefixer.detectDeviceMode(context) == DeviceMode.TELEVISION
         val originalOrientation = context.resources.configuration.orientation
+        val display = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+        val originalRotation = display.rotation
+        val realSize = Point().also(display::getRealSize)
+        val quarterTurn = originalRotation == android.view.Surface.ROTATION_90 ||
+            originalRotation == android.view.Surface.ROTATION_270
+        // Pixel C is naturally landscape: rotating every non-TV display by 90 degrees
+        // puts that tablet in portrait. Undo the current rotation before choosing a target.
+        val naturalLandscape = if (quarterTurn) realSize.y > realSize.x else realSize.x > realSize.y
+        val landscapeRotation = if (naturalLandscape) UiAutomation.ROTATION_FREEZE_0 else UiAutomation.ROTATION_FREEZE_90
         try {
-            if (!television) automation.setRotation(UiAutomation.ROTATION_FREEZE_90)
+            if (!television) assertTrue(automation.setRotation(landscapeRotation))
             compose.waitUntil(10_000) { context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
             screen(connected, width = 640)
             try {
                 compose.waitUntil(10_000) {
                     compose.runOnUiThread { hostView.hasWindowFocus() && hostView.rootView.width > hostView.rootView.height }
                 }
-                compose.onNodeWithTag("ntp-address").performScrollTo().performTextInput("time.example.org")
+                compose.onNodeWithTag("ntp-address").performScrollTo().performClick().performTextInput("time.example.org")
                 waitForKeyboard()
                 compose.onNodeWithTag("ntp-apply").performScrollTo().assertIsDisplayed()
             } finally { screenshot("landscape-ntp") }
@@ -922,9 +966,14 @@ class MainScreenTest {
                 screenshot("landscape-diagnostics")
             }
         } finally {
-            if (!television) automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
-            compose.waitUntil(10_000) { context.resources.configuration.orientation == originalOrientation }
-            automation.setRotation(UiAutomation.ROTATION_UNFREEZE)
+            try {
+                if (!television) assertTrue(automation.setRotation(originalRotation))
+                compose.waitUntil(10_000) {
+                    display.rotation == originalRotation && context.resources.configuration.orientation == originalOrientation
+                }
+            } finally {
+                automation.setRotation(UiAutomation.ROTATION_UNFREEZE)
+            }
         }
         assertTrue(actions.calls.isEmpty())
     }

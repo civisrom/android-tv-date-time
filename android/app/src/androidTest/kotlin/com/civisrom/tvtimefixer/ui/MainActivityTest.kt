@@ -81,26 +81,55 @@ class MainActivityTest {
     }
 
     @Test fun terminal_without_a_connection_reports_failure_without_running_locally() {
-        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
-        compose.onNodeWithTag("terminal-warning-accept").performClick()
-        compose.onNodeWithTag("terminal-input").performTextInput("echo terminal-test")
-        // The system IME moves Run after Compose text input has already returned.
-        if (Build.VERSION.SDK_INT >= 30) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        try {
+            compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+            compose.onNodeWithTag("terminal-warning-accept").performClick()
+            compose.onNodeWithTag("terminal-input").performClick().performTextInput("echo terminal-test")
+            // Native IME animation and the scrollable controls settle independently of Compose idleness.
             val root = compose.activity.window.decorView
             compose.waitUntil(5_000) {
-                compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
+                if (Build.VERSION.SDK_INT >= 30) {
+                    compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
+                } else hasLegacyImeWindow(automation)
             }
+            automation.waitForIdle(300, 3_000)
+            val run = compose.onNodeWithTag("terminal-run")
+            run.performScrollTo().assertIsDisplayed().assertIsEnabled()
+            var previousBounds: Pair<androidx.compose.ui.geometry.Rect, androidx.compose.ui.geometry.Rect>? = null
+            var stableSince = android.os.SystemClock.uptimeMillis()
+            compose.waitUntil(5_000) {
+                val bounds = run.fetchSemanticsNode().boundsInRoot to
+                    compose.onNodeWithTag("terminal-screen").fetchSemanticsNode().boundsInRoot
+                val now = android.os.SystemClock.uptimeMillis()
+                if (bounds != previousBounds || !run.isDisplayed()) {
+                    previousBounds = bounds
+                    stableSince = now
+                }
+                now - stableSince >= 500
+            }
+            run.assertIsDisplayed().performClick()
+            val error = compose.activity.getString(R.string.terminal_connection_error)
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasTestTag("terminal-status") and hasText(error, substring = true))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-status"))
+            compose.onNodeWithTag("terminal-status").assertTextContains(error)
+            screenshot("terminal-disconnected")
+        } catch (failure: Throwable) {
+            // Capture the failed state before ActivityScenario tears down the actual Activity.
+            runCatching {
+                val file = File(compose.activity.filesDir, "ui-screenshots/native-terminal-disconnected-failure.txt")
+                file.parentFile!!.mkdirs()
+                file.writeText("API ${Build.VERSION.SDK_INT}\n" + compose.onRoot().printToString())
+            }.exceptionOrNull()?.let(failure::addSuppressed)
+            runCatching { screenshot("terminal-disconnected-failure") }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
         }
-        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(300, 3_000)
-        compose.onNodeWithTag("terminal-run").performClick()
-        val error = compose.activity.getString(R.string.terminal_connection_error)
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag("terminal-status") and hasText(error, substring = true))
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithTag("terminal-list").performScrollToNode(hasTestTag("terminal-status"))
-        compose.onNodeWithTag("terminal-status").assertTextContains(error)
-        screenshot("terminal-disconnected")
     }
 
     @Test fun terminal_warning_can_be_cancelled_and_is_not_repeated_within_the_session() {

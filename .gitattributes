@@ -11,3 +11,6 @@ gradlew text eol=lf
 *.aab binary
 *.keystore binary
 *.jks binary
+
+# Preserve exact upstream licence bytes and their published SHA-256 values.
+licenses/python-standalone/** -text

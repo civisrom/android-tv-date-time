@@ -12,3 +12,9 @@ The build-tool project LICENSE applies to that project, not to CPython itself.
 The install_only_stripped distribution omits upstream root licence files.
 They are preserved separately here; SOURCES.json records exact source URLs
 and SHA-256 hashes. The embedded runtime retains its PSF licensing.
+
+The exact CPython 3.12.14 LICENSE and Doc/license.rst are also preserved as
+LICENSE.cpython-3.12.14.txt and NOTICE.cpython-3.12.14.rst. They supplement the
+older CPython reference notice in the standalone builder repository.
+The latter document includes current acknowledgements for software incorporated
+in CPython. Both texts are unmodified, with provenance in SOURCES.json.

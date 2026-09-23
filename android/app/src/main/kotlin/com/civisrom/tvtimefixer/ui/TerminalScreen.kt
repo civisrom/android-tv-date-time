@@ -204,7 +204,7 @@ internal fun TerminalScreen(
                     OutlinedTextField(value = remoteFile, onValueChange = { remoteFile = it },
                         label = { Text(stringResource(R.string.terminal_remote_path)) },
                         placeholder = { Text("/sdcard/Download/document.txt") }, singleLine = true,
-                        modifier = Modifier.testTag("terminal-remote-path"))
+                        modifier = Modifier.then(tvTextFieldNavigation(mode)).testTag("terminal-remote-path"))
                 }
             }, confirmButton = {
                 FilledTonalButton(enabled = !busy && !fileBusy && !state.running &&
@@ -299,7 +299,8 @@ internal fun TerminalScreen(
                                 enabled = state.draft.isNotEmpty(), modifier = Modifier.testTag("terminal-clear-input")) {
                                 Icon(painterResource(R.drawable.ic_terminal_clear), stringResource(R.string.terminal_clear_input))
                             }
-                        }, modifier = Modifier.fillMaxWidth().focusRequester(editorFocus).testTag("terminal-input"))
+                        }, modifier = Modifier.fillMaxWidth().focusRequester(editorFocus)
+                            .then(tvTextFieldNavigation(mode)).testTag("terminal-input"))
                     if (state.running) TerminalButton(R.string.terminal_stop, "terminal-stop", onClick = actions::stop)
                     else TerminalButton(R.string.terminal_run, "terminal-run", enabled = !busy && !fileBusy && state.draft.isNotBlank()) {
                         keyboard?.hide(); actions.run()
@@ -388,7 +389,7 @@ internal fun TerminalScreen(
                                 label = { Text(stringResource(R.string.terminal_search)) }, singleLine = true,
                                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                                modifier = Modifier.fillMaxWidth().testTag("terminal-search"))
+                                modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("terminal-search"))
                         }
                         val visible = terminalCatalog.map { group ->
                             group to group.examples.filter { example ->

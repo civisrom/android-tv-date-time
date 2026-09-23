@@ -59,7 +59,7 @@
 
     <!-- Режимы работы -->
     <string name="mode_television">TV mode. Use the setup guide for this TV or enter another device address.</string>
-    <string name="mode_handheld">Running on a phone: connect to a TV over the network or USB.</string>
+    <string name="mode_handheld">Phone/tablet mode: connect to a TV over the network or USB.</string>
 
     <!-- Подключение -->
     <string name="connect_title">Connect to a device</string>
@@ -587,8 +587,8 @@
     <string name="terminal_reference_134" formatted="false">Check whether a shell command exists; replace COMMAND</string>
 
     <string name="time_tools_title">Time settings, profiles and monitoring</string>
-    <string name="time_tools_hint">Saved settings, clock comparison and service evidence are separate facts. The first stable baseline is kept locally before managed changes. Terminal commands are not covered by this snapshot.</string>
-    <string name="time_tools_refresh">Read settings and service evidence</string>
+    <string name="time_tools_hint">Save and restore time settings, choose fallback servers and check clock accuracy here.</string>
+    <string name="time_tools_refresh">Show current settings</string>
     <string name="time_identity_unavailable">A stable device identity is unavailable. Saving and restoring settings are disabled. Refresh after connecting to a supported device.</string>
     <string name="time_identity_mismatch">The device identity changed. No further settings were written. Reconnect and inspect the current device.</string>
     <string name="time_current_title">Last read settings</string>
@@ -608,31 +608,32 @@
     <string name="time_settings_confirmed">Settings were saved and read back. This does not confirm clock synchronization or its source.</string>
     <string name="time_settings_partial">Some settings were not confirmed. Review each result below.</string>
     <string name="time_rollback_result">Attempt to return to the state before this operation:</string>
+    <string name="time_snapshot_hint">A snapshot is a copy of settings you can restore later. It is saved before the first change made with the app controls; terminal commands are not covered.</string>
     <string name="time_snapshot_date">Original snapshot: %1$s</string>
     <string name="time_snapshot_none">No original snapshot for this device yet.</string>
     <string name="time_snapshot_save">Save original snapshot</string>
     <string name="time_snapshot_replace">Replace original snapshot</string>
     <string name="time_snapshot_restore">Review and restore original settings</string>
     <string name="time_profiles_title">Device profiles</string>
-    <string name="time_profiles_hint">Profiles belong to this device. Connect using Favorites as usual; ADB trust and addresses are not copied into profiles. Names must be unique for this device.</string>
+    <string name="time_profiles_hint">A profile is a set of time settings for this device. Saving keeps a copy in the app; applying changes the device settings. Give each profile a unique name.</string>
     <string name="time_profile_name">Profile name</string>
     <string name="time_profile_save">Save current settings as profile</string>
     <string name="time_profile_apply">Review and apply</string>
     <string name="time_profile_delete">Delete profile</string>
     <string name="time_ntp_list_title">NTP fallback servers</string>
-    <string name="time_ntp_list_hint">Android 14+: up to four different DNS names or IPv4/IPv6 addresses, one per line, UDP 123. Android keeps a working server until it fails; values are not averaged. OEM support may differ. Readback confirms storage only.</string>
-    <string name="time_ntp_single_hint">This Android version supports one NTP host only. Use one DNS name or IPv4/IPv6 address, UDP 123.</string>
+    <string name="time_ntp_list_hint">Android 14+: up to four servers, one address per line. Android can use a fallback when a server is unavailable. Support depends on the firmware; saving the list does not confirm synchronization.</string>
+    <string name="time_ntp_single_hint">Enter one time server: a hostname or IP address, without a port. Multiple servers require Android 14+.</string>
     <string name="time_ntp_list_input">One NTP host per line</string>
     <string name="time_ntp_list_invalid">Enter valid, distinct hosts: up to four on Android 14+, otherwise one. Do not include URI schemes or ports.</string>
     <string name="time_source_title">System time source evidence</string>
-    <string name="time_source_unconfirmed">The current clock source is not confirmed. A matching clock, cached NTP response or confidence update does not prove that this server set the system clock.</string>
+    <string name="time_source_unconfirmed">The current time source could not be confirmed. An accurate clock or a saved NTP server alone does not identify it.</string>
     <string name="time_source_service_status">NTP service: %1$s. Time detector: %2$s.</string>
     <string name="time_source_response">Last recorded service response (historical): %1$s</string>
     <string name="time_source_age">Response age when read: %1$d s</string>
-    <string name="time_source_recorded">Last known clock-write operation: %1$s. This is historical and is not linked to the URI above.</string>
+    <string name="time_source_recorded">Last clock-setting event recorded by the system: %1$s. This is a past event; it does not identify a specific server.</string>
     <string name="time_source_unparseable">Unrecognized service format</string>
     <string name="time_monitor_title">Clock monitoring</string>
-    <string name="time_monitor_hint">One read-only comparison every 30 seconds, up to 10 minutes or 20 attempts. Busy operations are skipped. Leaving the app or disconnecting stops monitoring. No background service; nothing changes system time.</string>
+    <string name="time_monitor_hint">Compares the device clock with an NTP server every 30 seconds, for up to 10 minutes. Settings and time stay unchanged. Monitoring stops when you leave the app or disconnect the device.</string>
     <string name="time_monitor_start">Start monitoring</string>
     <string name="time_monitor_stop">Stop monitoring</string>
     <string name="time_monitor_running">Monitoring is running</string>
@@ -645,11 +646,11 @@
     <string name="time_monitor_sample">+%1$d s: %2$s</string>
     <string name="time_monitor_offset">Difference %1$.3f s; uncertainty ±%2$.3f s</string>
     <string name="time_preview_title">Review the action</string>
-    <string name="time_snapshot_preview">Read and save all four current settings. Replacing a snapshot removes the previous baseline for this device. No device setting changes. Values are read again before saving.</string>
-    <string name="time_profile_save_preview">Save the current settings locally under this name. Values below are the last reading; they are read again before saving. No device setting changes.</string>
+    <string name="time_snapshot_preview">Save a copy of the current time settings in the app. The device stays unchanged. An existing snapshot will be replaced, so its previous settings will no longer be available to restore.</string>
+    <string name="time_profile_save_preview">Save the time settings under this name. The app will read them again before saving; device settings stay unchanged.</string>
     <string name="time_profile_delete_preview">Delete this local profile. Device settings will not change.</string>
-    <string name="time_ntp_preview">Store this NTP setting. A stable original snapshot is required and saved first. This does not force a time refresh or prove the active time source.</string>
-    <string name="time_restore_preview">Apply these exact settings to the same device only. Each field is read back; unsupported or refused changes are reported separately.</string>
+    <string name="time_ntp_preview">Save this server list on the device. Before the first change, the app saves a snapshot you can restore later. Android controls clock synchronization.</string>
+    <string name="time_restore_preview">Apply the settings shown to this device. The app will check each change and report any that could not be completed.</string>
     <string name="time_preview_confirm">Confirm</string>
     <string name="time_preview_cancel">Cancel</string>
     <string name="time_saved_locally">Saved locally; device settings did not change.</string>

@@ -372,17 +372,6 @@ private fun MainContent(
             }
         }
         NtpSection(mode, state, actions, onDiagnostics, returnFocus, onFocusRestored)
-        FunctionCard("timezone") {
-            ExpandableSection(stringResource(R.string.time_zone_title), "timezone") {
-                TimeZoneSection(mode, state, actions, onDiagnostics, returnFocus, onFocusRestored)
-            }
-            OperationProgress(state, actions, "timezone", Operation.APPLY_TIME_ZONE)
-        }
-        FunctionCard("time-tools") {
-            ExpandableSection(stringResource(R.string.time_tools_title), "time-tools") {
-                TimeToolsSection(state, actions, mode)
-            }
-        }
         FunctionCard("pairing") {
             ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
                 onExpanded = { pairingExpanded = it }) {
@@ -390,6 +379,12 @@ private fun MainContent(
                     pairingCode, onPairingCode, pairingRequester)
             }
             OperationProgress(state, actions, "pairing", Operation.PAIR)
+        }
+        FunctionCard("timezone") {
+            ExpandableSection(stringResource(R.string.time_zone_title), "timezone") {
+                TimeZoneSection(mode, state, actions, onDiagnostics, returnFocus, onFocusRestored)
+            }
+            OperationProgress(state, actions, "timezone", Operation.APPLY_TIME_ZONE)
         }
         FunctionCard("usb") {
             ExpandableSection(stringResource(R.string.usb_title), "usb", expanded = usbExpanded,
@@ -399,6 +394,11 @@ private fun MainContent(
             OperationProgress(state, actions, "usb", Operation.CONNECT_USB, Operation.USB_PERMISSION)
         }
         if (state.connected) DeviceInfoSection(state, actions)
+        FunctionCard("time-tools") {
+            ExpandableSection(stringResource(R.string.time_tools_title), "time-tools") {
+                TimeToolsSection(state, actions, mode)
+            }
+        }
         HorizontalDivider()
         Column(
             Modifier.fillMaxWidth().testTag("usage-terms")

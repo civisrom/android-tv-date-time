@@ -495,7 +495,7 @@ Android Studio and a separate SDK installation are unnecessary. Open
 [item 11 — Android 11+ wireless debugging](#item-11--android-11-wireless-debugging).
 After pairing, the usual menu items use the encrypted connection.
 In the APK, expand the
-[Pairing section](#7-pairing--new-wireless-debugging-on-android-11).
+[Pairing section](#6-pairing--new-wireless-debugging-on-android-11).
 
 Both programs distinguish pairing and connection services in mDNS and verify
 the connection with a command on the device. A listed service does not yet
@@ -1057,24 +1057,7 @@ The address field highlights three times; applying remains a separate action.
 An IP can help with TV-side DNS problems, but a service is not guaranteed
 to keep that resolved address permanently.
 
-#### 6. "Time zone"
-
-This section is visible on phones and TVs, starts collapsed, and follows the NTP
-settings. Connect to the device, expand the section, and search by city or enter
-an exact zone ID, such as `Europe/London` or `UTC`. Selecting a result fills the
-field; only **Apply time zone** changes the setting.
-
-Applying a zone enables manual zone selection so automatic detection does not
-replace it. The NTP server and automatic date and time settings are preserved:
-the zone controls local time display, while NTP synchronizes the clock itself.
-The app reads the setting back to verify it. On failure, it attempts to restore
-the previous settings and reports whether restoration was confirmed.
-
-Required commands are checked on the connected device. AOSP includes them from
-Android 9, but firmware restrictions can vary. If unsupported, use the TV’s date
-and time settings. The phone’s Android version alone does not hide this menu.
-
-#### 7. Pairing — new wireless debugging on Android 11+
+#### 6. Pairing — new wireless debugging on Android 11+
 
 The pairing section starts collapsed; tap its heading to expand it.
 **Pair** on a discovered device expands the form, fills its address, and focuses the code field.
@@ -1129,6 +1112,23 @@ Change history: [2.6.1](release-notes/v2.6.1-en.md),
 [2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),
 [2.6.4](release-notes/v2.6.4-en.md), and [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5).
 
+#### 7. "Time zone"
+
+This section is visible on phones and TVs, starts collapsed, and follows the NTP
+settings. Connect to the device, expand the section, and search by city or enter
+an exact zone ID, such as `Europe/London` or `UTC`. Selecting a result fills the
+field; only **Apply time zone** changes the setting.
+
+Applying a zone enables manual zone selection so automatic detection does not
+replace it. The NTP server and automatic date and time settings are preserved:
+the zone controls local time display, while NTP synchronizes the clock itself.
+The app reads the setting back to verify it. On failure, it attempts to restore
+the previous settings and reports whether restoration was confirmed.
+
+Required commands are checked on the connected device. AOSP includes them from
+Android 9, but firmware restrictions can vary. If unsupported, use the TV’s date
+and time settings. The phone’s Android version alone does not hide this menu.
+
 #### 8. USB debugging
 
 Expand this section manually, or it opens automatically when USB ADB is
@@ -1157,8 +1157,11 @@ row disappears.
 
 #### 10. "Time settings, profiles and monitoring"
 
-After connecting, expand this section and select **Read settings and service
-evidence** to read the settings and available system time-service information.
+This section is at the bottom of the main screen, after USB debugging and
+device information. After connecting, expand it and select **Show current
+settings** to read the settings and time-service information without changing
+them. Brief explanations beside the controls describe snapshots, profiles,
+fallback servers and monitoring.
 
 - **Original snapshot.** The first snapshot is saved automatically before a
   managed NTP or timezone change, or you can save it manually. It contains

@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
@@ -117,6 +118,78 @@ class TerminalScreenTest {
         compose.runOnIdle { session.start("TV") }
         activate("terminal-stop")
         assertEquals(listOf("run", "stop"), calls)
+    }
+
+    private fun traverseEditorWithDpad(from: String, target: String) {
+        val field = compose.onNodeWithTag(from)
+        compose.runOnIdle { hideKeyboard(); inputMode.requestInputMode(InputMode.Keyboard) }
+        field.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+        field.assertIsFocused()
+        compose.runOnIdle { hideKeyboard() }
+        field.performScrollTo().assertIsDisplayed()
+        val route = mutableListOf<String>()
+        for (step in 0 until 16) {
+            route += compose.onAllNodes(isFocused()).fetchSemanticsNodes().joinToString {
+                it.config.getOrNull(SemanticsProperties.TestTag) ?: "node-${it.id}"
+            }
+            if (compose.onAllNodes(hasTestTag(target) and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
+                println("Terminal TV route from $from: $route")
+                compose.onNodeWithTag(target).assertIsDisplayed().performKeyInput { pressKey(Key.DirectionCenter) }
+                return
+            }
+            // The dialog places Cancel and Download beside each other. Down first
+            // leaves the editor; Right then reaches confirmation from Cancel.
+            val direction = if (from == "terminal-remote-path" &&
+                compose.onAllNodes(hasTestTag(from) and isFocused()).fetchSemanticsNodes().isEmpty()) {
+                Key.DirectionRight
+            } else Key.DirectionDown
+            field.performKeyInput { pressKey(direction) }
+        }
+        fail("Terminal TV editor $from did not reach $target with D-pad: $route")
+    }
+
+    @Test fun TV_command_editor_reaches_run_with_sequential_Dpad() {
+        session.edit("echo terminal-test")
+        screen(mode = DeviceMode.TELEVISION, width = 640, height = 360)
+        traverseEditorWithDpad("terminal-input", "terminal-run")
+        assertEquals(listOf("run"), calls)
+    }
+
+    @Test fun TV_download_path_reaches_confirmation_with_sequential_Dpad() {
+        screen(mode = DeviceMode.TELEVISION, width = 640, height = 360)
+        compose.onNodeWithTag("terminal-tab-files").performScrollTo().assertIsDisplayed().performClick()
+        scroll("terminal-download").performClick()
+        compose.onNodeWithTag("terminal-remote-path").performTextInput("/sdcard/Download/example.txt")
+        traverseEditorWithDpad("terminal-remote-path", "terminal-download-confirm")
+        assertEquals("adb pull '/sdcard/Download/example.txt'", session.state.value.draft)
+        assertEquals(listOf("run"), calls)
+    }
+
+    @Test fun TV_reference_search_reaches_category_with_sequential_Dpad() {
+        screen(mode = DeviceMode.TELEVISION, width = 640, height = 360)
+        compose.onNodeWithTag("terminal-tab-help").performScrollTo().assertIsDisplayed().performClick()
+        scroll("terminal-search").performTextInput("date")
+        traverseEditorWithDpad("terminal-search", "terminal-category-time")
+        scroll("terminal-example-time_0").assertIsDisplayed()
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun phone_command_editor_keeps_multiline_hardware_cursor_navigation() {
+        screen()
+        val field = compose.onNodeWithTag("terminal-input")
+        val text = "echo first\necho second"
+        field.performScrollTo().performClick().performTextReplacement(text)
+        compose.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
+        field.assertIsFocused()
+        field.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.MoveEnd) } }
+        assertEquals(text.length, field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange].start)
+        field.performKeyInput { pressKey(Key.DirectionUp) }
+        field.assertIsFocused()
+        assertTrue(field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange].start < text.length)
+        field.performKeyInput { pressKey(Key.DirectionDown) }
+        field.assertIsFocused()
+        assertEquals(text.length, field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange].start)
+        assertTrue(calls.isEmpty())
     }
 
     private fun scroll(tag: String): SemanticsNodeInteraction {

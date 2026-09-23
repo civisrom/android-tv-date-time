@@ -1,6 +1,8 @@
 package com.civisrom.tvtimefixer.ui
 
 import android.os.Build
+import android.os.SystemClock
+import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
@@ -67,7 +70,31 @@ class TvFieldNavigationTest {
         // Scrolling before a click races the previous editor's IME bring-into-view request.
         field.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         field.assertIsFocused()
-        compose.runOnIdle { keyboard?.hide() }
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        try {
+            // RequestFocus may start a native IME show animation after Compose is idle.
+            // Hiding immediately can be cancelled by that animation, notably on tablets.
+            automation.waitForIdle(500, 3_000)
+            compose.runOnIdle { keyboard?.hide() }
+            val root = compose.activity.window.decorView
+            var previousBounds: androidx.compose.ui.geometry.Rect? = null
+            var stableSince = SystemClock.uptimeMillis()
+            compose.waitUntil(5_000) {
+                val hidden = if (Build.VERSION.SDK_INT >= 30) {
+                    compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == false }
+                } else !hasLegacyImeWindow(automation)
+                val bounds = field.fetchSemanticsNode().boundsInRoot
+                val now = SystemClock.uptimeMillis()
+                if (!hidden || bounds != previousBounds) {
+                    previousBounds = bounds
+                    stableSince = now
+                }
+                hidden && now - stableSince >= 500
+            }
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
         field.performScrollTo().assertIsDisplayed()
         val route = mutableListOf<String>()
         for (step in 0 until 16) {

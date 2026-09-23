@@ -112,6 +112,7 @@ internal fun TimeSettingStatus.label(): Int = when (this) {
                 rollback.forEach { (field, status) -> Text(stringResource(field.label()) + ": " + stringResource(status.label())) }
             }
         }
+        Text(stringResource(R.string.time_snapshot_hint), style = MaterialTheme.typography.bodySmall)
         tools.snapshot?.let { Text(stringResource(R.string.time_snapshot_date,
             DateFormat.getDateTimeInstance().format(Date(it.capturedAt)))) }
             ?: Text(stringResource(R.string.time_snapshot_none))

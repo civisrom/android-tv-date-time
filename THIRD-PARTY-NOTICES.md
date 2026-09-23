@@ -107,7 +107,7 @@ the published APK apart from the signature.
 |---|---|
 | adb-shell | Apache-2.0 |
 | cryptography | Apache-2.0 OR BSD-3-Clause |
-| OpenSSL 3.x (used by Python/cryptography) | Apache-2.0 |
+| OpenSSL 3.x / 4.x (used by Python/cryptography) | Apache-2.0 |
 | rsa | Apache-2.0 |
 | packaging | Apache-2.0 OR BSD-2-Clause |
 | click | BSD-3-Clause |
