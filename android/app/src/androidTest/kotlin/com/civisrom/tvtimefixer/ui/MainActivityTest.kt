@@ -69,15 +69,64 @@ class MainActivityTest {
     }
 
     @Test fun terminal_opens_from_main_and_returns_focus_to_its_entry() {
-        compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
-        compose.onNodeWithTag("terminal-warning-accept").performClick()
-        compose.onNodeWithTag("terminal-screen").assertIsDisplayed()
-        compose.onNodeWithTag("terminal-input").performTextInput("getprop ro.product.model")
-        compose.onNodeWithTag("terminal-back").performClick()
-        compose.onNodeWithTag("terminal-open").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("terminal-open").performClick()
-        compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
-        screenshot("terminal-draft")
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        var stage = "open-terminal"
+        var clickBounds = "not-tapped"
+        try {
+            compose.onNodeWithTag("terminal-open").performScrollTo().performClick()
+            compose.onNodeWithTag("terminal-warning-accept").performClick()
+            compose.onNodeWithTag("terminal-screen").assertIsDisplayed()
+            compose.onNodeWithTag("terminal-input").performClick().performTextInput("getprop ro.product.model")
+            // The native keyboard changes the controls' layout after Compose text input.
+            // Keep it open and settle the actual Back button before one physical tap.
+            val root = compose.activity.window.decorView
+            stage = "wait-native-ime"
+            compose.waitUntil(15_000) {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
+                } else hasLegacyImeWindow(automation)
+            }
+            automation.waitForIdle(300, 3_000)
+            val back = compose.onNodeWithTag("terminal-back")
+            stage = "settle-back-bounds"
+            back.performScrollTo().assertIsDisplayed().assertIsEnabled()
+            var previousBounds: Pair<androidx.compose.ui.geometry.Rect, androidx.compose.ui.geometry.Rect>? = null
+            var stableSince = android.os.SystemClock.uptimeMillis()
+            compose.waitUntil(5_000) {
+                val bounds = back.fetchSemanticsNode().boundsInRoot to
+                    compose.onNodeWithTag("terminal-screen").fetchSemanticsNode().boundsInRoot
+                val now = android.os.SystemClock.uptimeMillis()
+                if (bounds != previousBounds || !back.isDisplayed()) {
+                    previousBounds = bounds
+                    stableSince = now
+                }
+                now - stableSince >= 500
+            }
+            clickBounds = previousBounds.toString()
+            stage = "tap-back-once"
+            back.assertIsDisplayed().performClick()
+            stage = "wait-main-after-back"
+            compose.waitUntil(5_000) {
+                compose.onAllNodesWithTag("terminal-open").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("terminal-screen").assertDoesNotExist()
+            stage = "reopen-and-check-draft"
+            compose.onNodeWithTag("terminal-open").performScrollTo().assertIsDisplayed().assertIsFocused()
+            compose.onNodeWithTag("terminal-open").performClick()
+            compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
+            screenshot("terminal-draft")
+        } catch (failure: Throwable) {
+            runCatching { screenshot("terminal-back-failure") }.exceptionOrNull()?.let(failure::addSuppressed)
+            runCatching {
+                val file = File(compose.activity.filesDir, "ui-screenshots/native-terminal-back-failure.txt")
+                file.parentFile!!.mkdirs()
+                file.writeText("API ${Build.VERSION.SDK_INT}; stage=$stage; back/screen=$clickBounds\n" + compose.onRoot().printToString())
+            }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
     }
 
     @Test fun terminal_without_a_connection_reports_failure_without_running_locally() {

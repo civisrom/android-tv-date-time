@@ -1458,10 +1458,12 @@ computer. Pairing a computer does not authorize the installed APK. If network
 debugging is unavailable or local connections are blocked, use another
 controlling device; USB requires a suitable port on the TV.
 
-Controls support a remote. On the main TV screen, Up and Down move focus
+Controls support a remote. With the on-screen keyboard closed, Up and Down on the main TV screen move focus
 from text fields to adjacent controls; Left and Right move the cursor within
 the text. TV address fields provide explicit copy and paste buttons;
 pasting only fills the field and does not connect.
+In pairing fields, press OK/Enter or tap the field to open the keyboard.
+Close it with Back before continuing to navigate the form.
 After entering a value, select the button for the action you need.
 In the favorites dialog, press Save after entering a name: dismissing the
 keyboard alone does not save the entry.

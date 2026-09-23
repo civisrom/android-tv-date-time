@@ -22,6 +22,8 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -163,8 +165,8 @@ fun MainScreen(
     var connectionSection by rememberSaveable { mutableStateOf("network") }
     // Код не попадает в savedInstanceState и сохраняется только на время
     // текущего процесса, в том числе при просмотре диагностики.
-    var pairingCode by remember { mutableStateOf("") }
-    LaunchedEffect(state.connected) { if (state.connected) pairingCode = "" }
+    val pairingCode = remember { TextFieldState() }
+    LaunchedEffect(state.connected) { if (state.connected) clearPairingCode(pairingCode) }
     val holder = rememberSaveableStateHolder()
     if (terminalWarning || (showTerminal && !terminalAccepted)) {
         AlertDialog(onDismissRequest = { terminalWarning = false; showTerminal = false; returnFocus = "terminal-open" },
@@ -207,7 +209,7 @@ fun MainScreen(
                 showDiagnostics = false; returnFocus = if (available) origin else "diagnostics-open"
             }, onClear = onClearDiagnostics, onExport = actions::exportDiagnostics, onCopy = actions::copyDiagnostics, exportMessage = state.diagnosticExportMessage)
     } else holder.SaveableStateProvider("main") {
-        MainContent(mode, state, actions, diagnostics, pairingCode, { pairingCode = it },
+        MainContent(mode, state, actions, diagnostics, pairingCode,
             connectionSection, { connectionSection = it },
             onDiagnostics = { id, key ->
                 selectedEvent = id; origin = key; returnFocus = null
@@ -246,8 +248,7 @@ private fun MainContent(
     state: AppState,
     actions: AppActions,
     diagnostics: DiagnosticSnapshot,
-    pairingCode: String,
-    onPairingCode: (String) -> Unit,
+    pairingCode: TextFieldState,
     connectionSection: String,
     onConnectionSection: (String) -> Unit,
     onDiagnostics: (Long?, String) -> Unit,
@@ -260,7 +261,7 @@ private fun MainContent(
     var repositoryLinkFailed by remember { mutableStateOf(false) }
     var usageTermsFocused by remember { mutableStateOf(false) }
     val openRepository = stringResource(R.string.project_repository_open)
-    var pairingAddress by rememberSaveable { mutableStateOf("") }
+    val pairingAddress = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
     var pairingExpanded by rememberSaveable { mutableStateOf(false) }
     var discoveryExpanded by rememberSaveable { mutableStateOf(state.discovered.isNotEmpty()) }
     var lastDiscoveredCount by rememberSaveable { mutableIntStateOf(state.discovered.size) }
@@ -345,7 +346,7 @@ private fun MainContent(
             ExpandableSection(stringResource(R.string.discovery_title), "discovery", expanded = discoveryExpanded,
                 onExpanded = { discoveryExpanded = it }) {
                 DiscoverySection(state, connectionActions("discovery"), onPair = {
-                    pairingAddress = it; pairingExpanded = true; focusPairing = true
+                    pairingAddress.setTextAndPlaceCursorAtEnd(it); pairingExpanded = true; focusPairing = true
                 })
             }
             if (connectionSection == "discovery") OperationProgress(state, actions, "discovery", Operation.CONNECT_NETWORK)
@@ -375,8 +376,7 @@ private fun MainContent(
         FunctionCard("pairing") {
             ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
                 onExpanded = { pairingExpanded = it }) {
-                PairingSection(mode, state, actions, pairingAddress, { pairingAddress = it },
-                    pairingCode, onPairingCode, pairingRequester)
+                PairingSection(mode, state, actions, pairingAddress, pairingCode, pairingRequester)
             }
             OperationProgress(state, actions, "pairing", Operation.PAIR)
         }
@@ -664,13 +664,11 @@ private fun PairingSection(
     mode: DeviceMode,
     state: AppState,
     actions: AppActions,
-    pairingAddress: String,
-    onPairingAddressChange: (String) -> Unit,
-    code: String,
-    onCode: (String) -> Unit,
+    pairingAddress: TextFieldState,
+    code: TextFieldState,
     codeFocus: FocusRequester,
 ) {
-    var connectAddress by rememberSaveable { mutableStateOf("") }
+    val connectAddress = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
     val keyboard = LocalSoftwareKeyboardController.current
     val submitFocus = remember { FocusRequester() }
     val pairingSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
@@ -684,40 +682,25 @@ private fun PairingSection(
         // в подключение, потому что оба показаны на одном экране телевизора
         CopyableText(stringResource(R.string.pairing_port_warning), style = MaterialTheme.typography.bodySmall)
 
-        OutlinedTextField(
-            value = pairingAddress,
-            onValueChange = onPairingAddressChange,
-            label = { Text(stringResource(R.string.pairing_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("pairing-address"),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+        PairingTextField(mode, pairingAddress, R.string.pairing_address_hint, KeyboardType.Uri,
+            modifier = Modifier.fillMaxWidth().testTag("pairing-address"),
+            onDone = { keyboard?.hide() },
         )
-        AddressPaste("pairing-address", onPairingAddressChange)
-        OutlinedTextField(
-            value = code,
-            onValueChange = onCode,
-            label = { Text(stringResource(R.string.pairing_code_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().focusRequester(codeFocus).then(tvTextFieldNavigation(mode)).testTag("pairing-code"),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+        AddressPaste("pairing-address") { pairingAddress.setTextAndPlaceCursorAtEnd(it) }
+        PairingTextField(mode, code, R.string.pairing_code_hint, KeyboardType.Number,
+            modifier = Modifier.fillMaxWidth().focusRequester(codeFocus).testTag("pairing-code"),
+            onDone = { keyboard?.hide() },
         )
-        OutlinedTextField(
-            value = connectAddress,
-            onValueChange = { connectAddress = it },
-            label = { Text(stringResource(R.string.pairing_connect_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("pairing-connect-address"),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = {
+        PairingTextField(mode, connectAddress, R.string.pairing_connect_address_hint, KeyboardType.Uri,
+            modifier = Modifier.fillMaxWidth().testTag("pairing-connect-address"),
+            onDone = {
                 if (pairingSupported && !state.busy) submitFocus.requestFocus()
                 keyboard?.hide()
-            }),
+            },
         )
-        AddressPaste("pairing-connect-address") { connectAddress = it }
+        AddressPaste("pairing-connect-address") { connectAddress.setTextAndPlaceCursorAtEnd(it) }
         Button(shape = MaterialTheme.shapes.medium,
-            onClick = { actions.pairAndConnect(pairingAddress, code, connectAddress) },
+            onClick = { actions.pairAndConnect(pairingAddress.text.toString(), code.text.toString(), connectAddress.text.toString()) },
             enabled = !state.busy && pairingSupported,
             modifier = Modifier.focusRequester(submitFocus).focusProperties { canFocus = true }.testTag("pairing-connect"),
         ) {
