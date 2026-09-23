@@ -4,6 +4,7 @@ import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.data.DeviceAddress
 import com.civisrom.tvtimefixer.data.DEFAULT_ADB_PORT
 import com.civisrom.tvtimefixer.data.isValidPairingCode
+import com.civisrom.tvtimefixer.data.hasExplicitDevicePort
 import com.civisrom.tvtimefixer.data.parseDeviceAddress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -48,6 +49,9 @@ class DeviceConnector(
     /** Текущее соединение, если транспорт ещё не сообщил о закрытии. */
     val activeClient: AdbClient?
         get() = client?.takeIf { it.isAlive() }
+
+    /** Ownership survives a closed socket; late cancellation must not clear a newer connection. */
+    internal fun ownsClient(candidate: AdbClient): Boolean = client === candidate
 
     /** Проверяет ответ устройства: открытый локальный сокет переживает потерю Wi-Fi. Вызывать вне UI. */
     fun checkConnection(): ConnectionState {
@@ -176,8 +180,8 @@ class DeviceConnector(
         connectInput: String,
     ): ConnectionState {
         // Wireless debugging advertises both ports; the legacy default 5555 is not a substitute.
-        val pairingAddress = parseDeviceAddress(pairingInput).takeIf { ':' in pairingInput }
-        val connectAddress = parseDeviceAddress(connectInput).takeIf { ':' in connectInput }
+        val pairingAddress = parseDeviceAddress(pairingInput).takeIf { hasExplicitDevicePort(pairingInput) }
+        val connectAddress = parseDeviceAddress(connectInput).takeIf { hasExplicitDevicePort(connectInput) }
         if (pairingAddress == null || connectAddress == null) {
             return failInput(null, ConnectionError.INVALID_ADDRESS)
         }

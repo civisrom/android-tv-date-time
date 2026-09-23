@@ -10,6 +10,36 @@ from src import ntp_network
 
 
 class NtpNetworkTests(unittest.TestCase):
+    def test_ipv6_udp_returns_a_validated_ntp_sample(self):
+        try:
+            responder = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            responder.bind(('::1', 0))
+        except OSError as error:
+            if 'responder' in locals():
+                responder.close()
+            self.skipTest(f'IPv6 loopback unavailable: {error}')
+        with responder:
+            responder.settimeout(2)
+
+            def serve():
+                data, peer = responder.recvfrom(512)
+                request = ntplib.NTPPacket()
+                request.from_data(data)
+                reply = ntplib.NTPPacket(mode=4, version=4, tx_timestamp=request.tx_timestamp)
+                reply.stratum = 1
+                reply.orig_timestamp = reply.recv_timestamp = request.tx_timestamp
+                responder.sendto(reply.to_data(), peer)
+
+            worker = threading.Thread(target=serve, daemon=True)
+            worker.start()
+            with mock.patch.object(ntp_network, 'resolve_addresses',
+                                   return_value=[(socket.AF_INET6, responder.getsockname())]):
+                sample = ntp_network.query_ntp('::1', .8)
+            self.assertLess(abs(sample.offset), 1)
+            self.assertEqual(1, sample.stratum)
+            worker.join(2)
+            self.assertFalse(worker.is_alive())
+
     def test_timestamp_era_before_after_and_across_2036(self):
         era = 2 ** 32
         for sent, received in [(era - 10, era - 9), (era + 10, era + 11), (era - .02, era - .01)]:

@@ -69,5 +69,11 @@ internal val additionalTerminalCategories: List<CommandCategory> = listOf(
         CommandExample("reference_127", R.string.terminal_reference_127, "adb shell screenrecord --help"),
         CommandExample("reference_128", R.string.terminal_reference_128, "adb logcat --help"),
         CommandExample("reference_extra_5", R.string.terminal_reference_extra_5, "adb shell cmd package help"),
+        CommandExample("reference_129", R.string.terminal_reference_129, "adb shell toybox COMMAND --help"),
+        CommandExample("reference_130", R.string.terminal_reference_130, "adb shell cmd wifi help"),
+        CommandExample("reference_131", R.string.terminal_reference_131, "adb shell cmd connectivity help"),
+        CommandExample("reference_132", R.string.terminal_reference_132, "adb shell dumpsys SERVICE -h"),
+        CommandExample("reference_133", R.string.terminal_reference_133, "adb shell wm help"),
+        CommandExample("reference_134", R.string.terminal_reference_134, "adb shell command -v COMMAND"),
     )),
 )

@@ -69,14 +69,32 @@ replace troubleshooting other network faults.
 
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
-    53 alternative servers**, including regional pools, Cloudflare, Google
-    and other public NTP servers. Development checks keep the two reference lists consistent.
+    91 alternative servers**, including regional pools, Cloudflare, Google,
+    MSK-IX, Yandex and national time services. The 2.6.5 update adds 38 addresses
+    verified using real NTPv3/v4 requests. Reachability depends on the network;
+    Android and desktop share the same catalog.
+*   **IPv6:** manual ADB connections and mDNS discovery support IPv4 and
+    IPv6. Use `[2001:db8::1]:37105` for IPv6 with a port; add the controller's
+    interface for a link-local address when needed, such as `[fe80::1%wlan0]:37105`.
+    The NTP field accepts a domain, IPv4 or IPv6 without brackets or an interface scope.
 *   **Time-server checks:** real NTP requests, round-trip time (RTT), successful
     reply percentage and offset from the controlling device's clock.
     Check before applying a server or find a suitable one from the reference.
 *   **Setting verification:** the program reads the NTP value back after writing
     it. This confirms the stored address; Android itself performs the actual
     clock synchronization.
+*   **Clock comparison:** a separate device-versus-NTP result with offset and
+    uncertainty. Matching clocks do not prove which server the system used;
+    an unconfirmed source is stated explicitly.
+*   **Time snapshots and profiles:** preserve the original NTP, automatic time,
+    automatic timezone and timezone settings for a specific device. Snapshots
+    survive program restarts; named profiles restore saved settings after confirmation.
+*   **Fallback NTP:** up to four addresses on Android 14 or later. Android
+    controls server selection; earlier versions use a single server.
+*   **Clock monitoring:** a session of up to 10 minutes with a measurement every
+    30 seconds, explicit stop and separate results for failed attempts.
+*   **Anonymized diagnostics:** save a report without addresses, device
+    identifiers, keys, pairing codes or raw command output.
 *   **NTP recovery:** restore the system time source or undo the last change
     with confirmation. See the source and clock offset before/after, plus
     guidance about automatic time and restarting the device.
@@ -95,6 +113,11 @@ replace troubleshooting other network faults.
 ### Desktop features
 
 *   Console menus for Windows, Linux and macOS; release builds include ADB.
+*   A startup network check (up to 4 seconds): an active network connection,
+    HTTPS Internet access, NTP replies over UDP/123 and the last saved device's
+    TCP port. Failures show network, VPN, proxy and firewall guidance. The
+    check allows the program to continue; Internet access alone does not
+    confirm TV reachability or ADB authorization.
 *   Local subnet scanning with a selectable ADB port, plus separate mDNS discovery.
 *   Batch NTP updates for discovered or manually entered devices.
 *   Automatic setup: discover a device via mDNS, detect the region, test
@@ -130,11 +153,11 @@ replace troubleshooting other network faults.
     a Stop button, and a choice of domain name or resolved IP address.
 *   USB host/OTG with device selection and discovery diagnostics.
 *   An ADB terminal with Android shell commands, streaming output, Stop,
-    session history, and 118 examples in 10 collapsible reference categories.
-    The editor is fixed below the tabs and fills the panel width, with Run
-    on a separate row below it; output scrolls independently of the editor
-    and controls. History and category titles are left aligned.
-    The Connected status is green.
+    session history, and 154 examples in 10 collapsible reference categories —
+    36 examples have been added. The editor fills the panel width below the
+    tabs, with Run on a separate row. On short screens, including at 200%
+    font size, the command panel scrolls to keep the controls accessible.
+    Output scrolls separately. The Connected status is green.
     A warning appears before entry; inserting an example never runs it.
 *   Install APKs and split APKs from a phone or tablet on the connected device
     over network ADB or USB. Choose documents in Files and APK, prepare the
@@ -217,20 +240,30 @@ Run via PowerShell
 
 ### macOS
 
-1. Download `AndroidTVTimeFixer-macos.zip` from [Releases](https://github.com/civisrom/android-tv-date-time/releases).
-   The current prebuilt file targets **Apple Silicon (arm64)**.
-2. Extract the archive and open Terminal in its folder. This is a console program:
-   ```bash
-   chmod +x AndroidTVTimeFixer
-   ./AndroidTVTimeFixer
-   ```
-3. If macOS blocks the downloaded file, check its source and the stated reason
-   under **System Settings → Privacy & Security**.
-   Intel Macs need a separate x86-64 build.
+Choose the archive in [release 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5)
+that matches your Mac's processor:
+
+| Processor | Archive |
+|---|---|
+| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.5/AndroidTVTimeFixer-macos.zip) |
+| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.5/AndroidTVTimeFixer-macos-intel.zip) |
+
+Download the matching archive from the release,
+extract it and open Terminal in its folder. This is a console program:
+
+```bash
+chmod +x AndroidTVTimeFixer
+./AndroidTVTimeFixer
+```
+
+If macOS blocks the downloaded file, check its source and the stated reason
+under **System Settings → Privacy & Security**. Builds are produced on macOS 15;
+check [Actions](https://github.com/civisrom/android-tv-date-time/actions/workflows/ci.yml)
+for the result of a particular revision.
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.5.apk` from [prerelease 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5). [What's new](release-notes/v2.6.5-en.md).
+1.  Download `AndroidTVTimeFixer-2.6.5.apk` from [release 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5). The release page describes the changes.
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
     sha256sum -c AndroidTVTimeFixer-2.6.5.apk.sha256
@@ -245,7 +278,7 @@ Run via PowerShell
 Requires **Android 6.0** or newer. See
 [Android application](#android-application) for details.
 
-The latest stable release is [2.6.4](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.4).
+The current release is [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5); the Android app continues to operate in test mode.
 
 **Google Play Protect.** This APK is distributed through GitHub Releases.
 Installing outside Google Play may trigger a scan prompt or warning; not every
@@ -258,6 +291,12 @@ See [Google Play Protect help](https://support.google.com/googleplay/answer/2812
 
 The **desktop program** is portable: by default its settings and log live **next to the executable**
 (`keys/`, `adb/`, `settings.json`, `saved_servers.json`, `android_tv_fixer.log`).
+
+Time snapshots are in `time-snapshots/` and profiles in `time-profiles.json`
+within the same directory. They contain settings and device bindings, so they
+are excluded from anonymized diagnostic reports. The regular settings export
+in menu 7 includes the language, address and favorite servers; ADB keys,
+snapshots and profiles are not included in that file.
 
 - `keys/` — the key for direct "network debugging" connections (legacy ADB protocol).
 - `adb/` — a private `adb` home for Android 11+ wireless debugging: it holds the key
@@ -280,7 +319,9 @@ When the program folder is not writable (for example, under `Program Files`), th
 In that case, existing settings and ADB keys from the application folder are copied
 automatically on first launch.
 
-The APK keeps its data separately in private Android app storage. Its log
+The APK keeps its data separately in private Android app storage. Snapshots
+and profiles are excluded from cloud backups; clearing app data or uninstalling
+the app removes them. A normal APK update preserves data. Its log
 retention rules are described under [Diagnostics](#if-the-app-misbehaves).
 
 ## Android TV Setup
@@ -485,6 +526,10 @@ the addresses from the current debugging screens manually.
 
 ![Main menu](screenshots/en.png)
 
+Phone screenshots of the Russian Android interface are available in the
+[Russian README gallery](README.md#приложение-на-смартфоне). They were taken on
+12 September 2026; individual labels and layouts may differ in newer builds.
+
 ## How to Use the Program
 
 ### Choosing a device and checking NTP
@@ -521,7 +566,7 @@ two-letter country code (such as `ru`, `by`, `de`). Enter `?name` to search by
 country name. The regional server is checked, written to the device and
 read back for confirmation.
 
-> **Tip:** If you don't know your country code, first open **item 3** — it displays a full list of country codes with names and NTP servers. Copy the desired code to the clipboard and paste it when prompted in item 1.
+Country codes and names are available in **item 3**.
 
 ### Item 2 — Change NTP time server to custom
 
@@ -529,7 +574,8 @@ Similar to item 1, but enter an NTP server domain name or IP address instead
 of a country code. The program checks the format and NTP response, then sets
 the server and reads back the result.
 
-> **Tip:** You can get the NTP server address from **item 3** (servers by country) or **item 4** (alternative servers — Cloudflare, Google, etc.). Open the desired item, copy the server address to the clipboard, and paste it when prompted in item 2.
+Use the addresses in **item 3** (by country) or **item 4**
+(alternative servers).
 
 ### Item 3 — Show country codes with country names and NTP servers
 
@@ -539,7 +585,8 @@ Displays a complete list of supported country codes (77), their names, and corre
 
 ### Item 4 — Show available alternative NTP servers
 
-Shows a list of alternative NTP servers: regional pools, Cloudflare, Google, and others. Results can be copied to the clipboard.
+Shows 91 alternative NTP addresses. Select a server to copy it to the
+clipboard; check its reachability from your network before applying it.
 
 > **Using the results:** The copied server address can be pasted into **item 2** for manual installation on the device.
 
@@ -549,7 +596,7 @@ Connects to the device and displays detailed information: model, manufacturer, A
 
 ### Item 6 — Ping NTP servers
 
-Checks the 130 reference addresses using real NTP requests rather than ICMP ping.
+Checks the 168 reference addresses using real NTP requests rather than ICMP ping.
 Shows round-trip time (RTT) and successful reply percentage, sorting by
 availability, reply percentage and speed. Many unreachable addresses can make
 the check take longer because each request must time out.
@@ -566,6 +613,9 @@ the check take longer because each request must time out.
 7. Export / Import settings
 8. Return to main menu
 r — System default; u — Undo last change
+s — Save original settings; b — Restore original settings
+p — Profiles; m — Fallback NTP; v — Clock monitoring
+d — Save anonymized diagnostics
 ```
 
 System default removes the custom NTP setting. Undo restores the previous
@@ -584,7 +634,36 @@ Opens a submenu for managing favorite servers:
 
 - **Remove server** — removes a selected server from the favorites list
 
-- **Export / Import settings** — save and restore all settings (language, IP, favorite servers) to a JSON file
+- **Export / Import settings** — save and restore the language, device address and favorite servers in a JSON file
+
+Additional commands are available in the same submenu:
+
+- **`s` / `b` — snapshot / restore.** The first snapshot is also saved
+  automatically before changing NTP. Later changes do not replace it; select
+  `s` and confirm to update the baseline. `b` previews saved values and
+  restores them after a `yes` confirmation.
+- **`p` — profiles.** Save a name, device address and time settings. When
+  creating a profile, you can edit NTP, `auto_time`, `auto_time_zone` and the
+  timezone. Applying a profile checks device identity and previews before/after
+  values. For USB, select the connected device first. Saving a profile alone
+  does not change Android settings.
+- **`m` — fallback NTP.** Enter one to four domains or IP addresses separated
+  by spaces or commas, without `ntp://` or a port. Before Android 14, only one
+  address is accepted. After confirmation, the program checks NTP; an unreachable
+  address needs separate consent to apply without verification.
+- **`v` — monitoring.** Compare the device clock against the first reachable
+  address in its current custom NTP setting every 30 seconds for up to 10
+  minutes. `Ctrl+C` stops monitoring and returns to the menu. This mode requires
+  a current custom NTP setting; monitoring does not start with the system
+  default. Matching clocks alone never
+  confirm the system clock source.
+- **`d` — diagnostics.** Enter a path to save an anonymized JSON report;
+  `~` is supported. The report excludes profiles and command logs.
+
+Restoring settings verifies each value after writing. If permission is denied
+or the connection drops, the program attempts to restore the state immediately
+before the operation and reports whether that succeeded. After a partial
+restoration, reconnect and check the current settings.
 
 #### Export / Import Settings Submenu
 
@@ -636,6 +715,7 @@ authorization; the fallback subnet scan checks one specified port.
 ### Item 10 — Terminal mode
 
 A mode for executing ADB commands and external programs. Useful for advanced users:
+
 - App management (install, uninstall)
 - File transfers (push/pull)
 - Screenshots and screen recording
@@ -773,15 +853,19 @@ Shows the current state in **bold, colour-coded text** so it can be read at a gl
 *   **red** — "Not connected", or the reason it failed;
 *   plain — "Connecting to…", while an attempt is in progress.
 
-**The input field** takes two forms:
+**The input field** accepts these forms:
 
 | What to enter | When |
 |---|---|
 | `192.168.0.112` | usually; port `5555` is added for you |
 | `192.168.0.112:37105` | when debugging uses a non-standard port |
+| `2001:db8::1` | IPv6 using the default port `5555` |
+| `[2001:db8::1]:37105` | IPv6 with an explicit port |
+| `[fe80::1%wlan0]:37105` | link-local IPv6 with the controller's interface |
 
 The four IPv4 numbers must be in the range 0–255 and the port in 1–65535.
-The connection field rejects domains, IPv6, URLs and invalid ports.
+IPv4 with leading zeroes, domains, URLs and invalid ports are rejected.
+Pairing requires an explicit port for both endpoints, including IPv6.
 
 Find the TV's address in its settings: **Settings → Network & Internet →** your
 network, or **Settings → About → Status**.
@@ -887,11 +971,11 @@ green, a rejected one red.
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
     `KZ · Kazakhstan · kz.pool.ntp.org`, `BY · Belarus · by.pool.ntp.org`.
-*   **The alternative-server list.** **Show alternative time servers (53)** —
+*   **The alternative-server list.** **Show alternative time servers (91)** —
     the same set as the desktop version: `0.openwrt.pool.ntp.org`, regional pools, Cloudflare, Google
     and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
-    (`time.google.com`) or IPv4 (`216.239.35.0`), without a port, spaces, path
+    (`time.google.com`), IPv4 (`216.239.35.0`) or IPv6, without brackets, an interface scope, port, spaces, path
     or `http://`. The standard NTP port, UDP/123, is used.
 
 **Favorite NTP servers.** Enter an address, press **Save server to favorites**,
@@ -921,7 +1005,7 @@ On Android 6–10, activating a new NTP setting usually requires restarting the
 device; Android 11+ reads it on the next network time refresh. Disabled automatic
 time is reported and is never silently enabled. Firmware behavior may vary.
 
-The **Apply** button does the same and, if the check passes, writes the address
+The **Apply** button first checks the server and, if it replies successfully, writes the address
 to the TV. The result appears **right under the button**, and the "Current:"
 line is updated with the value **read back from the device**.
 
@@ -959,12 +1043,12 @@ The NTP reply is received by the device running the APK: matching clocks do
 not prove that the TV synchronized with this particular server.
 
 The **Find the best one** button collapses the open country and alternative
-lists and checks the 130-address reference with five NTP requests per server,
+lists and checks the 168-address reference with five NTP requests per server,
 separated by one-second pauses. Results require at least four valid replies.
 Up to five candidates are ranked by reply rate, then median delay plus delay
 variation (RMS). This estimates availability and connection stability, not
 absolute clock accuracy. Checking may take several minutes. Progress
-shows **Checked N of 130, M usable**; **Stop** keeps results already found
+shows **Checked N of 168, M usable**; **Stop** keeps results already found
 and reports the actual number checked instead of marking the search as complete.
 
 Each result shows a name and the IP address obtained during the check.
@@ -1038,12 +1122,12 @@ the app no longer changes the key. Upgrading from the old in-memory identity
 requires pairing once more. Clearing app data, reinstalling, revoked access or
 expired TV authorization can also require a new code. The pairing code is not
 saved to disk. Deadlines are 10 seconds for TCP, 15 seconds for TLS/read
-inactivity and 60 seconds for the overall pairing operation. App addresses
-currently support IPv4 only.
+inactivity and 60 seconds for the overall pairing operation. Connection addresses
+support IPv4 and IPv6.
 
 Change history: [2.6.1](release-notes/v2.6.1-en.md),
 [2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),
-[2.6.4](release-notes/v2.6.4-en.md), and [2.6.5 (prerelease)](release-notes/v2.6.5-en.md).
+[2.6.4](release-notes/v2.6.4-en.md), and [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5).
 
 #### 8. USB debugging
 
@@ -1071,6 +1155,46 @@ expand it for the rest.
 Empty rows are hidden: if the firmware does not answer one command, only that
 row disappears.
 
+#### 10. "Time settings, profiles and monitoring"
+
+After connecting, expand this section and select **Read settings and service
+evidence** to read the settings and available system time-service information.
+
+- **Original snapshot.** The first snapshot is saved automatically before a
+  managed NTP or timezone change, or you can save it manually. It contains
+  the original NTP, `auto_time`, `auto_time_zone` and timezone, is bound to
+  device identity and survives APK restarts. Later changes do not overwrite
+  it. Replacing and restoring require confirmation; restoration reports each
+  setting separately. Unavailable values or denied writes are reported without
+  claiming that the entire set was restored.
+- **Device profiles.** Enter a unique name and save the current settings.
+  Creating or deleting a profile does not change the device. Applying it
+  previews saved values, then checks identity and each written value after
+  confirmation. If applying fails, the app attempts to return to the state
+  before the operation. Continue using Favorite devices to connect; profiles
+  do not copy addresses or ADB trust.
+- **Fallback NTP servers.** Enter one address per line, without a scheme or
+  port. Android 14+ accepts up to four distinct domains or IPv4/IPv6 addresses;
+  before Android 14 only one address is allowed and a list is not written.
+  Android selects a working server
+  rather than averaging their readings. Firmware support varies; reading the
+  list back confirms storage, not an actual change of clock source.
+- **Time source.** The last NTP reply and historical clock-setting event are
+  shown separately when firmware exposes them. A cached reply or matching
+  clocks do not confirm the current system clock source.
+- **Monitoring.** Start and Stop control a session of up to 10 minutes or
+  20 attempts. Comparisons run every 30 seconds; busy-device attempts are
+  skipped. Leaving the app or disconnecting ends the session. No background
+  service is started and neither settings nor system clocks are changed.
+  A one-off clock comparison older than 30 seconds is marked stale.
+  Comparison requires a reachable custom NTP server. With a system source
+  whose address is unspecified, the app reports that no comparison was made.
+
+Profiles and snapshots stay on the controlling Android device. Resetting the
+target may change its identity; an old snapshot is not applied automatically
+to a new identity. Commands entered manually in the terminal do not create
+snapshots and are not undone by these controls.
+
 ### If the app misbehaves
 
 **Diagnostics** opens a local history of operations and errors. Returning preserves
@@ -1083,17 +1207,22 @@ combined **256 KiB** disk budget. It excludes pairing codes, keys, serial number
 entered addresses and raw ADB output. Details include operation stages, error codes,
 command names without user arguments, exit status, duration, recognized system
 responses, NTP metrics and time zone recovery results. Exception types and bounded
-stack frames are included without arbitrary messages. The same details are copied
-into the report. Nothing is sent automatically.
-**Copy report** explicitly copies the history to the clipboard; **Clear** requires
-confirmation. A storage failure is shown in Diagnostics without stopping device
-operations.
+stack frames are included without arbitrary messages.
+
+**Save anonymized report** opens the system document picker. The report contains
+the app version, API, connection type, settings and clock-check results,
+measurement age and brief event codes. Addresses, serial numbers, identifiers
+and their hashes, profile contents and raw command output are excluded.
+On a TV without a document picker, use **Copy report**. Nothing is sent
+automatically; copying requires an explicit action. **Clear** deletes the
+journal after confirmation. A storage failure is shown in Diagnostics without
+stopping device operations.
 
 ### What the app does not do
 
-Unlike the desktop version there is no subnet scanning, no batch update across
-several TVs, no terminal mode and no settings export. Use
-the desktop program for those.
+The APK does not scan entire subnets, update several TVs in a batch, or transfer
+application settings through JSON. Use the desktop program for those actions.
+Anonymized diagnostic exports and local time snapshots are available in the APK.
 
 ### TV Mode
 
@@ -1135,7 +1264,7 @@ not guarantee this: firmware, ports and permissions also matter.
 |---|---|
 | Windows | Windows 10/11; the current prebuilt executable is x86-64 |
 | Linux | The current x86-64 build is produced on Ubuntu 22.04 and needs compatible system libraries. Other architectures require a separate build |
-| macOS | The current prebuilt executable is arm64 for Apple Silicon; Intel Macs need a separate build |
+| macOS | Separate macOS 15 builds: arm64 for Apple Silicon and x86-64 for Intel |
 | Android: classic ADB or USB | Android 6.0+; the controller needs hardware host/OTG support for USB |
 | Android: TLS pairing | Android 10+ on the APK device; the target must offer Wireless debugging |
 
@@ -1154,8 +1283,8 @@ needs a port supporting USB device mode, not only a port for storage devices.
 *   Phone → SHIELD discovery is not yet confirmed: Android returns an empty
     USB list in the tested configuration. Better diagnostics do not establish
     that this hardware scenario has been fixed.
-*   CI is configured for Android 6–17 and Android TV / Google TV 11/14/16,
-    including a 16 KiB page-size image. See [Android CI runs](https://github.com/civisrom/android-tv-date-time/actions/workflows/android.yml)
+*   CI is configured for 19 profiles: Android 6–17, a tablet, and Android TV /
+    Google TV 11/14/16, including a 16 KiB page-size image. See [Android CI runs](https://github.com/civisrom/android-tv-date-time/actions/workflows/android.yml)
     for the result of a particular revision. APK checks cover the presence of
     ARMv7, ARM64, x86 and x86-64 libraries and native alignment. x86 emulators
     do not replace physical testing of modern ARM boxes, TVs, cables and USB roles.
@@ -1166,7 +1295,7 @@ connection method and the error text. In the APK, details are available through 
 
 ## Development checks
 
-On `dev`, CI builds desktop for Windows, Linux and macOS, checks the Python
+On `dev`, CI builds desktop for Windows, Linux and both macOS architectures, checks the Python
 package and native ADB, and runs tests. Android CI builds debug and unsigned
 release APKs, runs unit tests, Lint, and emulator UI tests. Release publication
 depends on Android and dependency checks for the same source revision.
@@ -1211,7 +1340,9 @@ The full list is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). In short:
     Terms explicitly exempt open source components from their restrictions, so
     redistribution follows Apache-2.0.
 *   **Most Python libraries** — Apache-2.0, BSD, MIT and PSF.
-    The different `python-zeroconf` license is described below.
+*   **certifi** — MPL-2.0; desktop builds include its root certificate bundle
+    for HTTPS verification. The license and source are listed in
+    [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 *   **`spake2-java`** — **GPL-3.0**, arrives with `kadb-android` and performs
     the code pairing. APK only; it is not part of the desktop builds.
 *   **`kadb-android`, AndroidX, Compose, Kotlin** — Apache-2.0,

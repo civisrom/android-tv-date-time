@@ -16,7 +16,7 @@ data class NtpConfiguration(val raw: String) {
             require(uri.scheme == "ntp" && uri.userInfo == null && uri.rawQuery == null && uri.rawFragment == null)
             require(uri.path.isNullOrEmpty())
             val host = requireNotNull(uri.host).removeSurrounding("[", "]")
-            require(isValidNtpServer(host) || ':' in host)
+            require(isValidNtpServer(host))
             val port = if (uri.port == -1) 123 else uri.port
             require(port in 1..65535)
             NtpEndpoint(host, port)

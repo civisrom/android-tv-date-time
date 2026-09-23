@@ -7,8 +7,10 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
+import psutil
 
 from src.android_time_fixer import AndroidTVTimeFixer, AndroidTVTimeFixerError
 
@@ -54,6 +56,58 @@ class TerminalSafetyTests(unittest.TestCase):
         )
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(fixer._process_command_output(process, timeout=10), (0, 'ok\n', 'warning'))
+
+    def test_exited_parent_with_inherited_pipes_does_not_block_the_deadline(self):
+        fixer = self.fixer()
+        with tempfile.TemporaryDirectory() as directory:
+            pid_file = Path(directory) / 'child.pid'
+            script = (
+                "import subprocess,sys; from pathlib import Path; "
+                "child=subprocess.Popen([sys.executable,'-c',"
+                "'import time; time.sleep(2); print(\"LATE_OUTPUT\")']); "
+                "Path(sys.argv[1]).write_text(str(child.pid))"
+            )
+            process = subprocess.Popen(
+                [sys.executable, '-c', script, str(pid_file)], stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, **fixer._popen_group_options(),
+            )
+            try:
+                started = time.monotonic()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(TimeoutError):
+                        fixer._process_command_output(process, timeout=.3)
+                self.assertLess(time.monotonic() - started, 1.5)
+                self.assertIsNotNone(process.poll())
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+                if pid_file.exists():
+                    try:
+                        child = psutil.Process(int(pid_file.read_text()))
+                        child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+
+    def test_timed_out_pipe_reader_does_not_print_into_the_next_prompt(self):
+        fixer = self.fixer()
+        script = (
+            "import subprocess,sys; subprocess.Popen([sys.executable,'-c',"
+            "'import time; time.sleep(.6); print(\"LATE_OUTPUT\")'])"
+        )
+        process = subprocess.Popen(
+            [sys.executable, '-c', script], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, **fixer._popen_group_options(),
+        )
+        output = io.StringIO()
+        # Windows не позволяет безопасно завершить потомка уже вышедшего
+        # родителя через taskkill. Проверяем подавление вывода независимо от ОС.
+        with mock.patch('src.android_time_fixer.os.killpg', create=True), \
+                contextlib.redirect_stdout(output):
+            with self.assertRaises(TimeoutError):
+                fixer._process_command_output(process, timeout=.2)
+            time.sleep(.7)
+        self.assertNotIn('LATE_OUTPUT', output.getvalue())
 
     def test_connect_reports_stderr_before_retrying_and_after_final_failure(self):
         fixer = self.fixer()

@@ -64,8 +64,19 @@ class TerminalCommandTest {
             assertTrue("Missing ADB reference: $name", commands.any { it == "adb $name" || it.startsWith("adb $name ") })
         }
         // Device-provided help is needed because Android versions and vendor firmware expose different shell tools.
-        listOf("cmd -l", "pm help", "am help", "toybox").forEach { name ->
+        listOf("cmd -l", "dumpsys -l", "pm help", "am help", "settings help", "toybox",
+            "toybox COMMAND --help", "cmd SERVICE help", "dumpsys SERVICE -h", "command -v COMMAND").forEach { name ->
             assertTrue("Missing device help: $name", commands.any { it.removePrefix("adb shell ") == name })
+        }
+    }
+
+    @Test fun `time diagnostics preserve UTC formatting and do not require a host adb command`() {
+        val commands = terminalCatalog.single { it.id == "time" }.examples.map { it.command }
+        listOf("date -u '+%Y-%m-%dT%H:%M:%SZ'", "date +%s", "dumpsys time_detector",
+            "dumpsys time_zone_detector", "dumpsys network_time_update_service",
+            "cmd time_detector help", "cmd time_zone_detector help").forEach { command ->
+            assertTrue("Missing time diagnostic: $command", command in commands)
+            assertEquals(TerminalCommand.Shell(command), parseTerminalCommand(command))
         }
     }
 

@@ -9,6 +9,7 @@ import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -62,7 +63,7 @@ class TerminalScreenTest {
     private var hideKeyboard: () -> Unit = {}
 
     private fun screen(mode: DeviceMode = DeviceMode.HANDHELD, busy: Boolean = false, scale: Float = 1f, width: Int = 360,
-        target: String = "192.0.2.1:5555", name: String = "NVIDIA SHIELD") {
+        target: String = "192.0.2.1:5555", name: String = "NVIDIA SHIELD", height: Int? = null) {
         compose.setContent {
             val context = LocalContext.current
             val baseConfig = LocalConfiguration.current
@@ -75,7 +76,8 @@ class TerminalScreenTest {
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 MaterialTheme { Surface {
                     val state by session.state.collectAsState()
-                    Box(Modifier.width(width.dp).fillMaxSize()) {
+                    Box(Modifier.width(width.dp).fillMaxSize()
+                        .then(if (height == null) Modifier else Modifier.requiredHeight(height.dp))) {
                         TerminalScreen(mode, state, target, busy, actions, { calls += "back" }, deviceName = name)
                     }
                 } }
@@ -83,6 +85,38 @@ class TerminalScreenTest {
         }
         // Native window focus arrives independently of Compose idleness on older Android.
         compose.waitUntil(5_000) { compose.runOnUiThread { compose.activity.window.decorView.hasWindowFocus() } }
+    }
+
+    @Test fun short_screen_at_double_font_keeps_console_actions_and_output_reachable() {
+        session.edit("echo visible")
+        session.start("192.0.2.1:5555")
+        session.append("visible output\n")
+        session.finish(0)
+        screen(scale = 2f, width = 320, height = 480)
+        val run = compose.onNodeWithTag("terminal-run")
+        if (!run.isDisplayed()) run.performScrollTo()
+        run.assertIsDisplayed().assertIsEnabled()
+        scroll("terminal-status").performScrollTo().assertIsDisplayed()
+        scroll("terminal-output-0").assertIsDisplayed()
+        if (!run.isDisplayed()) run.performScrollTo()
+        run.performClick()
+        assertEquals(listOf("run"), calls)
+    }
+
+    @Test fun short_TV_screen_brings_focused_run_and_stop_buttons_into_view() {
+        session.edit("logcat")
+        screen(mode = DeviceMode.TELEVISION, scale = 1.5f, width = 640, height = 360)
+        compose.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
+        fun activate(tag: String) {
+            val button = compose.onNodeWithTag(tag)
+            button.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+            compose.waitUntil(5_000) { button.isDisplayed() }
+            button.assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        }
+        activate("terminal-run")
+        compose.runOnIdle { session.start("TV") }
+        activate("terminal-stop")
+        assertEquals(listOf("run", "stop"), calls)
     }
 
     private fun scroll(tag: String): SemanticsNodeInteraction {

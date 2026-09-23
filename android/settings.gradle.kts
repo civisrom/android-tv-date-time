@@ -51,9 +51,12 @@ val buildDependencyFixes = mapOf(
     "org.apache.commons:commons-lang3:3.16.0" to "3.18.0", // CVE-2025-48924
     "org.apache.httpcomponents:httpclient:4.5.6" to "4.5.14", // CVE-2020-13956
     "org.bitbucket.b_c:jose4j:0.9.5" to "0.9.6", // CVE-2024-29371
-    "org.bouncycastle:bcprov-jdk18on:1.80.2" to "1.84", // CVE-2026-0636
-    "org.bouncycastle:bcpkix-jdk18on:1.80.2" to "1.84", // CVE-2026-5588
-    "org.bouncycastle:bcutil-jdk18on:1.80.2" to "1.84", // keep the BC modules aligned
+    "org.bouncycastle:bcprov-jdk18on:1.80.2" to "1.86", // CVE-2026-8763 / CVE-2026-13506
+    "org.bouncycastle:bcpkix-jdk18on:1.80.2" to "1.86", // CVE-2026-5588; keep BC aligned
+    "org.bouncycastle:bcutil-jdk18on:1.80.2" to "1.86", // keep the BC modules aligned
+    "org.bouncycastle:bcprov-jdk18on:1.84" to "1.86", // Kadb runtime; CVE-2026-8763 / CVE-2026-13506
+    "org.bouncycastle:bcpkix-jdk18on:1.84" to "1.86", // keep the BC modules aligned
+    "org.bouncycastle:bcutil-jdk18on:1.84" to "1.86", // keep the BC modules aligned
     "org.jdom:jdom2:2.0.6" to "2.0.6.1", // CVE-2021-33813
 )
 gradle.beforeProject {

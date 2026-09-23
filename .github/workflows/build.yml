@@ -48,8 +48,13 @@ jobs:
             adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
             adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
             adb_base: "adb"
-          - os: macos-latest
+          - os: macos-15
             platform: macOS
+            adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
+            adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
+            adb_base: "adb"
+          - os: macos-15-intel
+            platform: macOS-Intel
             adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
             adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
             adb_base: "adb"
@@ -80,10 +85,10 @@ jobs:
             .venv
             ~/AppData/Local/pypoetry/Cache
             ~/.cache/pypoetry
-          key: poetry-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
+          key: poetry-${{ runner.os }}-${{ runner.arch }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
           restore-keys: |
-            poetry-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
-            poetry-${{ runner.os }}-
+            poetry-${{ runner.os }}-${{ runner.arch }}-py${{ env.PYTHON_VERSION }}-
+            poetry-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install Poetry
         run: python -m pip install "poetry==${{ env.POETRY_VERSION }}"
@@ -138,7 +143,7 @@ jobs:
         run: |
           poetry check --lock
           poetry run python -m py_compile src/android_time_fixer.py locales.py scripts/hooks/linux_hook.py scripts/hooks/macos_hook.py scripts/hooks/win_hook.py scripts/generate_icon.py
-          poetry run flake8 --select=F src/android_time_fixer.py locales.py scripts tests
+          poetry run flake8 --select=F src locales.py scripts tests
           poetry run python -m unittest discover -s tests -v
         shell: bash
 
@@ -158,6 +163,9 @@ jobs:
           else
             ./dist/${{ env.APP_NAME }} --version
             poetry run python scripts/smoke_desktop.py ./dist/${{ env.APP_NAME }}
+          fi
+          if [[ "${{ runner.os }}" == macOS ]]; then
+            test "$(lipo -archs ./dist/${{ env.APP_NAME }})" = "$(uname -m)"
           fi
         shell: bash
 
@@ -346,9 +354,15 @@ jobs:
           DEFAULT_PRERELEASE: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           BODY="$RUNNER_TEMP/release-notes.md"
+          COMPLETE="release-notes/$RELEASE_TAG.md"
           RU="release-notes/$RELEASE_TAG-ru.md"
           EN="release-notes/$RELEASE_TAG-en.md"
-          if [[ -f "$RU" && -f "$EN" ]]; then
+          if [[ -f "$COMPLETE" ]]; then
+            # A replacement release can preserve its existing description
+            # and append new notes in one reviewed, complete document.
+            echo "prepared=true" >> "$GITHUB_OUTPUT"
+            cp "$COMPLETE" "$BODY"
+          elif [[ -f "$RU" && -f "$EN" ]]; then
             echo "prepared=true" >> "$GITHUB_OUTPUT"
             cat "$RU" > "$BODY"
             printf '\n\n---\n\n' >> "$BODY"
@@ -358,9 +372,11 @@ jobs:
               '**Приложение для Android работает в тестовом режиме.**' \
               '**The Android app operates in test mode.**' > "$BODY"
           fi
-          printf '\n\n%s\n\n%s\n' \
-            'APK: GPL-3.0 (LICENSE-GPL-3.0.txt); исходный код проекта и desktop: Apache-2.0.' \
-            'APK: GPL-3.0 (LICENSE-GPL-3.0.txt); project sources and desktop: Apache-2.0.' >> "$BODY"
+          if [[ ! -f "$COMPLETE" ]]; then
+            printf '\n\n%s\n\n%s\n' \
+              'APK: GPL-3.0 (LICENSE-GPL-3.0.txt); исходный код проекта и desktop: Apache-2.0.' \
+              'APK: GPL-3.0 (LICENSE-GPL-3.0.txt); project sources and desktop: Apache-2.0.' >> "$BODY"
+          fi
           PRERELEASE="$DEFAULT_PRERELEASE"
           METADATA="release-notes/$RELEASE_TAG.json"
           if [[ -f "$METADATA" ]]; then

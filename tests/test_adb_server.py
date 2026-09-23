@@ -98,3 +98,47 @@ class AdbServerTests(unittest.TestCase):
     def test_standard_android_studio_port_is_rejected(self):
         with self.assertRaises(ValueError):
             ADBServerLease('adb-test', {'ANDROID_ADB_SERVER_PORT': '5037'})
+
+    def test_failed_registration_stops_the_new_server(self):
+        with tempfile.TemporaryDirectory() as root:
+            lease = self.lease(root)
+            try:
+                with mock.patch.object(lease, '_save', side_effect=OSError('disk full')):
+                    with self.assertRaises(OSError):
+                        self.start(lease)
+                self.assertFalse(lease.registered)
+                self.assertIsNotNone(lease.child.poll())
+                self.assertFalse(lease._listening())
+            finally:
+                if lease.child is not None and lease.child.poll() is None:
+                    lease.child.terminate()
+                    lease.child.wait(timeout=5)
+
+    def test_failed_registration_does_not_stop_an_existing_server(self):
+        with tempfile.TemporaryDirectory() as root:
+            first = self.lease(root)
+            self.start(first)
+            second = ADBServerLease('adb-test', first.env, root)
+            try:
+                with mock.patch.object(second, '_save', side_effect=OSError('disk full')):
+                    with self.assertRaises(OSError):
+                        second.ensure()
+                self.assertTrue(first._listening())
+                self.assertIsNone(first.child.poll())
+            finally:
+                first.release()
+                first.child.wait(timeout=5)
+
+    def test_cancelling_server_start_does_not_leave_an_unregistered_child(self):
+        with tempfile.TemporaryDirectory() as root:
+            lease = self.lease(root)
+            try:
+                with mock.patch.object(lease, '_listening', side_effect=[False, KeyboardInterrupt]):
+                    with self.assertRaises(KeyboardInterrupt):
+                        self.start(lease)
+                self.assertIsNotNone(lease.child.poll())
+                self.assertFalse(lease.registered)
+            finally:
+                if lease.child is not None and lease.child.poll() is None:
+                    lease.child.terminate()
+                    lease.child.wait(timeout=5)

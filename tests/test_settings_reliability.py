@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -41,6 +42,16 @@ class SettingsReliabilityTests(unittest.TestCase):
                     fixer.connect_or_reuse(address)
                 fixer.connect.assert_not_called()
 
+    def test_ipv4_leading_zeroes_cannot_redirect_a_device_or_ntp_request(self):
+        for address in ('010.0.0.1', '192.168.010.005', '127.0.0.01'):
+            with self.subTest(address=address):
+                self.assertFalse(AndroidTVTimeFixer.validate_ip(address))
+                self.assertFalse(AndroidTVTimeFixer.validate_ip(address + ':5555'))
+                self.assertFalse(AndroidTVTimeFixer.validate_ntp_server(address))
+        for address in ('10.0.0.1', '192.168.10.5', '127.0.0.1'):
+            self.assertTrue(AndroidTVTimeFixer.validate_ip(address))
+            self.assertTrue(AndroidTVTimeFixer.validate_ntp_server(address))
+
     def test_remove_favorite_preserves_order_when_actual_save_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             fixer = self.fixer(directory)
@@ -80,6 +91,15 @@ class SettingsReliabilityTests(unittest.TestCase):
                 self.assertEqual(fixer.scan_port, 5556)
             finally:
                 locales.current_language = original_language
+
+    def test_exported_home_relative_path_can_be_imported_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()), \
+                mock.patch.dict(os.environ, {'HOME': directory, 'USERPROFILE': directory}):
+            fixer = self.fixer(directory)
+            fixer.export_settings('~/backup.json')
+            fixer.saved_servers = {'favorite_servers': [], 'custom_servers': []}
+            fixer.import_settings('~/backup.json')
+            self.assertEqual(fixer.saved_servers['favorite_servers'], ['time.google.com', 'pool.ntp.org'])
 
     def test_import_rejects_oversized_or_unknown_backup_without_writing(self):
         for payload in [' ' * (1024 * 1024 + 1), '{"version":"999"}', '{"scan_port":true}', '{"adb_server_port":5037}']:

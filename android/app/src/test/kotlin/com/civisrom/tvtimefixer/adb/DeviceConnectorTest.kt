@@ -64,6 +64,21 @@ private class FakeFactory(
 }
 
 class DeviceConnectorTest {
+    @Test fun `closed client ownership distinguishes late cancellation from a newer connection`() {
+        val factory = FakeFactory()
+        val connector = DeviceConnector(factory)
+        connector.connect("192.0.2.1:5555")
+        val first = factory.clients.single()
+        first.close()
+        assertNull(connector.activeClient)
+        assertTrue(connector.ownsClient(first))
+        connector.connect("192.0.2.2:5555")
+        assertFalse(connector.ownsClient(first))
+        assertTrue(connector.ownsClient(factory.clients.last()))
+        connector.disconnect()
+        assertFalse(connector.ownsClient(factory.clients.last()))
+    }
+
     @Test fun `successful pairing waits for the device to accept its newly saved key`() = runBlocking {
         val client = FakeClient()
         var attempts = 0
@@ -206,7 +221,8 @@ class DeviceConnectorTest {
     }
 
     @Test fun `pairing requires explicit ports for both endpoints`() = runBlocking {
-        for ((pairing, connect) in listOf("192.0.2.1" to "192.0.2.1:40002", "192.0.2.1:40001" to "192.0.2.1")) {
+        for ((pairing, connect) in listOf("192.0.2.1" to "192.0.2.1:40002", "192.0.2.1:40001" to "192.0.2.1",
+            "::1" to "[::1]:40002", "[::1]:40001" to "::1", "[::1]" to "[::1]:40002")) {
             val factory = FakeFactory()
             val result = DeviceConnector(factory).pairAndConnect(pairing, "123456", connect)
             assertEquals(ConnectionError.INVALID_ADDRESS, (result as ConnectionState.Failed).reason)

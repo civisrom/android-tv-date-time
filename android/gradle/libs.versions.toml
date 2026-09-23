@@ -45,7 +45,7 @@ hidden-api-bypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", ve
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 spake2 = { module = "com.github.Flyfish233:spake2-java", version = "1.1.1" }
-bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version = "1.84" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version = "1.86" }
 conscrypt-fixture = { module = "org.conscrypt:conscrypt-openjdk-uber", version = "2.5.2" }
 
 [plugins]

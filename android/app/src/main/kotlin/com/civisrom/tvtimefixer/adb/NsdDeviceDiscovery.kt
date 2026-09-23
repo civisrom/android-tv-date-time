@@ -290,17 +290,18 @@ class NsdDeviceDiscovery(context: Context, private val resolveTimeoutMs: Long = 
     // ── Состояние ────────────────────────────────────────────────────────
 
     private fun remember(info: NsdServiceInfo, kind: DiscoveredDevice.Kind, epoch: Long, key: String, token: Any) {
-        val host = hostOf(info) ?: return
+        val host = hostOf(info)
         val port = info.port
-        if (port !in 1..65535) return
-        val device = DiscoveredDevice(
+        val device = if (host == null || port !in 1..65535) null else DiscoveredDevice(
             name = info.serviceName.orEmpty().ifBlank { host },
             address = DeviceAddress(host, port),
             kind = kind,
         )
         synchronized(lock) {
             if (!active(epoch) || services[key] !== token) return
-            devices[key] = device
+            // A continuous API 34 update can withdraw addresses or the service port.
+            // Keep the subscription for recovery, but never offer its old endpoint.
+            if (device == null) devices.remove(key) else devices[key] = device
         }
         publish()
     }
@@ -324,7 +325,7 @@ class NsdDeviceDiscovery(context: Context, private val resolveTimeoutMs: Long = 
 
         fun keyOf(name: String?, kind: DiscoveredDevice.Kind) = kind.name + "|" + name.orEmpty()
 
-        /** The address input/parser currently supports IPv4 only, unlike ADB itself. */
+        /** Prefer IPv4 when available; IPv6-only services remain connectable. */
         @SuppressLint("NewApi")
         fun hostOf(info: NsdServiceInfo): String? {
             val addresses: List<InetAddress> =
@@ -334,7 +335,9 @@ class NsdDeviceDiscovery(context: Context, private val resolveTimeoutMs: Long = 
                     @Suppress("DEPRECATION")
                     listOfNotNull(info.host)
                 }
-            return addresses.firstOrNull { it is Inet4Address }?.hostAddress
+            return addresses.sortedBy { it !is Inet4Address }.firstOrNull {
+                !it.isAnyLocalAddress && !it.isMulticastAddress
+            }?.hostAddress
         }
     }
 }

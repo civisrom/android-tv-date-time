@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import os
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 # Определяем базовый путь проекта
 BASEPATH = os.path.dirname(os.path.abspath('pyinstaller.spec'))
@@ -13,7 +13,7 @@ SRC_PATH = os.path.join(BASEPATH, 'src')
 # Добавляем src в PYTHONPATH
 sys.path.insert(0, SRC_PATH)
 
-datas = []
+datas = copy_metadata('certifi')
 binaries = []
 hiddenimports = [
     'logging',
@@ -131,9 +131,6 @@ a = Analysis(
         'pytest',
         'pip',
         'pkg_resources',
-        'email',
-        'html',
-        'http',
         'xmlrpc',
         'PyQt5',
         'PyQt6',

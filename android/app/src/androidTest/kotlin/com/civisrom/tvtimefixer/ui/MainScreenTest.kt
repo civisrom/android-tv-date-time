@@ -92,7 +92,18 @@ import org.junit.Test
 import org.junit.BeforeClass
 import org.junit.AfterClass
 
-private class ScreenActions : AppActions {
+internal class ScreenActions : AppActions {
+    override fun refreshTimeTools() {}
+    override fun saveTimeSnapshot(replace: Boolean) {}
+    override fun restoreTimeSnapshot() {}
+    override fun saveTimeProfile(name: String) {}
+    override fun applyTimeProfile(name: String) {}
+    override fun removeTimeProfile(name: String) {}
+    override fun applyNtpList(hosts: List<String>) {}
+    override fun startClockMonitor() {}
+    override fun stopClockMonitor() {}
+    override fun exportDiagnostics() {}
+    override fun copyDiagnostics() {}
     val calls = mutableListOf<String>()
     var onScan: () -> Unit = {}
     var onClearScan: () -> Unit = {}
@@ -348,7 +359,7 @@ class MainScreenTest {
         assertTrue(actions.calls.isEmpty())
     }
 
-    @Test fun expanded_diagnostics_and_report_include_technical_failure_details() {
+    @Test fun expanded_diagnostics_show_details_but_export_uses_only_categories() {
         val details = "shell=cmd alarm set-timezone <zone>; exit=1; error=permission_denied\n" +
             "timezone.failure=WRITE; restoration=RESTORED"
         val event = DiagnosticEvent(92, 1_800_000_000_000, Operation.APPLY_TIME_ZONE, Outcome.FAILED,
@@ -362,7 +373,8 @@ class MainScreenTest {
             .assertTextContains("error=permission_denied", substring = true)
             .assertTextContains("restoration=RESTORED", substring = true)
         val report = diagnosticReport(context, history, DeviceMode.HANDHELD)
-        assertTrue(report.contains(details))
+        assertFalse(report.contains(details))
+        assertTrue(report.contains("issue=TIME_ZONE_WRITE_FAILED"))
         assertTrue(report.contains("operation=APPLY_TIME_ZONE"))
         screenshot("technical-diagnostics")
     }
@@ -853,7 +865,7 @@ class MainScreenTest {
             .performScrollTo().assertIsDisplayed()
         val report = diagnosticReport(context, history, DeviceMode.HANDHELD)
         assertFalse(report.contains(context.getString(com.civisrom.tvtimefixer.R.string.diagnostics_success)))
-        assertTrue(report.contains(context.getString(com.civisrom.tvtimefixer.R.string.diagnostics_usb_none)))
+        assertTrue(report.contains("issue=USB_NONE"))
         assertTrue(actions.calls.isEmpty())
     }
 

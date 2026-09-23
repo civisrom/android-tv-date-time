@@ -92,6 +92,33 @@ class ReliabilityTests(unittest.TestCase):
             if os.name != 'nt':
                 self.assertEqual(target.stat().st_mode & 0o777, 0o600)
 
+    def test_portable_time_data_migration_keeps_snapshots_and_existing_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
+            fixer.current_path, fixer.data_dir = root / 'portable', root / 'user'
+            fixer.keys_folder = fixer.data_dir / 'keys'
+            fixer.current_path.mkdir()
+            fixer.data_dir.mkdir()
+            source = fixer.current_path / 'time-snapshots'
+            source.mkdir()
+            (source / ('a' * 64 + '.json')).write_text('old baseline')
+            (source / ('b' * 64 + '.json')).write_text('second baseline')
+            (source / 'unrelated.json').write_text('skip')
+            destination = fixer.data_dir / 'time-snapshots'
+            destination.mkdir()
+            (destination / ('a' * 64 + '.json')).write_text('new baseline')
+            (fixer.current_path / 'time-profiles.json').write_text('old profiles')
+            (fixer.data_dir / 'time-profiles.json').write_text('new profiles')
+            fixer._migrate_legacy_data()
+            self.assertEqual('new profiles', (fixer.data_dir / 'time-profiles.json').read_text())
+            self.assertEqual('new baseline', (destination / ('a' * 64 + '.json')).read_text())
+            self.assertEqual('second baseline', (destination / ('b' * 64 + '.json')).read_text())
+            self.assertFalse((destination / 'unrelated.json').exists())
+            (fixer.data_dir / 'time-profiles.json').unlink()
+            fixer._migrate_legacy_data()
+            self.assertEqual('old profiles', (fixer.data_dir / 'time-profiles.json').read_text())
+
     def test_generated_private_key_is_user_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
@@ -195,13 +222,26 @@ class ReliabilityTests(unittest.TestCase):
             self.assertIs(fixer.saved_servers, previous_servers)
 
     def test_ntp_confirmation_requires_exact_value(self) -> None:
+        from tests.test_device_time_settings import TimeDevice
+
+        class NoWriteDevice(TimeDevice):
+            def shell(self, command):
+                if command.startswith('settings put global ntp_server'):
+                    self.commands.append(command)
+                    return '\n__TVTF_EXIT__0\n'
+                return super().shell(command)
+
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
-        fixer.device = _FakeDevice('old.time.google.com')
+        fixer.device = NoWriteDevice('29')
+        fixer.device.globals['ntp_server'] = 'old.time.google.com'
         fixer.logger = logging.getLogger('test')
         fixer.verify_ntp_server = lambda server: True
 
-        with self.assertRaises(AndroidTVTimeFixerError):
-            fixer.set_ntp_server('time.google.com')
+        with tempfile.TemporaryDirectory() as directory:
+            fixer.data_dir = Path(directory)
+            with self.assertRaises(AndroidTVTimeFixerError):
+                fixer.set_ntp_server('time.google.com')
+        self.assertTrue(any(command.startswith('settings put global ntp_server') for command in fixer.device.commands))
 
     def test_invalid_server_never_enters_favorites(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
@@ -273,24 +313,20 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(fixer.process_manager.device_ip, '192.168.1.20:5555')
 
     def test_batch_reports_authorization_prompt_per_device(self) -> None:
+        from tests.test_device_time_settings import TimeDevice
         created = []
 
-        class _PromptingDevice:
+        class _PromptingDevice(TimeDevice):
             def __init__(self, host, port, default_transport_timeout_s=None):
+                super().__init__('29')
                 self.host = host
                 self.closed = False
-                self.ntp = ''
+                self.android_id = f'{int(host.rsplit(".", 1)[1]):016x}'
                 created.append(self)
 
             def connect(self, rsa_keys, auth_timeout_s, auth_callback):
                 auth_callback(self)
                 return True
-
-            def shell(self, command):
-                if command.startswith('settings put global ntp_server'):
-                    self.ntp = command.rsplit(' ', 1)[1]
-                    return ''
-                return self.ntp
 
             def close(self):
                 self.closed = True
@@ -305,15 +341,19 @@ class ReliabilityTests(unittest.TestCase):
         fixer.verify_ntp_server = lambda server: True
 
         output = io.StringIO()
-        with mock.patch('src.android_time_fixer.AdbDeviceTcp', _PromptingDevice), \
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch('src.android_time_fixer.AdbDeviceTcp', _PromptingDevice), \
                 mock.patch('src.android_time_fixer.PythonRSASigner', lambda pub, priv: object()), \
                 contextlib.redirect_stdout(output):
+            fixer.data_dir = Path(directory)
             fixer.batch_set_ntp('time.google.com', ['192.168.1.20', '192.168.1.21'])
+            self.assertEqual(2, len(list(Path(directory).rglob('*.json'))))
 
         printed = output.getvalue()
         # Подсказка печатается для каждого устройства и содержит его адрес
         for ip in ('192.168.1.20', '192.168.1.21'):
             self.assertIn(locales.get('batch_prompt_sent', ip=ip), printed)
+            self.assertIn(locales.get('batch_success', ip=ip, server='time.google.com'), printed)
         self.assertEqual(len(created), 2)
         self.assertTrue(all(device.closed for device in created))
 

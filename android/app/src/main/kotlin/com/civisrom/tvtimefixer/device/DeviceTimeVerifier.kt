@@ -17,7 +17,11 @@ data class DeviceTimeCheck(
     val uncertaintySeconds: Double? = null,
     val automaticTime: Boolean? = null,
     val timeZoneId: String? = null,
-)
+    val observedAtElapsedMillis: Long? = null,
+) {
+    fun ageMillis(now: Long): Long? = observedAtElapsedMillis?.let { (now - it).takeIf { age -> age >= 0 } }
+    fun isFresh(now: Long): Boolean = ageMillis(now)?.let { it <= 30_000L } == true
+}
 
 /** Только чтение через ADB и один NTP-запрос. Вызывается на Dispatchers.IO. */
 class DeviceTimeVerifier(
@@ -25,6 +29,11 @@ class DeviceTimeVerifier(
     private val elapsedRealtime: () -> Long,
 ) {
     fun verify(client: AdbClient, referenceOverride: String? = null, onFailure: (Exception) -> Unit = {}): DeviceTimeCheck {
+        val result = verifyInternal(client, referenceOverride, onFailure)
+        return if (result.observedAtElapsedMillis == null) result.copy(observedAtElapsedMillis = elapsedRealtime()) else result
+    }
+
+    private fun verifyInternal(client: AdbClient, referenceOverride: String?, onFailure: (Exception) -> Unit): DeviceTimeCheck {
         val server = read(client, "settings get global ntp_server")
             ?: return DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
         val automatic = when (read(client, "settings get global auto_time")) {
@@ -41,7 +50,8 @@ class DeviceTimeVerifier(
         for (endpoint in config.endpoints.take(4)) {
             try {
                 network = query.query(endpoint.host, endpoint.port)
-                result = result.copy(server = if (endpoint.port == 123) endpoint.host else "${endpoint.host}:${endpoint.port}")
+                val host = if (':' in endpoint.host) "[${endpoint.host}]" else endpoint.host
+                result = result.copy(server = if (endpoint.port == 123) endpoint.host else "$host:${endpoint.port}")
                 break
             } catch (e: CancellationException) { throw e }
             catch (e: InterruptedException) { throw CancellationException("Clock check cancelled", e) }
@@ -61,7 +71,7 @@ class DeviceTimeVerifier(
         // Читаем пояс после замера: длительность этой команды не относится к date +%s.
         // Неизвестный ID нельзя молча подменять GMT, как делает TimeZone.getTimeZone().
         val zone = read(client, "getprop persist.sys.timezone")?.takeIf { it in TimeZone.getAvailableIDs() }
-        val measured = result.copy(deviceTimeMillis = seconds * 1000L, timeZoneId = zone)
+        val measured = result.copy(deviceTimeMillis = seconds * 1000L, timeZoneId = zone, observedAtElapsedMillis = finished)
         if (reference <= 0 || network.rttMs < 0 || started < referenceElapsed || finished < started ||
             finished - referenceElapsed > 30_000L) {
             return measured.copy(status = DeviceTimeStatus.UNCERTAIN)

@@ -9,6 +9,17 @@ import org.junit.Test
 class FavoritesTest {
     private val device = FavoriteDevice("Гостиная", DeviceAddress("192.0.2.4", 37123), "serial-1", "TV")
 
+    @Test fun ipv6_addresses_and_scopes_survive_persistence() {
+        val folder = Files.createTempDirectory("favorites-ipv6").toFile()
+        try {
+            val store = FavoritesStore(File(folder, "favorites.bin"))
+            val expected = Favorites(listOf(device.copy(address = DeviceAddress("fe80::1%wlan0", 37105))),
+                listOf(FavoriteNtp("IPv6 NTP", "2001:db8::123")))
+            store.write(expected)
+            assertEquals(expected, store.read())
+        } finally { folder.deleteRecursively() }
+    }
+
     @Test fun persistence_keeps_names_ports_and_identity_across_restarts() {
         val folder = Files.createTempDirectory("favorites-test").toFile()
         try {

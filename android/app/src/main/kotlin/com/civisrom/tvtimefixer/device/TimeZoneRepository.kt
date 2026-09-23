@@ -10,6 +10,10 @@ val availableTimeZoneIds: Set<String> by lazy { TimeZone.getAvailableIDs().toSet
 fun isValidTimeZoneId(value: String): Boolean =
     value in availableTimeZoneIds && value.matches(Regex("[A-Za-z0-9_+./-]+"))
 
+// A captured target may know newer zone IDs than this Android controller. The target must confirm the write.
+internal fun isSafeCapturedTimeZone(value: String): Boolean = value.length in 1..128 &&
+    value !in setOf("null", "unknown") && value.matches(Regex("[A-Za-z][A-Za-z0-9_+./:-]*"))
+
 enum class TimeZoneFailure { INVALID_ZONE, UNSUPPORTED, READ_STATE, AUTO_MODE, WRITE }
 enum class TimeZoneRestoration { NOT_NEEDED, RESTORED, UNCONFIRMED }
 
@@ -35,9 +39,15 @@ class TimeZoneRepository(
     }
     private data class Snapshot(val zone: String, val auto: AutoMode)
 
-    fun setTimeZone(input: String): TimeZoneUpdateResult {
+    fun setTimeZone(input: String): TimeZoneUpdateResult = updateTimeZone(input, false)
+
+    fun restoreTimeZone(captured: String): TimeZoneUpdateResult = updateTimeZone(captured, true)
+
+    private fun updateTimeZone(input: String, captured: Boolean): TimeZoneUpdateResult {
         val zone = input.trim()
-        if (!isValidTimeZoneId(zone)) return TimeZoneUpdateResult.Failed(TimeZoneFailure.INVALID_ZONE)
+        if (!(if (captured) isSafeCapturedTimeZone(zone) else isValidTimeZoneId(zone))) {
+            return TimeZoneUpdateResult.Failed(TimeZoneFailure.INVALID_ZONE)
+        }
         var before: Snapshot? = null
         var autoAttempted = false
         var zoneAttempted = false
@@ -55,7 +65,7 @@ class TimeZoneRepository(
             if (sdk <= 0) throw IOException("Unknown target API")
             val auto = readAutoMode(sdk)
                 ?: return TimeZoneUpdateResult.Failed(TimeZoneFailure.UNSUPPORTED)
-            before = Snapshot(readZone(), auto)
+            before = Snapshot(readZone(captured), auto)
             if (!auto.manual) {
                 reason = TimeZoneFailure.AUTO_MODE
                 autoAttempted = true
@@ -65,7 +75,7 @@ class TimeZoneRepository(
             reason = TimeZoneFailure.WRITE
             zoneAttempted = true
             writeZone(zone)
-            checkEventually { readZone() == zone && (auto.kind == AutoKind.UNSUPPORTED ||
+            checkEventually { readZone(captured) == zone && (auto.kind == AutoKind.UNSUPPORTED ||
                 readAutoValue(auto.kind) == auto.disabledValue) }
             return TimeZoneUpdateResult.Applied(zone)
         } catch (error: Exception) {
@@ -77,14 +87,14 @@ class TimeZoneRepository(
                 if (zoneAttempted) runCatching { writeZone(snapshot.zone) }
                 if (autoAttempted) runCatching { writeAuto(snapshot.auto, snapshot.auto.value) }
                 val restored = runCatching {
-                    checkEventually { readZone() == snapshot.zone &&
+                    checkEventually { readZone(captured) == snapshot.zone &&
                         readAutoValue(snapshot.auto.kind) == snapshot.auto.value }
                 }.isSuccess
                 if (restored) TimeZoneRestoration.RESTORED else TimeZoneRestoration.UNCONFIRMED
             }
             if (error is CancellationException) throw error
             return TimeZoneUpdateResult.Failed(reason, restoration,
-                if (snapshot == null) null else runCatching { readZone() }.getOrNull())
+                if (snapshot == null) null else runCatching { readZone(captured) }.getOrNull())
         }
     }
 
@@ -126,13 +136,13 @@ class TimeZoneRepository(
         else -> throw IOException("Unknown service response")
     }
 
-    private fun readZone(): String = read("getprop persist.sys.timezone").also {
-        if (!isValidTimeZoneId(it)) throw IOException("Unknown target time zone")
+    private fun readZone(captured: Boolean = false): String = read("getprop persist.sys.timezone").also {
+        if (!(if (captured) isSafeCapturedTimeZone(it) else isValidTimeZoneId(it))) throw IOException("Unknown target time zone")
     }
 
     private fun writeZone(zone: String) {
         // Значение из проверенного справочника, включая восстановление старого пояса.
-        require(isValidTimeZoneId(zone))
+        require(isSafeCapturedTimeZone(zone))
         read("cmd alarm set-timezone '$zone'")
     }
 

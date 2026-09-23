@@ -21,6 +21,63 @@ class Locales:
 
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
+            "network_check_progress": Translation(
+                en="Checking the network and Internet access (up to 4 seconds)...",
+                ru="Проверка сети и доступа в интернет (до 4 секунд)...",
+            ),
+            "network_check_result": Translation(
+                en="Network check", ru="Проверка сети",
+            ),
+            "network_check_local": Translation(
+                en="Local network: {status}.", ru="Локальная сеть: {status}.",
+            ),
+            "network_interface_found": Translation(
+                en="network connection detected", ru="сетевое подключение обнаружено",
+            ),
+            "network_interface_missing": Translation(
+                en="no active network address found", ru="активный сетевой адрес не найден",
+            ),
+            "network_interface_unknown": Translation(
+                en="could not check network interfaces", ru="не удалось проверить сетевые интерфейсы",
+            ),
+            "network_check_internet": Translation(
+                en="Internet (HTTPS): {status} ({https_ok}/2).",
+                ru="Интернет (HTTPS): {status} ({https_ok}/2).",
+            ),
+            "network_check_ntp": Translation(
+                en="NTP (UDP/123): {status} ({ntp_ok}/2).",
+                ru="NTP (UDP/123): {status} ({ntp_ok}/2).",
+            ),
+            "network_confirmed": Translation(en="confirmed", ru="доступ подтверждён"),
+            "network_unconfirmed": Translation(en="not confirmed", ru="доступ не подтверждён"),
+            "network_check_target": Translation(
+                en="Last device {address}: {status}.", ru="Последнее устройство {address}: {status}.",
+            ),
+            "network_port_available": Translation(en="TCP port reachable", ru="TCP-порт доступен"),
+            "network_check_no_target": Translation(
+                en="Device access is checked when connecting.",
+                ru="Доступ к устройству проверяется при подключении.",
+            ),
+            "network_check_ok": Translation(
+                en="Internet access or an open TCP port does not confirm an authorized ADB connection.",
+                ru="Доступ в интернет или открытый TCP-порт не подтверждает авторизованное подключение ADB.",
+            ),
+            "network_check_ntp_blocked": Translation(
+                en="Internet access works, but NTP did not respond. Check UDP/123 access in the network, VPN and firewall. Device access is checked separately.",
+                ru="Интернет доступен, но NTP не ответил. Проверьте доступ по UDP/123 в сети, VPN и фаерволе. Доступ к устройству проверяется отдельно.",
+            ),
+            "network_check_https_failed": Translation(
+                en="NTP responds, but HTTPS access could not be confirmed. Check VPN or proxy settings, the computer clock and firewall permissions for Android TV Time Fixer.",
+                ru="NTP отвечает, но HTTPS-доступ не подтверждён. Проверьте VPN или прокси, часы компьютера и разрешения Android TV Time Fixer в фаерволе.",
+            ),
+            "network_check_failed": Translation(
+                en="Internet access could not be checked. Check the network connection, VPN or proxy settings and allow Android TV Time Fixer network access in the firewall. Local ADB and USB can still work.",
+                ru="Не удалось проверить доступ к интернету. Проверьте подключение к сети, настройки VPN или прокси и разрешите Android TV Time Fixer доступ к сети в фаерволе. Локальный ADB и USB могут продолжать работать.",
+            ),
+            "network_check_target_failed": Translation(
+                en="Could not connect to the device port. Check its address and ADB port, enabled debugging, Wi-Fi client isolation and firewall permissions for Android TV Time Fixer and adb.",
+                ru="Не удалось подключиться к порту устройства. Проверьте адрес и порт ADB, включённую отладку, изоляцию устройств в Wi-Fi и разрешения фаервола для Android TV Time Fixer и adb.",
+            ),
             "terminal_output_truncated": Translation(
                 en="Only the final part of the command output is retained.",
                 ru="Сохранена заключительная часть вывода команды.",
@@ -121,8 +178,8 @@ arising from the use of this program.
                 ru="4. Сделайте перезагрузку вашего ТВ или Nvidia Shield перед использованием программы."
             ),
             "firewall_notice": Translation(
-                en="5. Allow this program through your firewall when prompted (required for network scanning and ADB connections).",
-                ru="5. Разрешите программу в файрволле (брандмауэре) при появлении запроса (необходимо для сканирования сети и ADB-подключений)."
+                en="5. Allow this program and its bundled adb to access your local network through the firewall when prompted.",
+                ru="5. При запросе брандмауэра разрешите программе и встроенному adb доступ к локальной сети."
             ),
             "press_enter_to_continue": Translation(
                 en="\nPress Enter to continue...",
@@ -204,8 +261,8 @@ arising from the use of this program.
                 ru="Проверка доступности порта {port} на {ip}..."
             ),
             "port_not_available": Translation(
-                en="Port {port} is not available on {ip}. The device may be off, ADB is not enabled, or the port is incorrect.",
-                ru="Порт {port} недоступен на {ip}. Устройство может быть выключено, ADB не включён или порт указан неверно."
+                en="Port {port} is not available on {ip}. Check the address and ADB connection port, whether the device and debugging are enabled, and whether both devices are on the same local network. Check guest Wi-Fi/client isolation and firewall permissions for this program and its bundled adb. An unavailable port alone does not prove firewall blocking.",
+                ru="Порт {port} недоступен на {ip}. Проверьте адрес и порт подключения ADB, включены ли устройство и отладка, находятся ли оба устройства в одной локальной сети. Проверьте гостевой Wi-Fi, изоляцию клиентов и разрешения брандмауэра для программы и встроенного adb. Недоступность порта сама по себе не доказывает блокировку брандмауэром."
             ),
             "enter_scan_port": Translation(
                 en="ADB port to scan (Enter for {default}, 'q' to cancel): ",
@@ -340,14 +397,12 @@ arising from the use of this program.
                 "1. ADB debugging is enabled on your TV\n"
                 "2. Your TV and PC are on the same network\n"
                 "3. The IP address is entered correctly\n"
-                "4. You have granted access to the device when prompted on the TV\n"
-                "5. This program is allowed through your firewall",
+                "4. You have granted access to the device when prompted on the TV",
                 ru="Убедитесь, что:\n"
                 "1. На вашем ТВ включен отладчик ADB\n"
                 "2. Ваш ТВ и ПК находятся в одной сети\n"
                 "3. IP-адрес введен правильно\n"
-                "4. Вы предоставили доступ устройству при появлении запроса на ТВ\n"
-                "5. Программа добавлена в исключения файрвола (брандмауэра)"
+                "4. Вы предоставили доступ устройству при появлении запроса на ТВ"
             ),
             "last_error": Translation(
                 en="Last error: {error}",
@@ -396,6 +451,218 @@ arising from the use of this program.
             "ntp_changed_elsewhere": Translation(
                 en='The setting changed since this operation. Refresh it before making another change.',
                 ru='Настройка уже изменилась после этой операции. Проверьте её перед следующим изменением.'
+            ),
+            "state_tools_menu": Translation(
+                en='s. Save time snapshot; b. Restore snapshot; p. Device profiles\nm. Multiple NTP servers; v. Monitor clock (Stop: Ctrl+C); d. Export anonymous diagnostics',
+                ru='s. Сохранить снимок времени; b. Восстановить снимок; p. Профили устройств\nm. Несколько NTP-серверов; v. Наблюдать часы (Стоп: Ctrl+C); d. Экспорт обезличенной диагностики'
+            ),
+            "state_read_failed": Translation(
+                en='Could not read all time settings. No protected change was started.',
+                ru='Не удалось прочитать все настройки времени. Защищённое изменение не начато.'
+            ),
+            "state_changed_during_read": Translation(
+                en='Time settings changed while reading the snapshot. Try again; nothing was applied.',
+                ru='Настройки времени изменились во время чтения снимка. Повторите попытку; настройки не применены.'
+            ),
+            "state_changed_before_apply": Translation(
+                en='Settings changed after the preview. Review them again before applying.',
+                ru='Настройки изменились после предварительного просмотра. Проверьте их снова перед применением.'
+            ),
+            "state_command_failed": Translation(
+                en='Android did not confirm the command. Check ADB access and device permissions.',
+                ru='Android не подтвердил выполнение команды. Проверьте доступ ADB и разрешения устройства.'
+            ),
+            "state_transport_limit": Translation(
+                en='The raw NTP setting is too large to restore through this legacy ADB connection. Use platform-tools/USB; nothing was changed.',
+                ru='Исходная настройка NTP слишком велика для восстановления через это старое соединение ADB. Используйте platform-tools/USB; настройки не изменены.'
+            ),
+            "state_invalid": Translation(
+                en='Invalid time settings. Automatic flags accept 0, 1 or null; use a valid time zone ID.',
+                ru='Некорректные настройки времени. Автофлаги принимают 0, 1 или null; укажите правильный ID часового пояса.'
+            ),
+            "state_identity_unavailable": Translation(
+                en='Cannot establish a stable device identity; saving or restoring a snapshot is unavailable.',
+                ru='Не удалось определить устойчивую идентичность устройства; сохранение или восстановление снимка недоступно.'
+            ),
+            "state_identity_changed": Translation(
+                en='The selected device does not match the snapshot/profile. Nothing was applied.',
+                ru='Выбранное устройство не соответствует снимку или профилю. Настройки не применены.'
+            ),
+            "state_snapshot_invalid": Translation(
+                en='The saved snapshot is damaged or incompatible. It was not replaced.',
+                ru='Сохранённый снимок повреждён или несовместим. Он не перезаписан.'
+            ),
+            "state_snapshot_write_failed": Translation(
+                en='Could not save the recovery snapshot. The device setting was not changed.',
+                ru='Не удалось сохранить снимок для восстановления. Настройка устройства не изменена.'
+            ),
+            "state_readback_failed": Translation(
+                en='Android did not return the expected setting after the change.',
+                ru='После изменения Android не вернул ожидаемое значение настройки.'
+            ),
+            "state_timezone_unsupported": Translation(
+                en='This firmware does not expose the supported time zone command.',
+                ru='В этой прошивке нет поддерживаемой команды смены часового пояса.'
+            ),
+            "state_apply_failed": Translation(
+                en='Not all settings were confirmed. Recovery result follows.',
+                ru='Не все настройки подтверждены. Результат восстановления указан ниже.'
+            ),
+            "state_compensation_ok": Translation(
+                en='The state immediately before this attempt was restored and read back.',
+                ru='Состояние непосредственно перед этой попыткой восстановлено и прочитано обратно.'
+            ),
+            "state_compensation_failed": Translation(
+                en='Full recovery could not be confirmed. Reconnect and inspect all four time settings; the saved snapshot is retained.',
+                ru='Полное восстановление подтвердить не удалось. Подключитесь снова и проверьте все четыре настройки времени; сохранённый снимок оставлен.'
+            ),
+            "state_ntp_invalid": Translation(
+                en='Enter 1–4 distinct bare host names or IP addresses, without URL paths or custom ports.',
+                ru='Введите 1–4 разных имени сервера или IP-адреса без пути URL и нестандартных портов.'
+            ),
+            "state_multi_unsupported": Translation(
+                en='Multiple NTP servers and ntp:// configuration require Android 14+. This device accepts one bare host.',
+                ru='Несколько NTP-серверов и конфигурация ntp:// требуют Android 14+. Для этого устройства используйте один адрес.'
+            ),
+            "state_profile_invalid": Translation(
+                en='The saved profile is invalid or incompatible.',
+                ru='Сохранённый профиль некорректен или несовместим.'
+            ),
+            "state_profile_exists": Translation(
+                en='A profile with this name already exists.',
+                ru='Профиль с таким именем уже существует.'
+            ),
+            "state_profile_limit": Translation(
+                en='At most 64 profiles and 1 MiB of profile data can be saved. Existing profiles were retained.',
+                ru='Можно сохранить до 64 профилей и не более 1 МиБ данных. Существующие профили сохранены.'
+            ),
+            "state_snapshot_missing": Translation(
+                en='There is no saved time snapshot for this device.',
+                ru='Для этого устройства нет сохранённого снимка времени.'
+            ),
+            "state_preview_field": Translation(
+                en='  {field}: {before} → {after}',
+                ru='  {field}: {before} → {after}'
+            ),
+            "state_apply_confirm": Translation(
+                en='Proceed with the displayed operation? Type yes: ',
+                ru='Продолжить показанную операцию? Введите yes: '
+            ),
+            "state_snapshot_date": Translation(
+                en='Snapshot saved at: {date}',
+                ru='Снимок сохранён: {date}'
+            ),
+            "state_snapshot_replace": Translation(
+                en='This will replace the snapshot from {date}.',
+                ru='Будет заменён снимок от {date}.'
+            ),
+            "state_snapshot_saved": Translation(
+                en='Time snapshot saved for this device; it remains available after restart.',
+                ru='Снимок времени сохранён для этого устройства и останется доступен после перезапуска.'
+            ),
+            "state_restore_success": Translation(
+                en='All requested time settings were read back successfully. This does not prove clock synchronization.',
+                ru='Все запрошенные настройки времени прочитаны обратно. Это не подтверждает синхронизацию часов.'
+            ),
+            "state_multi_prompt": Translation(
+                en='NTP hosts, separated by spaces (up to 4; Enter keeps current): ',
+                ru='Адреса NTP через пробел (до 4; Enter — оставить текущую настройку): '
+            ),
+            "state_multi_policy": Translation(
+                en='Android 14+ chooses a working server and may keep using it until failure; these servers are not averaged. Saving does not force a refresh.',
+                ru='Android 14+ выбирает работающий сервер и может использовать его до отказа; показания серверов не усредняются. Сохранение не запускает принудительное обновление.'
+            ),
+            "state_profiles_empty": Translation(
+                en='No saved device profiles.',
+                ru='Сохранённых профилей устройств нет.'
+            ),
+            "state_profile_select": Translation(
+                en='Profile number (Enter cancels): ',
+                ru='Номер профиля (Enter — отмена): '
+            ),
+            "state_profiles_menu": Translation(
+                en='\nDevice profiles: 1. List; 2. Save/edit configuration; 3. Apply; 4. Delete; 0. Back',
+                ru='\nПрофили устройств: 1. Список; 2. Сохранить/изменить конфигурацию; 3. Применить; 4. Удалить; 0. Назад'
+            ),
+            "state_profile_name": Translation(
+                en='Profile name: ',
+                ru='Имя профиля: '
+            ),
+            "state_profile_field": Translation(
+                en='{field} [{current}] (Enter keeps current): ',
+                ru='{field} [{current}] (Enter — оставить текущее): '
+            ),
+            "state_profile_overwrite": Translation(
+                en='A profile with this name will be replaced.',
+                ru='Профиль с таким именем будет заменён.'
+            ),
+            "state_profile_saved": Translation(
+                en='Profile saved. Device settings were not changed.',
+                ru='Профиль сохранён. Настройки устройства не изменены.'
+            ),
+            "state_diagnostic_path": Translation(
+                en='Anonymous diagnostic JSON path (Enter cancels): ',
+                ru='Путь для обезличенного JSON-отчёта (Enter — отмена): '
+            ),
+            "state_diagnostic_saved": Translation(
+                en='Diagnostic report saved without addresses, device IDs, keys, paths, raw commands or logs.',
+                ru='Диагностический отчёт сохранён без адресов, идентификаторов устройства, ключей, путей, сырых команд и журналов.'
+            ),
+            "state_local_failed": Translation(
+                en='Operation could not be completed. Check the connection, selected file and write permissions.',
+                ru='Не удалось завершить операцию. Проверьте подключение, выбранный файл и права записи.'
+            ),
+            "state_monitor_start": Translation(
+                en='Clock monitoring: every 30 seconds, up to 10 minutes. Ctrl+C stops and returns to the menu. No settings are changed.',
+                ru='Наблюдение часов: каждые 30 секунд, до 10 минут. Ctrl+C останавливает и возвращает в меню. Настройки не изменяются.'
+            ),
+            "state_monitor_summary": Translation(
+                en='Monitoring finished: {samples} attempts, {skipped} without a clock reading.',
+                ru='Наблюдение завершено: {samples} попыток, {skipped} без показаний часов.'
+            ),
+            "state_monitor_stopped": Translation(
+                en='Monitoring stopped.',
+                ru='Наблюдение остановлено.'
+            ),
+            "state_clock_match": Translation(
+                en='Clock check: agrees with the NTP reference within 5 seconds, including measurement uncertainty.',
+                ru='Проверка часов: совпадают с контрольным NTP в пределах 5 секунд с учётом погрешности.'
+            ),
+            "state_clock_mismatch": Translation(
+                en='Clock check: difference from the NTP reference exceeds 5 seconds, including measurement uncertainty.',
+                ru='Проверка часов: расхождение с контрольным NTP превышает 5 секунд с учётом погрешности.'
+            ),
+            "state_clock_uncertain": Translation(
+                en='Clock check: measurement uncertainty does not allow a reliable conclusion.',
+                ru='Проверка часов: погрешность измерения не позволяет сделать достоверный вывод.'
+            ),
+            "state_clock_ntp_unavailable": Translation(
+                en='Clock check: no valid NTP response received for this attempt.',
+                ru='Проверка часов: в этой попытке не получен корректный ответ NTP.'
+            ),
+            "state_clock_device_unavailable": Translation(
+                en='Clock check: could not read device time.',
+                ru='Проверка часов: не удалось прочитать время устройства.'
+            ),
+            "state_clock_no_server": Translation(
+                en='Clock check: no configured reference with a supported UDP/123 endpoint. System-default and non-standard-port sources are not inferred.',
+                ru='Проверка часов: нет заданного контрольного адреса с поддерживаемым UDP/123. Системный источник и адреса с нестандартным портом не угадываются.'
+            ),
+            "state_clock_stale": Translation(
+                en='Clock check: this measurement is more than 30 seconds old.',
+                ru='Проверка часов: измерение старше 30 секунд.'
+            ),
+            "state_clock_measurement": Translation(
+                en='  Difference: {difference} ±{uncertainty} seconds',
+                ru='  Расхождение: {difference} ±{uncertainty} с'
+            ),
+            "state_clock_reference": Translation(
+                en='  NTP reference: {server}',
+                ru='  Контрольный NTP: {server}'
+            ),
+            "state_source_unconfirmed": Translation(
+                en='System clock source: unconfirmed. A clock match or cached NTP response alone is not proof.',
+                ru='Источник системных часов: не подтверждён. Совпадение часов или ответ в кэше NTP сами по себе этого не доказывают.'
             ),
             "ntp_no_undo": Translation(
                 en='There is no change to undo in this connection.',
@@ -1666,8 +1933,8 @@ localfilesystem:PATH. tcp:0 запрашивает свободный слуша
                 ru="Введите номер пункта меню:"
             ),
             "invalid_ip_format": Translation(
-                en="Invalid IP address format. Use the format: xxx.xxx.xxx.xxx or xxx.xxx.xxx.xxx:port (default port: {port})",
-                ru="Неверный формат IP-адреса. Используйте формат: xxx.xxx.xxx.xxx или xxx.xxx.xxx.xxx:порт (порт по умолчанию: {port})"
+                en="Invalid IP address. Use IPv4, IPv6 or [IPv6]:port (default port: {port}). Example: [2001:db8::1]:37105.",
+                ru="Неверный IP-адрес. Используйте IPv4, IPv6 или [IPv6]:порт (порт по умолчанию: {port}). Пример: [2001:db8::1]:37105."
             ),
             "invalid_ntp_server_format": Translation(
                 en="Invalid NTP server format. Use a valid domain name (e.g., time.google.com) or IP address.",

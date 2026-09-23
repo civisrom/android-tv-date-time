@@ -49,6 +49,42 @@ class TerminalExecutorTest {
     private fun response(id: String, bytes: ByteArray) = Buffer().writeUtf8(id).writeIntLe(bytes.size).write(bytes)
     private fun executor(session: TerminalSession = TerminalSession()) = TerminalExecutor(files, session)
 
+    @Test fun `catalog shell examples use the selected device and preserve text on both shell protocols`() {
+        val examples = terminalCatalog.flatMap { it.examples }
+            .filter { parseTerminalCommand(it.command) is TerminalCommand.Shell }
+        for (shellV2 in listOf(false, true)) {
+            for (example in examples) {
+                val session = TerminalSession().apply { edit(example.command); start("selected TV") }
+                val client = ServiceClient(shellV2).apply {
+                    responses += if (shellV2) Buffer().writeByte(1).writeIntLe(3).writeUtf8("ok\n")
+                        .writeByte(3).writeIntLe(1).writeByte(0) else Buffer().writeUtf8("ok\n")
+                }
+                val exit = executor(session).execute(client, parseTerminalCommand(example.command))
+                session.finish(exit)
+                val prefix = if (shellV2) "shell,v2,raw:" else "shell:"
+                assertEquals(example.id, prefix + example.command.removePrefix("adb shell "), client.sent.single().first)
+                assertEquals("ok\n", session.state.value.output.joinToString("") { it.text })
+                assertEquals(if (shellV2) 0 else null, exit)
+                assertEquals(1, client.serviceCloses)
+                assertFalse(client.closed)
+            }
+        }
+    }
+
+    @Test fun `device help output remains readable when Android returns exit 255`() {
+        val session = TerminalSession().apply { edit("cmd time_detector help"); start("selected TV") }
+        val help = "Time detector commands:\n  help\n"
+        val client = ServiceClient(shellV2Supported = true).apply {
+            responses += Buffer().writeByte(1).writeIntLe(help.toByteArray().size).writeUtf8(help)
+                .writeByte(3).writeIntLe(1).writeByte(255)
+        }
+        session.finish(executor(session).execute(client, parseTerminalCommand(session.state.value.draft)))
+        assertEquals(255, session.state.value.exitCode)
+        assertEquals(TerminalStatus.COMPLETE, session.state.value.status)
+        assertEquals(help, session.state.value.output.joinToString("") { it.text })
+        assertFalse(client.closed)
+    }
+
     @Test fun `APK bytes stream to selected device package manager with explicit size and no local path`() {
         val local = file("my app'; touch bad.apk", ByteArray(100_001) { (it % 251).toByte() })
         val client = ServiceClient().apply { responses += Buffer().writeUtf8("Success\n") }

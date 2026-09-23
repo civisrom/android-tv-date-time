@@ -224,6 +224,11 @@ jobs:
             device: pixel_2
             tv: false
             page_size: 4096
+          - name: tablet-35
+            image: system-images;android-35;google_apis;x86_64
+            device: pixel_c
+            tv: false
+            page_size: 4096
           - name: phone-26
             image: system-images;android-26;google_apis;x86_64
             device: pixel_2
@@ -290,7 +295,7 @@ jobs:
           expected_api=${expected_api%%;*}
           expected_api=${expected_api%%.*}
           ready_samples=0
-          for attempt in $(seq 1 120); do
+          for _attempt in $(seq 1 120); do
             if [[ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
               if [[ "$expected_api" == 23 ]]; then
                 # First-boot encryption also sets boot_completed in a temporary framework.
@@ -446,6 +451,7 @@ jobs:
           path: |
             ui-screenshots/
             ${{ runner.temp }}/ui-instrumentation.log
+            ${{ runner.temp }}/ui-shard-*.log
             ${{ runner.temp }}/ui-wireless.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt

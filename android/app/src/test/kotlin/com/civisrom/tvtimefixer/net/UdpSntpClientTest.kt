@@ -9,10 +9,34 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.*
+import org.junit.Assume.assumeNoException
 import org.junit.Test
 
 class UdpSntpClientTest {
     private fun elapsed() = System.nanoTime() / 1_000_000
+
+    @Test fun `IPv6 UDP packets pass the real SNTP client`() {
+        val bound = try { DatagramSocket(0, InetAddress.getByName("::1")) }
+        catch (error: java.net.SocketException) { assumeNoException("IPv6 loopback unavailable", error); return }
+        bound.use { server ->
+            server.soTimeout = 2000
+            val worker = thread(isDaemon = true) {
+                val request = DatagramPacket(ByteArray(48), 48)
+                server.receive(request)
+                val response = ByteArray(48)
+                response[0] = 0x24; response[1] = 1
+                request.data.copyInto(response, 24, 40, 48)
+                request.data.copyInto(response, 32, 40, 48)
+                request.data.copyInto(response, 40, 40, 48)
+                server.send(DatagramPacket(response, response.size, request.address, request.port))
+            }
+            val result = UdpSntpClient(1200, server.localPort, ::elapsed).query("::1")
+            assertEquals(InetAddress.getByName("::1"), InetAddress.getByName(result.address))
+            assertNotNull(result.referenceElapsedMillis)
+            worker.join(2000)
+            assertFalse(worker.isAlive)
+        }
+    }
 
     @Test fun `query falls back from first DNS address to a responding server`() {
         DatagramSocket(0, InetAddress.getByName("127.0.0.1")).use { server ->

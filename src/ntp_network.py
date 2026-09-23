@@ -96,7 +96,10 @@ def query_ntp(server, timeout, stopped=None):
                         break
                     except socket.timeout:
                         _remaining(address_deadline, stopped)
-                return parse_response(response, request, sent, time.monotonic() - started)
+                received_monotonic = time.monotonic()
+                stats = parse_response(response, request, sent, received_monotonic - started)
+                stats.received_monotonic = received_monotonic
+                return stats
         except (OSError, ntplib.NTPException) as failure:
             error = failure
     raise error

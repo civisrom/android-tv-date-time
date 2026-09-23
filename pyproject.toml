@@ -9,7 +9,14 @@ packages = [
     {include = "android_time_fixer.py", from = "src"},
     {include = "adb_server.py", from = "src"},
     {include = "ntp_network.py", from = "src"},
+    {include = "network_check.py", from = "src"},
+    {include = "device_time_check.py", from = "src"},
+    {include = "device_address.py", from = "src"},
     {include = "process_env.py", from = "src"},
+    {include = "device_time_settings.py", from = "src"},
+    {include = "time_profiles.py", from = "src"},
+    {include = "time_store_lock.py", from = "src"},
+    {include = "time_console.py", from = "src"},
     {include = "locales.py"}
 ]
 classifiers = [
@@ -31,6 +38,7 @@ cryptography = "^50.0.0"
 rsa = "^4.9.1"
 pyasn1 = "^0.6.4"
 ntplib = "^0.4.0"
+certifi = "^2026.7.22"
 # Запасной путь mDNS-обнаружения, когда у adb нет своего бэкенда
 zeroconf = "^0.151.3"
 

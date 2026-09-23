@@ -5,6 +5,7 @@ import com.civisrom.tvtimefixer.adb.ConnectionState
 import com.civisrom.tvtimefixer.adb.UsbDeviceAddress
 import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
 import com.civisrom.tvtimefixer.data.DeviceAddress
+import com.civisrom.tvtimefixer.device.*
 import com.civisrom.tvtimefixer.device.DeviceInfo
 import com.civisrom.tvtimefixer.device.DeviceTimeCheck
 import com.civisrom.tvtimefixer.device.DeviceTimeStatus
@@ -25,6 +26,26 @@ import org.junit.Test
  * с `addressOrNull()`, а та отдаёт адрес и при отказе тоже.
  */
 class AppStateTest {
+
+    @Test fun `new connection or reconnect cannot inherit previous clock monitor samples through background merge`() {
+        val oldIdentity = TimeDeviceIdentity("a".repeat(64), DeviceIdentityKind.SERIAL)
+        val sampled = AppState(connection = ConnectionState.Connected(DeviceAddress("192.0.2.1", 5555)),
+            timeTools = TimeToolsState(identity = oldIdentity, monitor = ClockMonitorState(running = true,
+                samples = listOf(ClockSample(0, DeviceTimeCheck(DeviceTimeStatus.MATCH))))))
+        val disconnected = sampled.connectionLost()
+        assertFalse(disconnected.timeTools.monitor.running)
+        assertEquals(ClockMonitorEnd.DISCONNECTED, disconnected.timeTools.monitor.ended)
+        assertEquals(1, disconnected.timeTools.monitor.samples.size)
+        for (identity in listOf(oldIdentity, oldIdentity.copy(digest = "b".repeat(64)))) {
+            val connecting = disconnected.beginConnection()
+            val read = connecting.copy(connection = ConnectionState.Connected(DeviceAddress("192.0.2.2", 5555)),
+                timeTools = TimeToolsState(identity = identity)).withLatestBackground(connecting)
+            assertEquals(identity, read.timeTools.identity)
+            assertTrue(read.timeTools.monitor.samples.isEmpty())
+            assertFalse(read.timeTools.monitor.running)
+            assertNull(read.timeTools.monitor.ended)
+        }
+    }
 
     @Test fun `connection cancellation is available only for an active connection attempt`() {
         val connections = setOf(com.civisrom.tvtimefixer.diagnostics.Operation.CONNECT_NETWORK,

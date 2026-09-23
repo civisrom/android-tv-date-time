@@ -53,6 +53,9 @@ adbkey
 adbkey.pub
 /settings.json
 saved_servers.json
+/time-snapshots/
+/time-profiles.json
+/time-profiles.lock
 backup.json
 android_tv_fixer.log
 

@@ -74,6 +74,8 @@ android {
 
     packaging {
         resources {
+            // Bouncy Castle 1.86 packages the same license in all three modules.
+            pickFirsts += "META-INF/LICENSE.md"
             // bouncycastle приезжает с kadb-android и тащит дублирующиеся
             // метаданные подписи, на которых упаковка падает
             excludes += setOf(

@@ -85,6 +85,13 @@ import kotlinx.coroutines.runInterruptible
 import com.civisrom.tvtimefixer.diagnostics.OperationTrace
 import com.civisrom.tvtimefixer.terminal.*
 import com.civisrom.tvtimefixer.ui.TerminalActions
+import com.civisrom.tvtimefixer.ui.TimeToolsState
+import com.civisrom.tvtimefixer.adb.AdbClient
+import com.civisrom.tvtimefixer.device.*
+import com.civisrom.tvtimefixer.data.SavedTimeSettings
+import com.civisrom.tvtimefixer.data.TimeProfile
+import com.civisrom.tvtimefixer.diagnostics.DiagnosticExportState
+import com.civisrom.tvtimefixer.diagnostics.diagnosticExport
 
 class MainActivity : ComponentActivity() {
 
@@ -108,6 +115,21 @@ class MainActivity : ComponentActivity() {
     private val deviceOperations = Mutex()
     private var usbReceiverRegistered = false
     private val favoritesStore get() = (application as TimeFixerApplication).favorites
+    private val timeSettingsStore get() = (application as TimeFixerApplication).timeSettings
+    private var clockMonitor: ClockMonitor? = null
+    private var monitorJob: Job? = null
+    private var pendingDiagnosticReport: String? = null
+    private val diagnosticDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        val report = pendingDiagnosticReport
+        pendingDiagnosticReport = null
+        if (uri != null && report != null) lifecycleScope.launch {
+            val saved = runCatching { withContext(Dispatchers.IO) {
+                contentResolver.openOutputStream(uri, "wt")?.use { it.write(report.toByteArray(Charsets.UTF_8)) }
+                    ?: throw java.io.IOException("Document unavailable")
+            } }.isSuccess
+            state = state.copy(diagnosticExportMessage = if (saved) R.string.time_export_saved else R.string.time_export_failed)
+        }
+    }
     private val terminal = TerminalSession()
     private val terminalFiles by lazy { TerminalFiles(File(filesDir, "terminal-documents")) }
     private var terminalFileBusy by mutableStateOf(false)
@@ -353,11 +375,12 @@ class MainActivity : ComponentActivity() {
             if (state.busy) return
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.PAIR, Operation.CHECK_NTP,
                     Operation.APPLY_NTP, Operation.CHECK_TIME) && !networkAllowed()) return
-            if (operation in setOf(Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE) &&
+            if (operation in setOf(Operation.READ_DEVICE, Operation.APPLY_TIME_ZONE, Operation.TIME_SETTINGS) &&
                 state.connection.targetOrNull() is com.civisrom.tvtimefixer.data.DeviceAddress && !networkAllowed()) return
             val generation = ++actionGeneration
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
-                state = state.connectionLost()
+                stopMonitor(ClockMonitorEnd.DISCONNECTED)
+                state = state.beginConnection()
             }
             val started = System.nanoTime()
             val transport = when (operation) {
@@ -392,6 +415,7 @@ class MainActivity : ComponentActivity() {
                         Operation.APPLY_NTP -> result.ntpMessage?.res !in listOf(R.string.ntp_applied, R.string.ntp_default_applied)
                         Operation.CHECK_TIME -> result.timeCheck?.status != DeviceTimeStatus.MATCH
                         Operation.APPLY_TIME_ZONE -> result.timeZoneResult !is TimeZoneUpdateResult.Applied
+                        Operation.TIME_SETTINGS -> result.timeTools.lastOperationSucceeded == false
                         Operation.READ_DEVICE -> result.diagnosticEventId != null || !result.connected || result.deviceInfo == null
                         else -> false
                     }
@@ -433,7 +457,7 @@ class MainActivity : ComponentActivity() {
                     if (generation == actionGeneration) state = if (zoneAction) state.copy(
                         timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE), timeZoneDiagnosticEventId = event,
                     ) else if (timeAction) state.copy(
-                        timeCheck = DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE), timeDiagnosticEventId = event,
+                        timeCheck = DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE, observedAtElapsedMillis = SystemClock.elapsedRealtime()), timeDiagnosticEventId = event,
                     ) else if (ntpAction) state.copy(
                         ntpMessage = UiMessage(R.string.operation_failed_hint), ntpDiagnosticEventId = event,
                     ) else state.copy(message = UiMessage(R.string.operation_failed_hint), diagnosticEventId = event)
@@ -500,6 +524,7 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun disconnect() = run(Operation.DISCONNECT) {
+            stopMonitor(ClockMonitorEnd.DISCONNECTED)
             runInterruptible(Dispatchers.IO) { connector.disconnect() }
             state.connectionLost().copy(message = null, diagnosticEventId = null)
         }
@@ -574,6 +599,10 @@ class MainActivity : ComponentActivity() {
                 if (check != null && !check.isUsable()) return@runInterruptible state.copy(
                     ntpCheck = check, ntpMessage = UiMessage(R.string.ntp_check_rejected,
                         listOf(getString(check.rejectionMessageRes()))))
+                val baseline = runCatching { ensureOriginalSnapshot(client) }.getOrElse {
+                    return@runInterruptible state.copy(ntpMessage = UiMessage(R.string.time_snapshot_required))
+                }
+                state = state.copy(timeTools = loadSavedTimeTools(client).copy(snapshot = baseline))
                 var failureId: Long? = null
                 val repository = DeviceRepository(trace.client(client)) { error ->
                     failureId = journal.record(Operation.APPLY_NTP, Outcome.FAILED,
@@ -627,6 +656,11 @@ class MainActivity : ComponentActivity() {
                     timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE),
                     message = UiMessage(R.string.error_unreachable),
                 )
+                val baseline = runCatching { ensureOriginalSnapshot(client) }.getOrElse {
+                    return@runInterruptible state.copy(timeZoneResult = TimeZoneUpdateResult.Failed(TimeZoneFailure.READ_STATE),
+                        message = UiMessage(R.string.time_snapshot_required))
+                }
+                state = state.copy(timeTools = loadSavedTimeTools(client).copy(snapshot = baseline))
                 var error: Exception? = null
                 val result = TimeZoneRepository(trace.client(client), onFailure = { error = it }).setTimeZone(zoneId)
                 trace.timeZone(result)
@@ -696,6 +730,94 @@ class MainActivity : ComponentActivity() {
             state = state.copy(ntpScan = null)
         }
 
+        override fun refreshTimeTools() = timeTask("refresh")
+        override fun saveTimeSnapshot(replace: Boolean) = timeTask(if (replace) "replace" else "snapshot")
+        override fun restoreTimeSnapshot() = timeTask("restore")
+        override fun saveTimeProfile(name: String) = timeTask("save-profile", name)
+        override fun applyTimeProfile(name: String) = timeTask("apply-profile", name)
+        override fun removeTimeProfile(name: String) = timeTask("delete-profile", name)
+        override fun applyNtpList(hosts: List<String>) = timeTask("ntp", hosts = hosts)
+        override fun startClockMonitor() = startMonitor()
+        override fun stopClockMonitor() = stopMonitor(ClockMonitorEnd.USER)
+        override fun copyDiagnostics() {
+            val copied = runCatching {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TVTimeFixer diagnostics", redactedDiagnosticReport()))
+            }.isSuccess
+            state = state.copy(diagnosticExportMessage = if (copied) R.string.diagnostics_copied else R.string.diagnostics_copy_failed)
+        }
+        override fun exportDiagnostics() {
+            if (pendingDiagnosticReport != null) return
+            state = state.copy(diagnosticExportMessage = null)
+            pendingDiagnosticReport = redactedDiagnosticReport()
+            try {
+                diagnosticDocument.launch("TVTimeFixer-diagnostics.txt")
+            } catch (_: android.content.ActivityNotFoundException) {
+                pendingDiagnosticReport = null
+                state = state.copy(diagnosticExportMessage = R.string.time_export_unavailable)
+            } catch (_: Exception) {
+                pendingDiagnosticReport = null
+                state = state.copy(diagnosticExportMessage = R.string.time_export_failed)
+            }
+        }
+
+        private fun timeTask(task: String, name: String = "", hosts: List<String> = emptyList()) = run(Operation.TIME_SETTINGS) {
+            stopMonitor(ClockMonitorEnd.USER)
+            val client = connector.activeClient ?: return@run state.connectionLost()
+            val expectedIdentity = state.timeTools.identity
+            val old = state
+            runInterruptible(Dispatchers.IO) {
+                try {
+                    val repository = TimeSettingsRepository(client)
+                    val identity = repository.readIdentity()
+                    if (identity == null || (task != "refresh" && identity != expectedIdentity)) {
+                        return@runInterruptible old.copy(timeTools = TimeToolsState(notice = if (identity == null)
+                            R.string.time_identity_unavailable else R.string.time_identity_mismatch, lastOperationSucceeded = false))
+                    }
+                    var change: TimeSettingsChange? = null
+                    var notice: Int? = null
+                    when (task) {
+                        "snapshot", "replace", "save-profile" -> {
+                            val captured = repository.capture()
+                            check(captured.capturable && captured.identity == identity)
+                            val saved = SavedTimeSettings(identity, System.currentTimeMillis(), captured.settings)
+                            if (task == "save-profile") timeSettingsStore.saveProfile(TimeProfile(name, saved))
+                            else timeSettingsStore.saveSnapshot(saved, replace = task == "replace")
+                            notice = R.string.time_saved_locally
+                        }
+                        "delete-profile" -> { timeSettingsStore.removeProfile(identity, name); notice = R.string.time_profile_deleted }
+                        "restore", "apply-profile", "ntp" -> {
+                            ensureOriginalSnapshot(client, identity)
+                            val saved = timeSettingsStore.read()
+                            change = when (task) {
+                                "restore" -> repository.apply(identity, saved.snapshots.first { it.identity == identity }.settings)
+                                "apply-profile" -> repository.apply(identity,
+                                    saved.profiles.first { it.name == name && it.saved.identity == identity }.saved.settings, rollbackOnFailure = true)
+                                else -> repository.applyNtpHosts(identity, hosts)
+                            }
+                        }
+                    }
+                    val current = repository.read()
+                    if (current.identity != identity) return@runInterruptible old.copy(timeTools = TimeToolsState(
+                        notice = R.string.time_identity_mismatch, lastOperationSucceeded = false))
+                    val loaded = loadSavedTimeTools(client)
+                    val source = if (task == "refresh") TimeSourceReader(client).read() else null
+                    old.copy(timeTools = loaded.copy(current = current, change = change, source = source,
+                        notice = notice ?: loaded.notice, lastOperationSucceeded = change?.confirmed ?: (loaded.notice == null)),
+                        timeCheck = if (change != null) null else old.timeCheck,
+                        ntpMessage = if (change != null) null else old.ntpMessage,
+                        ntpChange = if (change != null) null else old.ntpChange,
+                        timeZoneResult = if (change != null) null else old.timeZoneResult,
+                        deviceInfo = old.deviceInfo?.copy(currentNtpServer = current.settings[TimeSetting.NTP].orEmpty(),
+                            timezone = current.settings[TimeSetting.TIME_ZONE].orEmpty(), automaticTimeZone = current.settings.effectiveAutoZone))
+                } catch (error: CancellationException) { throw error
+                } catch (_: Exception) {
+                    old.copy(timeTools = old.timeTools.copy(notice = R.string.time_storage_or_capture_failed,
+                        change = null, lastOperationSucceeded = false))
+                }
+            }
+        }
+
         override fun refreshDeviceInfo() = run(Operation.READ_DEVICE) { trace -> state.withDeviceData(trace) }
 
         override fun requestDiscoveryPermission() = requestDiscoveryPermissions()
@@ -704,6 +826,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         exportDocument = savedInstanceState?.getString("terminalExportDocument")
+        pendingDiagnosticReport = savedInstanceState?.getString("diagnosticExportReport")
         val usbFilter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -752,6 +875,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        pendingDiagnosticReport?.let { outState.putString("diagnosticExportReport", it) }
         // Only a pending document name; terminal commands and output remain memory-only.
         outState.putString("terminalExportDocument", exportDocument)
         super.onSaveInstanceState(outState)
@@ -822,6 +946,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        stopMonitor(ClockMonitorEnd.BACKGROUND)
         // Сканирование mDNS держит радио включённым — на время невидимости
         // приложения оно останавливается. Сохранённую связь проверяем при возврате.
         runCatching { discovery?.stop() }
@@ -830,6 +955,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopMonitor(ClockMonitorEnd.BACKGROUND)
         actionGeneration++
         actionJob?.cancel()
         if (usbReceiverRegistered) unregisterReceiver(usbReceiver)
@@ -980,7 +1106,7 @@ class MainActivity : ComponentActivity() {
                 message = UiMessage(R.string.error_unreachable),
             )
             runCatching { DeviceRepository(trace.client(client)).readDeviceInfo() }.fold(
-                onSuccess = { clean.copy(deviceInfo = it, deviceName = it.displayName) },
+                onSuccess = { clean.copy(deviceInfo = it, deviceName = it.displayName, timeTools = loadSavedTimeTools(client)) },
                 onFailure = {
                     if (it is CancellationException) throw it
                     val event = journal.record(Operation.READ_DEVICE, Outcome.FAILED,
@@ -993,10 +1119,80 @@ class MainActivity : ComponentActivity() {
 
     private suspend fun AppState.withDeviceTime(trace: OperationTrace, reference: String? = null): AppState = runInterruptible(Dispatchers.IO) {
         val client = connector.activeClient
-        val check = if (!connected || client == null) DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE)
+        val check = if (!connected || client == null) DeviceTimeCheck(DeviceTimeStatus.DEVICE_UNAVAILABLE, observedAtElapsedMillis = SystemClock.elapsedRealtime())
             else timeVerifier.verify(trace.client(client), referenceOverride = reference, onFailure = trace::exception)
         trace.deviceTime(check)
         copy(timeCheck = check)
+    }
+
+    private fun loadSavedTimeTools(client: AdbClient): TimeToolsState {
+        val identity = TimeSettingsRepository(client).readIdentity()
+            ?: return TimeToolsState(notice = R.string.time_identity_unavailable)
+        return try {
+            val saved = timeSettingsStore.read()
+            TimeToolsState(identity = identity, snapshot = saved.snapshots.firstOrNull { it.identity == identity },
+                profiles = saved.profiles.filter { it.saved.identity == identity })
+        } catch (_: Exception) { TimeToolsState(identity = identity, notice = R.string.time_storage_or_capture_failed) }
+    }
+
+    /** Persist a stable baseline before the first managed write. An unreadable store is never overwritten. */
+    private fun ensureOriginalSnapshot(client: AdbClient, expected: TimeDeviceIdentity? = null): SavedTimeSettings {
+        val repository = TimeSettingsRepository(client)
+        val identity = repository.readIdentity() ?: error("Device identity unavailable")
+        check(expected == null || identity == expected)
+        timeSettingsStore.read().snapshots.firstOrNull { it.identity == identity }?.let { return it }
+        val captured = repository.capture()
+        check(captured.capturable && captured.identity == identity)
+        return timeSettingsStore.saveSnapshot(SavedTimeSettings(identity, System.currentTimeMillis(), captured.settings))
+    }
+
+    private fun redactedDiagnosticReport(): String = diagnosticExport(DiagnosticExportState(
+        BuildConfig.VERSION_NAME, Build.VERSION.SDK_INT, state.deviceInfo?.apiLevel?.toIntOrNull(),
+        diagnosticTransport(state.connection.targetOrNull()), state.connected,
+        settingVerified = state.timeTools.change?.statuses?.get(TimeSetting.NTP)?.let { it == TimeSettingStatus.VERIFIED }
+            ?: state.ntpChange?.let { true }, clock = state.timeCheck,
+        snapshotSaved = state.timeTools.snapshot != null, profileCount = state.timeTools.profiles.size,
+        monitor = state.timeTools.monitor, elapsedNow = SystemClock.elapsedRealtime()), journal.snapshot.value)
+
+    private fun startMonitor() {
+        if (!state.connected || state.busy || state.timeTools.monitor.running || monitorJob?.isCompleted == false || !networkAllowed()) return
+        val client = connector.activeClient ?: return
+        val monitor = ClockMonitor(SystemClock::elapsedRealtime)
+        clockMonitor = monitor
+        state = state.copy(timeTools = state.timeTools.copy(monitor = monitor.start()))
+        monitorJob = lifecycleScope.launch {
+            try {
+                while (isActive && clockMonitor === monitor && monitor.state.running) {
+                    if (!state.connected || connector.activeClient !== client) {
+                        stopMonitor(ClockMonitorEnd.DISCONNECTED); break
+                    }
+                    if (monitor.due()) {
+                        if (state.busy || !deviceOperations.tryLock()) monitor.add(skipped = ClockSampleSkip.BUSY)
+                        else try {
+                            val check = runInterruptible(Dispatchers.IO) { timeVerifier.verify(client) }
+                            if (clockMonitor === monitor && monitor.state.running) monitor.add(check = check)
+                        } finally { deviceOperations.unlock() }
+                    }
+                    if (clockMonitor === monitor) state = state.copy(timeTools = state.timeTools.copy(monitor = monitor.state))
+                    delay(500)
+                }
+            } finally {
+                // Cancelling a blocked ADB command closes its transport. Do not touch a newer connection.
+                if (!client.isAlive() && connector.ownsClient(client) && state.connected) {
+                    val stopped = state.timeTools.monitor
+                    state = state.connectionLost().copy(timeTools = TimeToolsState(monitor = stopped),
+                        message = UiMessage(R.string.time_monitor_reconnect))
+                }
+            }
+        }
+    }
+
+    private fun stopMonitor(reason: ClockMonitorEnd) {
+        clockMonitor?.let { monitor ->
+            state = state.copy(timeTools = state.timeTools.copy(monitor = monitor.stop(reason)))
+        }
+        clockMonitor = null
+        monitorJob?.cancel()
     }
 
     private fun TimeZoneUpdateResult.Failed.diagnosticIssue(): DiagnosticIssue =

@@ -46,6 +46,43 @@ class NsdDeviceDiscoveryTest {
         assertEquals(listOf("active-connect"), discovery.state.value.devices.map { it.name })
     }
 
+    @Test fun `API 34 removing a usable address withdraws the stale connection button until recovery`() {
+        discovery.start()
+        nsd.discovery.getValue(SERVICE_TLS_CONNECT).onServiceFound(connect)
+        val callback = nsd.callbacks.single()
+        callback.onServiceUpdated(connect)
+        assertEquals(1, discovery.state.value.devices.size)
+
+        val noAddresses = object : NsdServiceInfo("active-connect", SERVICE_TLS_CONNECT) {
+            override fun getHostAddresses() = emptyList<java.net.InetAddress>()
+        }
+        callback.onServiceUpdated(noAddresses)
+        assertTrue(discovery.state.value.devices.isEmpty())
+
+        callback.onServiceUpdated(connect)
+        assertEquals(1, discovery.state.value.devices.size)
+        val noPort = object : NsdServiceInfo("active-connect", SERVICE_TLS_CONNECT) {
+            override fun getPort() = 0
+        }
+        callback.onServiceUpdated(noPort)
+        assertTrue(discovery.state.value.devices.isEmpty())
+        callback.onServiceUpdated(connect)
+        assertEquals(1, discovery.state.value.devices.size)
+        assertEquals(1, nsd.callbacks.size)
+    }
+
+    @Test fun `IPv6-only service remains available and its endpoint round trips`() {
+        discovery.start()
+        nsd.discovery.getValue(SERVICE_TLS_CONNECT).onServiceFound(connect)
+        val ipv6Only = object : NsdServiceInfo("active-connect", SERVICE_TLS_CONNECT) {
+            override fun getHostAddresses() = listOf(java.net.InetAddress.getByName("2001:db8::123"))
+        }
+        nsd.callbacks.single().onServiceUpdated(ipv6Only)
+        val endpoint = discovery.state.value.devices.single().address
+        assertTrue(endpoint.toString().startsWith("["))
+        assertEquals(endpoint, com.civisrom.tvtimefixer.data.parseDeviceAddress(endpoint.toString()))
+    }
+
     @Test fun `stop restart ignores old discoveries updates and failures`() {
         discovery.start()
         val oldListener = nsd.discovery.getValue(SERVICE_TLS_PAIRING)

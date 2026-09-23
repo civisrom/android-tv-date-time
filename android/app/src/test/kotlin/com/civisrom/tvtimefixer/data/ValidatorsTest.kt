@@ -8,6 +8,46 @@ import org.junit.Test
 
 class ValidatorsTest {
 
+    @Test fun `IPv6 ADB round trip preserves scopes and explicit ports`() {
+        for (host in listOf("::1", "2001:db8::123", "fe80::1%wlan0", "fe80::2%3", "::ffff:192.0.2.1")) {
+            val endpoint = DeviceAddress(host, 37105)
+            assertEquals(endpoint, parseDeviceAddress(endpoint.toString()))
+            assertEquals(DeviceAddress(host, DEFAULT_ADB_PORT), parseDeviceAddress(host))
+            assertTrue(hasExplicitDevicePort(endpoint.toString()))
+            assertFalse(hasExplicitDevicePort(host))
+        }
+        assertEquals(DeviceAddress("::1", DEFAULT_ADB_PORT), parseDeviceAddress("[::1]"))
+        assertFalse(hasExplicitDevicePort("[::1]"))
+    }
+
+    @Test fun `IPv6 NTP literals have no URI brackets port or interface scope`() {
+        for (host in listOf("::1", "2001:db8::123", "::ffff:192.0.2.1")) assertTrue(host, isValidNtpServer(host))
+        for (host in listOf("[::1]", "[::1]:123", "fe80::1%wlan0", "::ffff:010.0.0.1")) {
+            assertFalse(host, isValidNtpServer(host))
+        }
+    }
+
+    @Test fun `malformed IPv6 cannot turn into DNS or an implicit port`() {
+        for (value in listOf("a:b", "1:2:3", "1:::2", "[::1]:0", "[::1]:65536", "[::1]:", "[::1]:+123",
+            "[::1]:５５５５", "[::1]:000001", "[127.0.0.1]:5555", "[::1]garbage", "::1%", "::1%bad/name",
+            "fe80::1%wlan0%2", "::ffff:010.0.0.1", "::1;id", "bad.example::1")) {
+            assertNull(value, parseDeviceAddress(value))
+        }
+    }
+
+    @Test
+    fun `leading zero IPv4 octets cannot select a different ADB or NTP destination`() {
+        for (address in listOf("010.0.0.1", "192.168.010.005", "127.0.0.01", "00.0.0.0")) {
+            assertFalse(address, isValidIpv4(address))
+            assertFalse(address, isValidNtpServer(address))
+            assertNull(address, parseDeviceAddress(address))
+            assertNull(address, parseDeviceAddress("$address:5555"))
+        }
+        assertTrue(isValidIpv4("0.0.0.0"))
+        assertTrue(isValidNtpServer("192.168.10.5"))
+        assertEquals(DeviceAddress("10.0.0.1", 5555), parseDeviceAddress("10.0.0.1:5555"))
+    }
+
     @Test
     fun `NTP-сервер принимает домен и IPv4`() {
         assertTrue(isValidNtpServer("time.google.com"))

@@ -111,31 +111,37 @@ class ADBServerLease:
     def ensure(self):
         with self.mutex, self._locked():
             state = self._load()
-            if not self._listening():
-                flags = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {'start_new_session': True}
-                child = subprocess.Popen([self.adb_path, 'server', 'nodaemon'], env=self.env,
-                                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)
-                self.child = child
-                deadline = time.monotonic() + 8
-                while child.poll() is None and not self._listening() and time.monotonic() < deadline:
-                    time.sleep(.05)
-                if child.poll() is not None or not self._listening():
-                    if child.poll() is None:
-                        child.terminate()
-                        try:
-                            child.wait(timeout=2)
-                        except subprocess.TimeoutExpired:
-                            child.kill()
-                            child.wait(timeout=2)
-                    raise OSError('Could not start the application ADB server')
-                process = psutil.Process(child.pid)
-                state['server'] = {'pid': child.pid, 'birth': process.create_time(), 'exe': process.exe()}
-            elif self._owned_process(state.get('server')) is None:
-                # Порт уже занят сервером без доказанного владения: можно
-                # использовать, но нельзя посылать ему kill-server/disconnect.
-                state.pop('server', None)
-            state['leases'][self.token] = os.getpid()
-            self._save(state)
+            started = None
+            try:
+                if not self._listening():
+                    flags = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {'start_new_session': True}
+                    started = subprocess.Popen([self.adb_path, 'server', 'nodaemon'], env=self.env,
+                                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)
+                    self.child = started
+                    deadline = time.monotonic() + 8
+                    while started.poll() is None and not self._listening() and time.monotonic() < deadline:
+                        time.sleep(.05)
+                    if started.poll() is not None or not self._listening():
+                        raise OSError('Could not start the application ADB server')
+                    process = psutil.Process(started.pid)
+                    state['server'] = {'pid': started.pid, 'birth': process.create_time(), 'exe': process.exe()}
+                elif self._owned_process(state.get('server')) is None:
+                    # Порт уже занят сервером без доказанного владения: можно
+                    # использовать, но нельзя посылать ему kill-server/disconnect.
+                    state.pop('server', None)
+                state['leases'][self.token] = os.getpid()
+                self._save(state)
+            except BaseException:
+                # Без записи владельца cleanup не сможет остановить новый
+                # сервер. Чужой уже работавший сервер здесь не затрагиваем.
+                if started is not None and started.poll() is None:
+                    started.terminate()
+                    try:
+                        started.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        started.kill()
+                        started.wait(timeout=2)
+                raise
             self.registered = True
 
     def release(self):

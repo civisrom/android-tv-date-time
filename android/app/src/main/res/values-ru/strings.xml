@@ -76,7 +76,7 @@
     <string name="connect_try_loopback">Подключиться к этому устройству</string>
 
     <!-- Причины неудачного подключения -->
-    <string name="error_invalid_address">Неверный адрес. Используйте 192.168.1.20 или 192.168.1.20:37105.</string>
+    <string name="error_invalid_address">Неверный адрес. Используйте IPv4 или IPv6. Порт IPv6 укажите в формате [2001:db8::1]:37105.</string>
     <string name="error_unreachable">Не удаётся достучаться до устройства. Проверьте, что оно в той же сети и отладка включена.</string>
     <string name="error_pairing_required">Устройство требует спаривания по коду. Откройте на нём «Беспроводную отладку» и воспользуйтесь спариванием ниже.</string>
     <string name="error_not_authorized">Подтвердите запрос отладки на экране устройства и повторите попытку.</string>
@@ -127,7 +127,7 @@
     <string name="ntp_apply">Применить</string>
     <string name="ntp_search_country">Поиск страны</string>
     <string name="ntp_applied">Настройка NTP сохранена: %1$s.</string>
-    <string name="ntp_invalid">Неверный адрес сервера времени. Введите домен или IPv4 без порта, пробелов и http://.</string>
+    <string name="ntp_invalid">Неверный адрес сервера времени. Введите домен, IPv4 или IPv6 без скобок, порта, интерфейса и http://.</string>
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
     <string name="ntp_permission_denied">Подключённое устройство запретило изменение сервера времени через ADB. Проверьте ограничения отладки в его настройках разработчика.</string>
@@ -549,4 +549,120 @@
     <string name="terminal_remove_failed">Не удалось удалить копию файла. Повторите попытку.</string>
     <string name="terminal_remove_title">Удалить файл из списка?</string>
     <string name="terminal_remove_hint">Копия «%1$s» будет удалена из хранилища приложения. Исходный файл и приложение на подключённом устройстве сохранятся.</string>
+    <string name="terminal_example_time_8" formatted="false">Показать часы устройства в UTC без изменения времени</string>
+    <string name="terminal_example_time_9" formatted="false">Прочитать Unix-время в секундах</string>
+    <string name="terminal_example_time_10" formatted="false">Проверить автоматическое определение времени; Android 10+</string>
+    <string name="terminal_example_time_11" formatted="false">Проверить автоматическое определение часового пояса; Android 11+</string>
+    <string name="terminal_example_time_12" formatted="false">Показать состояние сетевого времени, если служба доступна</string>
+    <string name="terminal_example_time_13" formatted="false">Прочитать справку службы времени, если она доступна в прошивке</string>
+    <string name="terminal_example_time_14" formatted="false">Прочитать справку службы часового пояса, если она доступна в прошивке</string>
+    <string name="terminal_example_apps_11" formatted="false">Показать имена системных пакетов</string>
+    <string name="terminal_example_apps_12" formatted="false">Показать отключённые пакеты без изменения их состояния</string>
+    <string name="terminal_example_apps_13" formatted="false">Показать UID пакетов и установившие их приложения</string>
+    <string name="terminal_example_apps_14" formatted="false">Проверить версию, разрешения и состояние пакета; замените PACKAGE</string>
+    <string name="terminal_example_apps_15" formatted="false">Показать заявленные аппаратные и программные возможности устройства</string>
+    <string name="terminal_example_apps_16" formatted="false">Прочитать ID активного пользователя Android</string>
+    <string name="terminal_example_files_8" formatted="false">Прочитать размер, права и время файла; замените путь</string>
+    <string name="terminal_example_files_9" formatted="false">Вычислить SHA-256 файла без его изменения</string>
+    <string name="terminal_example_files_10" formatted="false">Показать файлы непосредственно в Download без обхода вложенных папок</string>
+    <string name="terminal_example_system_9" formatted="false">Прочитать поддерживаемые ABI процессора для выбора APK</string>
+    <string name="terminal_example_system_10" formatted="false">Прочитать дату исправлений безопасности Android</string>
+    <string name="terminal_example_system_11" formatted="false">Прочитать режим SELinux без его изменения</string>
+    <string name="terminal_example_network_5" formatted="false">Проверить счётчики интерфейсов и состояние сетевых соединений</string>
+    <string name="terminal_example_network_6" formatted="false">Показать таблицу соседей в локальной сети</string>
+    <string name="terminal_example_network_7" formatted="false">Показать IPv6-адреса устройства</string>
+    <string name="terminal_example_network_8" formatted="false">Показать IPv6-маршруты устройства</string>
+    <string name="terminal_example_network_9" formatted="false">Прочитать режим Private DNS; Android 9+</string>
+    <string name="terminal_example_network_10" formatted="false">Прочитать настроенное имя сервера Private DNS; Android 9+</string>
+    <string name="terminal_example_input_6" formatted="false">Проверить устройства ввода и обработку нажатий</string>
+    <string name="terminal_example_input_7" formatted="false">Проверить подключённые дисплеи и поддерживаемые режимы</string>
+    <string name="terminal_example_logs_7" formatted="false">Проверить использование памяти одним пакетом; замените PACKAGE</string>
+    <string name="terminal_example_logs_8" formatted="false">Прочитать статистику отрисовки приложения; замените PACKAGE</string>
+    <string name="terminal_example_logs_9" formatted="false">Прочитать загрузку процессора процессами из системной службы</string>
+    <string name="terminal_reference_129" formatted="false">Прочитать справку утилиты Toybox; замените COMMAND её именем</string>
+    <string name="terminal_reference_130" formatted="false">Прочитать доступные в этой прошивке команды Wi-Fi</string>
+    <string name="terminal_reference_131" formatted="false">Прочитать доступные в этой прошивке сетевые команды</string>
+    <string name="terminal_reference_132" formatted="false">Прочитать параметры диагностики службы; замените SERVICE</string>
+    <string name="terminal_reference_133" formatted="false">Прочитать справку команд экрана и окон</string>
+    <string name="terminal_reference_134" formatted="false">Проверить наличие shell-команды; замените COMMAND</string>
+
+    <string name="time_tools_title">Настройки времени, профили и наблюдение</string>
+    <string name="time_tools_hint">Сохранённые настройки, сравнение часов и сведения службы — отдельные факты. Перед управляемым изменением исходный стабильный снимок сохраняется локально. Команды терминала этим снимком не охватываются.</string>
+    <string name="time_tools_refresh">Прочитать настройки и сведения службы</string>
+    <string name="time_identity_unavailable">Стабильную идентичность устройства определить не удалось. Сохранение и восстановление недоступны. Обновите сведения после подключения к поддерживаемому устройству.</string>
+    <string name="time_identity_mismatch">Идентичность устройства изменилась. Дальнейшая запись остановлена. Подключитесь заново и проверьте устройство.</string>
+    <string name="time_current_title">Последние прочитанные настройки</string>
+    <string name="time_field_ntp">Настройка NTP</string>
+    <string name="time_field_auto">Автоматическое время</string>
+    <string name="time_field_auto_zone">Автоматический часовой пояс</string>
+    <string name="time_field_zone">Часовой пояс</string>
+    <string name="time_status_verified">Прочитано и подтверждено</string>
+    <string name="time_status_unavailable">Недоступно</string>
+    <string name="time_status_permission">Нет разрешения</string>
+    <string name="time_status_unsupported">Не поддерживается устройством</string>
+    <string name="time_status_unconfirmed">Изменение не подтверждено повторным чтением</string>
+    <string name="time_status_failed">Операция завершилась ошибкой</string>
+    <string name="time_status_invalid">Недопустимое значение</string>
+    <string name="time_value_absent">Не задано (системное значение)</string>
+    <string name="time_value_empty">Пустое значение</string>
+    <string name="time_settings_confirmed">Настройки сохранены и прочитаны обратно. Это не подтверждает синхронизацию часов или её источник.</string>
+    <string name="time_settings_partial">Часть настроек не подтверждена. Проверьте результаты для каждого поля.</string>
+    <string name="time_rollback_result">Попытка возврата к состоянию перед этой операцией:</string>
+    <string name="time_snapshot_date">Исходный снимок: %1$s</string>
+    <string name="time_snapshot_none">Исходного снимка для этого устройства пока нет.</string>
+    <string name="time_snapshot_save">Сохранить исходный снимок</string>
+    <string name="time_snapshot_replace">Заменить исходный снимок</string>
+    <string name="time_snapshot_restore">Просмотреть и вернуть исходные настройки</string>
+    <string name="time_profiles_title">Профили устройства</string>
+    <string name="time_profiles_hint">Профили принадлежат этому устройству. Подключайтесь через «Избранное», как обычно; адреса и доверие ADB в профили не копируются. Имена должны быть уникальны для устройства.</string>
+    <string name="time_profile_name">Название профиля</string>
+    <string name="time_profile_save">Сохранить текущие настройки в профиль</string>
+    <string name="time_profile_apply">Просмотреть и применить</string>
+    <string name="time_profile_delete">Удалить профиль</string>
+    <string name="time_ntp_list_title">Резервные серверы NTP</string>
+    <string name="time_ntp_list_hint">Android 14+: до четырёх разных DNS-имён или адресов IPv4/IPv6, по одному в строке, UDP 123. Android сохраняет рабочий сервер до ошибки; значения не усредняются. Поддержка прошивки может отличаться. Повторное чтение подтверждает только запись.</string>
+    <string name="time_ntp_single_hint">Эта версия Android поддерживает один сервер NTP. Укажите одно DNS-имя или адрес IPv4/IPv6, UDP 123.</string>
+    <string name="time_ntp_list_input">Один сервер NTP в строке</string>
+    <string name="time_ntp_list_invalid">Укажите разные допустимые адреса: до четырёх на Android 14+, иначе один. Без схемы URI и номера порта.</string>
+    <string name="time_source_title">Сведения об источнике системного времени</string>
+    <string name="time_source_unconfirmed">Текущий источник часов не подтверждён. Совпадение часов, ответ NTP в кэше или обновление доверия не доказывают, что этот сервер установил системное время.</string>
+    <string name="time_source_service_status">Служба NTP: %1$s. Детектор времени: %2$s.</string>
+    <string name="time_source_response">Последний зарегистрированный ответ службы (исторический): %1$s</string>
+    <string name="time_source_age">Возраст ответа при чтении: %1$d с</string>
+    <string name="time_source_recorded">Последняя известная операция установки часов: %1$s. Это историческая запись, не связанная с URI выше.</string>
+    <string name="time_source_unparseable">Неизвестный формат службы</string>
+    <string name="time_monitor_title">Наблюдение за часами</string>
+    <string name="time_monitor_hint">Одно сравнение без изменения настроек каждые 30 секунд, до 10 минут или 20 попыток. Занятые операции пропускаются. Уход из приложения или отключение останавливает наблюдение. Фоновая служба не используется; системное время не меняется.</string>
+    <string name="time_monitor_start">Начать наблюдение</string>
+    <string name="time_monitor_stop">Остановить наблюдение</string>
+    <string name="time_monitor_running">Наблюдение выполняется</string>
+    <string name="time_monitor_stopped">Наблюдение остановлено</string>
+    <string name="time_monitor_user">Остановлено явным действием</string>
+    <string name="time_monitor_duration">Достигнут предел наблюдения</string>
+    <string name="time_monitor_background">Остановлено при уходе приложения с экрана</string>
+    <string name="time_monitor_disconnected">Остановлено после отключения</string>
+    <string name="time_monitor_busy">Пропуск: устройство занято</string>
+    <string name="time_monitor_sample">+%1$d с: %2$s</string>
+    <string name="time_monitor_offset">Расхождение %1$.3f с; погрешность ±%2$.3f с</string>
+    <string name="time_preview_title">Проверка действия</string>
+    <string name="time_snapshot_preview">Прочитать и сохранить четыре текущие настройки. Замена снимка удалит предыдущие исходные значения этого устройства. Настройки устройства не меняются. Перед сохранением значения читаются заново.</string>
+    <string name="time_profile_save_preview">Сохранить текущие настройки локально под этим именем. Ниже последний прочитанный набор; перед сохранением значения читаются заново. Настройки устройства не меняются.</string>
+    <string name="time_profile_delete_preview">Удалить этот локальный профиль. Настройки устройства не изменятся.</string>
+    <string name="time_ntp_preview">Записать эту настройку NTP. Сначала требуется сохранённый стабильный исходный снимок. Это не принудительное обновление времени и не доказательство активного источника часов.</string>
+    <string name="time_restore_preview">Применить эти точные значения только к тому же устройству. Каждое поле читается обратно; неподдерживаемые изменения и отказы показываются отдельно.</string>
+    <string name="time_preview_confirm">Подтвердить</string>
+    <string name="time_preview_cancel">Отмена</string>
+    <string name="time_saved_locally">Сохранено локально; настройки устройства не менялись.</string>
+    <string name="time_profile_deleted">Профиль удалён; настройки устройства не менялись.</string>
+    <string name="time_storage_or_capture_failed">Не удалось прочитать или сохранить стабильный снимок/профиль. Проверьте разрешения устройства, неизменность настроек и локальное хранилище. Ранее сохранённые данные сохранены.</string>
+    <string name="time_snapshot_required">Не удалось сохранить стабильный исходный снимок. Запрошенная настройка не изменена. Откройте раздел настроек времени и проверьте идентичность устройства, разрешения и хранилище.</string>
+    <string name="time_measurement_stale">Последняя проверка: старше 30 секунд либо возраст неизвестен. Он не подтверждает текущее состояние часов.</string>
+    <string name="time_export_save">Сохранить обезличенный отчёт</string>
+    <string name="time_export_saved">Обезличенный отчёт сохранён.</string>
+    <string name="time_export_failed">Не удалось сохранить отчёт. Можно скопировать его.</string>
+    <string name="time_export_unavailable">На устройстве нет системного выбора документа. Используйте «Копировать отчёт».</string>
+    <string name="time_effective_auto_zone">Фактическое автоопределение пояса: %1$s</string>
+    <string name="time_effective_on">Включено</string>
+    <string name="time_effective_off">Выключено или не поддерживается устройством</string>
+    <string name="time_monitor_reconnect">Наблюдение остановлено; прерванная команда ADB закрыла соединение. Подключитесь заново для продолжения.</string>
 </resources>

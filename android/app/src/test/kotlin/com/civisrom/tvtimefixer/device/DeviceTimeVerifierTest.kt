@@ -54,6 +54,23 @@ class DeviceTimeVerifierTest {
     }
     private fun verify() = DeviceTimeVerifier(query) { elapsed }.verify(client)
 
+    @Test fun `every completed attempt has a monotonic age even when no clock comparison was possible`() {
+        server = "null"
+        assertEquals(DeviceTimeStatus.SYSTEM_DEFAULT, verify().status)
+        assertTrue(verify().isFresh(elapsed))
+        server = "invalid;host"
+        assertEquals(DeviceTimeStatus.NO_SERVER, verify().status)
+        assertTrue(verify().isFresh(elapsed))
+        server = "pool.ntp.org"
+        queryFailure = IOException("offline")
+        assertEquals(DeviceTimeStatus.NTP_UNAVAILABLE, verify().status)
+        assertTrue(verify().isFresh(elapsed))
+        failingCommand = "settings get global ntp_server"
+        assertEquals(DeviceTimeStatus.DEVICE_UNAVAILABLE, verify().status)
+        assertTrue(verify().isFresh(elapsed))
+        assertFalse(verify().isFresh(elapsed + 30_001))
+    }
+
     @Test fun `aligned device clocks match with ADB and NTP uncertainty`() {
         val check = verify()
         assertEquals(DeviceTimeStatus.MATCH, check.status)

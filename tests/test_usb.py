@@ -146,7 +146,9 @@ class UsbConnectionTests(unittest.TestCase):
                 fixer = self.fixer()
                 fixer.usb_devices.return_value = [UsbAdbDevice('TV123', 7, 'DEVICE', model)]
                 output = io.StringIO()
-                with mock.patch.object(PlatformToolsTransport, 'shell', side_effect=['androidtvtimefixer', 'ok']), contextlib.redirect_stdout(output):
+                def reply(command):
+                    return {'echo androidtvtimefixer': 'androidtvtimefixer', 'echo ok': 'ok'}.get(command, '\n__TVTF_EXIT__1\n')
+                with mock.patch.object(PlatformToolsTransport, 'shell', side_effect=reply), contextlib.redirect_stdout(output):
                     fixer.connect_usb('usb:7')
                     fixer.connect_or_reuse('usb:7')
                 self.assertIn(locales.get('usb_connected', device=expected), output.getvalue())

@@ -74,6 +74,7 @@ internal fun Operation.labelRes(): Int = when (this) {
     Operation.CHECK_TIME -> R.string.time_check_title
     Operation.APPLY_TIME_ZONE -> R.string.time_zone_apply
     Operation.TERMINAL -> R.string.terminal_operation
+    Operation.TIME_SETTINGS -> R.string.time_tools_title
 }
 
 private fun DiagnosticIssue.labelRes(): Int = when (this) {
@@ -121,17 +122,9 @@ private fun eventHeading(context: Context, event: DiagnosticEvent): String {
 private fun formatTime(time: Long) = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(time))
 
 /** Отчёт строится только из уже безопасных событий, не из состояния устройства. */
-internal fun diagnosticReport(context: Context, snapshot: DiagnosticSnapshot, mode: DeviceMode): String = buildString {
-    appendLine("Android TV Time Fixer ${BuildConfig.VERSION_NAME}")
-    appendLine("Android API ${Build.VERSION.SDK_INT}; $mode; debug=${BuildConfig.DEBUG}")
-    appendLine(context.getString(R.string.diagnostics_hint))
-    if (!snapshot.storageAvailable) appendLine(context.getString(R.string.diagnostics_storage_failed))
-    if (snapshot.dropped > 0) appendLine(context.getString(R.string.diagnostics_dropped, snapshot.dropped))
-    snapshot.events.forEach { event ->
-        appendLine("${formatTime(event.time)}  ${eventHeading(context, event)}")
-        appendLine(diagnosticDetails(event))
-    }
-}
+internal fun diagnosticReport(context: Context, snapshot: DiagnosticSnapshot, mode: DeviceMode): String =
+    com.civisrom.tvtimefixer.diagnostics.diagnosticExport(
+        com.civisrom.tvtimefixer.diagnostics.DiagnosticExportState(BuildConfig.VERSION_NAME, Build.VERSION.SDK_INT), snapshot)
 
 @Composable
 internal fun DiagnosticsScreen(
@@ -140,6 +133,9 @@ internal fun DiagnosticsScreen(
     selectedId: Long?,
     onBack: () -> Unit,
     onClear: () -> Unit,
+    onExport: (() -> Unit)? = null,
+    onCopy: (() -> Unit)? = null,
+    exportMessage: Int? = null,
 ) {
     BackHandler(onBack = onBack)
     val backFocus = remember { FocusRequester() }
@@ -188,14 +184,17 @@ internal fun DiagnosticsScreen(
                         FilterChip(selected = errorsOnly, onClick = { errorsOnly = true }, modifier = Modifier.testTag("diagnostics-errors"),
                             label = { Text(stringResource(R.string.diagnostics_errors)) })
                         FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = {
-                            copyResult = if (runCatching {
+                            if (onCopy != null) onCopy() else copyResult = if (runCatching {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Android TV Time Fixer", diagnosticReport(context, snapshot, mode)))
                             }.isSuccess) R.string.diagnostics_copied else R.string.diagnostics_copy_failed
-                        }) { Text(stringResource(R.string.diagnostics_copy)) }
+                        }, modifier = Modifier.testTag("diagnostics-copy")) { Text(stringResource(R.string.diagnostics_copy)) }
+                        if (onExport != null) FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = onExport,
+                            modifier = Modifier.testTag("diagnostics-export")) { Text(stringResource(R.string.time_export_save)) }
                         FilledTonalButton(shape = MaterialTheme.shapes.medium, onClick = { confirmClear = true }, enabled = snapshot.events.isNotEmpty(),
                             modifier = Modifier.testTag("diagnostics-clear")) { Text(stringResource(R.string.diagnostics_clear)) }
                     }
+                    exportMessage?.let { Text(stringResource(it)) }
                     copyResult?.let { Text(stringResource(it)) }
                     if (selectedId != null && snapshot.events.none { it.id == selectedId }) {
                         Text(stringResource(R.string.diagnostics_entry_expired))

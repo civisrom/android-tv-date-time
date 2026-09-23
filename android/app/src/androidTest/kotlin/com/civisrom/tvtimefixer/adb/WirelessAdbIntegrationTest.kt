@@ -33,6 +33,8 @@ class WirelessAdbIntegrationTest {
         check(Build.VERSION.SDK_INT >= 30)
         val redroid = InstrumentationRegistry.getArguments().getString("redroid_wireless_fixture") == "true" &&
             shell("getprop ro.hardware").trim() == "redroid"
+        val testHost = InstrumentationRegistry.getArguments().getString("real_wireless_host") ?: "127.0.0.1"
+        check(testHost in listOf("127.0.0.1", "::1")) { "Wireless fixture host must be loopback" }
         check(redroid || shell("getprop ro.kernel.qemu").trim() == "1") { "Only disposable test devices are supported" }
         check(shell("getprop ro.adb.secure").trim() == "1") { "Wireless security tests require ADB authentication enabled" }
 
@@ -98,7 +100,7 @@ class WirelessAdbIntegrationTest {
             val pairingCode = checkNotNull(code)
             check(pairingCode.matches(Regex("[0-9]{6}")) && port in 1..65535)
             check(port != connectionPort) { "Pairing and connection must use distinct ports" }
-            DeviceAddress("127.0.0.1", port) to pairingCode
+            DeviceAddress(testHost, port) to pairingCode
         }
         try {
             if (redroid) {
@@ -120,7 +122,7 @@ class WirelessAdbIntegrationTest {
                     connectionPort in 1..65535
                 }
             }
-            val address = DeviceAddress("127.0.0.1", connectionPort)
+            val address = DeviceAddress(testHost, connectionPort)
             val factory = KadbAdbClientFactory(5_000, 8_000)
             val unpaired = runCatching { factory.connect(address).close() }.exceptionOrNull()
             if (unpaired !is AdbConnectionException) throw AssertionError("Unpaired ADB client was not rejected", unpaired)

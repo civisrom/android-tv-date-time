@@ -1,37 +1,46 @@
 import contextlib
 import io
 import logging
-import shlex
+from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
 from src.android_time_fixer import AndroidTVTimeFixer, AndroidTVTimeFixerError, locales
+from tests.test_device_time_settings import TimeDevice
 
 
-class Target:
+class Target(TimeDevice):
     def __init__(self, raw='null', api='29', automatic='0'):
-        self.raw, self.api, self.automatic = raw, api, automatic
-        self.commands = []
+        super().__init__(api)
+        self.raw = raw
+        self.globals['auto_time'] = automatic
 
-    def shell(self, command):
-        self.commands.append(command)
-        args = shlex.split(command)
-        if args == ['settings', 'get', 'global', 'ntp_server']:
-            return self.raw
-        if args[:4] == ['settings', 'put', 'global', 'ntp_server']:
-            self.raw = args[4]
-        if args == ['settings', 'delete', 'global', 'ntp_server']:
-            self.raw = 'null'
-        return {'getprop ro.build.version.sdk': self.api,
-                'settings get global auto_time': self.automatic, 'date +%s': '1800000000'}.get(command, '')
+    @property
+    def raw(self):
+        return self.globals['ntp_server']
+
+    @raw.setter
+    def raw(self, value):
+        self.globals['ntp_server'] = value
+
+    @property
+    def automatic(self):
+        return self.globals['auto_time']
 
 
 class NtpSettingsTests(unittest.TestCase):
     def fixer(self, target):
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)
         fixer.device = target
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        fixer.data_dir = Path(directory.name)
         fixer.logger = logging.getLogger('ntp-setting-test')
         fixer.verify_ntp_server = mock.Mock(return_value=True)
+        status = mock.patch('src.android_time_fixer.show_time_status')
+        status.start()
+        self.addCleanup(status.stop)
         return fixer
 
     def test_save_reports_restart_and_disabled_auto_time_instead_of_sync_success(self):

@@ -80,6 +80,30 @@ class AutoSetupDiscoveryTests(unittest.TestCase):
         fixer.connect_or_reuse.assert_not_called()
         fixer._test_ntp_server.assert_not_called()
 
+    def test_invalid_server_selection_does_not_fall_back_to_the_recommendation(self):
+        for answer in ('q', '0', '2', 'oops'):
+            with self.subTest(answer=answer):
+                fixer = self.fixer({'legacy': ['192.168.1.20:5555']})
+                fixer._test_ntp_server.return_value = {
+                    'server': 'time.example', 'status': 'Reachable', 'success_rate': 100,
+                    'median_rtt': 2, 'avg_rtt': 2, 'rtt_jitter': 0, 'offset': 0,
+                }
+                fixer.set_ntp_server = mock.Mock()
+                fixer.show_device_time = mock.Mock()
+                self.run_setup(fixer, ['', answer, ''])
+                fixer.set_ntp_server.assert_not_called()
+
+    def test_enter_selects_the_recommendation_after_explicit_confirmation(self):
+        fixer = self.fixer({'legacy': ['192.168.1.20:5555']})
+        fixer._test_ntp_server.return_value = {
+            'server': 'time.example', 'status': 'Reachable', 'success_rate': 100,
+            'median_rtt': 2, 'avg_rtt': 2, 'rtt_jitter': 0, 'offset': 0,
+        }
+        fixer.set_ntp_server = mock.Mock()
+        fixer.show_device_time = mock.Mock()
+        self.run_setup(fixer, ['', '', 'yes'])
+        fixer.set_ntp_server.assert_called_once_with('time.example')
+
 
 if __name__ == '__main__':
     unittest.main()

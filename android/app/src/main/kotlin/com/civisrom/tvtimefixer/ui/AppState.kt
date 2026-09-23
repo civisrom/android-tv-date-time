@@ -20,6 +20,8 @@ import com.civisrom.tvtimefixer.diagnostics.UsbSystemState
  * проверить целиком, не поднимая Compose.
  */
 data class AppState(
+    val timeTools: TimeToolsState = TimeToolsState(),
+    val diagnosticExportMessage: Int? = null,
     val localSetup: com.civisrom.tvtimefixer.LocalSetupState = com.civisrom.tvtimefixer.LocalSetupState(),
     val favorites: com.civisrom.tvtimefixer.data.Favorites = com.civisrom.tvtimefixer.data.Favorites(),
     val favoritesReady: Boolean = false,
@@ -75,11 +77,17 @@ data class AppState(
         discovered = latest.discovered, discoveryAvailable = latest.discoveryAvailable,
         discoverySearching = latest.discoverySearching, discoveryPermissionNeeded = latest.discoveryPermissionNeeded,
         ntpScan = latest.ntpScan,
+        timeTools = timeTools.copy(monitor = latest.timeTools.monitor),
+        diagnosticExportMessage = latest.diagnosticExportMessage,
     )
+
+    /** A fresh connection must never inherit samples from the previous device or session. */
+    fun beginConnection(): AppState = connectionLost().copy(timeTools = TimeToolsState())
 
     /** После потери связи сведения и подтверждения от прежнего устройства больше не актуальны. */
     fun connectionLost(): AppState = copy(
         connection = ConnectionState.Disconnected,
+        timeTools = TimeToolsState(monitor = timeTools.monitor.copy(running = false, ended = com.civisrom.tvtimefixer.device.ClockMonitorEnd.DISCONNECTED)),
         deviceName = "",
         deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,
         ntpChange = null, ntpBeforeTime = null,

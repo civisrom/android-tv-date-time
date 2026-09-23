@@ -101,6 +101,17 @@ internal const val PROJECT_REPOSITORY_URL = "https://github.com/civisrom/android
 
 /** Действия, которые экран запрашивает у владельца состояния. */
 interface AppActions {
+    fun refreshTimeTools()
+    fun saveTimeSnapshot(replace: Boolean)
+    fun restoreTimeSnapshot()
+    fun saveTimeProfile(name: String)
+    fun applyTimeProfile(name: String)
+    fun removeTimeProfile(name: String)
+    fun applyNtpList(hosts: List<String>)
+    fun startClockMonitor()
+    fun stopClockMonitor()
+    fun exportDiagnostics()
+    fun copyDiagnostics()
     fun connectFavorite(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice)
     fun saveCurrentDevice(name: String)
     fun updateFavoriteDevice(favorite: com.civisrom.tvtimefixer.data.FavoriteDevice)
@@ -194,7 +205,7 @@ fun MainScreen(
                     else -> true
                 }
                 showDiagnostics = false; returnFocus = if (available) origin else "diagnostics-open"
-            }, onClear = onClearDiagnostics)
+            }, onClear = onClearDiagnostics, onExport = actions::exportDiagnostics, onCopy = actions::copyDiagnostics, exportMessage = state.diagnosticExportMessage)
     } else holder.SaveableStateProvider("main") {
         MainContent(mode, state, actions, diagnostics, pairingCode, { pairingCode = it },
             connectionSection, { connectionSection = it },
@@ -366,6 +377,11 @@ private fun MainContent(
                 TimeZoneSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
             }
             OperationProgress(state, actions, "timezone", Operation.APPLY_TIME_ZONE)
+        }
+        FunctionCard("time-tools") {
+            ExpandableSection(stringResource(R.string.time_tools_title), "time-tools") {
+                TimeToolsSection(state, actions, mode)
+            }
         }
         FunctionCard("pairing") {
             ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
@@ -1128,14 +1144,21 @@ private fun NtpCheckCard(check: NtpProbeResult) {
 }
 
 @Composable
-private fun DeviceTimeCard(check: DeviceTimeCheck) {
+internal fun DeviceTimeCard(check: DeviceTimeCheck) {
     val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
+    var fresh by remember(check) { mutableStateOf(check.isFresh(android.os.SystemClock.elapsedRealtime())) }
+    LaunchedEffect(check) {
+        check.ageMillis(android.os.SystemClock.elapsedRealtime())?.let { age ->
+            if (age <= 30_000) { delay(30_001 - age); fresh = false }
+        }
+    }
     Card(Modifier.fillMaxWidth().testTag("time-check-result")) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.time_check_title), style = MaterialTheme.typography.titleSmall)
+            if (!fresh) Text(stringResource(R.string.time_measurement_stale), modifier = Modifier.testTag("time-check-stale"))
             Text(stringResource(check.status.messageRes()), modifier = Modifier.testTag("time-check-status"),
                 color = when (check.status) {
-                    DeviceTimeStatus.MATCH -> ConnectedColor
+                    DeviceTimeStatus.MATCH -> if (fresh) ConnectedColor else MaterialTheme.colorScheme.onSurface
                     DeviceTimeStatus.MISMATCH -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onSurface
                 })

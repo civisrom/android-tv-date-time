@@ -7,7 +7,7 @@ remains under its own license.
 ## Bundled binaries
 
 These apply to the desktop release archives
-(`AndroidTVTimeFixer-{windows,linux,macos}.zip`).
+(`AndroidTVTimeFixer-{windows,linux,macos,macos-intel}.zip`).
 
 ### Android Debug Bridge (adb)
 
@@ -94,11 +94,17 @@ the published APK apart from the signature.
 | pyperclip | BSD-3-Clause |
 | ifaddr | MIT |
 | ntplib | MIT |
+| certifi (Mozilla CA certificate bundle) | MPL-2.0 |
 | platformdirs | MIT |
 | rich | MIT |
 | typing-extensions | PSF-2.0 |
 | pyobjc-framework-Cocoa (macOS only) | MIT |
 | **python-zeroconf** | **LGPL-2.1-or-later** |
+
+The desktop HTTPS check includes the unmodified `certifi` CA bundle so TLS
+verification does not depend on a separately installed Python. Its source and
+licence are available at https://github.com/certifi/python-certifi and
+https://www.mozilla.org/MPL/2.0/.
 
 ## python-zeroconf and the LGPL
 

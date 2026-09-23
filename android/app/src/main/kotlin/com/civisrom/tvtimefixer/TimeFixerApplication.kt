@@ -9,6 +9,7 @@ import java.io.File
 
 class TimeFixerApplication : Application() {
     val favorites by lazy { com.civisrom.tvtimefixer.data.FavoritesStore(File(noBackupFilesDir, "favorites.bin")) }
+    val timeSettings by lazy { com.civisrom.tvtimefixer.data.TimeSettingsStore(File(noBackupFilesDir, "time-settings.bin")) }
     lateinit var diagnostics: DiagnosticJournal
         private set
 

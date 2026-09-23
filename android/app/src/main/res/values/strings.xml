@@ -76,7 +76,7 @@
     <string name="connect_try_loopback">Connect to this device</string>
 
     <!-- Причины неудачного подключения: разные ответы требуют разных действий -->
-    <string name="error_invalid_address">Invalid address. Use 192.168.1.20 or 192.168.1.20:37105.</string>
+    <string name="error_invalid_address">Invalid address. Use IPv4 or IPv6. For an IPv6 port, use [2001:db8::1]:37105.</string>
     <string name="error_unreachable">Cannot reach the device. Check that it is on the same network and that debugging is enabled.</string>
     <string name="error_pairing_required">The device needs pairing with a code. Open Wireless debugging on it and use pairing below.</string>
     <string name="error_not_authorized">Confirm the debugging prompt on the device screen, then try again.</string>
@@ -127,7 +127,7 @@
     <string name="ntp_apply">Apply</string>
     <string name="ntp_search_country">Search country</string>
     <string name="ntp_applied">NTP setting saved: %1$s.</string>
-    <string name="ntp_invalid">Invalid time server address. Enter a domain or IPv4 without a port, spaces, or http://.</string>
+    <string name="ntp_invalid">Invalid time server address. Enter a domain, IPv4 or IPv6 without brackets, a port, interface scope or http://.</string>
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
     <string name="ntp_permission_denied">The connected device denied permission to change the time server via ADB. Check debugging restrictions in its developer options.</string>
@@ -549,4 +549,120 @@
     <string name="terminal_remove_failed">Could not delete the file copy. Try again.</string>
     <string name="terminal_remove_title">Delete file from the list?</string>
     <string name="terminal_remove_hint">The copy “%1$s” will be deleted from app storage. The original file and the app on the connected device will be kept.</string>
+    <string name="terminal_example_time_8" formatted="false">Show the device clock in UTC without changing it</string>
+    <string name="terminal_example_time_9" formatted="false">Read Unix time in seconds</string>
+    <string name="terminal_example_time_10" formatted="false">Inspect automatic time detection; Android 10+</string>
+    <string name="terminal_example_time_11" formatted="false">Inspect automatic time zone detection; Android 11+</string>
+    <string name="terminal_example_time_12" formatted="false">Inspect network time state if this service is available</string>
+    <string name="terminal_example_time_13" formatted="false">Read time detection commands if supported by this firmware</string>
+    <string name="terminal_example_time_14" formatted="false">Read time zone commands if supported by this firmware</string>
+    <string name="terminal_example_apps_11" formatted="false">List system package identifiers</string>
+    <string name="terminal_example_apps_12" formatted="false">List disabled packages without changing them</string>
+    <string name="terminal_example_apps_13" formatted="false">List package UIDs and installer identifiers</string>
+    <string name="terminal_example_apps_14" formatted="false">Inspect package version, permissions and state; replace PACKAGE</string>
+    <string name="terminal_example_apps_15" formatted="false">List hardware and software features reported by the device</string>
+    <string name="terminal_example_apps_16" formatted="false">Read the active Android user ID</string>
+    <string name="terminal_example_files_8" formatted="false">Read file size, permissions and timestamps; replace the path</string>
+    <string name="terminal_example_files_9" formatted="false">Calculate a file SHA-256 checksum without modifying it</string>
+    <string name="terminal_example_files_10" formatted="false">List files directly in Download without recursive traversal</string>
+    <string name="terminal_example_system_9" formatted="false">Read supported CPU ABIs for APK selection</string>
+    <string name="terminal_example_system_10" formatted="false">Read the Android security patch date</string>
+    <string name="terminal_example_system_11" formatted="false">Read SELinux enforcement status without changing it</string>
+    <string name="terminal_example_network_5" formatted="false">Inspect network interface counters and link state</string>
+    <string name="terminal_example_network_6" formatted="false">Inspect the local network neighbour table</string>
+    <string name="terminal_example_network_7" formatted="false">List IPv6 addresses on the device</string>
+    <string name="terminal_example_network_8" formatted="false">List IPv6 routes on the device</string>
+    <string name="terminal_example_network_9" formatted="false">Read Private DNS mode; Android 9+</string>
+    <string name="terminal_example_network_10" formatted="false">Read the configured Private DNS hostname; Android 9+</string>
+    <string name="terminal_example_input_6" formatted="false">Inspect input devices and input dispatch state</string>
+    <string name="terminal_example_input_7" formatted="false">Inspect connected displays and supported modes</string>
+    <string name="terminal_example_logs_7" formatted="false">Inspect memory use for one package; replace PACKAGE</string>
+    <string name="terminal_example_logs_8" formatted="false">Read app rendering statistics; replace PACKAGE</string>
+    <string name="terminal_example_logs_9" formatted="false">Read process CPU usage from the system service</string>
+    <string name="terminal_reference_129" formatted="false">Read help for a Toybox tool; replace COMMAND with its name</string>
+    <string name="terminal_reference_130" formatted="false">Read Wi-Fi commands supported by this firmware</string>
+    <string name="terminal_reference_131" formatted="false">Read connectivity commands supported by this firmware</string>
+    <string name="terminal_reference_132" formatted="false">Read service-specific diagnostic options; replace SERVICE</string>
+    <string name="terminal_reference_133" formatted="false">Read display and window manager commands</string>
+    <string name="terminal_reference_134" formatted="false">Check whether a shell command exists; replace COMMAND</string>
+
+    <string name="time_tools_title">Time settings, profiles and monitoring</string>
+    <string name="time_tools_hint">Saved settings, clock comparison and service evidence are separate facts. The first stable baseline is kept locally before managed changes. Terminal commands are not covered by this snapshot.</string>
+    <string name="time_tools_refresh">Read settings and service evidence</string>
+    <string name="time_identity_unavailable">A stable device identity is unavailable. Saving and restoring settings are disabled. Refresh after connecting to a supported device.</string>
+    <string name="time_identity_mismatch">The device identity changed. No further settings were written. Reconnect and inspect the current device.</string>
+    <string name="time_current_title">Last read settings</string>
+    <string name="time_field_ntp">NTP setting</string>
+    <string name="time_field_auto">Automatic time</string>
+    <string name="time_field_auto_zone">Automatic time zone</string>
+    <string name="time_field_zone">Time zone</string>
+    <string name="time_status_verified">Read back and confirmed</string>
+    <string name="time_status_unavailable">Unavailable</string>
+    <string name="time_status_permission">Permission denied</string>
+    <string name="time_status_unsupported">Unsupported on this device</string>
+    <string name="time_status_unconfirmed">Readback did not confirm the change</string>
+    <string name="time_status_failed">Operation failed</string>
+    <string name="time_status_invalid">Invalid value</string>
+    <string name="time_value_absent">Not set (system default)</string>
+    <string name="time_value_empty">Empty value</string>
+    <string name="time_settings_confirmed">Settings were saved and read back. This does not confirm clock synchronization or its source.</string>
+    <string name="time_settings_partial">Some settings were not confirmed. Review each result below.</string>
+    <string name="time_rollback_result">Attempt to return to the state before this operation:</string>
+    <string name="time_snapshot_date">Original snapshot: %1$s</string>
+    <string name="time_snapshot_none">No original snapshot for this device yet.</string>
+    <string name="time_snapshot_save">Save original snapshot</string>
+    <string name="time_snapshot_replace">Replace original snapshot</string>
+    <string name="time_snapshot_restore">Review and restore original settings</string>
+    <string name="time_profiles_title">Device profiles</string>
+    <string name="time_profiles_hint">Profiles belong to this device. Connect using Favorites as usual; ADB trust and addresses are not copied into profiles. Names must be unique for this device.</string>
+    <string name="time_profile_name">Profile name</string>
+    <string name="time_profile_save">Save current settings as profile</string>
+    <string name="time_profile_apply">Review and apply</string>
+    <string name="time_profile_delete">Delete profile</string>
+    <string name="time_ntp_list_title">NTP fallback servers</string>
+    <string name="time_ntp_list_hint">Android 14+: up to four different DNS names or IPv4/IPv6 addresses, one per line, UDP 123. Android keeps a working server until it fails; values are not averaged. OEM support may differ. Readback confirms storage only.</string>
+    <string name="time_ntp_single_hint">This Android version supports one NTP host only. Use one DNS name or IPv4/IPv6 address, UDP 123.</string>
+    <string name="time_ntp_list_input">One NTP host per line</string>
+    <string name="time_ntp_list_invalid">Enter valid, distinct hosts: up to four on Android 14+, otherwise one. Do not include URI schemes or ports.</string>
+    <string name="time_source_title">System time source evidence</string>
+    <string name="time_source_unconfirmed">The current clock source is not confirmed. A matching clock, cached NTP response or confidence update does not prove that this server set the system clock.</string>
+    <string name="time_source_service_status">NTP service: %1$s. Time detector: %2$s.</string>
+    <string name="time_source_response">Last recorded service response (historical): %1$s</string>
+    <string name="time_source_age">Response age when read: %1$d s</string>
+    <string name="time_source_recorded">Last known clock-write operation: %1$s. This is historical and is not linked to the URI above.</string>
+    <string name="time_source_unparseable">Unrecognized service format</string>
+    <string name="time_monitor_title">Clock monitoring</string>
+    <string name="time_monitor_hint">One read-only comparison every 30 seconds, up to 10 minutes or 20 attempts. Busy operations are skipped. Leaving the app or disconnecting stops monitoring. No background service; nothing changes system time.</string>
+    <string name="time_monitor_start">Start monitoring</string>
+    <string name="time_monitor_stop">Stop monitoring</string>
+    <string name="time_monitor_running">Monitoring is running</string>
+    <string name="time_monitor_stopped">Monitoring is stopped</string>
+    <string name="time_monitor_user">Stopped by an explicit action</string>
+    <string name="time_monitor_duration">Observation limit reached</string>
+    <string name="time_monitor_background">Stopped when the app left the foreground</string>
+    <string name="time_monitor_disconnected">Stopped after disconnection</string>
+    <string name="time_monitor_busy">Skipped: device is busy</string>
+    <string name="time_monitor_sample">+%1$d s: %2$s</string>
+    <string name="time_monitor_offset">Difference %1$.3f s; uncertainty ±%2$.3f s</string>
+    <string name="time_preview_title">Review the action</string>
+    <string name="time_snapshot_preview">Read and save all four current settings. Replacing a snapshot removes the previous baseline for this device. No device setting changes. Values are read again before saving.</string>
+    <string name="time_profile_save_preview">Save the current settings locally under this name. Values below are the last reading; they are read again before saving. No device setting changes.</string>
+    <string name="time_profile_delete_preview">Delete this local profile. Device settings will not change.</string>
+    <string name="time_ntp_preview">Store this NTP setting. A stable original snapshot is required and saved first. This does not force a time refresh or prove the active time source.</string>
+    <string name="time_restore_preview">Apply these exact settings to the same device only. Each field is read back; unsupported or refused changes are reported separately.</string>
+    <string name="time_preview_confirm">Confirm</string>
+    <string name="time_preview_cancel">Cancel</string>
+    <string name="time_saved_locally">Saved locally; device settings did not change.</string>
+    <string name="time_profile_deleted">Profile deleted; device settings did not change.</string>
+    <string name="time_storage_or_capture_failed">Could not read or save a stable snapshot/profile. Check device permissions, unchanged settings and local storage. Existing saved data was kept.</string>
+    <string name="time_snapshot_required">A stable original snapshot could not be saved. The requested setting was not changed. Open Time settings to inspect device identity, permissions and storage.</string>
+    <string name="time_measurement_stale">Last check: older than 30 seconds or age unavailable. It does not confirm the current clock state.</string>
+    <string name="time_export_save">Save anonymized report</string>
+    <string name="time_export_saved">Anonymized report saved.</string>
+    <string name="time_export_failed">Could not save the report. You can copy it instead.</string>
+    <string name="time_export_unavailable">This device has no document picker. Use Copy report.</string>
+    <string name="time_effective_auto_zone">Effective automatic zone detection: %1$s</string>
+    <string name="time_effective_on">Enabled</string>
+    <string name="time_effective_off">Disabled or not supported by the device</string>
+    <string name="time_monitor_reconnect">Monitoring stopped and its interrupted ADB command closed the connection. Reconnect to continue.</string>
 </resources>
