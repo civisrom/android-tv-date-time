@@ -218,14 +218,31 @@ class MainActivityTest {
                 flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             }
             fun waitForKeyboard(visible: Boolean, root: View = compose.activity.window.decorView) {
-                compose.waitUntil(5_000) {
-                    if (Build.VERSION.SDK_INT >= 30) {
+                val started = android.os.SystemClock.uptimeMillis()
+                var reportedSlowShow = false
+                // Opening a new dialog input session can wait for the external IME process.
+                // Keep Done/hide at five seconds: that transition is the app behavior under test.
+                compose.waitUntil(if (visible) 15_000 else 5_000) {
+                    val observed = if (Build.VERSION.SDK_INT >= 30) {
                         // Read the actual input window; the accessibility window list can lag on API 31.
-                        compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == visible }
+                        compose.runOnUiThread { root.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) }
                     } else {
                         // Legacy Insets only estimate IME visibility and miss floating dialogs.
-                        hasLegacyImeWindow(automation) == visible
+                        hasLegacyImeWindow(automation)
                     }
+                    val elapsed = android.os.SystemClock.uptimeMillis() - started
+                    if (visible && observed != true && elapsed >= 5_000 && !reportedSlowShow) {
+                        reportedSlowShow = true
+                        val stage = if (root === compose.activity.window.decorView) "main" else "dialog"
+                        val focused = compose.runOnUiThread { root.hasWindowFocus() }
+                        val diagnostic = "API=${Build.VERSION.SDK_INT} stage=$stage elapsedMs=$elapsed " +
+                            "expectedIme=true observedIme=$observed windowFocused=$focused\n"
+                        android.util.Log.w("FavoriteImeWait", diagnostic.trim())
+                        val file = File(compose.activity.filesDir, "ui-screenshots/ime-timeout-favorite-$stage.txt")
+                        file.parentFile!!.mkdirs()
+                        file.writeText(diagnostic)
+                    }
+                    observed == visible
                 }
                 automation.waitForIdle(300, 3_000)
             }

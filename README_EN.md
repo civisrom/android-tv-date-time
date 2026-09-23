@@ -522,13 +522,220 @@ the addresses from the current debugging screens manually.
 
 ## Screenshots
 
+Click an image to open it at full size. Galleries are grouped by function.
+
 ### Desktop program
 
-![Main menu](screenshots/en.png)
+Console version **2.6.6**, running on Linux. The main menus are shared by Windows, Linux and macOS; terminal appearance depends on the system. Connected scenarios use a test Android device.
 
-Phone screenshots of the Russian Android interface are available in the
-[Russian README gallery](README.md#приложение-на-смартфоне). They were taken on
-12 September 2026; individual labels and layouts may differ in newer builds.
+<details>
+<summary>Startup and main menu</summary>
+
+| Startup network check | Android and network setup |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/01-network.png" alt="Startup network check" width="420">](screenshots/desktop-v2.6.6/en/01-network.png) | [<img src="screenshots/desktop-v2.6.6/en/02-instructions.png" alt="Android and network setup" width="420">](screenshots/desktop-v2.6.6/en/02-instructions.png) |
+
+| Main menu |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/03-main.png" alt="Main menu" width="420">](screenshots/desktop-v2.6.6/en/03-main.png) |
+
+</details>
+
+<details>
+<summary>Time-server catalogue</summary>
+
+| Country catalogue (excerpt) | Alternative NTP servers (excerpt) |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/04-countries.png" alt="Country catalogue (excerpt)" width="420">](screenshots/desktop-v2.6.6/en/04-countries.png) | [<img src="screenshots/desktop-v2.6.6/en/05-ntp-servers.png" alt="Alternative NTP servers (excerpt)" width="420">](screenshots/desktop-v2.6.6/en/05-ntp-servers.png) |
+
+| Current and custom NTP | Multiple NTP servers: preview |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/17-custom-ntp.png" alt="Current and custom NTP" width="420">](screenshots/desktop-v2.6.6/en/17-custom-ntp.png) | [<img src="screenshots/desktop-v2.6.6/en/26-multiple-ntp.png" alt="Multiple NTP servers: preview" width="420">](screenshots/desktop-v2.6.6/en/26-multiple-ntp.png) |
+
+| NTP reachability results (excerpt) |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/32-ntp-check.png" alt="NTP reachability results (excerpt)" width="420">](screenshots/desktop-v2.6.6/en/32-ntp-check.png) |
+
+</details>
+
+<details>
+<summary>Settings, profiles and diagnostics</summary>
+
+| Servers and time tools | Settings export and import |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/06-server-management.png" alt="Servers and time tools" width="420">](screenshots/desktop-v2.6.6/en/06-server-management.png) | [<img src="screenshots/desktop-v2.6.6/en/07-backup.png" alt="Settings export and import" width="420">](screenshots/desktop-v2.6.6/en/07-backup.png) |
+
+| Device profiles | Anonymous diagnostics export |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/08-profiles.png" alt="Device profiles" width="420">](screenshots/desktop-v2.6.6/en/08-profiles.png) | [<img src="screenshots/desktop-v2.6.6/en/09-diagnostic-export.png" alt="Anonymous diagnostics export" width="420">](screenshots/desktop-v2.6.6/en/09-diagnostic-export.png) |
+
+| Diagnostic report saved |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/10-diagnostic-saved.png" alt="Diagnostic report saved" width="420">](screenshots/desktop-v2.6.6/en/10-diagnostic-saved.png) |
+
+</details>
+
+<details>
+<summary>Connections and batch operations</summary>
+
+| Network scan and batch operations | Wireless debugging |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/11-network-batch.png" alt="Network scan and batch operations" width="420">](screenshots/desktop-v2.6.6/en/11-network-batch.png) | [<img src="screenshots/desktop-v2.6.6/en/12-wireless.png" alt="Wireless debugging" width="420">](screenshots/desktop-v2.6.6/en/12-wireless.png) |
+
+| Pairing address entry | USB: no connected devices |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/13-pairing.png" alt="Pairing address entry" width="420">](screenshots/desktop-v2.6.6/en/13-pairing.png) | [<img src="screenshots/desktop-v2.6.6/en/14-usb.png" alt="USB: no connected devices" width="420">](screenshots/desktop-v2.6.6/en/14-usb.png) |
+
+| Device and ADB address selection | Automatic setup: device discovery |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/30-device-address.png" alt="Device and ADB address selection" width="420">](screenshots/desktop-v2.6.6/en/30-device-address.png) | [<img src="screenshots/desktop-v2.6.6/en/31-auto-discovery.png" alt="Automatic setup: device discovery" width="420">](screenshots/desktop-v2.6.6/en/31-auto-discovery.png) |
+
+</details>
+
+<details>
+<summary>Terminal and reference</summary>
+
+| ADB terminal | Terminal reference (excerpt) |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/15-terminal.png" alt="ADB terminal" width="420">](screenshots/desktop-v2.6.6/en/15-terminal.png) | [<img src="screenshots/desktop-v2.6.6/en/16-terminal-help.png" alt="Terminal reference (excerpt)" width="420">](screenshots/desktop-v2.6.6/en/16-terminal-help.png) |
+
+</details>
+
+<details>
+<summary>Time settings, snapshots and monitoring</summary>
+
+| Android and computer clocks | Time settings snapshot |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/18-device-clock.png" alt="Android and computer clocks" width="420">](screenshots/desktop-v2.6.6/en/18-device-clock.png) | [<img src="screenshots/desktop-v2.6.6/en/19-snapshot.png" alt="Time settings snapshot" width="420">](screenshots/desktop-v2.6.6/en/19-snapshot.png) |
+
+| Persistent snapshot saved | Restore preview |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/20-snapshot-saved.png" alt="Persistent snapshot saved" width="420">](screenshots/desktop-v2.6.6/en/20-snapshot-saved.png) | [<img src="screenshots/desktop-v2.6.6/en/21-restore-preview.png" alt="Restore preview" width="420">](screenshots/desktop-v2.6.6/en/21-restore-preview.png) |
+
+| Clock monitoring: two readings | Monitoring stopped |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/27-monitor.png" alt="Clock monitoring: two readings" width="420">](screenshots/desktop-v2.6.6/en/27-monitor.png) | [<img src="screenshots/desktop-v2.6.6/en/28-monitor-stopped.png" alt="Monitoring stopped" width="420">](screenshots/desktop-v2.6.6/en/28-monitor-stopped.png) |
+
+| Anonymous device diagnostics |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/29-connected-diagnostic.png" alt="Anonymous device diagnostics" width="420">](screenshots/desktop-v2.6.6/en/29-connected-diagnostic.png) |
+
+</details>
+
+<details>
+<summary>Creating and applying profiles</summary>
+
+| Device profile preview | Profile saved without applying |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/22-profile-preview.png" alt="Device profile preview" width="420">](screenshots/desktop-v2.6.6/en/22-profile-preview.png) | [<img src="screenshots/desktop-v2.6.6/en/23-profile-saved.png" alt="Profile saved without applying" width="420">](screenshots/desktop-v2.6.6/en/23-profile-saved.png) |
+
+| Saved device profile | Profile application preview |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/en/24-profile-list.png" alt="Saved device profile" width="420">](screenshots/desktop-v2.6.6/en/24-profile-list.png) | [<img src="screenshots/desktop-v2.6.6/en/25-profile-apply.png" alt="Profile application preview" width="420">](screenshots/desktop-v2.6.6/en/25-profile-apply.png) |
+
+</details>
+
+### Android interface
+
+Actual screens from test build **2.6.6-dev** in phone and TV modes. The illustrations use demonstration addresses, devices and results. USB screenshots show the state with no device connected.
+
+<details>
+<summary>Connection, NTP and device settings</summary>
+
+| Device connection | Network device discovery | Favorite devices |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/01-connection.png" alt="Device connection" width="260">](screenshots/android-v2.6.6/en/01-connection.png) | [<img src="screenshots/android-v2.6.6/en/02-discovery.png" alt="Network device discovery" width="260">](screenshots/android-v2.6.6/en/02-discovery.png) | [<img src="screenshots/android-v2.6.6/en/03-favorites.png" alt="Favorite devices" width="260">](screenshots/android-v2.6.6/en/03-favorites.png) |
+
+| Save or edit a favorite device | Pairing: two addresses and a code | Time zone selection |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/03b-favorite-editor.png" alt="Save or edit a favorite device" width="260">](screenshots/android-v2.6.6/en/03b-favorite-editor.png) | [<img src="screenshots/android-v2.6.6/en/09-pairing.png" alt="Pairing: two addresses and a code" width="260">](screenshots/android-v2.6.6/en/09-pairing.png) | [<img src="screenshots/android-v2.6.6/en/10-timezone.png" alt="Time zone selection" width="260">](screenshots/android-v2.6.6/en/10-timezone.png) |
+
+| USB connection: no physical device | Device information | Detailed device information |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/11-usb.png" alt="USB connection: no physical device" width="260">](screenshots/android-v2.6.6/en/11-usb.png) | [<img src="screenshots/android-v2.6.6/en/12-device-info.png" alt="Device information" width="260">](screenshots/android-v2.6.6/en/12-device-info.png) | [<img src="screenshots/android-v2.6.6/en/13-device-details.png" alt="Detailed device information" width="260">](screenshots/android-v2.6.6/en/13-device-details.png) |
+
+| Time tools in the last section |
+|:---:|
+| [<img src="screenshots/android-v2.6.6/en/14-section-order.png" alt="Time tools in the last section" width="260">](screenshots/android-v2.6.6/en/14-section-order.png) |
+
+</details>
+
+<details>
+<summary>NTP servers and clock checks</summary>
+
+| NTP server and clock checks | Clock comparison result: example | Confirm restoring the system NTP setting |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/04-ntp-check.png" alt="NTP server and clock checks" width="260">](screenshots/android-v2.6.6/en/04-ntp-check.png) | [<img src="screenshots/android-v2.6.6/en/04b-clock-check.png" alt="Clock comparison result: example" width="260">](screenshots/android-v2.6.6/en/04b-clock-check.png) | [<img src="screenshots/android-v2.6.6/en/04c-ntp-reset-preview.png" alt="Confirm restoring the system NTP setting" width="260">](screenshots/android-v2.6.6/en/04c-ntp-reset-preview.png) |
+
+| Time server catalog and search | Servers by country | Additional time servers |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/05-ntp-picker.png" alt="Time server catalog and search" width="260">](screenshots/android-v2.6.6/en/05-ntp-picker.png) | [<img src="screenshots/android-v2.6.6/en/06-ntp-countries.png" alt="Servers by country" width="260">](screenshots/android-v2.6.6/en/06-ntp-countries.png) | [<img src="screenshots/android-v2.6.6/en/07-ntp-alternatives.png" alt="Additional time servers" width="260">](screenshots/android-v2.6.6/en/07-ntp-alternatives.png) |
+
+| Server latency selection: example |
+|:---:|
+| [<img src="screenshots/android-v2.6.6/en/08-ntp-scan.png" alt="Server latency selection: example" width="260">](screenshots/android-v2.6.6/en/08-ntp-scan.png) |
+
+</details>
+
+<details>
+<summary>Time settings, profiles and monitoring</summary>
+
+| Current settings and saved snapshot | Snapshot restoration preview | Replace the original snapshot |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/15-time-settings.png" alt="Current settings and saved snapshot" width="260">](screenshots/android-v2.6.6/en/15-time-settings.png) | [<img src="screenshots/android-v2.6.6/en/16-restore-preview.png" alt="Snapshot restoration preview" width="260">](screenshots/android-v2.6.6/en/16-restore-preview.png) | [<img src="screenshots/android-v2.6.6/en/17-snapshot-replace.png" alt="Replace the original snapshot" width="260">](screenshots/android-v2.6.6/en/17-snapshot-replace.png) |
+
+| Device settings profiles | Apply profile preview | Delete profile confirmation |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/18-profiles.png" alt="Device settings profiles" width="260">](screenshots/android-v2.6.6/en/18-profiles.png) | [<img src="screenshots/android-v2.6.6/en/19-profile-preview.png" alt="Apply profile preview" width="260">](screenshots/android-v2.6.6/en/19-profile-preview.png) | [<img src="screenshots/android-v2.6.6/en/20-profile-delete.png" alt="Delete profile confirmation" width="260">](screenshots/android-v2.6.6/en/20-profile-delete.png) |
+
+| Fallback NTP list for Android 14+ | Fallback server list preview | Historical time service evidence |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/21-ntp-fallback.png" alt="Fallback NTP list for Android 14+" width="260">](screenshots/android-v2.6.6/en/21-ntp-fallback.png) | [<img src="screenshots/android-v2.6.6/en/22-ntp-fallback-preview.png" alt="Fallback server list preview" width="260">](screenshots/android-v2.6.6/en/22-ntp-fallback-preview.png) | [<img src="screenshots/android-v2.6.6/en/23-time-source.png" alt="Historical time service evidence" width="260">](screenshots/android-v2.6.6/en/23-time-source.png) |
+
+| Clock monitoring: samples and skipped checks |
+|:---:|
+| [<img src="screenshots/android-v2.6.6/en/24-clock-monitor.png" alt="Clock monitoring: samples and skipped checks" width="260">](screenshots/android-v2.6.6/en/24-clock-monitor.png) |
+
+</details>
+
+<details>
+<summary>Terminal, reference and files</summary>
+
+| Terminal warning | ADB console: output example | Command reference and search |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/25-terminal-warning.png" alt="Terminal warning" width="260">](screenshots/android-v2.6.6/en/25-terminal-warning.png) | [<img src="screenshots/android-v2.6.6/en/26-terminal-console.png" alt="ADB console: output example" width="260">](screenshots/android-v2.6.6/en/26-terminal-console.png) | [<img src="screenshots/android-v2.6.6/en/27-terminal-reference.png" alt="Command reference and search" width="260">](screenshots/android-v2.6.6/en/27-terminal-reference.png) |
+
+| Time commands in the reference | In-memory command history | Files: import, APK, push, and export |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/28-terminal-time-commands.png" alt="Time commands in the reference" width="260">](screenshots/android-v2.6.6/en/28-terminal-time-commands.png) | [<img src="screenshots/android-v2.6.6/en/29-terminal-history.png" alt="In-memory command history" width="260">](screenshots/android-v2.6.6/en/29-terminal-history.png) | [<img src="screenshots/android-v2.6.6/en/30-terminal-files.png" alt="Files: import, APK, push, and export" width="260">](screenshots/android-v2.6.6/en/30-terminal-files.png) |
+
+| Imported APK file actions | Download a file from the device |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/30b-apk-file-actions.png" alt="Imported APK file actions" width="260">](screenshots/android-v2.6.6/en/30b-apk-file-actions.png) | [<img src="screenshots/android-v2.6.6/en/31-terminal-download.png" alt="Download a file from the device" width="260">](screenshots/android-v2.6.6/en/31-terminal-download.png) |
+
+</details>
+
+<details>
+<summary>Diagnostics</summary>
+
+| Diagnostics and sanitized export | Diagnostic event details |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/32-diagnostics.png" alt="Diagnostics and sanitized export" width="260">](screenshots/android-v2.6.6/en/32-diagnostics.png) | [<img src="screenshots/android-v2.6.6/en/33-diagnostics-details.png" alt="Diagnostic event details" width="260">](screenshots/android-v2.6.6/en/33-diagnostics-details.png) |
+
+</details>
+
+<details>
+<summary>TV mode and setup wizard</summary>
+
+| Main screen in television mode | TV: enabling developer options |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/34-tv-main.png" alt="Main screen in television mode" width="420">](screenshots/android-v2.6.6/en/34-tv-main.png) | [<img src="screenshots/android-v2.6.6/en/35-tv-setup-developer.png" alt="TV: enabling developer options" width="420">](screenshots/android-v2.6.6/en/35-tv-setup-developer.png) |
+
+| TV: enabling debugging | TV: connection and verification |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/en/36-tv-setup-debugging.png" alt="TV: enabling debugging" width="420">](screenshots/android-v2.6.6/en/36-tv-setup-debugging.png) | [<img src="screenshots/android-v2.6.6/en/37-tv-setup-connect.png" alt="TV: connection and verification" width="420">](screenshots/android-v2.6.6/en/37-tv-setup-connect.png) |
+
+</details>
 
 ## How to Use the Program
 
@@ -1302,7 +1509,7 @@ connection method and the error text. In the APK, details are available through 
 ## Development checks
 
 On `dev`, CI builds desktop for Windows, Linux and both macOS architectures, checks the Python
-package and native ADB, and runs tests. Android CI builds debug and unsigned
+package and native ADB, and runs tests. A full Android CI run builds debug and unsigned
 release APKs, runs unit tests, Lint, and emulator UI tests. Release publication
 depends on Android and dependency checks for the same source revision.
 

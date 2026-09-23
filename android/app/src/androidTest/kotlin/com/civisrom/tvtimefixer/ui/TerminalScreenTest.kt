@@ -5,6 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
+import android.view.KeyEvent
+import android.view.View
 import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -33,6 +35,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.espresso.Espresso
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
@@ -122,10 +127,36 @@ class TerminalScreenTest {
 
     private fun traverseEditorWithDpad(from: String, target: String) {
         val field = compose.onNodeWithTag(from)
-        compose.runOnIdle { hideKeyboard(); inputMode.requestInputMode(InputMode.Keyboard) }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var inputRoot: View = compose.activity.window.decorView
+        if (from == "terminal-remote-path") {
+            Espresso.onView(isRoot()).inRoot(isDialog()).check { view, error ->
+                if (error != null) throw error
+                inputRoot = view
+            }
+        }
+        compose.waitUntil(5_000) { compose.runOnUiThread { inputRoot.hasWindowFocus() } }
+        // The remote changes the native window's touch mode, including a dialog's
+        // separate owner. Then establish only the starting editor directly.
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
+        // The preparatory event can scroll a lazy reference list past its search row.
+        if (from == "terminal-search") scroll(from)
         field.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
         field.assertIsFocused()
-        compose.runOnIdle { hideKeyboard() }
+        // A dialog owns a separate Compose view/input mode. Native D-pad events below
+        // must enter that active window, and its IME must finish hiding first.
+        Espresso.closeSoftKeyboard()
+        val automation = instrumentation.uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        try {
+            compose.waitUntil(5_000) {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    compose.runOnUiThread { inputRoot.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == false }
+                } else !hasLegacyImeWindow(automation)
+            }
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
         field.performScrollTo().assertIsDisplayed()
         val route = mutableListOf<String>()
         for (step in 0 until 16) {
@@ -134,29 +165,30 @@ class TerminalScreenTest {
             }
             if (compose.onAllNodes(hasTestTag(target) and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
                 println("Terminal TV route from $from: $route")
-                compose.onNodeWithTag(target).assertIsDisplayed().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithTag(target).assertIsDisplayed()
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
                 return
             }
             // The dialog places Cancel and Download beside each other. Down first
             // leaves the editor; Right then reaches confirmation from Cancel.
             val direction = if (from == "terminal-remote-path" &&
                 compose.onAllNodes(hasTestTag(from) and isFocused()).fetchSemanticsNodes().isEmpty()) {
-                Key.DirectionRight
-            } else Key.DirectionDown
-            field.performKeyInput { pressKey(direction) }
+                KeyEvent.KEYCODE_DPAD_RIGHT
+            } else KeyEvent.KEYCODE_DPAD_DOWN
+            instrumentation.sendKeyDownUpSync(direction)
         }
         fail("Terminal TV editor $from did not reach $target with D-pad: $route")
     }
 
     @Test fun TV_command_editor_reaches_run_with_sequential_Dpad() {
         session.edit("echo terminal-test")
-        screen(mode = DeviceMode.TELEVISION, width = 640, height = 360)
+        screen(mode = DeviceMode.TELEVISION, width = 640)
         traverseEditorWithDpad("terminal-input", "terminal-run")
         assertEquals(listOf("run"), calls)
     }
 
     @Test fun TV_download_path_reaches_confirmation_with_sequential_Dpad() {
-        screen(mode = DeviceMode.TELEVISION, width = 640, height = 360)
+        screen(mode = DeviceMode.TELEVISION, width = 640)
         compose.onNodeWithTag("terminal-tab-files").performScrollTo().assertIsDisplayed().performClick()
         scroll("terminal-download").performClick()
         compose.onNodeWithTag("terminal-remote-path").performTextInput("/sdcard/Download/example.txt")
@@ -166,7 +198,7 @@ class TerminalScreenTest {
     }
 
     @Test fun TV_reference_search_reaches_category_with_sequential_Dpad() {
-        screen(mode = DeviceMode.TELEVISION, width = 640, height = 360)
+        screen(mode = DeviceMode.TELEVISION, width = 640)
         compose.onNodeWithTag("terminal-tab-help").performScrollTo().assertIsDisplayed().performClick()
         scroll("terminal-search").performTextInput("date")
         traverseEditorWithDpad("terminal-search", "terminal-category-time")

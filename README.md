@@ -539,26 +539,220 @@ Android Studio и отдельная установка SDK не нужны. О�
 
 ## Скриншоты
 
+Нажмите на изображение, чтобы открыть его в полном размере. Галереи сгруппированы по функциям.
+
 ### Программа для компьютера
 
-![Главное меню](screenshots/ru.png)
+Консольная версия **2.6.6**, запущенная в Linux. Основные меню общие для Windows, Linux и macOS; оформление терминала зависит от системы. Для подключённых сценариев использовано тестовое Android-устройство.
 
-### Приложение на смартфоне
+<details>
+<summary>Запуск и главное меню</summary>
 
-Скриншоты русской версии APK из ветки `dev`, сделанные на смартфоне 12 сентября 2026 года.
-Нажмите на изображение, чтобы открыть его в полном размере.
+| Проверка сети при запуске | Подготовка Android и сети |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/01-network.png" alt="Проверка сети при запуске" width="420">](screenshots/desktop-v2.6.6/ru/01-network.png) | [<img src="screenshots/desktop-v2.6.6/ru/02-instructions.png" alt="Подготовка Android и сети" width="420">](screenshots/desktop-v2.6.6/ru/02-instructions.png) |
 
-| Настройка NTP | Подбор сервера | Часовой пояс |
+| Главное меню |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/03-main.png" alt="Главное меню" width="420">](screenshots/desktop-v2.6.6/ru/03-main.png) |
+
+</details>
+
+<details>
+<summary>Каталог серверов времени</summary>
+
+| Каталог стран (фрагмент) | Альтернативные NTP-серверы (фрагмент) |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/04-countries.png" alt="Каталог стран (фрагмент)" width="420">](screenshots/desktop-v2.6.6/ru/04-countries.png) | [<img src="screenshots/desktop-v2.6.6/ru/05-ntp-servers.png" alt="Альтернативные NTP-серверы (фрагмент)" width="420">](screenshots/desktop-v2.6.6/ru/05-ntp-servers.png) |
+
+| Текущий и пользовательский NTP | Несколько NTP-серверов: предпросмотр |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/17-custom-ntp.png" alt="Текущий и пользовательский NTP" width="420">](screenshots/desktop-v2.6.6/ru/17-custom-ntp.png) | [<img src="screenshots/desktop-v2.6.6/ru/26-multiple-ntp.png" alt="Несколько NTP-серверов: предпросмотр" width="420">](screenshots/desktop-v2.6.6/ru/26-multiple-ntp.png) |
+
+| Результаты проверки NTP (фрагмент) |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/32-ntp-check.png" alt="Результаты проверки NTP (фрагмент)" width="420">](screenshots/desktop-v2.6.6/ru/32-ntp-check.png) |
+
+</details>
+
+<details>
+<summary>Настройки, профили и диагностика</summary>
+
+| Серверы и инструменты времени | Экспорт и импорт настроек |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/06-server-management.png" alt="Серверы и инструменты времени" width="420">](screenshots/desktop-v2.6.6/ru/06-server-management.png) | [<img src="screenshots/desktop-v2.6.6/ru/07-backup.png" alt="Экспорт и импорт настроек" width="420">](screenshots/desktop-v2.6.6/ru/07-backup.png) |
+
+| Профили устройств | Экспорт обезличенной диагностики |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/08-profiles.png" alt="Профили устройств" width="420">](screenshots/desktop-v2.6.6/ru/08-profiles.png) | [<img src="screenshots/desktop-v2.6.6/ru/09-diagnostic-export.png" alt="Экспорт обезличенной диагностики" width="420">](screenshots/desktop-v2.6.6/ru/09-diagnostic-export.png) |
+
+| Диагностический отчёт сохранён |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/10-diagnostic-saved.png" alt="Диагностический отчёт сохранён" width="420">](screenshots/desktop-v2.6.6/ru/10-diagnostic-saved.png) |
+
+</details>
+
+<details>
+<summary>Подключения и групповая работа</summary>
+
+| Сканирование и групповые операции | Беспроводная отладка |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/11-network-batch.png" alt="Сканирование и групповые операции" width="420">](screenshots/desktop-v2.6.6/ru/11-network-batch.png) | [<img src="screenshots/desktop-v2.6.6/ru/12-wireless.png" alt="Беспроводная отладка" width="420">](screenshots/desktop-v2.6.6/ru/12-wireless.png) |
+
+| Ввод адреса спаривания | USB: устройства не подключены |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/13-pairing.png" alt="Ввод адреса спаривания" width="420">](screenshots/desktop-v2.6.6/ru/13-pairing.png) | [<img src="screenshots/desktop-v2.6.6/ru/14-usb.png" alt="USB: устройства не подключены" width="420">](screenshots/desktop-v2.6.6/ru/14-usb.png) |
+
+| Выбор устройства и адреса ADB | Автонастройка: поиск устройства |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/30-device-address.png" alt="Выбор устройства и адреса ADB" width="420">](screenshots/desktop-v2.6.6/ru/30-device-address.png) | [<img src="screenshots/desktop-v2.6.6/ru/31-auto-discovery.png" alt="Автонастройка: поиск устройства" width="420">](screenshots/desktop-v2.6.6/ru/31-auto-discovery.png) |
+
+</details>
+
+<details>
+<summary>Терминал и справка</summary>
+
+| Терминал ADB | Справка терминала (фрагмент) |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/15-terminal.png" alt="Терминал ADB" width="420">](screenshots/desktop-v2.6.6/ru/15-terminal.png) | [<img src="screenshots/desktop-v2.6.6/ru/16-terminal-help.png" alt="Справка терминала (фрагмент)" width="420">](screenshots/desktop-v2.6.6/ru/16-terminal-help.png) |
+
+</details>
+
+<details>
+<summary>Настройки времени, снимки и наблюдение</summary>
+
+| Часы Android и компьютера | Снимок настроек времени |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/18-device-clock.png" alt="Часы Android и компьютера" width="420">](screenshots/desktop-v2.6.6/ru/18-device-clock.png) | [<img src="screenshots/desktop-v2.6.6/ru/19-snapshot.png" alt="Снимок настроек времени" width="420">](screenshots/desktop-v2.6.6/ru/19-snapshot.png) |
+
+| Постоянный снимок сохранён | Предпросмотр отката |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/20-snapshot-saved.png" alt="Постоянный снимок сохранён" width="420">](screenshots/desktop-v2.6.6/ru/20-snapshot-saved.png) | [<img src="screenshots/desktop-v2.6.6/ru/21-restore-preview.png" alt="Предпросмотр отката" width="420">](screenshots/desktop-v2.6.6/ru/21-restore-preview.png) |
+
+| Наблюдение часов: два измерения | Наблюдение остановлено |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/27-monitor.png" alt="Наблюдение часов: два измерения" width="420">](screenshots/desktop-v2.6.6/ru/27-monitor.png) | [<img src="screenshots/desktop-v2.6.6/ru/28-monitor-stopped.png" alt="Наблюдение остановлено" width="420">](screenshots/desktop-v2.6.6/ru/28-monitor-stopped.png) |
+
+| Обезличенная диагностика устройства |
+|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/29-connected-diagnostic.png" alt="Обезличенная диагностика устройства" width="420">](screenshots/desktop-v2.6.6/ru/29-connected-diagnostic.png) |
+
+</details>
+
+<details>
+<summary>Создание и применение профилей</summary>
+
+| Предпросмотр профиля устройства | Профиль сохранён без применения |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/22-profile-preview.png" alt="Предпросмотр профиля устройства" width="420">](screenshots/desktop-v2.6.6/ru/22-profile-preview.png) | [<img src="screenshots/desktop-v2.6.6/ru/23-profile-saved.png" alt="Профиль сохранён без применения" width="420">](screenshots/desktop-v2.6.6/ru/23-profile-saved.png) |
+
+| Сохранённый профиль устройства | Предпросмотр применения профиля |
+|:---:|:---:|
+| [<img src="screenshots/desktop-v2.6.6/ru/24-profile-list.png" alt="Сохранённый профиль устройства" width="420">](screenshots/desktop-v2.6.6/ru/24-profile-list.png) | [<img src="screenshots/desktop-v2.6.6/ru/25-profile-apply.png" alt="Предпросмотр применения профиля" width="420">](screenshots/desktop-v2.6.6/ru/25-profile-apply.png) |
+
+</details>
+
+### Интерфейс Android
+
+Настоящие экраны тестовой сборки **2.6.6-dev** в режимах телефона и TV. На иллюстрациях показаны демонстрационные адреса, устройства и результаты. Кадры USB показывают состояние без подключённого устройства.
+
+<details>
+<summary>Подключение, NTP и настройки устройства</summary>
+
+| Подключение к устройству | Поиск телевизоров в сети | Избранные устройства |
 |:---:|:---:|:---:|
-| [<img src="screenshots/photo_apk_ru1.jpg" alt="Настройка сервера времени и поиск по стране" width="260">](screenshots/photo_apk_ru1.jpg) | [<img src="screenshots/photo_apk_ru2.jpg" alt="Проверка и подбор стабильного сервера времени" width="260">](screenshots/photo_apk_ru2.jpg) | [<img src="screenshots/photo_apk_ru3.jpg" alt="Настройка часового пояса и беспроводная отладка" width="260">](screenshots/photo_apk_ru3.jpg) |
+| [<img src="screenshots/android-v2.6.6/ru/01-connection.png" alt="Подключение к устройству" width="260">](screenshots/android-v2.6.6/ru/01-connection.png) | [<img src="screenshots/android-v2.6.6/ru/02-discovery.png" alt="Поиск телевизоров в сети" width="260">](screenshots/android-v2.6.6/ru/02-discovery.png) | [<img src="screenshots/android-v2.6.6/ru/03-favorites.png" alt="Избранные устройства" width="260">](screenshots/android-v2.6.6/ru/03-favorites.png) |
 
-| Сопряжение по коду | Отладка по USB |
-|:---:|:---:|
-| [<img src="screenshots/photo_apk_ru4.jpg" alt="Сопряжение и подключение по разным портам" width="260">](screenshots/photo_apk_ru4.jpg) | [<img src="screenshots/photo_apk_ru5.jpg" alt="Подключение по USB и условия использования" width="260">](screenshots/photo_apk_ru5.jpg) |
+| Сохранение и изменение избранного устройства | Спаривание: два адреса и код | Выбор часового пояса |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/03b-favorite-editor.png" alt="Сохранение и изменение избранного устройства" width="260">](screenshots/android-v2.6.6/ru/03b-favorite-editor.png) | [<img src="screenshots/android-v2.6.6/ru/09-pairing.png" alt="Спаривание: два адреса и код" width="260">](screenshots/android-v2.6.6/ru/09-pairing.png) | [<img src="screenshots/android-v2.6.6/ru/10-timezone.png" alt="Выбор часового пояса" width="260">](screenshots/android-v2.6.6/ru/10-timezone.png) |
 
-| Терминал ADB | Справка команд |
+| Подключение по USB: без физического устройства | Сведения об устройстве | Подробные сведения об устройстве |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/11-usb.png" alt="Подключение по USB: без физического устройства" width="260">](screenshots/android-v2.6.6/ru/11-usb.png) | [<img src="screenshots/android-v2.6.6/ru/12-device-info.png" alt="Сведения об устройстве" width="260">](screenshots/android-v2.6.6/ru/12-device-info.png) | [<img src="screenshots/android-v2.6.6/ru/13-device-details.png" alt="Подробные сведения об устройстве" width="260">](screenshots/android-v2.6.6/ru/13-device-details.png) |
+
+| Настройки времени в последнем разделе |
+|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/14-section-order.png" alt="Настройки времени в последнем разделе" width="260">](screenshots/android-v2.6.6/ru/14-section-order.png) |
+
+</details>
+
+<details>
+<summary>Серверы NTP и проверка часов</summary>
+
+| Проверка сервера NTP и часов | Результат сравнения часов: пример | Подтверждение возврата системного NTP |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/04-ntp-check.png" alt="Проверка сервера NTP и часов" width="260">](screenshots/android-v2.6.6/ru/04-ntp-check.png) | [<img src="screenshots/android-v2.6.6/ru/04b-clock-check.png" alt="Результат сравнения часов: пример" width="260">](screenshots/android-v2.6.6/ru/04b-clock-check.png) | [<img src="screenshots/android-v2.6.6/ru/04c-ntp-reset-preview.png" alt="Подтверждение возврата системного NTP" width="260">](screenshots/android-v2.6.6/ru/04c-ntp-reset-preview.png) |
+
+| Каталог и поиск серверов времени | Серверы по странам | Дополнительные серверы времени |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/05-ntp-picker.png" alt="Каталог и поиск серверов времени" width="260">](screenshots/android-v2.6.6/ru/05-ntp-picker.png) | [<img src="screenshots/android-v2.6.6/ru/06-ntp-countries.png" alt="Серверы по странам" width="260">](screenshots/android-v2.6.6/ru/06-ntp-countries.png) | [<img src="screenshots/android-v2.6.6/ru/07-ntp-alternatives.png" alt="Дополнительные серверы времени" width="260">](screenshots/android-v2.6.6/ru/07-ntp-alternatives.png) |
+
+| Подбор сервера по отклику: пример |
+|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/08-ntp-scan.png" alt="Подбор сервера по отклику: пример" width="260">](screenshots/android-v2.6.6/ru/08-ntp-scan.png) |
+
+</details>
+
+<details>
+<summary>Настройки времени, профили и наблюдение</summary>
+
+| Текущие настройки и сохранённый снимок | Предпросмотр восстановления снимка | Замена исходного снимка |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/15-time-settings.png" alt="Текущие настройки и сохранённый снимок" width="260">](screenshots/android-v2.6.6/ru/15-time-settings.png) | [<img src="screenshots/android-v2.6.6/ru/16-restore-preview.png" alt="Предпросмотр восстановления снимка" width="260">](screenshots/android-v2.6.6/ru/16-restore-preview.png) | [<img src="screenshots/android-v2.6.6/ru/17-snapshot-replace.png" alt="Замена исходного снимка" width="260">](screenshots/android-v2.6.6/ru/17-snapshot-replace.png) |
+
+| Профили настроек устройства | Предпросмотр применения профиля | Подтверждение удаления профиля |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/18-profiles.png" alt="Профили настроек устройства" width="260">](screenshots/android-v2.6.6/ru/18-profiles.png) | [<img src="screenshots/android-v2.6.6/ru/19-profile-preview.png" alt="Предпросмотр применения профиля" width="260">](screenshots/android-v2.6.6/ru/19-profile-preview.png) | [<img src="screenshots/android-v2.6.6/ru/20-profile-delete.png" alt="Подтверждение удаления профиля" width="260">](screenshots/android-v2.6.6/ru/20-profile-delete.png) |
+
+| Список резервных NTP для Android 14+ | Предпросмотр списка резервных серверов | Исторические сведения службы времени |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/21-ntp-fallback.png" alt="Список резервных NTP для Android 14+" width="260">](screenshots/android-v2.6.6/ru/21-ntp-fallback.png) | [<img src="screenshots/android-v2.6.6/ru/22-ntp-fallback-preview.png" alt="Предпросмотр списка резервных серверов" width="260">](screenshots/android-v2.6.6/ru/22-ntp-fallback-preview.png) | [<img src="screenshots/android-v2.6.6/ru/23-time-source.png" alt="Исторические сведения службы времени" width="260">](screenshots/android-v2.6.6/ru/23-time-source.png) |
+
+| Наблюдение за часами: замеры и пропуски |
+|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/24-clock-monitor.png" alt="Наблюдение за часами: замеры и пропуски" width="260">](screenshots/android-v2.6.6/ru/24-clock-monitor.png) |
+
+</details>
+
+<details>
+<summary>Терминал, справка и файлы</summary>
+
+| Предупреждение терминала | Консоль ADB: пример вывода | Справочник команд и поиск |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/25-terminal-warning.png" alt="Предупреждение терминала" width="260">](screenshots/android-v2.6.6/ru/25-terminal-warning.png) | [<img src="screenshots/android-v2.6.6/ru/26-terminal-console.png" alt="Консоль ADB: пример вывода" width="260">](screenshots/android-v2.6.6/ru/26-terminal-console.png) | [<img src="screenshots/android-v2.6.6/ru/27-terminal-reference.png" alt="Справочник команд и поиск" width="260">](screenshots/android-v2.6.6/ru/27-terminal-reference.png) |
+
+| Команды времени в справочнике | История команд в памяти | Файлы: импорт, APK, отправка и экспорт |
+|:---:|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/28-terminal-time-commands.png" alt="Команды времени в справочнике" width="260">](screenshots/android-v2.6.6/ru/28-terminal-time-commands.png) | [<img src="screenshots/android-v2.6.6/ru/29-terminal-history.png" alt="История команд в памяти" width="260">](screenshots/android-v2.6.6/ru/29-terminal-history.png) | [<img src="screenshots/android-v2.6.6/ru/30-terminal-files.png" alt="Файлы: импорт, APK, отправка и экспорт" width="260">](screenshots/android-v2.6.6/ru/30-terminal-files.png) |
+
+| Действия с импортированным APK | Загрузка файла с устройства |
 |:---:|:---:|
-| [<img src="screenshots/photo_apk_ru6.jpg" alt="Поле команды и отдельная область вывода терминала" width="260">](screenshots/photo_apk_ru6.jpg) | [<img src="screenshots/photo_apk_ru7.jpg" alt="Категории встроенной справки терминала ADB" width="260">](screenshots/photo_apk_ru7.jpg) |
+| [<img src="screenshots/android-v2.6.6/ru/30b-apk-file-actions.png" alt="Действия с импортированным APK" width="260">](screenshots/android-v2.6.6/ru/30b-apk-file-actions.png) | [<img src="screenshots/android-v2.6.6/ru/31-terminal-download.png" alt="Загрузка файла с устройства" width="260">](screenshots/android-v2.6.6/ru/31-terminal-download.png) |
+
+</details>
+
+<details>
+<summary>Диагностика</summary>
+
+| Диагностика и обезличенный экспорт | Подробности диагностического события |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/32-diagnostics.png" alt="Диагностика и обезличенный экспорт" width="260">](screenshots/android-v2.6.6/ru/32-diagnostics.png) | [<img src="screenshots/android-v2.6.6/ru/33-diagnostics-details.png" alt="Подробности диагностического события" width="260">](screenshots/android-v2.6.6/ru/33-diagnostics-details.png) |
+
+</details>
+
+<details>
+<summary>Режим TV и мастер настройки</summary>
+
+| Главный экран в режиме телевизора | TV: включение режима разработчика |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/34-tv-main.png" alt="Главный экран в режиме телевизора" width="420">](screenshots/android-v2.6.6/ru/34-tv-main.png) | [<img src="screenshots/android-v2.6.6/ru/35-tv-setup-developer.png" alt="TV: включение режима разработчика" width="420">](screenshots/android-v2.6.6/ru/35-tv-setup-developer.png) |
+
+| TV: включение отладки | TV: подключение и проверка |
+|:---:|:---:|
+| [<img src="screenshots/android-v2.6.6/ru/36-tv-setup-debugging.png" alt="TV: включение отладки" width="420">](screenshots/android-v2.6.6/ru/36-tv-setup-debugging.png) | [<img src="screenshots/android-v2.6.6/ru/37-tv-setup-connect.png" alt="TV: подключение и проверка" width="420">](screenshots/android-v2.6.6/ru/37-tv-setup-connect.png) |
+
+</details>
 
 ## Как пользоваться программой
 
@@ -1346,7 +1540,7 @@ APK. Если сетевой режим отсутствует или локал
 ## Проверки при разработке
 
 В `dev` CI собирает desktop для Windows, Linux и обеих архитектур macOS, проверяет Python-пакет,
-нативный ADB и запускает тесты. Android CI собирает debug и неподписанный release,
+нативный ADB и запускает тесты. Полный прогон Android CI собирает debug и неподписанный release,
 выполняет unit-тесты, Lint и матрицу UI на эмуляторах. Публикация релиза зависит
 от Android-проверок и проверки зависимостей той же версии исходников.
 
