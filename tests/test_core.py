@@ -239,7 +239,9 @@ class ReliabilityTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             fixer.data_dir = Path(directory)
-            with self.assertRaises(AndroidTVTimeFixerError):
+            # main() configures UTF-8 on Windows; a unit test calls the method
+            # directly and must not depend on the runner's redirected encoding.
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(AndroidTVTimeFixerError):
                 fixer.set_ntp_server('time.google.com')
         self.assertTrue(any(command.startswith('settings put global ntp_server') for command in fixer.device.commands))
 

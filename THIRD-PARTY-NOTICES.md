@@ -85,6 +85,7 @@ the published APK apart from the signature.
 |---|---|
 | adb-shell | Apache-2.0 |
 | cryptography | Apache-2.0 OR BSD-3-Clause |
+| OpenSSL 3.x (used by Python/cryptography) | Apache-2.0 |
 | rsa | Apache-2.0 |
 | packaging | Apache-2.0 OR BSD-2-Clause |
 | click | BSD-3-Clause |
@@ -105,6 +106,13 @@ The desktop HTTPS check includes the unmodified `certifi` CA bundle so TLS
 verification does not depend on a separately installed Python. Its source and
 licence are available at https://github.com/certifi/python-certifi and
 https://www.mozilla.org/MPL/2.0/.
+
+The macOS Intel build compiles the locked `cryptography` version with a
+statically linked OpenSSL 3 from Homebrew, avoiding a conflict with Python's
+separate OpenSSL library. Its upstream licence is included in the executable
+as `licenses/OPENSSL-LICENSE.txt`. OpenSSL is developed by the OpenSSL Project;
+source and licensing information: https://github.com/openssl/openssl and
+https://openssl-library.org/source/license/.
 
 ## python-zeroconf and the LGPL
 

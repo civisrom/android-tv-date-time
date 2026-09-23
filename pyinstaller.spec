@@ -102,6 +102,11 @@ if sys.platform == 'win32':
 elif sys.platform == 'darwin':
     runtime_hooks = [os.path.join(HOOKS_PATH, 'macos_hook.py')]
     platform_data = [('resources/adb', 'resources')]
+    if os.environ.get('OPENSSL_STATIC') == '1':
+        openssl_license = os.path.join(BASEPATH, 'resources', 'OPENSSL-LICENSE.txt')
+        if not os.path.isfile(openssl_license):
+            raise RuntimeError('Run scripts/verify_macos_crypto.py before packaging static OpenSSL')
+        datas.append((openssl_license, 'licenses'))
 else:  # linux
     runtime_hooks = [os.path.join(HOOKS_PATH, 'linux_hook.py')]
     platform_data = [('resources/adb', 'resources')]
