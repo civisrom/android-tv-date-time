@@ -2,6 +2,7 @@ package com.civisrom.tvtimefixer.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.R
 import com.civisrom.tvtimefixer.adb.ConnectionState
@@ -30,6 +32,7 @@ import com.civisrom.tvtimefixer.diagnostics.*
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 
 class TimeToolsScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -73,12 +76,26 @@ class TimeToolsScreenTest {
     }
     private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()
 
+    private fun screenshot(name: String) {
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.waitForIdle(300, 3_000)
+        val file = File(instrumentation.targetContext.filesDir, "ui-screenshots/time-tools-$name.png")
+        file.parentFile!!.mkdirs()
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            checkScreenshotContent(bitmap)
+        } finally { bitmap.recycle() }
+    }
+
     @Test fun short_screen_double_font_restore_preview_cancel_and_confirm() {
         screen()
         click("time-snapshot-restore")
         compose.onNodeWithTag("time-preview-values").assertExists()
         compose.onNode(hasText("${compose.activity.getString(R.string.time_field_zone)}: Europe/Moscow") and
             hasAnyAncestor(hasTestTag("time-preview-values"))).performScrollTo().assertIsDisplayed()
+        screenshot("phone-font200-restore-preview")
         compose.onNodeWithTag("time-preview-cancel").assertIsDisplayed().performClick()
         assertTrue(calls.isEmpty())
         click("time-snapshot-restore")
@@ -128,8 +145,10 @@ class TimeToolsScreenTest {
         }
         activate("time-monitor-start")
         compose.onNodeWithTag("time-monitor-start").assertIsNotEnabled()
+        screenshot("tv-monitor-running")
         activate("time-monitor-stop")
         compose.onNodeWithTag("time-monitor-stop").assertIsNotEnabled()
+        screenshot("tv-monitor-stopped")
         assertEquals(listOf("start", "stop"), calls)
     }
 

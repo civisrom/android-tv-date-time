@@ -76,11 +76,16 @@ jobs:
         if: matrix.os == 'macos-15-intel'
         shell: bash
         run: |
+          brew update
+          brew upgrade openssl@3
           echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
           echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
 
       - name: Install project
         run: poetry install --no-interaction --with dev
+
+      - name: Report native OpenSSL versions
+        run: poetry run python -c "import ssl; from cryptography.hazmat.backends.openssl.backend import backend; print('Python ssl:', ssl.OPENSSL_VERSION); print('cryptography:', backend.openssl_version_text())"
 
       - name: Verify static OpenSSL for macOS Intel
         if: matrix.os == 'macos-15-intel'
