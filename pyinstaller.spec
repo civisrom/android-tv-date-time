@@ -14,6 +14,11 @@ SRC_PATH = os.path.join(BASEPATH, 'src')
 sys.path.insert(0, SRC_PATH)
 
 datas = copy_metadata('certifi')
+if os.environ.get('BUILD_PYTHON_STANDALONE'):
+    python_licenses = os.path.join(BASEPATH, 'licenses', 'python-standalone')
+    if not os.path.isdir(python_licenses):
+        raise RuntimeError('Pinned standalone Python licence files are missing')
+    datas.append((python_licenses, 'licenses/python-standalone'))
 binaries = []
 hiddenimports = [
     'logging',

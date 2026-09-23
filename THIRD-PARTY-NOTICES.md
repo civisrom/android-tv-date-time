@@ -24,6 +24,28 @@ software license", so redistribution here follows Apache-2.0.
 
 Source: https://android.googlesource.com/platform/packages/modules/adb/
 
+### Embedded Python runtime
+
+The Windows and macOS executables use CPython 3.12.14 from Astral's
+`python-build-standalone` release `20260901`, with OpenSSL 3.5.8. The build
+downloads architecture-specific archives and verifies their pinned SHA-256
+hashes. Linux uses the Ubuntu build runtime and its security-maintained OpenSSL
+package.
+
+CPython is covered by the Python Software Foundation licence and the notices
+in its licence file. The Windows and macOS executables preserve upstream licence texts
+under `licenses/python-standalone/`, including notices for OpenSSL 3
+(Apache-2.0), zlib (Zlib), libffi and Expat (MIT), bzip2 (bzip2-1.0.6), and
+XZ/liblzma (0BSD). The directory
+also retains the upstream distribution's optional-library notices for reference;
+this does not mean that every optional component is included in this program.
+Berkeley DB and OpenSSL 1.1 are not bundled by this application.
+
+Exact source URLs and checksums are recorded in that directory's `SOURCES.json`.
+Runtime source and build definitions:
+https://github.com/astral-sh/python-build-standalone/tree/20260901 and
+https://github.com/python/cpython/tree/v3.12.14.
+
 ## Android application (APK)
 
 The `AndroidTVTimeFixer-*.apk` published with each release is a **separate
