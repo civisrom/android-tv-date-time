@@ -78,8 +78,8 @@ DEFAULT_ADB_PORT = 5555
 #: Android Studio, а программа глушит свой сервер при выходе.
 DEFAULT_ADB_SERVER_PORT = 5038
 
-#: Файлы, которые adb хранит в своём каталоге <HOME>/.android.
-ADB_HOME_FILES = ('adbkey', 'adbkey.pub', 'adbkey.known_hosts')
+#: Ключи и список доверенных беспроводных устройств; старое имя сохранено для совместимости.
+ADB_HOME_FILES = ('adbkey', 'adbkey.pub', 'adb_known_hosts.pb', 'adbkey.known_hosts')
 
 #: mDNS-сервисы, которыми Android анонсирует отладку.
 #: pairing — на экране открыт диалог спаривания, connect — можно подключаться,

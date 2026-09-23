@@ -714,6 +714,51 @@ class ReliabilityTests(unittest.TestCase):
                 (fixer.adb_dot_android / 'adbkey').read_text(encoding='utf-8'), 'already-here'
             )
 
+    def test_adb_home_migration_preserves_native_wireless_trust(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_home = Path(temp_dir) / 'home'
+            source_dir = fake_home / '.android'
+            source_dir.mkdir(parents=True)
+            # Synthetic protobuf: one host entry, no real device identity or key.
+            native_trust = b'\x0a\x09\x0a\x07test-tv'
+            original_files = {
+                'adb_known_hosts.pb': native_trust,
+                'adbkey.known_hosts': b'legacy-test-data',
+            }
+            for name, content in original_files.items():
+                (source_dir / name).write_bytes(content)
+
+            fixer = self._fixer_with_data_dir(temp_dir)
+            fixer.adb_dot_android.mkdir(parents=True)
+            with mock.patch('src.android_time_fixer.Path.home', return_value=fake_home):
+                fixer._migrate_adb_home()
+
+            for name, content in original_files.items():
+                with self.subTest(name=name):
+                    destination = fixer.adb_dot_android / name
+                    self.assertTrue(destination.is_file(), name)
+                    self.assertEqual(destination.read_bytes(), content)
+                    self.assertEqual((source_dir / name).read_bytes(), content)
+                    if os.name != 'nt':
+                        self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
+
+    def test_adb_home_migration_preserves_existing_native_wireless_trust(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_home = Path(temp_dir) / 'home'
+            source = fake_home / '.android' / 'adb_known_hosts.pb'
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b'other-synthetic-host-list')
+            fixer = self._fixer_with_data_dir(temp_dir)
+            fixer.adb_dot_android.mkdir(parents=True)
+            destination = fixer.adb_dot_android / 'adb_known_hosts.pb'
+            destination.write_bytes(b'existing-synthetic-host-list')
+
+            with mock.patch('src.android_time_fixer.Path.home', return_value=fake_home):
+                fixer._migrate_adb_home()
+
+            self.assertEqual(destination.read_bytes(), b'existing-synthetic-host-list')
+            self.assertEqual(source.read_bytes(), b'other-synthetic-host-list')
+
     def test_adb_home_migration_survives_missing_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             fixer = self._fixer_with_data_dir(temp_dir)

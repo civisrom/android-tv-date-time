@@ -104,6 +104,8 @@ replace troubleshooting other network faults.
     with the computer's clock.
 *   **Saved ADB trust:** reuse ADB keys and verify the connection with a command
     on the device. Revoking access may require authorization or pairing again.
+    On Linux and macOS, ADB data migration also preserves the list of trusted
+    wireless devices.
 *   **Russian and English interface:** the desktop program remembers the language
     selected at startup; the APK follows the system language.
 *   **Version and source code:** the version, source code label and GitHub link
