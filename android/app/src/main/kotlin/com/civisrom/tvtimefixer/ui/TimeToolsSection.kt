@@ -17,16 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isShiftPressed
-import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import com.civisrom.tvtimefixer.DeviceMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -85,16 +75,7 @@ internal fun TimeSettingStatus.label(): Int = when (this) {
 
 /** Preview is local UI state: cancelling it cannot call a mutation action. */
 @Composable internal fun TimeToolsSection(state: AppState, actions: AppActions, mode: DeviceMode = DeviceMode.HANDHELD) {
-    val focus = LocalFocusManager.current
-    // A TV remote uses Up/Down to leave an editor. Phones retain normal multiline cursor editing.
-    val editorNavigation = if (mode != DeviceMode.TELEVISION) Modifier else Modifier.onPreviewKeyEvent {
-        if (it.type != KeyEventType.KeyDown || it.isCtrlPressed || it.isShiftPressed || it.isAltPressed) false
-        else when (it.key) {
-            Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
-            Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
-            else -> false
-        }
-    }
+    val editorNavigation = tvTextFieldNavigation(mode)
     val tools = state.timeTools
     val enabled = state.connected && !state.busy
     var profileName by rememberSaveable(tools.identity) { mutableStateOf("") }

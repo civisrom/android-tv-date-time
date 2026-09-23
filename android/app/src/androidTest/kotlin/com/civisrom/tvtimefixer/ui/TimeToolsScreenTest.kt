@@ -163,7 +163,8 @@ class TimeToolsScreenTest {
         field.performScrollTo().performClick().performTextReplacement(text)
         compose.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
         field.assertIsFocused()
-        field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(text.length, text.length, false)) }
+        field.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.MoveEnd) } }
+        assertEquals(text.length, field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange].start)
         field.performKeyInput { pressKey(Key.DirectionUp) }
         field.assertIsFocused()
         assertTrue(field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange].start < text.length)

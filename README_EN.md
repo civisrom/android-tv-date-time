@@ -1247,9 +1247,11 @@ computer. Pairing a computer does not authorize the installed APK. If network
 debugging is unavailable or local connections are blocked, use another
 controlling device; USB requires a suitable port on the TV.
 
-Controls support a remote. TV address fields provide explicit copy and paste
-buttons; pasting only fills the field and does not connect.
-Finishing text input dismisses the keyboard and focuses the next action.
+Controls support a remote. On the main TV screen, Up and Down move focus
+from text fields to adjacent controls; Left and Right move the cursor within
+the text. TV address fields provide explicit copy and paste buttons;
+pasting only fills the field and does not connect.
+After entering a value, select the button for the action you need.
 In the favorites dialog, press Save after entering a name: dismissing the
 keyboard alone does not save the entry.
 

@@ -371,10 +371,10 @@ private fun MainContent(
                 DiagnosticLink(id, "connection-details", onDiagnostics, returnFocus, onFocusRestored)
             }
         }
-        NtpSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
+        NtpSection(mode, state, actions, onDiagnostics, returnFocus, onFocusRestored)
         FunctionCard("timezone") {
             ExpandableSection(stringResource(R.string.time_zone_title), "timezone") {
-                TimeZoneSection(state, actions, onDiagnostics, returnFocus, onFocusRestored)
+                TimeZoneSection(mode, state, actions, onDiagnostics, returnFocus, onFocusRestored)
             }
             OperationProgress(state, actions, "timezone", Operation.APPLY_TIME_ZONE)
         }
@@ -386,7 +386,7 @@ private fun MainContent(
         FunctionCard("pairing") {
             ExpandableSection(stringResource(R.string.pairing_title), "pairing", expanded = pairingExpanded,
                 onExpanded = { pairingExpanded = it }) {
-                PairingSection(state, actions, pairingAddress, { pairingAddress = it },
+                PairingSection(mode, state, actions, pairingAddress, { pairingAddress = it },
                     pairingCode, onPairingCode, pairingRequester)
             }
             OperationProgress(state, actions, "pairing", Operation.PAIR)
@@ -564,7 +564,7 @@ private fun NetworkAddressSection(mode: DeviceMode, state: AppState, actions: Ap
         label = { Text(stringResource(R.string.connect_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) }, singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
-        modifier = Modifier.fillMaxWidth().testTag("network-address"))
+        modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("network-address"))
     AddressPaste("network-address") { address = it }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(shape = MaterialTheme.shapes.medium, onClick = { actions.connect(address) }, enabled = !state.busy, modifier = Modifier.testTag("network-connect")) {
@@ -661,6 +661,7 @@ private fun DiscoveredRow(
 
 @Composable
 private fun PairingSection(
+    mode: DeviceMode,
     state: AppState,
     actions: AppActions,
     pairingAddress: String,
@@ -688,7 +689,7 @@ private fun PairingSection(
             onValueChange = onPairingAddressChange,
             label = { Text(stringResource(R.string.pairing_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().testTag("pairing-address"),
+            modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("pairing-address"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         )
@@ -698,7 +699,7 @@ private fun PairingSection(
             onValueChange = onCode,
             label = { Text(stringResource(R.string.pairing_code_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().focusRequester(codeFocus).testTag("pairing-code"),
+            modifier = Modifier.fillMaxWidth().focusRequester(codeFocus).then(tvTextFieldNavigation(mode)).testTag("pairing-code"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
         )
@@ -707,7 +708,7 @@ private fun PairingSection(
             onValueChange = { connectAddress = it },
             label = { Text(stringResource(R.string.pairing_connect_address_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().testTag("pairing-connect-address"),
+            modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("pairing-connect-address"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = {
                 if (pairingSupported && !state.busy) submitFocus.requestFocus()
@@ -726,7 +727,7 @@ private fun PairingSection(
 }
 
 @Composable
-private fun NtpSection(state: AppState, actions: AppActions,
+private fun NtpSection(mode: DeviceMode, state: AppState, actions: AppActions,
     onDiagnostics: (Long?, String) -> Unit, returnFocus: String?, onFocusRestored: () -> Unit,
 ) {
     var custom by rememberSaveable { mutableStateOf("") }
@@ -826,7 +827,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                     focusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
                     unfocusedContainerColor = if (highlightAddress) ConnectedColor.copy(alpha = 0.12f) else Color.Transparent,
                 ),
-                modifier = Modifier.fillMaxWidth().testTag("ntp-address"),
+                modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("ntp-address"),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {
                     if (!state.busy && custom.isNotBlank()) checkFocus.requestFocus()
@@ -927,7 +928,7 @@ private fun NtpSection(state: AppState, actions: AppActions,
                 onValueChange = { query = it },
                 label = { Text(stringResource(R.string.ntp_search_country), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("ntp-search"),
+                modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("ntp-search"),
             )
             matches.forEach { match ->
                 val country = match.country
@@ -1027,7 +1028,7 @@ private fun NtpChangeCard(state: AppState, change: com.civisrom.tvtimefixer.devi
 
 /** Ручной выбор пояса подключённого устройства, отдельно от настройки NTP. */
 @Composable
-private fun TimeZoneSection(state: AppState, actions: AppActions,
+private fun TimeZoneSection(mode: DeviceMode, state: AppState, actions: AppActions,
     onDiagnostics: (Long?, String) -> Unit, returnFocus: String?, onFocusRestored: () -> Unit,
 ) {
     val unsupported = state.deviceInfo?.apiLevel?.toIntOrNull()?.let { it < 28 } == true
@@ -1073,7 +1074,7 @@ private fun TimeZoneSection(state: AppState, actions: AppActions,
             showChoices = true
         }, singleLine = true, enabled = !state.busy,
             label = { Text(stringResource(R.string.time_zone_search), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            modifier = Modifier.fillMaxWidth().testTag("time-zone-search"))
+            modifier = Modifier.fillMaxWidth().then(tvTextFieldNavigation(mode)).testTag("time-zone-search"))
         Text(stringResource(R.string.time_zone_search_hint), style = MaterialTheme.typography.bodySmall)
         Button(shape = MaterialTheme.shapes.medium, onClick = {
             showChoices = false
