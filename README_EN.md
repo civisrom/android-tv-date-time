@@ -70,7 +70,7 @@ replace troubleshooting other network faults.
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
     91 alternative servers**, including regional pools, Cloudflare, Google,
-    MSK-IX, Yandex and national time services. The 2.6.5 update adds 38 addresses
+    MSK-IX, Yandex and national time services. The 2.6.6 update adds 38 addresses
     verified using real NTPv3/v4 requests. Reachability depends on the network;
     Android and desktop share the same catalog.
 *   **IPv6:** manual ADB connections and mDNS discovery support IPv4 and
@@ -240,13 +240,13 @@ Run via PowerShell
 
 ### macOS
 
-Choose the archive in [release 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5)
+Choose the archive in [release 2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6)
 that matches your Mac's processor:
 
 | Processor | Archive |
 |---|---|
-| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.5/AndroidTVTimeFixer-macos.zip) |
-| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.5/AndroidTVTimeFixer-macos-intel.zip) |
+| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.6/AndroidTVTimeFixer-macos.zip) |
+| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.6/AndroidTVTimeFixer-macos-intel.zip) |
 
 Download the matching archive from the release,
 extract it and open Terminal in its folder. This is a console program:
@@ -263,22 +263,22 @@ for the result of a particular revision.
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.5.apk` from [release 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5). The release page describes the changes.
+1.  Download `AndroidTVTimeFixer-2.6.6.apk` from [release 2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6). The release page describes the changes.
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.5.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.6.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.5.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.6.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
 Requires **Android 6.0** or newer. See
 [Android application](#android-application) for details.
 
-The current release is [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5); the Android app continues to operate in test mode.
+The current release is [2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6); the Android app continues to operate in test mode.
 
 **Google Play Protect.** This APK is distributed through GitHub Releases.
 Installing outside Google Play may trigger a scan prompt or warning; not every
@@ -1108,10 +1108,6 @@ saved to disk. Deadlines are 10 seconds for TCP, 15 seconds for TLS/read
 inactivity and 60 seconds for the overall pairing operation. Connection addresses
 support IPv4 and IPv6.
 
-Change history: [2.6.1](release-notes/v2.6.1-en.md),
-[2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),
-[2.6.4](release-notes/v2.6.4-en.md), and [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5).
-
 #### 7. "Time zone"
 
 This section is visible on phones and TVs, starts collapsed, and follows the NTP
@@ -1197,6 +1193,11 @@ Profiles and snapshots stay on the controlling Android device. Resetting the
 target may change its identity; an old snapshot is not applied automatically
 to a new identity. Commands entered manually in the terminal do not create
 snapshots and are not undone by these controls.
+
+Change history: [2.6.1](release-notes/v2.6.1-en.md),
+[2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),
+[2.6.4](release-notes/v2.6.4-en.md), [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5),
+and [2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6).
 
 ### If the app misbehaves
 

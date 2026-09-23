@@ -71,7 +71,7 @@ Android TV и других совместимых Android-устройствах
 *   **Настройка NTP:** выбор по стране, поиск по коду или названию, собственный
     адрес в виде доменного имени или IP. Общий справочник содержит **77 стран
     и 91 альтернативный сервер**: региональные пулы, Cloudflare, Google,
-    MSK-IX, Яндекс и национальные службы времени. В обновлении 2.6.5 добавлено
+    MSK-IX, Яндекс и национальные службы времени. В обновлении 2.6.6 добавлено
     38 адресов, проверенных настоящими запросами NTPv3/v4. Доступность зависит
     от сети; справочник одинаков в Android и десктопной версии.
 *   **IPv6:** ручные подключения ADB и обнаружение mDNS поддерживают IPv4 и
@@ -247,13 +247,13 @@ VPN или фильтрация multicast могут мешать связи и 
 
 ### macOS
 
-В [выпуске 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5)
+В [выпуске 2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6)
 выберите архив под процессор Mac:
 
 | Процессор | Архив |
 |---|---|
-| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.5/AndroidTVTimeFixer-macos.zip) |
-| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.5/AndroidTVTimeFixer-macos-intel.zip) |
+| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.6/AndroidTVTimeFixer-macos.zip) |
+| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.6/AndroidTVTimeFixer-macos-intel.zip) |
 
 Скачайте подходящий архив из выпуска, распакуйте
 и откройте Терминал в его папке. Это консольная программа:
@@ -270,22 +270,22 @@ chmod +x AndroidTVTimeFixer
 
 ### Android (APK)
 
-1.  Скачайте `AndroidTVTimeFixer-2.6.5.apk` из [выпуска 2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5). Описание изменений находится на странице выпуска.
+1.  Скачайте `AndroidTVTimeFixer-2.6.6.apk` из [выпуска 2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6). Описание изменений находится на странице выпуска.
 2.  Сверьте контрольную сумму с файлом `.apk.sha256` рядом:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.5.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.6.apk.sha256
     ```
 3.  Установите:
     *   **На телефон** — откройте файл и разрешите установку из неизвестных
         источников для файлового менеджера или браузера.
-    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.5.apk`
+    *   **На сам Android TV** — либо через `adb install AndroidTVTimeFixer-2.6.6.apk`
         с компьютера, либо любым файловым менеджером на телевизоре. Иконка
         появится и в обычном лаунчере, и в лаунчере Android TV.
 
 Требуется **Android 6.0** или новее. Подробности — в разделе
 [Приложение для Android](#приложение-для-android).
 
-Текущий выпуск — [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5); Android-приложение продолжает работать в тестовом режиме.
+Текущий выпуск — [2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6); Android-приложение продолжает работать в тестовом режиме.
 
 **Google Play Защита.** APK распространяется через GitHub Releases.
 При установке не из Google Play система может предложить проверку или показать
@@ -1147,10 +1147,6 @@ ADB-ключ APK сохраняется в приватном каталоге �
 Ожидание ограничено: TCP 10 секунд, чтение/TLS 15 секунд, вся операция
 сопряжения 60 секунд. Адреса подключения поддерживают IPv4 и IPv6.
 
-История изменений: [2.6.1](release-notes/v2.6.1-ru.md),
-[2.6.2](release-notes/v2.6.2-ru.md), [2.6.3](release-notes/v2.6.3-ru.md),
-[2.6.4](release-notes/v2.6.4-ru.md) и [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5).
-
 #### 7. «Часовой пояс»
 
 Раздел виден на телефоне и телевизоре, свёрнут по умолчанию и находится после
@@ -1237,6 +1233,11 @@ ADB-ключ APK сохраняется в приватном каталоге �
 сброса целевого устройства его идентичность может измениться: прежний снимок
 не применяется автоматически к новой идентичности. Команды, вручную запущенные
 в терминале, не создают снимок и не отменяются этими кнопками.
+
+История изменений: [2.6.1](release-notes/v2.6.1-ru.md),
+[2.6.2](release-notes/v2.6.2-ru.md), [2.6.3](release-notes/v2.6.3-ru.md),
+[2.6.4](release-notes/v2.6.4-ru.md), [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5)
+и [2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6).
 
 ### Если приложение ведёт себя странно
 

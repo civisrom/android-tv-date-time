@@ -232,7 +232,7 @@ def _profiles(fixer):
 def diagnostic_report(fixer):
     # Только заранее определённые поля. Ни get_device_info(), ни логи/снимки,
     # ни shell output не попадают в экспорт даже при ошибке устройства.
-    report = {'schema_version': 1, 'app_version': '2.6.5', 'platform': sys.platform,
+    report = {'schema_version': 1, 'app_version': '2.6.6', 'platform': sys.platform,
               'exported_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'transport_selected': bool(fixer.device), 'android_api': None, 'settings_read': False,
               'read_failure': None,
