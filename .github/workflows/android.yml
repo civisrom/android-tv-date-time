@@ -11,18 +11,24 @@ on:
       - 'shared/**'
       - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
+      - '.github/android-ui-profiles.json'
   pull_request:
     paths:
       - 'android/**'
       - 'shared/**'
       - 'scripts/verify_android_apk.py'
       - '.github/workflows/android.yml'
+      - '.github/android-ui-profiles.json'
   workflow_dispatch:
     inputs:
       full_checks:
         description: 'Полная проверка: тесты, lint и матрица виртуальных устройств'
         type: boolean
         default: false
+      ui_profile:
+        description: 'Профиль для адресной проверки (например, phone-23); пусто — вся матрица. Требует full_checks=true'
+        type: string
+        default: ''
   workflow_call:
     inputs:
       full_checks:
@@ -41,10 +47,36 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      ui-matrix: ${{ steps.ui-matrix.outputs.matrix }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Select UI profiles
+        id: ui-matrix
+        env:
+          REQUESTED_UI_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.ui_profile || '' }}
+          FULL_CHECKS: ${{ inputs.full_checks }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          matrix = json.loads(Path('.github/android-ui-profiles.json').read_text())
+          requested = os.environ['REQUESTED_UI_PROFILE'].strip()
+          if requested:
+              if os.environ['FULL_CHECKS'] != 'true':
+                  raise SystemExit('Selecting a UI profile requires full_checks=true')
+              matrix['include'] = [p for p in matrix['include'] if p['name'] == requested]
+              if not matrix['include']:
+                  raise SystemExit('Unknown UI profile: ' + requested)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('matrix=' + json.dumps(matrix, separators=(',', ':')) + '\n')
+          print('Selected UI profiles: ' + ', '.join(p['name'] for p in matrix['include']))
+          PY
 
       - name: Set up JDK 21
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -136,104 +168,8 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 4
-      matrix:
-        include:
-          - name: phone-26
-            image: system-images;android-26;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: tablet-35
-            image: system-images;android-35;google_apis;x86_64
-            device: pixel_c
-            tv: false
-            page_size: 4096
-          - name: android-tv-30
-            image: system-images;android-30;android-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: phone-35
-            image: system-images;android-35;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-36
-            # A production image enforces ADB authentication, including unknown TLS clients.
-            image: system-images;android-36;google_apis_playstore;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-29
-            image: system-images;android-29;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-28
-            image: system-images;android-28;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-31
-            image: system-images;android-31;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-37.0
-            image: system-images;android-37.0;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-23
-            image: system-images;android-23;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-24
-            image: system-images;android-24;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-33
-            image: system-images;android-33;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: android-tv-36
-            image: system-images;android-36;android-tv;x86_64
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: google-tv-36-16k
-            image: system-images;android-36;google-tv-ps16k;x86_64
-            device: tv_1080p
-            tv: true
-            page_size: 16384
-          - name: google-tv-30
-            image: system-images;android-30;google-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: android-tv-34
-            image: system-images;android-34;android-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: google-tv-34
-            image: system-images;android-34;google-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
-          - name: phone-30
-            image: system-images;android-30;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-34
-            image: system-images;android-34;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
+      matrix: ${{ fromJSON(needs.build.outputs.ui-matrix) }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -425,7 +361,7 @@ jobs:
           if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
             while IFS= read -r name; do
               name=${name//$'\r'/}
-              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt|native-terminal-(disconnected|back)-failure\.txt)$ ]] || continue
+              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt|native-terminal-(disconnected|back|clear)-failure\.txt)$ ]] || continue
               if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
                 cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
                 rm -f -- "ui-screenshots/$name"

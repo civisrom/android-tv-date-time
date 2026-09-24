@@ -51,9 +51,17 @@ class TerminalScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val session = TerminalSession()
     private val calls = mutableListOf<String>()
+    private var editTrace: MutableList<String>? = null
     private lateinit var inputMode: InputModeManager
     private val actions = object : TerminalActions {
-        override fun edit(command: String) = session.edit(command)
+        override fun edit(command: String) {
+            session.edit(command)
+            editTrace?.add("${android.os.SystemClock.uptimeMillis()}:" + when (command) {
+                "" -> "empty"
+                "unfinished command" -> "original"
+                else -> "other"
+            })
+        }
         override fun run() { calls += "run" }
         override fun stop() { calls += "stop" }
         override fun clearOutput() = session.clearOutput()
@@ -480,15 +488,57 @@ class TerminalScreenTest {
     @Test fun clearing_the_command_line_preserves_the_result_and_history() {
         session.edit("echo previous"); session.start("TV"); session.append("previous"); session.finish(0)
         session.edit("unfinished command")
-        screen()
-        compose.onNodeWithTag("terminal-clear-input").performClick()
-        compose.runOnIdle {
-            assertEquals("", session.state.value.draft)
-            assertEquals("previous", session.state.value.output.single().text)
-            assertEquals(listOf("echo previous"), session.state.value.history)
+        editTrace = java.util.Collections.synchronizedList(mutableListOf())
+        try {
+            screen()
+            compose.onNodeWithTag("terminal-clear-input").performClick()
+            compose.runOnIdle {
+                assertEquals("", session.state.value.draft)
+                assertEquals("previous", session.state.value.output.single().text)
+                assertEquals(listOf("echo previous"), session.state.value.history)
+            }
+            compose.onNodeWithTag("terminal-run").assertIsNotEnabled()
+            compose.onNodeWithTag("terminal-follow").assertIsSelected()
+        } catch (failure: Throwable) {
+            runCatching { recordClearFailure(failure) }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        } finally {
+            println("Terminal clear edit callbacks: $editTrace")
+            editTrace = null
         }
-        compose.onNodeWithTag("terminal-run").assertIsNotEnabled()
-        compose.onNodeWithTag("terminal-follow").assertIsSelected()
+    }
+
+    private fun recordClearFailure(failure: Throwable) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val directory = java.io.File(instrumentation.targetContext.filesDir, "ui-screenshots")
+        // Preserve the failed frame before any diagnostic synchronization or teardown.
+        runCatching {
+            directory.mkdirs()
+            val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            try {
+                java.io.File(directory, "native-terminal-clear-failure.png").outputStream().use {
+                    check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+                }
+            } finally { bitmap.recycle() }
+        }.exceptionOrNull()?.let(failure::addSuppressed)
+        runCatching {
+            directory.mkdirs()
+            val file = java.io.File(directory, "native-terminal-clear-failure.txt")
+            // Write the callback evidence first: later semantics queries can themselves fail.
+            file.writeText("API ${Build.VERSION.SDK_INT}; edit callbacks=$editTrace\n")
+            val window = compose.runOnUiThread {
+                val root = compose.activity.window.decorView
+                val insets = androidx.core.view.ViewCompat.getRootWindowInsets(root)
+                "windowFocused=${root.hasWindowFocus()}; touchMode=${root.isInTouchMode}; " +
+                    "ime=${insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())}"
+            }
+            file.appendText("$window\n")
+            listOf("terminal-clear-input", "terminal-input", "terminal-screen").forEach { tag ->
+                val node = compose.onNodeWithTag(tag)
+                file.appendText("$tag: displayed=${node.isDisplayed()}; bounds=${node.fetchSemanticsNode().boundsInRoot}\n")
+            }
+            file.appendText(compose.onRoot().printToString())
+        }.exceptionOrNull()?.let(failure::addSuppressed)
     }
 
     @Test fun connection_header_shows_the_connected_target_model() {
