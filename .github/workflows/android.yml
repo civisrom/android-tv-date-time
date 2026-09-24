@@ -353,12 +353,14 @@ jobs:
           done
           exit "$ui_failed"
 
-      - name: Repeat terminal activity and keyboard transitions on Android 6
-        if: success() && matrix.name == 'phone-23'
+      - name: Repeat terminal activity and keyboard transitions
+        if: success() && (matrix.name == 'phone-23' || matrix.name == 'phone-36')
         timeout-minutes: 10
+        env:
+          UI_PROFILE: ${{ matrix.name }}
         run: |
           set -euo pipefail
-          # Fixed checks of both failing activity/keyboard transitions, never retry-until-green.
+          # Fixed checks of failing activity/keyboard transitions, never retry-until-green.
           # Stop at the first failed, skipped, missing, reordered or timed-out test.
           terminal_class=com.civisrom.tvtimefixer.ui.TerminalScreenTest
           run_sequence() {
@@ -401,14 +403,24 @@ jobs:
           PY
           }
           for iteration in $(seq -w 1 20); do
-            # Separate groups retain both adjacencies under JUnit's default method order.
-            run_sequence clear \
-              TV_reference_search_reaches_category_with_sequential_Dpad \
-              insert_from_reference_fills_editor_without_running_and_places_cursor_at_the_end \
-              clearing_the_command_line_preserves_the_result_and_history
-            run_sequence scroll \
-              native_touch_clears_the_focused_editor_with_the_keyboard_visible \
-              scrolling_long_output_keeps_editor_run_and_clear_controls_in_place
+            if [[ "$UI_PROFILE" == phone-23 ]]; then
+              # Separate groups retain both adjacencies under JUnit's default method order.
+              run_sequence clear \
+                TV_reference_search_reaches_category_with_sequential_Dpad \
+                insert_from_reference_fills_editor_without_running_and_places_cursor_at_the_end \
+                clearing_the_command_line_preserves_the_result_and_history
+              run_sequence scroll \
+                native_touch_clears_the_focused_editor_with_the_keyboard_visible \
+                scrolling_long_output_keeps_editor_run_and_clear_controls_in_place
+            elif [[ "$UI_PROFILE" == phone-36 ]]; then
+              # Each search case opens, edits and closes the real IME for all three queries.
+              run_sequence search \
+                stop_is_available_from_help_and_files_while_the_command_runs \
+                search_does_not_offer_external_ADB_commands
+            else
+              echo "Unexpected terminal stress profile: $UI_PROFILE" >&2
+              exit 1
+            fi
           done
 
       - name: Collect UI screenshots and IME timeout details
@@ -419,7 +431,7 @@ jobs:
           if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
             while IFS= read -r name; do
               name=${name//$'\r'/}
-              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt|native-terminal-(disconnected|back|clear|clear-ime|clear-ime-cleanup|scroll)-failure\.txt)$ ]] || continue
+              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt|native-terminal-(disconnected|back|clear|clear-ime|clear-ime-cleanup|scroll|search|search-cleanup)-failure\.txt)$ ]] || continue
               if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
                 cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
                 rm -f -- "ui-screenshots/$name"
@@ -448,6 +460,7 @@ jobs:
             ${{ runner.temp }}/ui-shard-*.log
             ${{ runner.temp }}/ui-terminal-clear-repeat-*.log
             ${{ runner.temp }}/ui-terminal-scroll-repeat-*.log
+            ${{ runner.temp }}/ui-terminal-search-repeat-*.log
             ${{ runner.temp }}/ui-wireless.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt

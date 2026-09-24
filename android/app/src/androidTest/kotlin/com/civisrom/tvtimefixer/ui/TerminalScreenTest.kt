@@ -52,6 +52,7 @@ class TerminalScreenTest {
     private val session = TerminalSession()
     private val calls = mutableListOf<String>()
     private var editTrace: MutableList<String>? = null
+    private var searchAttempt = 0
     private lateinit var inputMode: InputModeManager
     private val actions = object : TerminalActions {
         override fun edit(command: String) {
@@ -242,6 +243,9 @@ class TerminalScreenTest {
         val root = compose.activity.window.decorView
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val originalFlags = automation.serviceInfo.flags
+        val attempt = ++searchAttempt
+        var stage = "prepare-closed-keyboard"
+        var testFailure: Throwable? = null
         try {
             automation.serviceInfo = automation.serviceInfo.apply {
                 flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
@@ -256,21 +260,53 @@ class TerminalScreenTest {
                 }
                 automation.waitForIdle(300, 3_000)
             }
-            scroll("terminal-search").performClick().performTextReplacement(query)
+            closeKeyboardAndWait()
+            val field = scroll("terminal-search").assertIsDisplayed()
+            waitForStableControls(listOf("terminal-search"))
+            stage = "tap-search-once"
+            field.performClick().assertIsFocused()
+            stage = "wait-keyboard-shown"
             waitForKeyboard(true)
-            compose.onNodeWithTag("terminal-search").performImeAction()
+            // Replace the query only after the native editor is ready, so changing
+            // the filtered list does not overlap the keyboard's opening transition.
+            stage = "replace-query"
+            field.performTextReplacement(query)
+            stage = "submit-search"
+            field.performImeAction()
+            stage = "wait-keyboard-hidden"
             waitForKeyboard(false)
             // The full header replaces its compact IME variant when Compose Insets settle.
+            stage = "wait-full-header"
             compose.waitUntil(5_000) {
                 compose.runOnUiThread { root.hasWindowFocus() } &&
                     compose.onAllNodesWithTag("terminal-device-name").fetchSemanticsNodes().isNotEmpty()
             }
             // Keep focus on a concrete control; TV can restore it after clearFocus().
+            stage = "focus-back"
             compose.onNodeWithTag("terminal-back").performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
             compose.onNodeWithTag("terminal-back").assertIsFocused()
-            compose.onNodeWithTag("terminal-search").assertIsNotFocused()
+            field.assertIsNotFocused()
+            // Losing editor focus can finish its native input session after the
+            // first hide. Settle that boundary before a subsequent query.
+            stage = "settle-after-focus-back"
+            waitForStableControls(listOf("terminal-back"))
+        } catch (failure: Throwable) {
+            testFailure = failure
+            runCatching { recordTerminalFailure(failure, "native-terminal-search-failure",
+                listOf("terminal-search", "terminal-back", "terminal-list", "terminal-screen"),
+                "searchAttempt=$attempt; stage=$stage") }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
         } finally {
-            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+            try {
+                closeKeyboardAndWait()
+            } catch (cleanupFailure: Throwable) {
+                runCatching { recordTerminalFailure(cleanupFailure, "native-terminal-search-cleanup-failure",
+                    listOf("terminal-search", "terminal-back", "terminal-list", "terminal-screen"),
+                    "searchAttempt=$attempt; stage=$stage") }.exceptionOrNull()?.let(cleanupFailure::addSuppressed)
+                if (testFailure != null) testFailure.addSuppressed(cleanupFailure) else throw cleanupFailure
+            } finally {
+                automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+            }
         }
     }
 
@@ -668,7 +704,7 @@ class TerminalScreenTest {
     }
 
     private fun recordTerminalFailure(failure: Throwable, name: String = "native-terminal-clear-failure",
-        tags: List<String> = listOf("terminal-clear-input", "terminal-input", "terminal-screen")) {
+        tags: List<String> = listOf("terminal-clear-input", "terminal-input", "terminal-screen"), details: String = "") {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory = java.io.File(instrumentation.targetContext.filesDir, "ui-screenshots")
         // Preserve the failed frame before any diagnostic synchronization or teardown.
@@ -677,7 +713,7 @@ class TerminalScreenTest {
             directory.mkdirs()
             val file = java.io.File(directory, "$name.txt")
             // Write the callback evidence first: later semantics queries can themselves fail.
-            file.writeText("API ${Build.VERSION.SDK_INT}; edit callbacks=$editTrace\n")
+            file.writeText("API ${Build.VERSION.SDK_INT}; edit callbacks=$editTrace; $details\n")
             val automation = instrumentation.uiAutomation
             val originalFlags = automation.serviceInfo.flags
             try {
