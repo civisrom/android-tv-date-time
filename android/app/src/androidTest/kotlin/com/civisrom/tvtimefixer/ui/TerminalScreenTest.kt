@@ -491,6 +491,10 @@ class TerminalScreenTest {
         editTrace = java.util.Collections.synchronizedList(mutableListOf())
         try {
             screen()
+            // The previous Activity can leave a native IME window visible after this
+            // Compose root is already idle and focused. Wait for the actual click target.
+            Espresso.closeSoftKeyboard()
+            waitForClearButton(imeVisible = false)
             compose.onNodeWithTag("terminal-clear-input").performClick()
             compose.runOnIdle {
                 assertEquals("", session.state.value.draft)
@@ -508,22 +512,115 @@ class TerminalScreenTest {
         }
     }
 
-    private fun recordClearFailure(failure: Throwable) {
+    @Test fun native_touch_clears_the_focused_editor_with_the_keyboard_visible() {
+        org.junit.Assume.assumeFalse("Requires a handheld input method",
+            compose.activity.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK ==
+                Configuration.UI_MODE_TYPE_TELEVISION)
+        session.edit("echo previous"); session.start("TV"); session.append("previous"); session.finish(0)
+        session.edit("unfinished command")
+        editTrace = java.util.Collections.synchronizedList(mutableListOf())
+        try {
+            screen()
+            Espresso.closeSoftKeyboard()
+            waitForClearButton(imeVisible = false)
+            compose.onNodeWithTag("terminal-input").performScrollTo().assertIsDisplayed()
+            nativeTap("terminal-input")
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            val originalFlags = automation.serviceInfo.flags
+            try {
+                compose.waitUntil(15_000) { hasLegacyImeWindow(automation) }
+            } finally {
+                automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+            }
+            compose.onNodeWithTag("terminal-input").assertIsFocused()
+            compose.onNodeWithTag("terminal-clear-input").performScrollTo()
+            waitForClearButton(imeVisible = true)
+            clearScreenshot("native-terminal-clear-ime-ready")
+            nativeTap("terminal-clear-input")
+            compose.runOnIdle {
+                assertEquals("", session.state.value.draft)
+                assertEquals("previous", session.state.value.output.single().text)
+                assertEquals(listOf("echo previous"), session.state.value.history)
+            }
+            compose.onNodeWithTag("terminal-input").assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("")))
+            compose.onNodeWithTag("terminal-run").assertIsNotEnabled()
+            compose.onNodeWithTag("terminal-follow").assertIsSelected()
+            clearScreenshot("native-terminal-clear-ime-after")
+        } catch (failure: Throwable) {
+            runCatching { recordClearFailure(failure, "native-terminal-clear-ime-failure") }
+                .exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        } finally {
+            println("Terminal native clear edit callbacks: $editTrace")
+            editTrace = null
+        }
+    }
+
+    private fun waitForClearButton(imeVisible: Boolean) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        val clear = compose.onNodeWithTag("terminal-clear-input")
+        var previousBounds: Pair<androidx.compose.ui.geometry.Rect, androidx.compose.ui.geometry.Rect>? = null
+        var stableSince = android.os.SystemClock.uptimeMillis()
+        try {
+            compose.waitUntil(5_000) {
+                val node = clear.fetchSemanticsNode()
+                val bounds = node.boundsInWindow to compose.onNodeWithTag("terminal-screen").fetchSemanticsNode().boundsInWindow
+                val ready = hasLegacyImeWindow(automation) == imeVisible && clear.isDisplayed() &&
+                    node.config.getOrNull(SemanticsProperties.Disabled) == null &&
+                    compose.runOnUiThread { compose.activity.window.decorView.hasWindowFocus() }
+                val now = android.os.SystemClock.uptimeMillis()
+                if (!ready || bounds != previousBounds) {
+                    previousBounds = bounds
+                    stableSince = now
+                }
+                ready && now - stableSince >= 500
+            }
+            clear.assertIsDisplayed().assertIsEnabled()
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
+    }
+
+    private fun nativeTap(tag: String) {
+        val center = compose.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInWindow.center
+        val origin = IntArray(2)
+        compose.runOnUiThread { compose.activity.window.decorView.getLocationOnScreen(origin) }
+        val pointer = android.view.MotionEvent.PointerProperties().apply {
+            id = 0; toolType = android.view.MotionEvent.TOOL_TYPE_FINGER
+        }
+        val point = android.view.MotionEvent.PointerCoords().apply {
+            x = center.x + origin[0]; y = center.y + origin[1]; pressure = 1f; size = 1f
+        }
+        val downTime = android.os.SystemClock.uptimeMillis()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+            val event = android.view.MotionEvent.obtain(downTime, android.os.SystemClock.uptimeMillis(), action, 1,
+                arrayOf(pointer), arrayOf(point), 0, 0, 1f, 1f, 0, 0, android.view.InputDevice.SOURCE_TOUCHSCREEN, 0)
+            try { instrumentation.sendPointerSync(event) } finally { event.recycle() }
+        }
+    }
+
+    private fun clearScreenshot(name: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val directory = java.io.File(instrumentation.targetContext.filesDir, "ui-screenshots").apply { mkdirs() }
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            java.io.File(directory, "$name.png").outputStream().use {
+                check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally { bitmap.recycle() }
+    }
+
+    private fun recordClearFailure(failure: Throwable, name: String = "native-terminal-clear-failure") {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory = java.io.File(instrumentation.targetContext.filesDir, "ui-screenshots")
         // Preserve the failed frame before any diagnostic synchronization or teardown.
+        runCatching { clearScreenshot(name) }.exceptionOrNull()?.let(failure::addSuppressed)
         runCatching {
             directory.mkdirs()
-            val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
-            try {
-                java.io.File(directory, "native-terminal-clear-failure.png").outputStream().use {
-                    check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
-                }
-            } finally { bitmap.recycle() }
-        }.exceptionOrNull()?.let(failure::addSuppressed)
-        runCatching {
-            directory.mkdirs()
-            val file = java.io.File(directory, "native-terminal-clear-failure.txt")
+            val file = java.io.File(directory, "$name.txt")
             // Write the callback evidence first: later semantics queries can themselves fail.
             file.writeText("API ${Build.VERSION.SDK_INT}; edit callbacks=$editTrace\n")
             val window = compose.runOnUiThread {

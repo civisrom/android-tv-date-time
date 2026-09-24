@@ -353,6 +353,50 @@ jobs:
           done
           exit "$ui_failed"
 
+      - name: Repeat terminal activity and keyboard transitions on Android 6
+        if: success() && matrix.name == 'phone-23'
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          # A fixed stress check of the original failing sequence, never retry-until-green.
+          # Stop at the first failed, skipped, missing, reordered or timed-out test.
+          terminal_class=com.civisrom.tvtimefixer.ui.TerminalScreenTest
+          methods=(
+            TV_reference_search_reaches_category_with_sequential_Dpad
+            insert_from_reference_fills_editor_without_running_and_places_cursor_at_the_end
+            clearing_the_command_line_preserves_the_result_and_history
+          )
+          selection="$terminal_class#${methods[0]},$terminal_class#${methods[1]},$terminal_class#${methods[2]}"
+          for iteration in $(seq -w 1 20); do
+            result="$RUNNER_TEMP/ui-terminal-clear-repeat-$iteration.log"
+            "$ANDROID_HOME/platform-tools/adb" shell am force-stop com.civisrom.tvtimefixer
+            timeout 180 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r \
+              -e timeout_msec 60000 -e class "$selection" \
+              com.civisrom.tvtimefixer.test/androidx.test.runner.AndroidJUnitRunner | tee "$result"
+            python3 - "$result" "${methods[@]}" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          text = Path(sys.argv[1]).read_text()
+          expected = sys.argv[2:]
+          started, completed = [], []
+          current = None
+          for line in text.splitlines():
+              if line.startswith('INSTRUMENTATION_STATUS: test='):
+                  current = line.split('=', 1)[1]
+              elif line.startswith('INSTRUMENTATION_STATUS_CODE: '):
+                  code = int(line.split(': ', 1)[1])
+                  if code not in (0, 1) or current is None:
+                      raise SystemExit('Unexpected instrumentation status: ' + line)
+                  (started if code == 1 else completed).append(current)
+                  current = None
+          if started != expected or completed != expected or not re.search(r'^OK \(3 tests\)\s*$', text, re.M):
+              raise SystemExit('Terminal transition sequence did not pass exactly once in the required order')
+          print('Verified terminal transition sequence: ' + sys.argv[1])
+          PY
+          done
+
       - name: Collect UI screenshots and IME timeout details
         if: always()
         run: |
@@ -361,7 +405,7 @@ jobs:
           if names=$(timeout 15 "$ANDROID_HOME/platform-tools/adb" shell run-as com.civisrom.tvtimefixer ls files/ui-screenshots); then
             while IFS= read -r name; do
               name=${name//$'\r'/}
-              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt|native-terminal-(disconnected|back|clear)-failure\.txt)$ ]] || continue
+              [[ "$name" =~ ^([a-zA-Z0-9._-]+\.png|ime-timeout-[a-zA-Z0-9._-]+\.txt|native-terminal-(disconnected|back|clear|clear-ime)-failure\.txt)$ ]] || continue
               if ! timeout 15 "$ANDROID_HOME/platform-tools/adb" exec-out run-as com.civisrom.tvtimefixer \
                 cat "files/ui-screenshots/$name" > "ui-screenshots/$name"; then
                 rm -f -- "ui-screenshots/$name"
@@ -388,6 +432,7 @@ jobs:
             ui-screenshots/
             ${{ runner.temp }}/ui-instrumentation.log
             ${{ runner.temp }}/ui-shard-*.log
+            ${{ runner.temp }}/ui-terminal-clear-repeat-*.log
             ${{ runner.temp }}/ui-wireless.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt
