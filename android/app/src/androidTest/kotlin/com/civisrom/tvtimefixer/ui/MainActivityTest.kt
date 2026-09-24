@@ -10,7 +10,7 @@ import android.view.View
 import android.view.WindowInsets
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.RootMatchers.isDialog
@@ -20,14 +20,44 @@ import com.civisrom.tvtimefixer.MainActivity
 import com.civisrom.tvtimefixer.DeviceMode
 import com.civisrom.tvtimefixer.detectDeviceMode
 import com.civisrom.tvtimefixer.R
+import com.civisrom.tvtimefixer.TimeFixerApplication
+import com.civisrom.tvtimefixer.diagnostics.Operation
+import com.civisrom.tvtimefixer.diagnostics.Outcome
 import java.io.File
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
 /** Настоящие Application, Activity, lifecycle и обработчики действий установленного APK. */
 class MainActivityTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    // Keep background StateFlow emissions queued until the UI test clock runs them.
+    @get:Rule val compose = createAndroidComposeRule<MainActivity>(effectContext = StandardTestDispatcher())
+
+    @Test fun background_diagnostics_updates_render_before_and_after_activity_recreation() {
+        val journal = (compose.activity.application as TimeFixerApplication).diagnostics
+        compose.onNodeWithTag("diagnostics-open").performScrollTo().performClick()
+
+        fun assertEventVisible(id: Long) {
+            compose.waitUntil(10_000) { journal.snapshot.value.events.any { it.id == id } }
+            compose.onNodeWithTag("diagnostics-events").performScrollToNode(hasTestTag("diagnostic-$id"))
+            compose.onNodeWithTag("diagnostic-$id").assertIsDisplayed()
+        }
+
+        // record() queues work; the real diagnostics-writer persists and publishes each update.
+        val started = journal.record(Operation.CHECK_CONNECTION, Outcome.STARTED)
+        assertEventVisible(started)
+        val succeeded = journal.record(Operation.CHECK_CONNECTION, Outcome.SUCCESS)
+        assertEventVisible(succeeded)
+
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("diagnostics-back").assertIsDisplayed()
+        assertEventVisible(started)
+        assertEventVisible(succeeded)
+        assertEventVisible(journal.record(Operation.CHECK_CONNECTION, Outcome.CANCELLED))
+        compose.onNodeWithTag("diagnostics-back").performClick()
+        compose.onNodeWithTag("main-content").assertExists()
+    }
 
     @Test fun stalled_connection_can_be_cancelled_and_retried_without_leaving_a_socket_open() {
         java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { listener ->

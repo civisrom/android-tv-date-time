@@ -59,22 +59,27 @@ internal fun PairingTextField(
     }
 
     var editing by remember(value) { mutableStateOf(false) }
+    var startOnFocus by remember(value) { mutableStateOf(false) }
     val interaction = remember(value) { MutableInteractionSource() }
     LaunchedEffect(interaction) {
-        // A real tap is also an explicit entry, including a tap on an already focused field.
+        // A tap starts its own session. Remember editing intent without changing keyboard
+        // options: changing them here would restart the session that the tap just opened.
         interaction.interactions.collect { if (it is PressInteraction.Release) editing = true }
     }
     OutlinedTextField(state = value,
         label = { Text(stringResource(label), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         lineLimits = TextFieldLineLimits.SingleLine,
-        keyboardOptions = options.copy(showKeyboardOnFocus = editing),
+        keyboardOptions = options.copy(showKeyboardOnFocus = startOnFocus),
         onKeyboardAction = { onDone() }, interactionSource = interaction,
-        modifier = modifier.onFocusChanged { if (!it.isFocused) editing = false }
+        modifier = modifier.onFocusChanged {
+            if (!it.isFocused) { editing = false; startOnFocus = false }
+        }
             .onPreviewKeyEvent {
                 if (!editing && it.type == KeyEventType.KeyDown &&
                     !it.isCtrlPressed && !it.isShiftPressed && !it.isAltPressed &&
                     (it.key == Key.DirectionCenter || it.key == Key.Enter || it.key == Key.NumPadEnter)) {
                     editing = true
+                    startOnFocus = true
                     true
                 } else false
             }.then(tvTextFieldNavigation(mode)))

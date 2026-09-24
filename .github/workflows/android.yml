@@ -138,6 +138,26 @@ jobs:
       max-parallel: 4
       matrix:
         include:
+          - name: phone-26
+            image: system-images;android-26;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
+          - name: tablet-35
+            image: system-images;android-35;google_apis;x86_64
+            device: pixel_c
+            tv: false
+            page_size: 4096
+          - name: android-tv-30
+            image: system-images;android-30;android-tv;x86
+            device: tv_1080p
+            tv: true
+            page_size: 4096
+          - name: phone-35
+            image: system-images;android-35;google_apis;x86_64
+            device: pixel_2
+            tv: false
+            page_size: 4096
           - name: phone-36
             # A production image enforces ADB authentication, including unknown TLS clients.
             image: system-images;android-36;google_apis_playstore;x86_64
@@ -189,11 +209,6 @@ jobs:
             device: tv_1080p
             tv: true
             page_size: 16384
-          - name: android-tv-30
-            image: system-images;android-30;android-tv;x86
-            device: tv_1080p
-            tv: true
-            page_size: 4096
           - name: google-tv-30
             image: system-images;android-30;google-tv;x86
             device: tv_1080p
@@ -216,21 +231,6 @@ jobs:
             page_size: 4096
           - name: phone-34
             image: system-images;android-34;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: phone-35
-            image: system-images;android-35;google_apis;x86_64
-            device: pixel_2
-            tv: false
-            page_size: 4096
-          - name: tablet-35
-            image: system-images;android-35;google_apis;x86_64
-            device: pixel_c
-            tv: false
-            page_size: 4096
-          - name: phone-26
-            image: system-images;android-26;google_apis;x86_64
             device: pixel_2
             tv: false
             page_size: 4096

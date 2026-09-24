@@ -3,6 +3,8 @@ package com.civisrom.tvtimefixer.ui
 import android.os.Build
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
@@ -13,9 +15,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.PlatformTextInputInterceptor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.TextRange
@@ -26,6 +31,7 @@ import com.civisrom.tvtimefixer.R
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 class PairingTextFieldTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -33,18 +39,25 @@ class PairingTextFieldTest {
     private val second = TextFieldState("two")
     private var submitted = 0
     private var done = 0
+    private val inputSessionStarts = AtomicInteger()
+    private val observeInputSessions = PlatformTextInputInterceptor { request, nextHandler ->
+        inputSessionStarts.incrementAndGet()
+        nextHandler.startInputMethod(request)
+    }
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
 
     private fun screen(mode: DeviceMode, firstKeyboard: KeyboardType = KeyboardType.Uri) {
         compose.setContent {
             val keyboard = LocalSoftwareKeyboardController.current
-            MaterialTheme {
-                Column(Modifier.fillMaxSize()) {
-                    PairingTextField(mode, first, R.string.pairing_address_hint, firstKeyboard,
-                        modifier = Modifier.testTag("first"), onDone = { done++; keyboard?.hide() })
-                    PairingTextField(mode, second, R.string.pairing_connect_address_hint, KeyboardType.Uri,
-                        modifier = Modifier.testTag("second"), onDone = { done++; keyboard?.hide() })
-                    Button(onClick = { submitted++ }, modifier = Modifier.testTag("submit")) { Text("Submit") }
+            InterceptPlatformTextInput(observeInputSessions) {
+                MaterialTheme {
+                    Column(Modifier.fillMaxSize()) {
+                        PairingTextField(mode, first, R.string.pairing_address_hint, firstKeyboard,
+                            modifier = Modifier.testTag("first"), onDone = { done++; keyboard?.hide() })
+                        PairingTextField(mode, second, R.string.pairing_connect_address_hint, KeyboardType.Uri,
+                            modifier = Modifier.testTag("second"), onDone = { done++; keyboard?.hide() })
+                        Button(onClick = { submitted++ }, modifier = Modifier.testTag("submit")) { Text("Submit") }
+                    }
                 }
             }
         }
@@ -52,6 +65,22 @@ class PairingTextFieldTest {
     }
 
     private fun key(code: Int) = instrumentation.sendKeyDownUpSync(code)
+
+    private fun nativeTap(tag: String) {
+        val center = compose.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInWindow.center
+        val origin = IntArray(2)
+        compose.runOnUiThread { compose.activity.window.decorView.getLocationOnScreen(origin) }
+        val pointer = MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_FINGER }
+        val point = MotionEvent.PointerCoords().apply {
+            x = center.x + origin[0]; y = center.y + origin[1]; pressure = 1f; size = 1f
+        }
+        val downTime = SystemClock.uptimeMillis()
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, 1,
+                arrayOf(pointer), arrayOf(point), 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
+            try { instrumentation.sendPointerSync(event) } finally { event.recycle() }
+        }
+    }
 
     private fun ime(shown: Boolean) {
         val automation = instrumentation.uiAutomation
@@ -62,8 +91,8 @@ class PairingTextFieldTest {
                 val matches = if (Build.VERSION.SDK_INT >= 30) {
                     compose.runOnUiThread {
                         compose.activity.window.decorView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == shown
-                    }
-                } else hasLegacyImeWindow(automation) == shown
+                      }
+                  } else hasLegacyImeWindow(automation) == shown
                 val now = SystemClock.uptimeMillis()
                 if (!matches) stableSince = now
                 matches && now - stableSince >= 500
@@ -121,8 +150,13 @@ class PairingTextFieldTest {
     @Test fun TV_touch_then_hardware_Enter_uses_Done_instead_of_reentering_edit_mode() {
         screen(DeviceMode.TELEVISION)
         initialFocus()
-        compose.onNodeWithTag("first").performClick()
-        ime(true)
+        assertEquals(0, inputSessionStarts.get())
+        nativeTap("first")
+        try { ime(true) } finally {
+            val touchMode = compose.runOnUiThread { compose.activity.window.decorView.isInTouchMode }
+            println("PAIRING_NATIVE_TOUCH sessions=${inputSessionStarts.get()} touchMode=$touchMode")
+        }
+        assertEquals("A tap must retain its input session without restarting it", 1, inputSessionStarts.get())
         compose.onNodeWithTag("first").performTextInput("x")
         key(KeyEvent.KEYCODE_ENTER)
         compose.waitUntil(5_000) { done == 1 }
@@ -157,11 +191,15 @@ class PairingTextFieldTest {
         screen(mode)
         val field = compose.onNodeWithTag("first")
         field.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        field.assertIsFocused()
+        if (mode == DeviceMode.HANDHELD) ime(true)
         field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(1, 2, false)) }
+        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(1, 2)))
         field.performTextInput("X")
         field.performTextInput("Y")
         compose.runOnIdle { assertEquals("oXYe", first.text.toString()) }
         field.performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(1, 1, false)) }
+        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(1)))
         field.assertTextContains("oXYe")
         field.performTextInput("Z")
         compose.runOnIdle { assertEquals("oZXYe", first.text.toString()) }
@@ -172,7 +210,7 @@ class PairingTextFieldTest {
         field.performTextInput("a")
         field.performTextInput("b")
         compose.runOnIdle { assertEquals("ab", first.text.toString()) }
-        val selection = field.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.TextSelectionRange]
+        val selection = field.fetchSemanticsNode().config[SemanticsProperties.TextSelectionRange]
         assertEquals(TextRange(2), selection)
     }
 

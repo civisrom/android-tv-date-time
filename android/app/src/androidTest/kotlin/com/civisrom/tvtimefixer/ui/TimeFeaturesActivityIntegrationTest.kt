@@ -5,7 +5,7 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.MainActivity
@@ -14,6 +14,7 @@ import com.civisrom.tvtimefixer.adb.*
 import com.civisrom.tvtimefixer.data.*
 import com.civisrom.tvtimefixer.device.*
 import java.io.File
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -21,7 +22,7 @@ import org.junit.Test
 
 /** Runs actual Activity actions; opt-in and serialized with every other device-settings test. */
 class TimeFeaturesActivityIntegrationTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val compose = createAndroidComposeRule<MainActivity>(effectContext = StandardTestDispatcher())
 
     @Test fun real_UI_profiles_persist_restore_monitor_lifecycle_and_clipboard() {
         val args = InstrumentationRegistry.getArguments()

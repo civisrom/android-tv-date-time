@@ -2,10 +2,11 @@ package com.civisrom.tvtimefixer.ui
 
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.civisrom.tvtimefixer.MainActivity
 import com.civisrom.tvtimefixer.R
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -13,7 +14,7 @@ import org.junit.Test
 
 /** Exercises the real Activity actions, not a replacement AppActions implementation. */
 class NetworkActivityIntegrationTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val compose = createAndroidComposeRule<MainActivity>(effectContext = StandardTestDispatcher())
 
     @Test fun real_connection_terminal_cancellation_and_reconnect_through_the_UI() {
         val args = InstrumentationRegistry.getArguments()
