@@ -69,8 +69,8 @@ replace troubleshooting other network faults.
 
 *   **NTP setup:** choose by country, search by code or name, or enter a domain
     name or IP address. The shared reference contains **77 countries and
-    91 alternative servers**, including regional pools, Cloudflare, Google,
-    MSK-IX, Yandex and national time services. The 2.6.6 update adds 38 addresses
+    90 alternative servers**, including regional pools, Cloudflare, Google,
+    MSK-IX, Yandex and national time services. The 2.6.6 update adds 37 addresses
     verified using real NTPv3/v4 requests. Reachability depends on the network;
     Android and desktop share the same catalog.
 *   **IPv6:** manual ADB connections and mDNS discovery support IPv4 and
@@ -794,7 +794,7 @@ Displays a complete list of supported country codes (77), their names, and corre
 
 ### Item 4 — Show available alternative NTP servers
 
-Shows 91 alternative NTP addresses. Select a server to copy it to the
+Shows 90 alternative NTP addresses. Select a server to copy it to the
 clipboard; check its reachability from your network before applying it.
 
 > **Using the results:** The copied server address can be pasted into **item 2** for manual installation on the device.
@@ -1180,7 +1180,7 @@ green, a rejected one red.
     their codes (77)** button. You do not have to remember the codes: each row
     shows the code, the name and the address — `RU · Russia · ru.pool.ntp.org`,
     `KZ · Kazakhstan · kz.pool.ntp.org`, `BY · Belarus · by.pool.ntp.org`.
-*   **The alternative-server list.** **Show alternative time servers (91)** —
+*   **The alternative-server list.** **Show alternative time servers (90)** —
     the same set as the desktop version: `0.openwrt.pool.ntp.org`, regional pools, Cloudflare, Google
     and other public NTP servers.
 *   **By hand.** The "Time server address" field takes a domain name
@@ -1344,26 +1344,10 @@ are explained in [USB debugging](#usb-debugging).
 If the mobile app cannot connect over USB, try the desktop version for
 Windows, Linux or macOS.
 
-#### 9. "Device"
+#### 9. "Time settings, profiles and monitoring"
 
-Details read from the TV include firmware and security patches, chip and app
-architectures, graphics, RAM and data storage, display modes and HDR, audio
-outputs, network addresses and time settings. Serial number, locale, battery,
-kernel version and uptime are also shown when available. **Refresh** reads the
-details again; background connection checks do not poll them. Decoder lists
-come from readable firmware files and may be incomplete or include inactive
-variants; they do not verify hardware acceleration or DRM.
-
-Model, Android version, time server and time zone are visible immediately. The
-time server label and value are green. **All device details** starts collapsed;
-expand it for the rest.
-Empty rows are hidden: if the firmware does not answer one command, only that
-row disappears.
-
-#### 10. "Time settings, profiles and monitoring"
-
-This section is at the bottom of the main screen, after USB debugging and
-device information. After connecting, expand it and select **Show current
+This section follows USB debugging, before device information.
+After connecting, expand it and select **Show current
 settings** to read the settings and time-service information without changing
 them. Brief explanations beside the controls describe snapshots, profiles,
 fallback servers and monitoring.
@@ -1402,6 +1386,22 @@ Profiles and snapshots stay on the controlling Android device. Resetting the
 target may change its identity; an old snapshot is not applied automatically
 to a new identity. Commands entered manually in the terminal do not create
 snapshots and are not undone by these controls.
+
+#### 10. "Device"
+
+Details read from the TV include firmware and security patches, chip and app
+architectures, graphics, RAM and data storage, display modes and HDR, audio
+outputs, network addresses and time settings. Serial number, locale, battery,
+kernel version and uptime are also shown when available. **Refresh** reads the
+details again; background connection checks do not poll them. Decoder lists
+come from readable firmware files and may be incomplete or include inactive
+variants; they do not verify hardware acceleration or DRM.
+
+Model, Android version, time server and time zone are visible immediately. The
+time server label and value are green. **All device details** starts collapsed;
+expand it for the rest.
+Empty rows are hidden: if the firmware does not answer one command, only that
+row disappears.
 
 Change history: [2.6.1](release-notes/v2.6.1-en.md),
 [2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),

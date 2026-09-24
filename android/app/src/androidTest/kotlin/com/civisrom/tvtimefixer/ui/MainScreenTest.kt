@@ -410,7 +410,7 @@ class MainScreenTest {
     }
 
     private fun assertTimeToolsSectionOrder() {
-        val order = listOf("function-pairing", "function-timezone", "function-usb", "function-device-info", "function-time-tools")
+        val order = listOf("function-pairing", "function-timezone", "function-usb", "function-time-tools", "function-device-info")
         // These eager Column children retain their un-clipped layout positions off screen.
         val positions = order.map { compose.onNodeWithTag(it).fetchSemanticsNode().positionInRoot.y }
         order.zipWithNext().forEachIndexed { index, (before, after) ->
@@ -418,14 +418,14 @@ class MainScreenTest {
         }
     }
 
-    @Test fun time_tools_are_last_after_USB_and_device_info_and_open_by_touch() {
+    @Test fun time_tools_follow_USB_before_device_info_and_open_by_touch() {
         screen(connected, width = 320, scale = 1.5f)
         assertTimeToolsSectionOrder()
         compose.onNodeWithTag("time-tools-refresh").assertDoesNotExist()
         compose.onNodeWithTag("section-time-tools").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithTag("time-tools-refresh").performScrollTo().assertIsDisplayed().assertIsEnabled()
         assertTrue(actions.calls.isEmpty())
-        screenshot("phone-time-tools-last")
+        screenshot("phone-time-tools-after-usb")
     }
 
     @Test fun pairing_collapses_without_losing_inputs_or_running_actions() {
@@ -696,7 +696,7 @@ class MainScreenTest {
             tools.assertIsDisplayed().assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
             compose.onNodeWithTag("time-tools-refresh").performScrollTo().assertIsDisplayed().assertIsEnabled()
             assertTrue(actions.calls.isEmpty())
-            screenshot("tv-time-tools-last")
+            screenshot("tv-time-tools-after-usb")
         } finally {
             instrumentation.setInTouchMode(true)
         }

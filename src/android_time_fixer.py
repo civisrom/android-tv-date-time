@@ -632,7 +632,6 @@ CUSTOM_NTP_SERVERS = [
     'a.ntp.br',
     'b.ntp.br',
     'c.ntp.br',
-    'time.facebook.com',
     'time.stdtime.gov.tw',
     'ntp.ubuntu.com',
     'ptbtime2.ptb.de'

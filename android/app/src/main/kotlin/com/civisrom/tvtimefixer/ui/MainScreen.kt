@@ -393,12 +393,12 @@ private fun MainContent(
             }
             OperationProgress(state, actions, "usb", Operation.CONNECT_USB, Operation.USB_PERMISSION)
         }
-        if (state.connected) DeviceInfoSection(state, actions)
         FunctionCard("time-tools") {
             ExpandableSection(stringResource(R.string.time_tools_title), "time-tools") {
                 TimeToolsSection(state, actions, mode)
             }
         }
+        if (state.connected) DeviceInfoSection(state, actions)
         HorizontalDivider()
         Column(
             Modifier.fillMaxWidth().testTag("usage-terms")
