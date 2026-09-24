@@ -446,33 +446,42 @@ class TerminalScreenTest {
         session.edit("logcat -d"); session.start("TV")
         repeat(200) { session.append("Line $it: " + "output ".repeat(20) + "\n") }
         session.finish(0)
-        screen()
         val tags = listOf("terminal-input", "terminal-run", "terminal-clear", "terminal-follow")
-        val positions = tags.associateWith { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
-        val input = positions.getValue("terminal-input")
-        val model = compose.onNodeWithTag("terminal-device-name").fetchSemanticsNode().boundsInRoot
-        val tabs = listOf("console", "help", "history", "files").map {
-            compose.onNodeWithTag("terminal-tab-$it").fetchSemanticsNode().boundsInRoot
+        try {
+            screen()
+            // This baseline compares the full header and controls with no keyboard.
+            closeKeyboardAndWait()
+            waitForStableControls(tags)
+            val positions = tags.associateWith { compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
+            val input = positions.getValue("terminal-input")
+            val model = compose.onNodeWithTag("terminal-device-name").fetchSemanticsNode().boundsInRoot
+            val tabs = listOf("console", "help", "history", "files").map {
+                compose.onNodeWithTag("terminal-tab-$it").fetchSemanticsNode().boundsInRoot
+            }
+            val output = compose.onNodeWithTag("terminal-list").fetchSemanticsNode().boundsInRoot
+            assertTrue("Editor must follow the device model", model.bottom <= input.top)
+            assertTrue("Editor must follow all tabs", tabs.all { it.bottom <= input.top })
+            assertEquals("Editor must use the full panel width", output.left, input.left, 1f)
+            assertEquals("Editor must use the full panel width", output.right, input.right, 1f)
+            assertTrue("Run must be on a separate row below the editor", input.bottom <= positions.getValue("terminal-run").top)
+            listOf("terminal-clear", "terminal-follow").forEach {
+                val control = positions.getValue(it)
+                assertTrue("Output controls must follow Run and precede output",
+                    positions.getValue("terminal-run").bottom <= control.top && control.bottom <= output.top)
+            }
+            compose.onNodeWithTag("terminal-follow").performClick()
+            compose.onNodeWithTag("terminal-list").performScrollToIndex(0)
+            tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }
+            compose.onNodeWithTag("terminal-list").performScrollToIndex(session.state.value.output.size)
+            tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }
+            compose.onNodeWithTag("terminal-clear").performClick()
+            assertTrue(session.state.value.output.isEmpty())
+            assertEquals("logcat -d", session.state.value.draft)
+        } catch (failure: Throwable) {
+            runCatching { recordTerminalFailure(failure, "native-terminal-scroll-failure", tags + "terminal-list" + "terminal-screen") }
+                .exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
         }
-        val output = compose.onNodeWithTag("terminal-list").fetchSemanticsNode().boundsInRoot
-        assertTrue("Editor must follow the device model", model.bottom <= input.top)
-        assertTrue("Editor must follow all tabs", tabs.all { it.bottom <= input.top })
-        assertEquals("Editor must use the full panel width", output.left, input.left, 1f)
-        assertEquals("Editor must use the full panel width", output.right, input.right, 1f)
-        assertTrue("Run must be on a separate row below the editor", input.bottom <= positions.getValue("terminal-run").top)
-        listOf("terminal-clear", "terminal-follow").forEach {
-            val control = positions.getValue(it)
-            assertTrue("Output controls must follow Run and precede output",
-                positions.getValue("terminal-run").bottom <= control.top && control.bottom <= output.top)
-        }
-        compose.onNodeWithTag("terminal-follow").performClick()
-        compose.onNodeWithTag("terminal-list").performScrollToIndex(0)
-        tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }
-        compose.onNodeWithTag("terminal-list").performScrollToIndex(session.state.value.output.size)
-        tags.forEach { assertEquals(positions[it], compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot) }
-        compose.onNodeWithTag("terminal-clear").performClick()
-        assertTrue(session.state.value.output.isEmpty())
-        assertEquals("logcat -d", session.state.value.draft)
     }
 
     @Test fun manually_scrolling_output_pauses_following_new_lines() {
@@ -504,7 +513,7 @@ class TerminalScreenTest {
             compose.onNodeWithTag("terminal-run").assertIsNotEnabled()
             compose.onNodeWithTag("terminal-follow").assertIsSelected()
         } catch (failure: Throwable) {
-            runCatching { recordClearFailure(failure) }.exceptionOrNull()?.let(failure::addSuppressed)
+            runCatching { recordTerminalFailure(failure) }.exceptionOrNull()?.let(failure::addSuppressed)
             throw failure
         } finally {
             println("Terminal clear edit callbacks: $editTrace")
@@ -519,6 +528,7 @@ class TerminalScreenTest {
         session.edit("echo previous"); session.start("TV"); session.append("previous"); session.finish(0)
         session.edit("unfinished command")
         editTrace = java.util.Collections.synchronizedList(mutableListOf())
+        var testFailure: Throwable? = null
         try {
             screen()
             Espresso.closeSoftKeyboard()
@@ -548,12 +558,56 @@ class TerminalScreenTest {
             compose.onNodeWithTag("terminal-follow").assertIsSelected()
             clearScreenshot("native-terminal-clear-ime-after")
         } catch (failure: Throwable) {
-            runCatching { recordClearFailure(failure, "native-terminal-clear-ime-failure") }
+            testFailure = failure
+            runCatching { recordTerminalFailure(failure, "native-terminal-clear-ime-failure") }
                 .exceptionOrNull()?.let(failure::addSuppressed)
             throw failure
         } finally {
             println("Terminal native clear edit callbacks: $editTrace")
             editTrace = null
+            // Close the IME while its Activity still owns the input connection. ActivityRule
+            // teardown does not wait for the native keyboard window to disappear.
+            try {
+                closeKeyboardAndWait()
+            } catch (cleanupFailure: Throwable) {
+                runCatching { recordTerminalFailure(cleanupFailure, "native-terminal-clear-ime-cleanup-failure") }
+                    .exceptionOrNull()?.let(cleanupFailure::addSuppressed)
+                if (testFailure != null) testFailure.addSuppressed(cleanupFailure) else throw cleanupFailure
+            }
+        }
+    }
+
+    private fun closeKeyboardAndWait() {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        try {
+            Espresso.closeSoftKeyboard()
+            compose.waitUntil(5_000) { !hasLegacyImeWindow(automation) }
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
+    }
+
+    private fun waitForStableControls(tags: List<String>) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        var previousBounds: List<androidx.compose.ui.geometry.Rect>? = null
+        var stableSince = android.os.SystemClock.uptimeMillis()
+        try {
+            compose.waitUntil(5_000) {
+                val controls = (tags + "terminal-screen").map { compose.onNodeWithTag(it) }
+                val bounds = controls.map { it.fetchSemanticsNode().boundsInWindow }
+                val ready = !hasLegacyImeWindow(automation) && controls.all { it.isDisplayed() } &&
+                    compose.runOnUiThread { compose.activity.window.decorView.hasWindowFocus() }
+                val now = android.os.SystemClock.uptimeMillis()
+                if (!ready || bounds != previousBounds) {
+                    previousBounds = bounds
+                    stableSince = now
+                }
+                ready && now - stableSince >= 500
+            }
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
         }
     }
 
@@ -613,7 +667,8 @@ class TerminalScreenTest {
         } finally { bitmap.recycle() }
     }
 
-    private fun recordClearFailure(failure: Throwable, name: String = "native-terminal-clear-failure") {
+    private fun recordTerminalFailure(failure: Throwable, name: String = "native-terminal-clear-failure",
+        tags: List<String> = listOf("terminal-clear-input", "terminal-input", "terminal-screen")) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory = java.io.File(instrumentation.targetContext.filesDir, "ui-screenshots")
         // Preserve the failed frame before any diagnostic synchronization or teardown.
@@ -623,16 +678,28 @@ class TerminalScreenTest {
             val file = java.io.File(directory, "$name.txt")
             // Write the callback evidence first: later semantics queries can themselves fail.
             file.writeText("API ${Build.VERSION.SDK_INT}; edit callbacks=$editTrace\n")
+            val automation = instrumentation.uiAutomation
+            val originalFlags = automation.serviceInfo.flags
+            try {
+                file.appendText("nativeIme=${hasLegacyImeWindow(automation)}\n")
+            } finally {
+                automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+            }
             val window = compose.runOnUiThread {
                 val root = compose.activity.window.decorView
                 val insets = androidx.core.view.ViewCompat.getRootWindowInsets(root)
+                val visible = android.graphics.Rect().also(root::getWindowVisibleDisplayFrame)
+                val origin = IntArray(2).also(root::getLocationOnScreen)
                 "windowFocused=${root.hasWindowFocus()}; touchMode=${root.isInTouchMode}; " +
-                    "ime=${insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())}"
+                    "ime=${insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())}; " +
+                    "root=${root.width}x${root.height}; origin=${origin.toList()}; visibleFrame=$visible; " +
+                    "softInputMode=${compose.activity.window.attributes.softInputMode}"
             }
             file.appendText("$window\n")
-            listOf("terminal-clear-input", "terminal-input", "terminal-screen").forEach { tag ->
+            tags.forEach { tag ->
                 val node = compose.onNodeWithTag(tag)
-                file.appendText("$tag: displayed=${node.isDisplayed()}; bounds=${node.fetchSemanticsNode().boundsInRoot}\n")
+                val semantics = node.fetchSemanticsNode()
+                file.appendText("$tag: displayed=${node.isDisplayed()}; bounds=${semantics.boundsInRoot}; windowBounds=${semantics.boundsInWindow}\n")
             }
             file.appendText(compose.onRoot().printToString())
         }.exceptionOrNull()?.let(failure::addSuppressed)

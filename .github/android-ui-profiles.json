@@ -1,6 +1,13 @@
 {
   "include": [
     {
+      "name": "phone-23",
+      "image": "system-images;android-23;google_apis;x86_64",
+      "device": "pixel_2",
+      "tv": false,
+      "page_size": 4096
+    },
+    {
       "name": "phone-26",
       "image": "system-images;android-26;google_apis;x86_64",
       "device": "pixel_2",
@@ -59,13 +66,6 @@
     {
       "name": "phone-37.0",
       "image": "system-images;android-37.0;google_apis;x86_64",
-      "device": "pixel_2",
-      "tv": false,
-      "page_size": 4096
-    },
-    {
-      "name": "phone-23",
-      "image": "system-images;android-23;google_apis;x86_64",
       "device": "pixel_2",
       "tv": false,
       "page_size": 4096
