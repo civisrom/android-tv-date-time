@@ -200,7 +200,10 @@ class WirelessAdbIntegrationTest {
                 val failure = java.util.concurrent.atomic.AtomicReference<Exception>()
                 val caller = kotlin.concurrent.thread(isDaemon = true) {
                     try { TerminalExecutor(files, session).execute(client, blocked) }
-                    catch (error: Exception) { failure.set(error) }
+                    catch (error: Exception) {
+                        session.fail(error, connectionPreserved = client.isAlive())
+                        failure.set(error)
+                    }
                     finally { stopped.countDown() }
                 }
                 try {
@@ -210,6 +213,9 @@ class WirelessAdbIntegrationTest {
                     caller.interrupt()
                     assertTrue("Terminal cancellation did not stop the command", stopped.await(3, TimeUnit.SECONDS))
                     assertTrue(failure.get() is kotlinx.coroutines.CancellationException)
+                    assertEquals(TerminalStatus.CANCELLED, session.state.value.status)
+                    assertNull(session.state.value.problem)
+                    assertTrue(session.state.value.connectionPreserved)
                     assertTrue(client.isAlive())
                     assertEquals(ConnectionState.Connected(address), connector.checkConnection())
                 } finally {

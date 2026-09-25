@@ -45,16 +45,25 @@ def main():
         lease.ensure()
         window = 0
         if os.name == 'nt':
+            from ctypes import wintypes
             api = ctypes.WinDLL('kernel32')
             api.GetConsoleWindow.restype = ctypes.c_void_p
             window = api.GetConsoleWindow() or 0
+            # Record the real OS event; returning False leaves termination to Windows.
+            handler_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+            @handler_type
+            def control_event(event):
+                (args.worker / 'console-event').write_text(str(event), encoding='ascii')
+                return False
+            api.SetConsoleCtrlHandler.argtypes = [handler_type, wintypes.BOOL]
+            assert api.SetConsoleCtrlHandler(control_event, True)
         print(json.dumps({'pid': lease.child.pid if lease.child else None, 'window': window}), flush=True)
         try:
             input()
         finally:
             lease.release()
         return
-    cases = ['normal', 'foreign'] + (['terminate', 'close-window', 'two-owners'] if os.name == 'nt' else [])
+    cases = ['normal', 'foreign'] + (['terminate', 'two-owners', 'close-window'] if os.name == 'nt' else [])
     for case in cases:
         with tempfile.TemporaryDirectory(prefix='adb-cleanup-') as root:
             directory = Path(root)
@@ -97,9 +106,14 @@ def main():
                     api = ctypes.WinDLL('user32', use_last_error=True)
                     api.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
                     api.PostMessageW.restype = wintypes.BOOL
+                    api.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+                    window_class = ctypes.create_unicode_buffer(256)
+                    api.GetClassNameW(info['window'], window_class, len(window_class))
+                    print(f'close-window: console class={window_class.value}', flush=True)
                     assert info['window'] and api.PostMessageW(info['window'], 0x0010, 0, 0)
                     first.wait(timeout=15)  # stdin остаётся открытым: проверяем именно закрытие окна.
                     first.communicate()
+                    assert (directory / 'console-event').read_text(encoding='ascii') == '2', 'No CTRL_CLOSE_EVENT'
                 else:
                     first.communicate('\n', timeout=15)
                     assert first.returncode == 0
