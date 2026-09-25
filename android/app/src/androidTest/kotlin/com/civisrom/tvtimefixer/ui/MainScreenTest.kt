@@ -140,11 +140,18 @@ internal class ScreenActions : AppActions {
 
 class MainScreenTest {
     @Test fun system_default_in_confirmation_is_localized_instead_of_null() {
-        screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "null", apiLevel = "34")))
+        // Use the activity locale for both the screen and its separate dialog window.
+        compose.setContent {
+            MaterialTheme {
+                MainScreen(DeviceMode.HANDHELD,
+                    connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "null", apiLevel = "34")), actions)
+            }
+        }
         compose.onNodeWithTag("ntp-reset").performScrollTo().performClick()
-        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_current,
-            russianString(com.civisrom.tvtimefixer.R.string.time_value_absent))).assertExists()
-        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_current, "null")).assertDoesNotExist()
+        screenshot("system-default-confirmation")
+        compose.onNodeWithText(context.getString(com.civisrom.tvtimefixer.R.string.ntp_current,
+            context.getString(com.civisrom.tvtimefixer.R.string.time_value_absent))).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(com.civisrom.tvtimefixer.R.string.ntp_current, "null")).assertDoesNotExist()
         compose.onNodeWithTag("ntp-confirm-cancel").performClick()
         assertTrue(actions.calls.isEmpty())
     }
