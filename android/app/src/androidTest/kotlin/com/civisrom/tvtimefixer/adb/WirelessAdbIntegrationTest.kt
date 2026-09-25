@@ -157,6 +157,14 @@ class WirelessAdbIntegrationTest {
             assertEquals(ConnectionState.Connected(address), connector.connect(address))
             println("Wireless ADB: paired and reconnected without a code")
             val client = checkNotNull(connector.activeClient)
+            val (retryEndpoint, retryCode) = beginPairing()
+            val incorrect = (if (retryCode[0] == '0') "1" else "0") + retryCode.drop(1)
+            val rejectedRetry = connector.pairAndConnect(retryEndpoint.toString(), incorrect, address.toString())
+            assertTrue(rejectedRetry is ConnectionState.Failed)
+            assertSame(client, connector.activeClient)
+            assertEquals(ConnectionState.Connected(address), connector.checkConnection())
+            manage("disablePairing")
+            println("Wireless ADB: rejected re-pairing preserves the existing connection")
             val session = TerminalSession()
             fun execute(command: String, expected: Int = 0) {
                 session.edit(command)
@@ -185,32 +193,33 @@ class WirelessAdbIntegrationTest {
             assertFalse(client.shell("pm path $packageName").output.startsWith("package:"))
             println("Wireless ADB: shell, files, APK and split APK verified")
 
-            session.edit("echo terminal-cancel-ready; sleep 60")
-            val blocked = checkNotNull(session.start(address.toString()))
-            val stopped = java.util.concurrent.CountDownLatch(1)
-            val failure = java.util.concurrent.atomic.AtomicReference<Exception>()
-            val caller = kotlin.concurrent.thread(isDaemon = true) {
-                try { TerminalExecutor(files, session).execute(client, blocked) }
-                catch (error: Exception) { failure.set(error) }
-                finally { stopped.countDown() }
-            }
-            try {
-                waitFor("Silent command did not start") {
-                    session.state.value.output.any { "terminal-cancel-ready" in it.text }
+            repeat(3) {
+                session.edit("echo terminal-cancel-ready; sleep 60")
+                val blocked = checkNotNull(session.start(address.toString()))
+                val stopped = java.util.concurrent.CountDownLatch(1)
+                val failure = java.util.concurrent.atomic.AtomicReference<Exception>()
+                val caller = kotlin.concurrent.thread(isDaemon = true) {
+                    try { TerminalExecutor(files, session).execute(client, blocked) }
+                    catch (error: Exception) { failure.set(error) }
+                    finally { stopped.countDown() }
                 }
-                caller.interrupt()
-                assertTrue("Terminal cancellation did not close the socket", stopped.await(3, TimeUnit.SECONDS))
-                assertTrue(failure.get() is kotlinx.coroutines.CancellationException)
-                assertFalse(client.isAlive())
-            } finally {
-                client.close()
-                caller.interrupt()
-                caller.join(3_000)
+                try {
+                    waitFor("Silent command did not start") {
+                        session.state.value.output.any { "terminal-cancel-ready" in it.text }
+                    }
+                    caller.interrupt()
+                    assertTrue("Terminal cancellation did not stop the command", stopped.await(3, TimeUnit.SECONDS))
+                    assertTrue(failure.get() is kotlinx.coroutines.CancellationException)
+                    assertTrue(client.isAlive())
+                    assertEquals(ConnectionState.Connected(address), connector.checkConnection())
+                } finally {
+                    caller.interrupt()
+                    caller.join(3_000)
+                }
+                execute("echo after-cancel")
+                assertTrue(session.state.value.output.any { "after-cancel" in it.text })
             }
-            connector.disconnect()
-            assertEquals(ConnectionState.Connected(address), connector.connect(address))
-            assertEquals("after-cancel", connector.activeClient!!.shell("echo after-cancel").trimmedOutput)
-            println("Wireless ADB: silent command cancellation and reconnect verified")
+            println("Wireless ADB: three cancelled commands preserve the connection and next command")
         } finally {
             connector.disconnect()
             runCatching { manage("disablePairing") }

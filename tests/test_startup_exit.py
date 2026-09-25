@@ -14,7 +14,7 @@ class StartupExitTests(unittest.TestCase):
             fixer.load_language.return_value = 'en'
             fixer.ping_ntp_servers.side_effect = failure
             with mock.patch.object(app, 'AndroidTVTimeFixer', return_value=fixer), \
-                    mock.patch('builtins.input', side_effect=['', '6', '3', '0']), \
+                    mock.patch('builtins.input', side_effect=['', '6', '3', '0', '']), \
                     contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as exit:
                 app.main()
             self.assertEqual(exit.exception.code, 0)

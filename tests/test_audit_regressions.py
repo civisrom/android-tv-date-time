@@ -150,7 +150,7 @@ class AuditRegressions(unittest.TestCase):
     def test_diagnostic_version_matches_application_and_package(self):
         fixer = self.fixer()
         fixer.device = None
-        package = tomllib.loads(Path('pyproject.toml').read_text())['tool']['poetry']['version']
+        package = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['tool']['poetry']['version']
         self.assertEqual(diagnostic_report(fixer)['app_version'], app.APP_VERSION)
         self.assertEqual(app.APP_VERSION, package)
 

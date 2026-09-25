@@ -23,7 +23,9 @@ def main():
     # Здесь допустим только временный пользователь GitHub runner.
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise RuntimeError('Run this smoke test only on a disposable GitHub runner')
-    time_answers = ('\n\n7\ns\nb\nm\nv\np\n1\n0\np\n2\np\n3\np\n4\nd\n\nd\nreport.json\n8\n0\n\n')
+    # Invalid profile operations now stay in their submenu; leave it explicitly.
+    time_answers = ('\n\n7\ns\nb\nm\nv\np\n1\n0\np\n2\n0\np\n3\n0\np\n4\n0\n'
+                    'd\n\nd\nreport.json\n8\n0\n\n')
     cases = (
         ('language-eof', '', ('Выберите язык',)),
         ('english-menu-eof', '1\n\n', ('Main Menu',)),
