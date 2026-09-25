@@ -160,6 +160,19 @@ jobs:
         shell: bash
         run: poetry run python scripts/probe_usb_adb.py --adb "$USB_TEST_ADB"
 
+      - name: Select real console window for the close-event test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Disposable runner only. WM_CLOSE cannot close the message-only
+          # PseudoConsoleWindow returned by a delegated Windows Terminal.
+          $consoleKey = 'HKCU:\Console\%%Startup'
+          New-Item -Path $consoleKey -Force | Out-Null
+          foreach ($valueName in @('DelegationConsole', 'DelegationTerminal')) {
+            New-ItemProperty -Path $consoleKey -Name $valueName -PropertyType String -Force `
+              -Value '{B23D10C0-E52E-411E-9D5B-C09FDF709C7D}' | Out-Null
+          }
+
       - name: Verify native ADB cleanup and Windows console close
         shell: bash
         run: poetry run python scripts/probe_adb_cleanup.py --adb "$USB_TEST_ADB"

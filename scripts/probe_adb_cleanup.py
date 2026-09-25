@@ -110,6 +110,7 @@ def main():
                     window_class = ctypes.create_unicode_buffer(256)
                     api.GetClassNameW(info['window'], window_class, len(window_class))
                     print(f'close-window: console class={window_class.value}', flush=True)
+                    assert window_class.value == 'ConsoleWindowClass', 'Select Windows Console Host for this test'
                     assert info['window'] and api.PostMessageW(info['window'], 0x0010, 0, 0)
                     first.wait(timeout=15)  # stdin остаётся открытым: проверяем именно закрытие окна.
                     first.communicate()
