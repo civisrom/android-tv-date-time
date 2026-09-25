@@ -115,11 +115,10 @@ replace troubleshooting other network faults.
 ### Desktop features
 
 *   Console menus for Windows, Linux and macOS; release builds include ADB.
-*   A startup network check (up to 4 seconds): an active network connection,
-    HTTPS Internet access, NTP replies over UDP/123 and the last saved device's
-    TCP port. Failures show network, VPN, proxy and firewall guidance. The
-    check allows the program to continue; Internet access alone does not
-    confirm TV reachability or ADB authorization.
+*   A startup network check (up to 4 seconds): an active network address,
+    HTTPS Internet access and NTP replies over UDP/123. Failures show network,
+    VPN, proxy and firewall guidance. The check allows the program to continue;
+    access to the TV is checked when connecting.
 *   Local subnet scanning with a selectable ADB port, plus separate mDNS discovery.
 *   Batch NTP updates for discovered or manually entered devices.
 *   Automatic setup: discover a device via mDNS, detect the region, test

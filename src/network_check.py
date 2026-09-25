@@ -35,7 +35,6 @@ class NetworkCheckResult:
     ntp_ok: int
     elapsed_seconds: float
     local_network: bool | None = None
-    target_reachable: bool | None = None
 
     @property
     def https_reachable(self):
@@ -91,22 +90,7 @@ def _probe_local_network(unused, deadline, stopped):
     return False
 
 
-def _probe_target(target, deadline, stopped):
-    host, port = target
-    # Последний адрес уже проверен приложением. Числовой IP также исключает
-    # лишний DNS, а один TCP connect ничего не посылает в протоколе ADB.
-    ip = ipaddress.ip_address(host)
-    remaining = deadline - time.monotonic()
-    if remaining <= 0 or stopped.is_set():
-        return False
-    family = socket.AF_INET6 if ip.version == 6 else socket.AF_INET
-    with socket.socket(family, socket.SOCK_STREAM) as client:
-        client.settimeout(remaining)
-        client.connect((host, port))
-    return not stopped.is_set()
-
-
-def check_network(timeout=4.0, target=None):
+def check_network(timeout=4.0):
     """Не блокирует меню дольше общего таймаута, включая системный DNS."""
     if timeout <= 0:
         raise ValueError('Network check timeout must be positive')
@@ -127,8 +111,6 @@ def check_network(timeout=4.0, target=None):
     probes = [('local', _probe_local_network, None)]
     probes += [('https', _probe_https, url) for url in HTTPS_URLS]
     probes += [('ntp', _probe_ntp, host) for host in NTP_HOSTS]
-    if target is not None:
-        probes.append(('target', _probe_target, target))
     pending = 0
     for protocol, probe, address in probes:
         if _PROBE_SLOTS.acquire(blocking=False):
@@ -137,7 +119,7 @@ def check_network(timeout=4.0, target=None):
                              name='startup-network', daemon=True).start()
 
     successes = {'https': 0, 'ntp': 0}
-    observations = {'local': None, 'target': False if target is not None else None}
+    local_network = None
     try:
         while pending:
             remaining = deadline - time.monotonic()
@@ -150,9 +132,9 @@ def check_network(timeout=4.0, target=None):
             if protocol in successes:
                 successes[protocol] += bool(reachable)
             else:
-                observations[protocol] = reachable
+                local_network = reachable
             pending -= 1
     finally:
         stopped.set()
     return NetworkCheckResult(successes['https'], successes['ntp'], time.monotonic() - started,
-                              observations['local'], observations['target'])
+                              local_network)

@@ -1655,10 +1655,14 @@ class AndroidTVTimeFixer:
         return False
 
     def show_network_check(self) -> None:
-        """Показывает доступность сети, не блокируя дальнейшую работу ADB."""
-        target = self.parse_ip_port(self.last_device_ip) if self.validate_ip(self.last_device_ip) else None
+        """Показывает доступность сети, не блокируя дальнейшую работу ADB.
+
+        Телевизор здесь не проверяется: он может быть выключен, а порт
+        беспроводной отладки меняется при каждом включении. Доступ к нему
+        проверяет подключение.
+        """
         print(Fore.CYAN + locales.get('network_check_progress'))
-        result = check_network(timeout=4.0, target=target)
+        result = check_network(timeout=4.0)
         print(Fore.CYAN + locales.get('network_check_result'))
         local_status = {True: 'network_interface_found', False: 'network_interface_missing',
                         None: 'network_interface_unknown'}[result.local_network]
@@ -1668,14 +1672,7 @@ class AndroidTVTimeFixer:
                          status=status(result.https_reachable)))
         print(locales.get('network_check_ntp', ntp_ok=result.ntp_ok,
                          status=status(result.ntp_reachable)))
-        if target:
-            target_status = 'network_port_available' if result.target_reachable else 'network_unconfirmed'
-            print(locales.get('network_check_target', address=format_address(*target),
-                             status=locales.get(target_status)))
-            if not result.target_reachable:
-                print(Fore.YELLOW + locales.get('network_check_target_failed'))
-        else:
-            print(locales.get('network_check_no_target'))
+        print(locales.get('network_check_no_target'))
         message = {
             (True, True): 'network_check_ok',
             (True, False): 'network_check_ntp_blocked',

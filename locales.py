@@ -32,7 +32,7 @@ class Locales:
                 en="Local network: {status}.", ru="Локальная сеть: {status}.",
             ),
             "network_interface_found": Translation(
-                en="network connection detected", ru="сетевое подключение обнаружено",
+                en="active network address found", ru="найден активный сетевой адрес",
             ),
             "network_interface_missing": Translation(
                 en="no active network address found", ru="активный сетевой адрес не найден",
@@ -50,33 +50,25 @@ class Locales:
             ),
             "network_confirmed": Translation(en="confirmed", ru="доступ подтверждён"),
             "network_unconfirmed": Translation(en="not confirmed", ru="доступ не подтверждён"),
-            "network_check_target": Translation(
-                en="Last device {address}: {status}.", ru="Последнее устройство {address}: {status}.",
-            ),
-            "network_port_available": Translation(en="TCP port reachable", ru="TCP-порт доступен"),
             "network_check_no_target": Translation(
                 en="Device access is checked when connecting.",
                 ru="Доступ к устройству проверяется при подключении.",
             ),
             "network_check_ok": Translation(
-                en="Internet access or an open TCP port does not confirm an authorized ADB connection.",
-                ru="Доступ в интернет или открытый TCP-порт не подтверждает авторизованное подключение ADB.",
+                en="Internet and NTP are reachable.",
+                ru="Интернет и NTP доступны.",
             ),
             "network_check_ntp_blocked": Translation(
-                en="Internet access works, but NTP did not respond. Check UDP/123 access in the network, VPN and firewall. Device access is checked separately.",
-                ru="Интернет доступен, но NTP не ответил. Проверьте доступ по UDP/123 в сети, VPN и фаерволе. Доступ к устройству проверяется отдельно.",
+                en="Internet access works, but NTP did not respond. Check UDP/123 access in the network, VPN and firewall.",
+                ru="Интернет доступен, но NTP не ответил. Проверьте доступ по UDP/123 в сети, VPN и фаерволе.",
             ),
             "network_check_https_failed": Translation(
                 en="NTP responds, but HTTPS access could not be confirmed. Check VPN or proxy settings, the computer clock and firewall permissions for Android TV Time Fixer.",
                 ru="NTP отвечает, но HTTPS-доступ не подтверждён. Проверьте VPN или прокси, часы компьютера и разрешения Android TV Time Fixer в фаерволе.",
             ),
             "network_check_failed": Translation(
-                en="Internet access could not be checked. Check the network connection, VPN or proxy settings and allow Android TV Time Fixer network access in the firewall. Local ADB and USB can still work.",
-                ru="Не удалось проверить доступ к интернету. Проверьте подключение к сети, настройки VPN или прокси и разрешите Android TV Time Fixer доступ к сети в фаерволе. Локальный ADB и USB могут продолжать работать.",
-            ),
-            "network_check_target_failed": Translation(
-                en="Could not connect to the device port. Check its address and ADB port, enabled debugging, Wi-Fi client isolation and firewall permissions for Android TV Time Fixer and adb.",
-                ru="Не удалось подключиться к порту устройства. Проверьте адрес и порт ADB, включённую отладку, изоляцию устройств в Wi-Fi и разрешения фаервола для Android TV Time Fixer и adb.",
+                en="Neither HTTPS nor NTP responded. Check the network connection, VPN or proxy settings and allow Android TV Time Fixer network access in the firewall. Local ADB and USB can still work.",
+                ru="Ни HTTPS, ни NTP не ответили. Проверьте подключение к сети, настройки VPN или прокси и разрешите Android TV Time Fixer доступ к сети в фаерволе. Локальный ADB и USB могут продолжать работать.",
             ),
             "terminal_output_truncated": Translation(
                 en="Only the final part of the command output is retained.",

@@ -86,44 +86,12 @@ class NetworkCheckTests(unittest.TestCase):
                         'net': [SimpleNamespace(family=family, address=address)]}):
                 self.assertEqual(expected, network_check._probe_local_network(None, time.monotonic() + 2, threading.Event()))
 
-    def test_target_probe_connects_and_closes_without_sending_adb(self):
-        received = []
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-            listener.bind(('127.0.0.1', 0))
-            listener.listen()
-            listener.settimeout(2)
-
-            def serve():
-                with listener.accept()[0] as connection:
-                    connection.settimeout(2)
-                    received.append(connection.recv(32))
-
-            worker = threading.Thread(target=serve, daemon=True)
-            worker.start()
-            with mock.patch.object(network_check, '_probe_https', return_value=True), \
-                    mock.patch.object(network_check, '_probe_ntp', return_value=True):
-                result = network_check.check_network(timeout=1, target=listener.getsockname())
-            worker.join(2)
-            self.assertFalse(worker.is_alive())
-        self.assertTrue(result.target_reachable)
-        self.assertEqual([b''], received)
-
-    def test_target_refusal_does_not_hide_working_internet(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as closed_port:
-            closed_port.bind(('127.0.0.1', 0))
-            with mock.patch.object(network_check, '_probe_https', return_value=True), \
-                    mock.patch.object(network_check, '_probe_ntp', return_value=True):
-                result = network_check.check_network(timeout=1, target=closed_port.getsockname())
-        self.assertFalse(result.target_reachable)
-        self.assertTrue(result.https_reachable)
-
     def test_local_inspection_failure_remains_unknown(self):
         with mock.patch.object(network_check, '_probe_local_network', side_effect=OSError('interface failure')), \
                 mock.patch.object(network_check, '_probe_https', return_value=False), \
                 mock.patch.object(network_check, '_probe_ntp', return_value=False):
             result = network_check.check_network()
         self.assertIsNone(result.local_network)
-        self.assertIsNone(result.target_reachable)
 
     def test_https_requires_http_response_over_verified_tls(self):
         for status, url, expected in ((204, 'https://example.test/', True),

@@ -90,7 +90,7 @@ class StartupExitTests(unittest.TestCase):
         self.assertEqual(exit.exception.code, 1)
         fixer.close.assert_called_once()
 
-    def test_network_check_keeps_internet_ntp_and_device_status_separate_in_both_languages(self):
+    def test_network_check_keeps_internet_and_ntp_status_separate_in_both_languages(self):
         previous = app.locales.current_language
         try:
             for language in ('ru', 'en'):
@@ -100,27 +100,25 @@ class StartupExitTests(unittest.TestCase):
                         (0, 2, 'network_check_https_failed'), (0, 0, 'network_check_failed')):
                     with self.subTest(language=language, https=https, ntp=ntp):
                         fixer = object.__new__(app.AndroidTVTimeFixer)
-                        fixer.last_device_ip = '192.0.2.10:37105'
                         output = io.StringIO()
-                        result = NetworkCheckResult(https, ntp, .1, True, False)
+                        result = NetworkCheckResult(https, ntp, .1, True)
                         with mock.patch.object(app, 'check_network', return_value=result) as probe, \
                                 contextlib.redirect_stdout(output):
                             fixer.show_network_check()
-                        probe.assert_called_once_with(timeout=4.0, target=('192.0.2.10', 37105))
+                        probe.assert_called_once_with(timeout=4.0)
                         self.assertIn(app.locales.get(expected), output.getvalue())
-                        self.assertIn(app.locales.get('network_check_target_failed'), output.getvalue())
-                        self.assertIn('192.0.2.10:37105', output.getvalue())
+                        self.assertIn(app.locales.get('network_check_no_target'), output.getvalue())
                         self.assertNotIn('{status}', output.getvalue())
         finally:
             app.locales.current_language = previous
 
-    def test_network_check_does_not_probe_an_invalid_or_usb_saved_target(self):
-        for target in ('', 'usb:1', 'bad;target', '192.0.2.1:99999'):
-            with self.subTest(target=target):
-                fixer = object.__new__(app.AndroidTVTimeFixer)
-                fixer.last_device_ip = target
-                with mock.patch.object(app, 'check_network',
-                                       return_value=NetworkCheckResult(0, 0, .1)) as probe, \
-                        contextlib.redirect_stdout(io.StringIO()):
-                    fixer.show_network_check()
-                probe.assert_called_once_with(timeout=4.0, target=None)
+    def test_network_check_does_not_probe_the_saved_device(self):
+        fixer = object.__new__(app.AndroidTVTimeFixer)
+        fixer.last_device_ip = '192.0.2.10:37105'
+        output = io.StringIO()
+        with mock.patch.object(app, 'check_network',
+                               return_value=NetworkCheckResult(2, 2, .1, True)) as probe, \
+                contextlib.redirect_stdout(output):
+            fixer.show_network_check()
+        probe.assert_called_once_with(timeout=4.0)
+        self.assertNotIn('192.0.2.10', output.getvalue())
