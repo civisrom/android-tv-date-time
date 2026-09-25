@@ -269,9 +269,11 @@ class MainScreenTest {
     @Test fun checked_time_shows_device_local_time_and_UTC_for_the_same_instant() {
         screen(connected.copy(timeCheck = DeviceTimeCheck(DeviceTimeStatus.MATCH,
             deviceTimeMillis = 1_788_873_348_000L, timeZoneId = "Europe/Moscow")))
-        compose.onNodeWithText("Местное время устройства при проверке: 2026-09-08 16:15:48 (Europe/Moscow)")
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_check_device_local_time,
+            "2026-09-08 16:15:48", "Europe/Moscow"))
             .performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Время устройства при проверке (UTC): 2026-09-08 13:15:48")
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.time_check_device_time,
+            "2026-09-08 13:15:48"))
             .performScrollTo().assertIsDisplayed()
         screenshot("time-check-local-and-utc")
         assertTrue(actions.calls.isEmpty())
