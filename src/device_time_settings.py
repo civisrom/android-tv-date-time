@@ -20,7 +20,14 @@ class DeviceStateError(RuntimeError):
 def checked_shell(device, command, allow_help=False, preserve=False):
     # Legacy shell не сообщает exit code, а platform-tools transport намеренно
     # разрешает ненулевой exit для grep/help. Критичные операции проверяют свой.
-    output = device.shell(command + "; printf '\\n__TVTF_EXIT__%s\\n' \"$?\"")
+    try:
+        output = device.shell(command + "; printf '\\n__TVTF_EXIT__%s\\n' \"$?\"")
+    except DeviceStateError:
+        raise
+    except Exception as error:
+        # Ошибка транспорта не является отказом Android выполнить команду.
+        # Не включаем адреса/вывод транспорта в пользовательское сообщение.
+        raise DeviceStateError('state_connection_lost') from error
     if not isinstance(output, str) or len(output) > 1024 * 1024:
         raise DeviceStateError('state_read_failed')
     match = re.search(r'\n__TVTF_EXIT__(\d+)\s*$', output)
@@ -51,7 +58,7 @@ class TimeSettings:
                 or state.auto_time not in ('0', '1', 'null')
                 or state.auto_time_zone not in ('0', '1', 'null')
                 or not isinstance(state.timezone, str)
-                or not re.fullmatch(r'[A-Za-z0-9_+./-]{1,100}', state.timezone)
+                or not re.fullmatch(r'[A-Za-z0-9_+./-]{0,100}', state.timezone)
                 or (state.effective_auto_zone is not None and type(state.effective_auto_zone) is not bool)):
             raise DeviceStateError('state_invalid')
         return state
@@ -191,6 +198,8 @@ def _write_global(device, name, value, identity):
 def _apply(device, desired, before, identity):
     zone_changed = desired.timezone != before.timezone
     if zone_changed:
+        if not desired.timezone:
+            raise DeviceStateError('state_timezone_unsupported')
         help_text = checked_shell(device, 'cmd alarm help', allow_help=True)
         if not re.search(r'^\s*set-timezone(?:\s|$)', help_text, re.M):
             raise DeviceStateError('state_timezone_unsupported')
@@ -212,10 +221,17 @@ def _apply(device, desired, before, identity):
         _change(device, 'cmd time_zone_detector set_auto_detection_enabled ' + str(desired.effective_auto_zone).lower(), identity)
     if zone_changed or desired.auto_time_zone != before.auto_time_zone:
         _write_global(device, 'auto_time_zone', desired.auto_time_zone, identity)
-    if read_time_settings(device) != desired:
+    actual = read_time_settings(device)
+    # После включения автопояса Android вправе сразу выбрать другой пояс.
+    # Запрошенный ручной пояс уже проверен до включения этого режима.
+    automatic_zone = desired.effective_auto_zone is True or (
+        desired.effective_auto_zone is None and desired.auto_time_zone == '1')
+    if any(getattr(actual, field) != getattr(desired, field) for field in asdict(desired)
+           if field != 'timezone' or not automatic_zone):
         raise DeviceStateError('state_readback_failed')
     if device_identity(device) != identity:
         raise DeviceStateError('state_identity_changed')
+    return actual
 
 
 def apply_time_settings(device, desired, expected_identity, expected_current=None):
@@ -230,7 +246,7 @@ def apply_time_settings(device, desired, expected_identity, expected_current=Non
     if device_identity(device) != expected_identity:
         raise DeviceStateError('state_identity_changed')
     try:
-        _apply(device, desired, before, expected_identity)
+        actual = _apply(device, desired, before, expected_identity)
     except BaseException as error:
         # Android не предоставляет транзакцию для этих настроек. После любого
         # отказа пробуем вернуть состояние непосредственно перед применением.
@@ -243,5 +259,7 @@ def apply_time_settings(device, desired, expected_identity, expected_current=Non
             pass
         if not isinstance(error, Exception):
             raise
+        if isinstance(error, DeviceStateError) and error.code == 'state_connection_lost':
+            raise DeviceStateError('state_write_unconfirmed', rollback=restored) from error
         raise DeviceStateError('state_apply_failed', rollback=restored) from error
-    return desired
+    return actual

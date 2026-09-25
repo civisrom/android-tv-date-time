@@ -6,6 +6,13 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
+
+import psutil
+
+
+def adb_pids():
+    return {p.pid for p in psutil.process_iter(['name']) if (p.info['name'] or '').lower() in ('adb', 'adb.exe')}
 
 
 def main():
@@ -40,9 +47,15 @@ def main():
             binary = root / executable.name
             shutil.copy2(executable, binary)
             output = root / 'console.txt'
+            existing_adb = adb_pids()
             with output.open('wb') as stream:
                 result = subprocess.run([str(binary)], input=answers.encode('utf-8'),
                                         stdout=stream, stderr=subprocess.STDOUT, cwd=root, timeout=45)
+            deadline = time.monotonic() + 5
+            while adb_pids() - existing_adb and time.monotonic() < deadline:
+                time.sleep(.1)
+            if adb_pids() - existing_adb:
+                raise AssertionError(f'{name}: packaged application left ADB running')
             if output.stat().st_size > 256 * 1024:
                 raise AssertionError(f'{name}: excessive console output')
             text = output.read_text(encoding='utf-8', errors='replace')

@@ -26,6 +26,8 @@ def parse_address(value, default_port=5555):
         if ':' not in address or not re.fullmatch(r'[A-Za-z0-9_.-]{1,32}', scope):
             raise ValueError('Invalid IPv6 scope')
     parsed = ipaddress.ip_address(host)
+    if parsed.version == 6 and parsed.is_link_local and '%' not in host:
+        raise ValueError('Link-local IPv6 requires an interface scope')
     if bracketed and parsed.version != 6:
         raise ValueError('Brackets require IPv6')
     return host, port

@@ -99,6 +99,7 @@ def query_ntp(server, timeout, stopped=None):
                 received_monotonic = time.monotonic()
                 stats = parse_response(response, request, sent, received_monotonic - started)
                 stats.received_monotonic = received_monotonic
+                stats.server_address = address[0]
                 return stats
         except (OSError, ntplib.NTPException) as failure:
             error = failure

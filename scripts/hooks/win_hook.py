@@ -34,7 +34,7 @@ def setup_windows_environment() -> None:
 
 def setup_logger() -> logging.Logger:
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
     return logging.getLogger('WindowsHook')

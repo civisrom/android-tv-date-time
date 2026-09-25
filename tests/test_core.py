@@ -570,6 +570,27 @@ class ReliabilityTests(unittest.TestCase):
                 self.assertIsInstance(transport, PlatformToolsTransport)
                 self.assertIn('shell', run.call_args.args[0])
 
+    def test_only_a_fresh_successful_pairing_gets_bounded_connection_retries(self) -> None:
+        import time
+        failed = subprocess.CompletedProcess(['adb'], 1, stdout='failed to connect')
+        connected = subprocess.CompletedProcess(['adb'], 0, stdout='connected to 192.168.1.20:37105')
+        probe = subprocess.CompletedProcess(['adb'], 0, stdout='androidtvtimefixer\n')
+        fixer = self._platform_tools_fixer()
+        fixer._recent_pairing = ('192.168.1.20', time.monotonic())
+        with mock.patch('src.android_time_fixer.subprocess.run', side_effect=[failed, failed, connected, probe]) as run, \
+                mock.patch('src.android_time_fixer.time.sleep') as sleep:
+            fixer._connect_via_platform_tools('192.168.1.20', 37105)
+            self.assertEqual(sleep.call_count, 2)
+            self.assertEqual(run.call_count, 4)
+            self.assertTrue(all(c.kwargs['timeout'] <= 5 for c in run.call_args_list[:3]))
+        self.assertIsNone(fixer._recent_pairing)
+        for host, age, expected in [('192.168.1.20', 0, 5), ('192.168.1.21', 0, 1), ('192.168.1.20', 30, 1)]:
+            fixer._recent_pairing = (host, time.monotonic() - age)
+            with mock.patch('src.android_time_fixer.subprocess.run', return_value=failed) as run, \
+                    mock.patch('src.android_time_fixer.time.sleep'), self.assertRaises(AndroidTVTimeFixerError):
+                fixer._connect_via_platform_tools('192.168.1.20', 37105)
+            self.assertEqual(run.call_count, expected)
+
     def test_failed_shell_probe_does_not_disconnect_other_clients(self) -> None:
         results = [subprocess.CompletedProcess(['adb'], 0, stdout='connected to 192.168.1.20:37105'),
                    subprocess.CompletedProcess(['adb'], 1, stdout='error: device offline'),
@@ -977,7 +998,7 @@ class ReliabilityTests(unittest.TestCase):
         result = fixer.mdns_connectable()
         # Отсортировано по адресу; ждущее спаривания сюда не попадает —
         # подключиться к нему нельзя, сначала нужен код
-        self.assertEqual(result, ['192.168.1.9:5555', '192.168.1.112:37105'])
+        self.assertEqual(result, ['192.168.1.112:37105', '192.168.1.9:5555'])
 
     def test_mdns_discover_all_falls_back_to_zeroconf(self) -> None:
         fixer = AndroidTVTimeFixer.__new__(AndroidTVTimeFixer)

@@ -13,6 +13,12 @@ import uuid
 import psutil
 from platformdirs import user_data_path
 
+if os.name == 'nt':
+    if __package__:
+        from .windows_job import WindowsAdbJob
+    else:
+        from windows_job import WindowsAdbJob
+
 
 class ADBServerLease:
     def __init__(self, adb_path, env, directory=None):
@@ -25,6 +31,7 @@ class ADBServerLease:
         self.token = uuid.uuid4().hex
         self.registered = False
         self.child = None
+        self.windows_job = None
         self.mutex = threading.RLock()
 
     @contextmanager
@@ -113,11 +120,38 @@ class ADBServerLease:
             state = self._load()
             started = None
             try:
+                # Каждый экземпляр держит свой handle общего job. Windows
+                # закроет его даже при TerminateProcess/закрытии окна, когда
+                # finally/atexit не выполняются. Чужие серверы в job не включаем.
+                if os.name == 'nt' and self.windows_job is None:
+                    record = state.get('server')
+                    if self._owned_process(record) is not None and record.get('job'):
+                        try:
+                            job = WindowsAdbJob(record['job'])
+                        except OSError:
+                            # Последний владелец мог завершиться перед OpenJobObject.
+                            deadline = time.monotonic() + 2
+                            while self._listening() and time.monotonic() < deadline:
+                                time.sleep(.05)
+                            if self._listening():
+                                raise OSError('Could not acquire the application ADB server job')
+                            job = None
+                        if job is not None:
+                            if job.contains(record['pid']):
+                                self.windows_job = job
+                            else:
+                                job.close()
                 if not self._listening():
+                    if os.name == 'nt':
+                        if self.windows_job is not None:
+                            self.windows_job.close()
+                        self.windows_job = WindowsAdbJob()
                     flags = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {'start_new_session': True}
                     started = subprocess.Popen([self.adb_path, 'server', 'nodaemon'], env=self.env,
                                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)
                     self.child = started
+                    if self.windows_job is not None:
+                        self.windows_job.assign(started)
                     deadline = time.monotonic() + 8
                     while started.poll() is None and not self._listening() and time.monotonic() < deadline:
                         time.sleep(.05)
@@ -125,6 +159,8 @@ class ADBServerLease:
                         raise OSError('Could not start the application ADB server')
                     process = psutil.Process(started.pid)
                     state['server'] = {'pid': started.pid, 'birth': process.create_time(), 'exe': process.exe()}
+                    if self.windows_job is not None:
+                        state['server']['job'] = self.windows_job.name
                 elif self._owned_process(state.get('server')) is None:
                     # Порт уже занят сервером без доказанного владения: можно
                     # использовать, но нельзя посылать ему kill-server/disconnect.
@@ -141,6 +177,9 @@ class ADBServerLease:
                     except subprocess.TimeoutExpired:
                         started.kill()
                         started.wait(timeout=2)
+                if not self.registered and self.windows_job is not None:
+                    self.windows_job.close()
+                    self.windows_job = None
                 raise
             self.registered = True
 
@@ -167,3 +206,6 @@ class ADBServerLease:
                 self.registered = False
             if self.child is not None:
                 self.child.poll()  # Забираем статус своего уже завершённого дочернего процесса.
+            if self.windows_job is not None:
+                self.windows_job.close()
+                self.windows_job = None

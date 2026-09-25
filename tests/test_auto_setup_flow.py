@@ -42,7 +42,7 @@ class AutoSetupDiscoveryTests(unittest.TestCase):
     def test_multiple_addresses_are_deduplicated_sorted_and_selected_explicitly(self):
         fixer = self.fixer({'connect': ['192.168.1.20:37105'],
                             'legacy': ['192.168.1.2:5555', '192.168.1.20:37105']})
-        self.run_setup(fixer, ['2'])
+        self.run_setup(fixer, ['1'])
         fixer.connect_or_reuse.assert_called_once_with('192.168.1.20:37105')
         fixer.prompt_adb_port.assert_not_called()
         fixer.scan_network_for_android_devices.assert_not_called()
@@ -103,6 +103,19 @@ class AutoSetupDiscoveryTests(unittest.TestCase):
         fixer.show_device_time = mock.Mock()
         self.run_setup(fixer, ['', '', 'yes'])
         fixer.set_ntp_server.assert_called_once_with('time.example')
+
+    def test_shared_reply_addresses_do_not_fill_the_best_list_with_aliases(self):
+        fixer = self.fixer({'legacy': ['192.168.1.20:5555']})
+        fixer.ntp_servers = {name: name for name in ['fast.example', 'alias.example', 'other.example']}
+        def probe(host, *args):
+            return {'server': host, 'status': 'Reachable', 'success_rate': 100,
+                    'median_rtt': 1 if host == 'fast.example' else 2, 'avg_rtt': 2, 'rtt_jitter': 0, 'offset': 0,
+                    'addresses': ['192.0.2.2' if host == 'other.example' else '192.0.2.1']}
+        fixer._test_ntp_server.side_effect = probe
+        fixer.set_ntp_server = mock.Mock()
+        fixer.show_device_time = mock.Mock()
+        self.run_setup(fixer, ['', '2', 'yes'])
+        fixer.set_ntp_server.assert_called_once_with('other.example')
 
 
 if __name__ == '__main__':

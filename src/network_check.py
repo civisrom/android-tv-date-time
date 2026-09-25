@@ -35,6 +35,10 @@ class NetworkCheckResult:
     ntp_ok: int
     elapsed_seconds: float
     local_network: bool | None = None
+    https_total: int = len(HTTPS_URLS)
+    ntp_total: int = len(NTP_HOSTS)
+    https_skipped: int = 0
+    ntp_skipped: int = 0
 
     @property
     def https_reachable(self):
@@ -77,15 +81,25 @@ def _probe_ntp(host, deadline, stopped):
     return not stopped.is_set()
 
 
+def is_virtual_interface(name):
+    name = name.lower()
+    return (any(marker in name for marker in ('virtual', 'vbox', 'vmware', 'hyper-v', 'vethernet',
+                                             'docker', 'wsl', 'npcap', 'loopback', 'vpn'))
+            or name.startswith(('veth', 'br-', 'tun', 'tap', 'utun', 'wg', 'tailscale')))
+
+
 def _probe_local_network(unused, deadline, stopped):
     states = psutil.net_if_stats()
     for name, addresses in psutil.net_if_addrs().items():
-        if name not in states or not states[name].isup:
+        if name not in states or not states[name].isup or is_virtual_interface(name):
             continue
         for address in addresses:
             if address.family in (socket.AF_INET, socket.AF_INET6):
-                ip = ipaddress.ip_address(address.address.split('%', 1)[0])
-                if not ip.is_loopback and not ip.is_unspecified:
+                try:
+                    ip = ipaddress.ip_address(address.address.split('%', 1)[0])
+                except ValueError:
+                    continue
+                if not (ip.is_loopback or ip.is_unspecified or ip.is_link_local or ip.is_multicast):
                     return True
     return False
 
@@ -112,11 +126,14 @@ def check_network(timeout=4.0):
     probes += [('https', _probe_https, url) for url in HTTPS_URLS]
     probes += [('ntp', _probe_ntp, host) for host in NTP_HOSTS]
     pending = 0
+    skipped = {'local': 0, 'https': 0, 'ntp': 0}
     for protocol, probe, address in probes:
         if _PROBE_SLOTS.acquire(blocking=False):
             pending += 1
             threading.Thread(target=run, args=(protocol, probe, address),
                              name='startup-network', daemon=True).start()
+        else:
+            skipped[protocol] += 1
 
     successes = {'https': 0, 'ntp': 0}
     local_network = None
@@ -137,4 +154,5 @@ def check_network(timeout=4.0):
     finally:
         stopped.set()
     return NetworkCheckResult(successes['https'], successes['ntp'], time.monotonic() - started,
-                              local_network)
+                              local_network, len(HTTPS_URLS), len(NTP_HOSTS),
+                              skipped['https'], skipped['ntp'])

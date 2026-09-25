@@ -99,3 +99,32 @@ class NtpSettingsTests(unittest.TestCase):
         self.assertEqual(info['model'], 'TV')
         self.assertEqual(info['android_version'], '14')
         self.assertEqual(info['screen_resolution'], '')
+
+    def test_connection_loss_before_write_is_reported_without_mutating_settings(self):
+        target = Target()
+        fixer = self.fixer(target)
+        target.shell = mock.Mock(side_effect=BrokenPipeError('private transport details'))
+        with self.assertRaises(AndroidTVTimeFixerError) as error:
+            fixer.set_ntp_server('pool.ntp.org')
+        self.assertEqual(str(error.exception), locales.get('state_connection_lost'))
+        self.assertIsNone(fixer.device)
+        self.assertEqual(target.raw, 'null')
+
+    def test_loss_after_write_reports_unknown_result_and_keeps_original_snapshot(self):
+        target = Target()
+        fixer = self.fixer(target)
+        shell = target.shell
+
+        def disconnect_after_write(command):
+            result = shell(command)
+            if command.startswith('settings put global ntp_server'):
+                target.shell = mock.Mock(side_effect=ConnectionResetError('private address'))
+            return result
+
+        target.shell = disconnect_after_write
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(AndroidTVTimeFixerError) as error:
+            fixer.set_ntp_server('pool.ntp.org')
+        self.assertEqual(str(error.exception), locales.get('state_write_unconfirmed'))
+        self.assertIsNone(fixer.device)
+        self.assertEqual(target.raw, 'pool.ntp.org')
+        self.assertEqual(1, len(list(fixer.data_dir.rglob('*.json'))))

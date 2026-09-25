@@ -4,9 +4,22 @@ import json
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from device_time_settings import DeviceStateError, TimeSettings
 from time_store_lock import time_store_lock
+
+
+def validate_profile_name(name):
+    return isinstance(name, str) and 1 <= len(name) <= 80 and bool(name.strip()) and name.isprintable()
+
+
+def validate_profile_timezone(zone):
+    try:
+        ZoneInfo(zone)
+        return True
+    except (ValueError, ZoneInfoNotFoundError):
+        return False
 
 
 def parse_ntp_configuration(raw, validate_host):
@@ -54,8 +67,7 @@ class TimeProfileStore:
     @staticmethod
     def _validate(profile):
         if (not isinstance(profile, dict) or set(profile) != {'name', 'target', 'identity', 'settings'}
-                or not isinstance(profile['name'], str) or not 1 <= len(profile['name']) <= 80
-                or not profile['name'].strip() or not profile['name'].isprintable()
+                or not validate_profile_name(profile['name'])
                 or not isinstance(profile['target'], str) or not profile['target'].isprintable()
                 or len(profile['target']) > 300
                 or not isinstance(profile['identity'], dict)

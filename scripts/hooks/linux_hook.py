@@ -30,7 +30,7 @@ def setup_linux_environment() -> None:
 
 def _setup_logger() -> logging.Logger:
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
     return logging.getLogger('LinuxHook')

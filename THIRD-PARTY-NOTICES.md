@@ -121,6 +121,7 @@ the published APK apart from the signature.
 | platformdirs | MIT |
 | rich | MIT |
 | typing-extensions | PSF-2.0 |
+| tzdata | Apache-2.0 (Python package); public-domain IANA timezone data |
 | pyobjc-framework-Cocoa (macOS only) | MIT |
 | **python-zeroconf** | **LGPL-2.1-or-later** |
 
@@ -128,6 +129,10 @@ The desktop HTTPS check includes the unmodified `certifi` CA bundle so TLS
 verification does not depend on a separately installed Python. Its source and
 licence are available at https://github.com/certifi/python-certifi and
 https://www.mozilla.org/MPL/2.0/.
+
+The desktop profile editor includes `tzdata` for IANA timezone validation,
+including on Windows. Package metadata and licence files are bundled with it.
+Source: https://github.com/python/tzdata.
 
 The macOS Intel build compiles the locked `cryptography` version with a
 statically linked OpenSSL 3 from Homebrew, avoiding a conflict with Python's

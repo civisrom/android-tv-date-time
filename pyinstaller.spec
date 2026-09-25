@@ -55,6 +55,7 @@ packages = [
     # zeroconf тянет Cython-расширения и импортирует подмодули динамически,
     # поэтому его собирает collect_all ниже; ifaddr — его зависимость
     'zeroconf',
+    'tzdata',
     'ifaddr'
 ]
 

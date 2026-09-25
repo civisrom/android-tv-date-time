@@ -8,6 +8,19 @@ from src.network_check import NetworkCheckResult
 
 
 class StartupExitTests(unittest.TestCase):
+    def test_interrupt_or_expected_error_in_an_operation_returns_to_menu(self):
+        for failure in (KeyboardInterrupt(), app.AndroidTVTimeFixerError('device unavailable')):
+            fixer = mock.Mock()
+            fixer.load_language.return_value = 'en'
+            fixer.ping_ntp_servers.side_effect = failure
+            with mock.patch.object(app, 'AndroidTVTimeFixer', return_value=fixer), \
+                    mock.patch('builtins.input', side_effect=['', '6', '3', '0']), \
+                    contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as exit:
+                app.main()
+            self.assertEqual(exit.exception.code, 0)
+            fixer.show_country_codes.assert_called_once()
+            fixer.close.assert_called_once()
+
     def test_windows_redirected_streams_preserve_Russian_text(self):
         output = io.BytesIO()
         errors = io.BytesIO()

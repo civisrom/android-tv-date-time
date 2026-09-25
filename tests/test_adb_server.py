@@ -91,7 +91,11 @@ class AdbServerTests(unittest.TestCase):
                 state['server']['birth'] += 1
                 path.write_text(json.dumps(state))
                 lease.release()
-                self.assertTrue(lease._listening())
+                # Windows owns the original child through a kernel job, even
+                # if the PID record is damaged. It still cannot affect a
+                # replacement process that was never assigned to that job.
+                if os.name != 'nt':
+                    self.assertTrue(lease._listening())
             finally:
                 lease.child.terminate(); lease.child.wait(timeout=5)
 

@@ -21,6 +21,34 @@ class Locales:
 
         # Dictionary containing all translations
         self.translations: Dict[str, Translation] = {
+            'network_check_incomplete': Translation(en='Some checks could not start because earlier network requests are still pending: HTTPS {https}, NTP {ntp}. This does not mean the network is unavailable.', ru='Часть проверок не запущена: предыдущие сетевые запросы ещё ожидают ответа (HTTPS: {https}, NTP: {ntp}). Это не означает отсутствия сети.'),
+            'mdns_transport_connect': Translation(en='wireless debugging (pairing required)', ru='беспроводная отладка (нужно сопряжение)'),
+            'mdns_transport_legacy': Translation(en='classic debugging (confirmation on device)', ru='классическая отладка (подтверждение на устройстве)'),
+            'favorite_system_default': Translation(en='The device uses the system time source. There is no explicit server address to save as a favorite.', ru='Устройство использует системный источник времени. Явного адреса сервера для добавления в избранное нет.'),
+            'state_profile_name_invalid': Translation(en='Enter a profile name of 1–80 printable characters.', ru='Введите имя профиля: от 1 до 80 печатных символов.'),
+            'state_profile_timezone_invalid': Translation(en='Unknown time zone. Enter an IANA name, for example Europe/Moscow.', ru='Неизвестный часовой пояс. Введите имя IANA, например Europe/Moscow.'),
+            'ntp_shared_addresses': Translation(en='Several server names answered from the same IP. The list shows one result per address. Names and country labels do not prove independent time sources.', ru='Несколько имён серверов ответили с одного IP. В списке оставлен один результат на адрес. Разные имена и страны не означают независимые источники времени.'),
+            'connection_auth_hint': Translation(en='If you denied the request, retry and allow it. If another request is pending on the TV, dismiss it first. A timeout alone cannot distinguish denial from no response.', ru='Если вы отклонили запрос, повторите подключение и разрешите доступ. Если на ТВ ожидает другой запрос, сначала закройте его. По одному таймауту нельзя отличить отказ от отсутствия ответа.'),
+            'connection_cancel_hint': Translation(
+                en='Cancel: q then Enter, or Ctrl+C. If no prompt appears, dismiss any other pending request on the TV and retry.',
+                ru='Отмена: q и Enter или Ctrl+C. Если запроса нет, закройте другой ожидающий запрос на ТВ и повторите подключение.',
+            ),
+            'pairing_retry_hint': Translation(
+                en='Could not pair with {ip}. Check the address and network. The code may be wrong or expired, or the pairing dialog was closed. Open a new dialog on the TV and enter its current port and code.',
+                ru='Не удалось выполнить сопряжение с {ip}. Проверьте адрес и сеть. Код мог быть неверным или устареть, либо диалог сопряжения закрыт. Откройте новый диалог на ТВ и введите показанные порт и код.',
+            ),
+            'wireless_port_prompt': Translation(
+                en='Port shown in the device debugging screen (required; q to cancel): ',
+                ru='Порт с экрана отладки устройства (обязателен; q — отмена): ',
+            ),
+            'state_connection_lost': Translation(
+                en='Connection to the device was lost. Reconnect and check its current settings.',
+                ru='Связь с устройством потеряна. Подключитесь заново и проверьте текущие настройки.',
+            ),
+            'state_write_unconfirmed': Translation(
+                en='Connection was lost while saving. The setting may have changed, but could not be confirmed. Reconnect and read the current settings; the original snapshot is retained.',
+                ru='Связь оборвалась при сохранении. Настройка могла измениться, но проверить результат не удалось. Подключитесь заново и прочитайте текущие настройки; исходный снимок сохранён.',
+            ),
             "network_check_progress": Translation(
                 en="Checking the network and Internet access (up to 4 seconds)...",
                 ru="Проверка сети и доступа в интернет (до 4 секунд)...",
@@ -41,12 +69,12 @@ class Locales:
                 en="could not check network interfaces", ru="не удалось проверить сетевые интерфейсы",
             ),
             "network_check_internet": Translation(
-                en="Internet (HTTPS): {status} ({https_ok}/2).",
-                ru="Интернет (HTTPS): {status} ({https_ok}/2).",
+                en='Internet (HTTPS): {status} ({https_ok}/{total}).',
+                ru='Интернет (HTTPS): {status} ({https_ok}/{total}).'
             ),
             "network_check_ntp": Translation(
-                en="NTP (UDP/123): {status} ({ntp_ok}/2).",
-                ru="NTP (UDP/123): {status} ({ntp_ok}/2).",
+                en='NTP (UDP/123): {status} ({ntp_ok}/{total}).',
+                ru='NTP (UDP/123): {status} ({ntp_ok}/{total}).'
             ),
             "network_confirmed": Translation(en="confirmed", ru="доступ подтверждён"),
             "network_unconfirmed": Translation(en="not confirmed", ru="доступ не подтверждён"),
@@ -357,8 +385,8 @@ arising from the use of this program.
                 ru="Устройства, ожидающие спаривания (на экране открыт диалог спаривания):"
             ),
             "mdns_service_connect": Translation(
-                en="Paired devices ready to connect:",
-                ru="Спаренные устройства, готовые к подключению:"
+                en='Available debugging connections:',
+                ru='Доступные подключения отладки:'
             ),
             "adb_shell_command_failed": Translation(
                 en="Failed to run the command on the device: {error}",
@@ -541,8 +569,8 @@ arising from the use of this program.
                 ru='Продолжить показанную операцию? Введите yes: '
             ),
             "state_snapshot_date": Translation(
-                en='Snapshot saved at: {date}',
-                ru='Снимок сохранён: {date}'
+                en='Original snapshot from: {date}',
+                ru='Исходный снимок от: {date}'
             ),
             "state_snapshot_replace": Translation(
                 en='This will replace the snapshot from {date}.',
@@ -617,16 +645,16 @@ arising from the use of this program.
                 ru='Наблюдение остановлено.'
             ),
             "state_clock_match": Translation(
-                en='Clock check: agrees with the NTP reference within 5 seconds, including measurement uncertainty.',
-                ru='Проверка часов: совпадают с контрольным NTP в пределах 5 секунд с учётом погрешности.'
+                en='Device time is correct within 5 seconds, allowing for measurement accuracy.',
+                ru='Часы устройства идут верно в пределах 5 секунд с учётом точности замера.'
             ),
             "state_clock_mismatch": Translation(
-                en='Clock check: difference from the NTP reference exceeds 5 seconds, including measurement uncertainty.',
-                ru='Проверка часов: расхождение с контрольным NTP превышает 5 секунд с учётом погрешности.'
+                en='Device time differs by more than 5 seconds, allowing for measurement accuracy.',
+                ru='Часы устройства отличаются от точного времени больше чем на 5 секунд с учётом точности замера.'
             ),
             "state_clock_uncertain": Translation(
-                en='Clock check: measurement uncertainty does not allow a reliable conclusion.',
-                ru='Проверка часов: погрешность измерения не позволяет сделать достоверный вывод.'
+                en='The measurement is not accurate enough to check the clock.',
+                ru='Точности замера недостаточно, чтобы проверить часы.'
             ),
             "state_clock_ntp_unavailable": Translation(
                 en='Clock check: no valid NTP response received for this attempt.',
@@ -645,16 +673,16 @@ arising from the use of this program.
                 ru='Проверка часов: измерение старше 30 секунд.'
             ),
             "state_clock_measurement": Translation(
-                en='  Difference: {difference} ±{uncertainty} seconds',
-                ru='  Расхождение: {difference} ±{uncertainty} с'
+                en='Difference: {difference} s; measurement accuracy ±{uncertainty} s. Positive means the device is ahead.',
+                ru='Разница: {difference} с; точность замера ±{uncertainty} с. Плюс означает, что часы устройства спешат.'
             ),
             "state_clock_reference": Translation(
-                en='  NTP reference: {server}',
-                ru='  Контрольный NTP: {server}'
+                en='Compared with: {server}',
+                ru='Сравнение с: {server}'
             ),
             "state_source_unconfirmed": Translation(
-                en='System clock source: unconfirmed. A clock match or cached NTP response alone is not proof.',
-                ru='Источник системных часов: не подтверждён. Совпадение часов или ответ в кэше NTP сами по себе этого не доказывают.'
+                en='This compares the clocks; it does not identify the server Android actually uses to set its time.',
+                ru='Это сравнение часов; оно не определяет, с каким сервером Android действительно синхронизирует время.'
             ),
             "ntp_no_undo": Translation(
                 en='There is no change to undo in this connection.',
@@ -2119,8 +2147,8 @@ localfilesystem:PATH. tcp:0 запрашивает свободный слуша
                 ru="  Запрос авторизации отправлен на {ip}. Подтвердите его на экране устройства."
             ),
             "batch_success": Translation(
-                en="  OK  {ip}: NTP setting saved: {server}. Enable automatic time; Android 6–10 usually needs a TV restart.",
-                ru="  ОК  {ip}: настройка NTP сохранена: {server}. Включите автовремя; на Android 6–10 обычно нужен перезапуск TV."
+                en='  OK  {ip}: NTP setting saved: {server}.',
+                ru='  ОК  {ip}: настройка NTP сохранена: {server}.'
             ),
             "batch_failed": Translation(
                 en="  ERR {ip}: {error}",

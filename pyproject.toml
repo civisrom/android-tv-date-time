@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "androidtvtimefixer"
-version = "2.6.6"
+version = "2.6.7"
 description = "Time fixer for Android TV"
 authors = ["Orientalium"]
 readme = "README.md"
@@ -8,6 +8,7 @@ license = "Apache-2.0"
 packages = [
     {include = "android_time_fixer.py", from = "src"},
     {include = "adb_server.py", from = "src"},
+    {include = "windows_job.py", from = "src"},
     {include = "ntp_network.py", from = "src"},
     {include = "network_check.py", from = "src"},
     {include = "device_time_check.py", from = "src"},
@@ -17,6 +18,8 @@ packages = [
     {include = "time_profiles.py", from = "src"},
     {include = "time_store_lock.py", from = "src"},
     {include = "time_console.py", from = "src"},
+    {include = "console_cancel.py", from = "src"},
+    {include = "app_version.py", from = "src"},
     {include = "locales.py"}
 ]
 classifiers = [
@@ -51,6 +54,7 @@ pyobjc-framework-Cocoa = { version = "^12.1", markers = "sys_platform == 'darwin
 # Общие зависимости
 click = "^8.3.3"
 rich = "^15.0.0"
+tzdata = "^2026.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.1"

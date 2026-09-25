@@ -78,7 +78,7 @@ class NetworkCheckTests(unittest.TestCase):
                  (False, socket.AF_INET, '192.0.2.5', False),
                  (True, socket.AF_INET, '0.0.0.0', False),
                  (True, socket.AF_INET, '192.0.2.5', True),
-                 (True, socket.AF_INET6, 'fe80::1%wlan0', True))
+                 (True, socket.AF_INET6, 'fe80::1%wlan0', False))
         for up, family, address, expected in cases:
             with self.subTest(address=address, up=up), \
                     mock.patch.object(network_check.psutil, 'net_if_stats', return_value={'net': SimpleNamespace(isup=up)}), \

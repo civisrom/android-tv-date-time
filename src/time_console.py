@@ -6,11 +6,13 @@ import re
 import sys
 
 from colorama import Fore
-from locales import locales
+from locales import locales, Language
+from app_version import APP_VERSION
 from device_time_check import monitor_device_time, verify_device_time
 from device_time_settings import (DeviceStateError, TimeSettings, TimeSnapshotStore, apply_time_settings,
                                   checked_shell, device_identity, read_time_settings)
-from time_profiles import TimeProfileStore, build_ntp_configuration, parse_ntp_configuration
+from time_profiles import (TimeProfileStore, build_ntp_configuration, parse_ntp_configuration,
+                           validate_profile_name, validate_profile_timezone)
 
 
 def snapshot_store(fixer):
@@ -41,14 +43,21 @@ def clock_check(fixer, raw=None):
                               _references(fixer, raw))
 
 
-def print_clock_check(check):
-    print(locales.get('state_clock_' + check.status_at().lower()))
+def print_clock_check(check, monitoring=False):
+    parts = []
+    measured = (datetime.datetime.fromisoformat(check.measured_at_utc).astimezone()
+                if check.measured_at_utc else datetime.datetime.now().astimezone())
+    parts.append(measured.strftime('%H:%M:%S %z'))
+    parts.append(locales.get('state_clock_' + check.status_at().lower()))
     if check.difference_seconds is not None:
-        print(locales.get('state_clock_measurement', difference=f'{check.difference_seconds:+.3f}',
-                         uncertainty=f'{check.uncertainty_seconds:.3f}'))
+        number = lambda value: value.replace('.', ',') if locales.current_language == Language.RU else value
+        parts.append(locales.get('state_clock_measurement', difference=number(f'{check.difference_seconds:+.1f}'),
+                                uncertainty=number(f'{check.uncertainty_seconds:.1f}')))
     if check.reference_server:
-        print(locales.get('state_clock_reference', server=check.reference_server))
-    print(locales.get('state_source_unconfirmed'))
+        parts.append(locales.get('state_clock_reference', server=check.reference_server))
+    print(' | '.join(parts) if monitoring else '\n'.join(parts))
+    if not monitoring:
+        print(locales.get('state_source_unconfirmed'))
 
 
 def show_time_status(fixer, raw=None):
@@ -159,80 +168,94 @@ def _profiles(fixer):
     store = TimeProfileStore(fixer.data_dir, fixer._atomic_write_json)
     while True:
         print(locales.get('state_profiles_menu'))
-        action = input(locales.get('select_action')).strip()
-        if action == '0':
+        action = input(locales.get('select_action') + ' ').strip().lower()
+        if action in ('0', 'q'):
             return
-        if action == '1':
-            for profile in store.load():
-                print(f'{profile["name"]} — {profile["target"]}')
-        elif action == '2':
-            device = require_device(fixer)
-            name = input(locales.get('state_profile_name')).strip()
-            identity = device_identity(device)
-            target = fixer.connected_ip or ''
-            current = read_time_settings(device)
-            if device_identity(device) != identity:
-                raise DeviceStateError('state_identity_changed')
-            raw = _enter_ntp(fixer, device, current.ntp_server)
-            values = asdict(current)
-            for key in ('auto_time', 'auto_time_zone', 'timezone'):
-                answer = input(locales.get('state_profile_field', field=key, current=values[key])).strip()
-                if answer:
-                    values[key] = answer
-                    if key == 'auto_time_zone' and values['effective_auto_zone'] is not None:
-                        if answer not in ('0', '1'):
-                            raise DeviceStateError('state_invalid')
-                        values['effective_auto_zone'] = answer == '1'
-            desired = replace(TimeSettings.from_dict(values), ntp_server=raw)
-            _preview(current, desired)
-            if any(profile['name'] == name for profile in store.load()):
-                print(locales.get('state_profile_overwrite'))
-            if _confirmed():
+        try:
+            if action == '1':
+                for profile in store.load():
+                    print(f'{profile["name"]} — {profile["target"]}')
+            elif action == '2':
+                device = require_device(fixer)
+                name = input(locales.get('state_profile_name')).strip()
+                if not validate_profile_name(name):
+                    print(Fore.RED + locales.get('state_profile_name_invalid'))
+                    continue
+                identity = device_identity(device)
+                target = fixer.connected_ip or ''
+                current = read_time_settings(device)
                 if device_identity(device) != identity:
                     raise DeviceStateError('state_identity_changed')
-                store.save(name, target, identity, desired, replace=True)
-                print(locales.get('state_profile_saved'))
-        elif action in ('3', '4'):
-            profile = _select_profile(store)
-            if profile is None:
-                continue
-            if action == '4':
-                if _confirmed():
-                    store.delete(profile['name'])
-                continue
-            target = profile['target']
-            if not fixer.validate_device_target(target):
-                raise DeviceStateError('state_profile_invalid')
-            if target.startswith('usb:'):
-                # USB transport ID меняется при перезапуске adb. Пользователь
-                # сначала выбирает устройство, затем проверяется его identity.
-                device = require_device(fixer)
-            else:
-                fixer.connect_or_reuse(target)
-                device = require_device(fixer)
-            if device_identity(device) != profile['identity']:
-                raise DeviceStateError('state_identity_changed')
-            current = read_time_settings(device)
-            desired = TimeSettings.from_dict(profile['settings'])
-            endpoints = parse_ntp_configuration(desired.ntp_server, fixer.validate_ntp_server)
-            if _read_api(device) < 34 and (len(endpoints) > 1 or desired.ntp_server.startswith('ntp://')):
-                raise DeviceStateError('state_multi_unsupported')
-            _preview(current, desired)
-            if _confirmed():
-                if not _verify_configuration(fixer, desired.ntp_server):
+                raw = _enter_ntp(fixer, device, current.ntp_server)
+                values = asdict(current)
+                for key in ('auto_time', 'auto_time_zone', 'timezone'):
+                    answer = input(locales.get('state_profile_field', field=key, current=values[key])).strip()
+                    if answer:
+                        values[key] = answer
+                        if key == 'auto_time_zone' and values['effective_auto_zone'] is not None:
+                            if answer not in ('0', '1'):
+                                raise DeviceStateError('state_invalid')
+                            values['effective_auto_zone'] = answer == '1'
+                if values['timezone'] != current.timezone and not validate_profile_timezone(values['timezone']):
+                    print(Fore.RED + locales.get('state_profile_timezone_invalid'))
                     continue
-                snapshot_store(fixer).save(device)
-                apply_time_settings(device, desired, profile['identity'], expected_current=current)
-                print(Fore.GREEN + locales.get('state_restore_success'))
-                show_time_status(fixer, desired.ntp_server)
-        else:
-            print(locales.get('invalid_input'))
+                desired = replace(TimeSettings.from_dict(values), ntp_server=raw)
+                _preview(current, desired)
+                if any(profile['name'] == name for profile in store.load()):
+                    print(locales.get('state_profile_overwrite'))
+                if _confirmed():
+                    if device_identity(device) != identity:
+                        raise DeviceStateError('state_identity_changed')
+                    store.save(name, target, identity, desired, replace=True)
+                    print(locales.get('state_profile_saved'))
+            elif action in ('3', '4'):
+                profile = _select_profile(store)
+                if profile is None:
+                    continue
+                if action == '4':
+                    if _confirmed():
+                        store.delete(profile['name'])
+                    continue
+                target = profile['target']
+                if not fixer.validate_device_target(target):
+                    raise DeviceStateError('state_profile_invalid')
+                if target.startswith('usb:'):
+                    # USB transport ID меняется при перезапуске adb. Пользователь
+                    # сначала выбирает устройство, затем проверяется его identity.
+                    device = require_device(fixer)
+                else:
+                    fixer.connect_or_reuse(target)
+                    device = require_device(fixer)
+                if device_identity(device) != profile['identity']:
+                    raise DeviceStateError('state_identity_changed')
+                current = read_time_settings(device)
+                desired = TimeSettings.from_dict(profile['settings'])
+                endpoints = parse_ntp_configuration(desired.ntp_server, fixer.validate_ntp_server)
+                if _read_api(device) < 34 and (len(endpoints) > 1 or desired.ntp_server.startswith('ntp://')):
+                    raise DeviceStateError('state_multi_unsupported')
+                _preview(current, desired)
+                if _confirmed():
+                    if not _verify_configuration(fixer, desired.ntp_server):
+                        continue
+                    snapshot_store(fixer).save(device)
+                    apply_time_settings(device, desired, profile['identity'], expected_current=current)
+                    print(Fore.GREEN + locales.get('state_restore_success'))
+                    show_time_status(fixer, desired.ntp_server)
+            else:
+                print(locales.get('invalid_input'))
+
+        except DeviceStateError as error:
+            if error.code in ('state_connection_lost', 'state_write_unconfirmed'):
+                raise
+            print(Fore.RED + locales.get(error.code))
+            if error.rollback is not None:
+                print(locales.get('state_compensation_ok' if error.rollback else 'state_compensation_failed'))
 
 
 def diagnostic_report(fixer):
     # Только заранее определённые поля. Ни get_device_info(), ни логи/снимки,
     # ни shell output не попадают в экспорт даже при ошибке устройства.
-    report = {'schema_version': 1, 'app_version': '2.6.6', 'platform': sys.platform,
+    report = {'schema_version': 1, 'app_version': APP_VERSION, 'platform': sys.platform,
               'exported_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'transport_selected': bool(fixer.device), 'android_api': None, 'settings_read': False,
               'read_failure': None,
@@ -279,13 +302,16 @@ def advanced_time_action(fixer, action):
             if not references:
                 raise DeviceStateError('state_clock_no_server')
             print(locales.get('state_monitor_start'))
+            print(locales.get('state_source_unconfirmed'))
             try:
                 summary = monitor_device_time(lambda command, timeout: fixer._timed_device_shell(device, command, timeout),
-                                              references, print_clock_check)
+                                              references, lambda check: print_clock_check(check, monitoring=True))
                 print(locales.get('state_monitor_summary', samples=summary.samples, skipped=summary.skipped))
             except KeyboardInterrupt:
                 print(locales.get('state_monitor_stopped'))
     except DeviceStateError as error:
+        if error.code in ('state_connection_lost', 'state_write_unconfirmed'):
+            fixer._close_device()
         print(Fore.RED + locales.get(error.code))
         if error.rollback is not None:
             print(locales.get('state_compensation_ok' if error.rollback else 'state_compensation_failed'))

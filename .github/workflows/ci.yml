@@ -160,6 +160,10 @@ jobs:
         shell: bash
         run: poetry run python scripts/probe_usb_adb.py --adb "$USB_TEST_ADB"
 
+      - name: Verify native ADB cleanup and Windows console close
+        shell: bash
+        run: poetry run python scripts/probe_adb_cleanup.py --adb "$USB_TEST_ADB"
+
       - name: Build and smoke-test desktop executable
         shell: bash
         run: |
