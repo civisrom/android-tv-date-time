@@ -354,7 +354,7 @@ jobs:
           exit "$ui_failed"
 
       - name: Repeat terminal activity and keyboard transitions
-        if: success() && (matrix.name == 'phone-23' || matrix.name == 'phone-36')
+        if: success() && (matrix.name == 'phone-23' || matrix.name == 'phone-36' || matrix.name == 'tablet-35')
         timeout-minutes: 10
         env:
           UI_PROFILE: ${{ matrix.name }}
@@ -417,6 +417,10 @@ jobs:
               run_sequence search \
                 stop_is_available_from_help_and_files_while_the_command_runs \
                 search_does_not_offer_external_ADB_commands
+            elif [[ "$UI_PROFILE" == tablet-35 ]]; then
+              run_sequence history \
+                history_selection_only_edits_and_survives_navigation_between_tabs \
+                manually_scrolling_output_pauses_following_new_lines
             else
               echo "Unexpected terminal stress profile: $UI_PROFILE" >&2
               exit 1
@@ -461,6 +465,7 @@ jobs:
             ${{ runner.temp }}/ui-terminal-clear-repeat-*.log
             ${{ runner.temp }}/ui-terminal-scroll-repeat-*.log
             ${{ runner.temp }}/ui-terminal-search-repeat-*.log
+            ${{ runner.temp }}/ui-terminal-history-repeat-*.log
             ${{ runner.temp }}/ui-wireless.log
             ${{ runner.temp }}/ui-emulator.log
             ${{ runner.temp }}/ui-logcat.txt

@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -75,8 +74,6 @@ class TerminalScreenTest {
         }
     }
 
-    private var hideKeyboard: () -> Unit = {}
-
     private fun screen(mode: DeviceMode = DeviceMode.HANDHELD, busy: Boolean = false, scale: Float = 1f, width: Int = 360,
         target: String = "192.0.2.1:5555", name: String = "NVIDIA SHIELD", height: Int? = null) {
         compose.setContent {
@@ -85,8 +82,6 @@ class TerminalScreenTest {
             val config = remember(baseConfig) { Configuration(baseConfig).apply { setLocale(Locale.forLanguageTag("ru")) } }
             val ru = remember(context, config) { context.createConfigurationContext(config) }
             inputMode = LocalInputModeManager.current
-            val keyboard = LocalSoftwareKeyboardController.current
-            hideKeyboard = { keyboard?.hide() }
             CompositionLocalProvider(LocalContext provides ru, LocalConfiguration provides config,
                 LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 MaterialTheme { Surface {
@@ -416,12 +411,16 @@ class TerminalScreenTest {
         compose.onNodeWithTag("terminal-tab-history").performClick()
         compose.onNodeWithText("getprop ro.product.model").performClick()
         compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
-        compose.runOnIdle { hideKeyboard() }
+        closeKeyboardAndWait()
         compose.waitUntil(5000) { compose.onAllNodesWithTag("terminal-tab-files").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("terminal-tab-files").performClick()
-        compose.onNodeWithTag("terminal-tab-console").performClick()
+        // Native IME insets can move the tabs after Compose reports idle.
+        waitForStableControls(listOf("terminal-tab-files", "terminal-tab-console"))
+        compose.onNodeWithTag("terminal-tab-files").performClick().assertIsSelected()
+        waitForStableControls(listOf("terminal-tab-console"))
+        compose.onNodeWithTag("terminal-tab-console").performClick().assertIsSelected()
         compose.onNodeWithTag("terminal-input").assertTextContains("getprop ro.product.model")
         assertTrue(calls.isEmpty())
+        closeKeyboardAndWait()
     }
 
     @Test fun execution_is_disabled_during_another_device_operation() {
