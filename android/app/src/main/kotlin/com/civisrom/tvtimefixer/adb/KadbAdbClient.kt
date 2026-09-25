@@ -25,6 +25,7 @@ internal class KadbAdbClient(
     @Volatile private var closed = false
 
     override val shellV2Supported: Boolean get() = connection.supportsFeature("shell_v2")
+    override val independentServiceClose: Boolean get() = true
 
     override fun openService(destination: String, timeoutMs: Int): AdbService {
         check(!closed) { "ADB client closed" }

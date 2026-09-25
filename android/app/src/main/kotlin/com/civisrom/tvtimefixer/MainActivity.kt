@@ -292,9 +292,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 } catch (e: CancellationException) {
-                    terminal.fail(e)
-                    withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
-                    if (generation == actionGeneration) state = state.connectionLost()
+                    val preserved = withContext(NonCancellable + Dispatchers.IO) {
+                        (connector.activeClient != null).also { if (!it) connector.disconnect() }
+                    }
+                    terminal.fail(e, connectionPreserved = preserved)
+                    journal.record(Operation.TERMINAL, Outcome.CANCELLED, diagnosticTransport(state.connection.targetOrNull()))
+                    if (generation == actionGeneration && !preserved) state = state.connectionLost()
                     throw e
                 } catch (e: Exception) {
                     terminal.fail(e)
@@ -380,7 +383,7 @@ class MainActivity : ComponentActivity() {
             val generation = ++actionGeneration
             if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
                 stopMonitor(ClockMonitorEnd.DISCONNECTED)
-                state = state.beginConnection()
+                if (operation != Operation.PAIR) state = state.beginConnection()
             }
             val started = System.nanoTime()
             val transport = when (operation) {
@@ -396,6 +399,7 @@ class MainActivity : ComponentActivity() {
             val resetZone = zoneAction || operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB,
                 Operation.PAIR, Operation.READ_DEVICE)
             state = state.copy(busy = true, connectionCancelling = false, operation = operation, diagnosticEventId = null,
+                pairingFailure = null, message = null,
                 timeZoneResult = if (resetZone) null else state.timeZoneResult,
                 timeZoneDiagnosticEventId = if (resetZone) null else state.timeZoneDiagnosticEventId,
                 timeCheck = if (resetTime) null else state.timeCheck,
@@ -408,9 +412,10 @@ class MainActivity : ComponentActivity() {
                     // Нажатие во время фоновой проверки ждёт её завершения,
                     // не теряется и не читает тот же ADB-транспорт одновременно.
                     val result = deviceOperations.withLock { block(trace) }
-                    val failure = result.connection as? ConnectionState.Failed
+                    val failure = result.pairingFailure ?: (result.connection as? ConnectionState.Failed)
                     val failed = when (operation) {
-                        Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR -> !result.connected
+                        Operation.CONNECT_NETWORK, Operation.CONNECT_USB -> !result.connected
+                        Operation.PAIR -> failure != null || !result.connected
                         Operation.CHECK_NTP -> result.ntpCheck?.isUsable() != true
                         Operation.APPLY_NTP -> result.ntpMessage?.res !in listOf(R.string.ntp_applied, R.string.ntp_default_applied)
                         Operation.CHECK_TIME -> result.timeCheck?.status != DeviceTimeStatus.MATCH
@@ -446,9 +451,14 @@ class MainActivity : ComponentActivity() {
                 } catch (e: CancellationException) {
                     journal.record(operation, Outcome.CANCELLED, transport, trace = trace)
                     if (operation in setOf(Operation.CONNECT_NETWORK, Operation.CONNECT_USB, Operation.PAIR)) {
-                        withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
-                        if (generation == actionGeneration) state = state.connectionLost().copy(
-                            message = UiMessage(R.string.connect_cancelled))
+                        if (operation == Operation.PAIR && connector.state is ConnectionState.Connected) {
+                            if (generation == actionGeneration) state = state.copy(connection = connector.state,
+                                message = UiMessage(R.string.connect_cancelled))
+                        } else {
+                            withContext(NonCancellable + Dispatchers.IO) { connector.disconnect() }
+                            if (generation == actionGeneration) state = state.connectionLost().copy(
+                                message = UiMessage(R.string.connect_cancelled))
+                        }
                     }
                     throw e
                 } catch (e: Exception) {
@@ -567,7 +577,10 @@ class MainActivity : ComponentActivity() {
             val result = withContext(Dispatchers.IO) {
                 connector.pairAndConnect(pairingAddress, code, connectAddress)
             }
-            state.copy(connection = result, message = null).withDeviceData(trace)
+            if (result is ConnectionState.Failed) {
+                state.copy(connection = connector.state, pairingFailure = result,
+                    message = if (connector.state is ConnectionState.Connected) UiMessage(result.reason.messageRes()) else null)
+            } else state.beginConnection().copy(connection = result, message = null).withDeviceData(trace)
         }
 
         override fun checkNtpServer(server: String) = run(Operation.CHECK_NTP) { trace ->

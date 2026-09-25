@@ -27,6 +27,7 @@ data class AppState(
     val favoritesReady: Boolean = false,
     val favoritesBusy: Boolean = false,
     val connection: ConnectionState = ConnectionState.Disconnected,
+    val pairingFailure: ConnectionState.Failed? = null,
     val busy: Boolean = false,
     val connectionCancelling: Boolean = false,
     val operation: Operation? = null,
@@ -87,6 +88,7 @@ data class AppState(
     /** После потери связи сведения и подтверждения от прежнего устройства больше не актуальны. */
     fun connectionLost(): AppState = copy(
         connection = ConnectionState.Disconnected,
+        pairingFailure = null,
         timeTools = TimeToolsState(monitor = timeTools.monitor.copy(running = false, ended = com.civisrom.tvtimefixer.device.ClockMonitorEnd.DISCONNECTED)),
         deviceName = "",
         deviceInfo = null, ntpMessage = null, ntpCheck = null, ntpDiagnosticEventId = null,

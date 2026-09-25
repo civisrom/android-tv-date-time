@@ -93,7 +93,8 @@ class TimeToolsScreenTest {
         screen()
         click("time-snapshot-restore")
         compose.onNodeWithTag("time-preview-values").assertExists()
-        compose.onNode(hasText("${compose.activity.getString(R.string.time_field_zone)}: Europe/Moscow") and
+        compose.onNode(hasText("${compose.activity.getString(R.string.time_field_zone)}: " +
+            compose.activity.getString(R.string.time_value_change, "Europe/Moscow", "Europe/Moscow")) and
             hasAnyAncestor(hasTestTag("time-preview-values"))).performScrollTo().assertIsDisplayed()
         screenshot("phone-font200-restore-preview")
         compose.onNodeWithTag("time-preview-cancel").assertIsDisplayed().performClick()
@@ -117,6 +118,19 @@ class TimeToolsScreenTest {
         assertEquals(listOf("apply:Living room", "delete:Living room", "snapshot:true"), calls)
     }
 
+    @Test fun restore_preview_localizes_switches_and_shows_current_and_desired_values() {
+        state = state.copy(timeTools = state.timeTools.copy(current = state.timeTools.current!!.copy(
+            settings = TimeSettings(settings.values + (TimeSetting.AUTO_TIME to "1"), false))))
+        screen(scale = 1f)
+        click("time-snapshot-restore")
+        val expected = compose.activity.getString(R.string.time_field_auto) + ": " + compose.activity.getString(
+            R.string.time_value_change, compose.activity.getString(R.string.time_value_on), compose.activity.getString(R.string.time_value_off))
+        compose.onNode(hasText(expected) and hasAnyAncestor(hasTestTag("time-preview-values")))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("time-preview-cancel").performClick()
+        assertTrue(calls.isEmpty())
+    }
+
     @Test fun NTP_list_validates_API_limit_duplicates_and_mixed_IPv6_before_preview() {
         screen(scale = 1f)
         val field = compose.onNodeWithTag("time-ntp-list")
@@ -129,7 +143,9 @@ class TimeToolsScreenTest {
         compose.onNodeWithTag("time-ntp-list-apply").performScrollTo().assertIsNotEnabled()
         field.performScrollTo().performTextReplacement("127.0.0.2\n::1")
         click("time-ntp-list-apply")
-        compose.onNodeWithText("ntp://127.0.0.2|ntp://[::1]").assertExists()
+        compose.onNodeWithText("1. 127.0.0.2").assertExists()
+        compose.onNodeWithText("2. ::1").assertExists()
+        compose.onNodeWithText("ntp://127.0.0.2|ntp://[::1]").assertDoesNotExist()
         compose.onNodeWithTag("time-preview-confirm").performClick()
         assertEquals(listOf("ntp:127.0.0.2|::1"), calls)
     }

@@ -1,23 +1,52 @@
 package com.civisrom.tvtimefixer.terminal
 
 import com.civisrom.tvtimefixer.adb.AdbClient
+import com.civisrom.tvtimefixer.adb.AdbService
 import com.civisrom.tvtimefixer.adb.boundedAdbCommand
 import com.civisrom.tvtimefixer.adb.readStreamingShell
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicReference
 
 /** Runs on the existing, explicitly selected transport, under the device operation mutex. */
 internal class TerminalExecutor(private val files: TerminalFiles, private val session: TerminalSession) {
-    fun execute(client: AdbClient, command: TerminalCommand): Int? =
-        boundedAdbCommand(TERMINAL_TIMEOUT_MS.toLong(), client::close) {
+    fun execute(client: AdbClient, command: TerminalCommand): Int? {
+        val active = AtomicReference<AdbService?>()
+        val scoped = object : AdbClient by client {
+            override fun openService(destination: String, timeoutMs: Int): AdbService {
+                val service = client.openService(destination, timeoutMs)
+                active.set(service)
+                if (Thread.currentThread().isInterrupted) {
+                    active.getAndSet(null)?.close()
+                    throw InterruptedException()
+                }
+                return object : AdbService by service {
+                    override fun close() {
+                        if (active.compareAndSet(service, null)) service.close()
+                    }
+                }
+            }
+        }
+        val stop: () -> Unit = {
+            val service = active.getAndSet(null)
+            if (client.independentServiceClose && service != null) {
+                // A lost network must not turn Stop into another unbounded wait.
+                boundedAdbCommand(1000, client::close) { service.close() }
+            } else {
+                client.close()
+                service?.close()
+            }
+        }
+        return boundedAdbCommand(TERMINAL_TIMEOUT_MS.toLong(), stop) {
             // Local validation errors must not tear down a healthy transport.
             try { Result.success(when (command) {
-                is TerminalCommand.Shell -> shell(client, command.text)
-                is TerminalCommand.Adb -> adb(client, command)
+                is TerminalCommand.Shell -> shell(scoped, command.text)
+                is TerminalCommand.Adb -> adb(scoped, command)
                 else -> throw TerminalException(TerminalProblem.ARGUMENTS)
             }) } catch (e: TerminalException) { Result.failure(e) }
             catch (e: AdbRemoteException) { session.append(e.response, true); Result.success(1) }
         }.getOrThrow()
+    }
 
     private fun shell(client: AdbClient, command: String): Int? {
         val service = (if (client.shellV2Supported) "shell,v2,raw:" else "shell:") + command

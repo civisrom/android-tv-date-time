@@ -22,6 +22,7 @@ data class ScanProgress(
     /** Пригодные к применению, уже упорядоченные лучшими вперёд. */
     val best: List<NtpProbeResult>,
     val cancelled: Boolean = false,
+    val sharedAddresses: Boolean = false,
 ) {
     val finished: Boolean get() = cancelled || checked >= total
 }
@@ -60,7 +61,8 @@ class NtpScanner(
                         // Непригодные не копим: список нужен только чтобы
                         // предложить лучшее, а не чтобы отчитаться обо всех
                         if (result.isUsable() && result.successRate >= 80) usable += result
-                        send(ScanProgress(checked, total, rankNtpServers(usable).take(keepBest)))
+                        val ranked = distinctNtpEndpoints(rankNtpServers(usable))
+                        send(ScanProgress(checked, total, ranked.take(keepBest), sharedAddresses = ranked.size < usable.size))
                     }
                 }
             }.awaitAll()

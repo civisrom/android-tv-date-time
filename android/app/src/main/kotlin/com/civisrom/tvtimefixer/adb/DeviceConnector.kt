@@ -112,6 +112,13 @@ class DeviceConnector(
         return state
     }
 
+    private fun pairingInputFailure(address: DeviceTarget?, reason: ConnectionError): ConnectionState = synchronized(lock) {
+        if (state is ConnectionState.Connected && client?.isAlive() == true) {
+            generation++
+            ConnectionState.Failed(address, reason)
+        } else failInput(address, reason)
+    }
+
     private fun connectTarget(address: DeviceTarget, expectedGeneration: Int? = null, open: () -> AdbClient): ConnectionState {
         val (previous, attempt) = synchronized(lock) {
             if (expectedGeneration != null && generation != expectedGeneration) return state
@@ -183,20 +190,22 @@ class DeviceConnector(
         val pairingAddress = parseDeviceAddress(pairingInput).takeIf { hasExplicitDevicePort(pairingInput) }
         val connectAddress = parseDeviceAddress(connectInput).takeIf { hasExplicitDevicePort(connectInput) }
         if (pairingAddress == null || connectAddress == null) {
-            return failInput(null, ConnectionError.INVALID_ADDRESS)
+            return pairingInputFailure(null, ConnectionError.INVALID_ADDRESS)
         }
         if (!isValidPairingCode(pairingCode)) {
-            return failInput(pairingAddress, ConnectionError.PAIRING_REJECTED)
+            return pairingInputFailure(pairingAddress, ConnectionError.PAIRING_REJECTED)
         }
 
-        val (previous, attempt) = synchronized(lock) {
-            val previous = client
-            client = null
+        val (previous, previousState, attempt) = synchronized(lock) {
             generation++
-            state = ConnectionState.Connecting(connectAddress)
-            previous to generation
+            val previousState = state
+            // Pairing uses a separate socket. A rejected code must not close
+            // the device that the user is already working with.
+            if (state !is ConnectionState.Connected || client?.isAlive() != true) {
+                state = ConnectionState.Connecting(connectAddress)
+            }
+            Triple(client, previousState, generation)
         }
-        previous?.close()
         return try {
             factory.pair(pairingAddress, pairingCode.trim())
             currentCoroutineContext().ensureActive()
@@ -207,10 +216,15 @@ class DeviceConnector(
             val abandoned = synchronized(lock) {
                 if (generation == attempt) {
                     generation++
-                    val abandoned = client
-                    client = null
-                    state = ConnectionState.Disconnected
-                    abandoned
+                    if (client === previous && previousState is ConnectionState.Connected && previous?.isAlive() == true) {
+                        state = previousState
+                        null
+                    } else {
+                        val abandoned = client
+                        client = null
+                        state = ConnectionState.Disconnected
+                        abandoned
+                    }
                 } else null
             }
             runCatching { abandoned?.close() }
@@ -218,9 +232,13 @@ class DeviceConnector(
         } catch (e: AdbConnectionException) {
             val diagnosticId = runCatching { onFailure(pairingAddress, e) }.getOrNull()
             synchronized(lock) {
-                if (generation == attempt) state = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
+                if (generation != attempt) return state
+                val failure = ConnectionState.Failed(pairingAddress, e.reason, diagnosticId)
+                state = if (client === previous && previousState is ConnectionState.Connected && previous?.isAlive() == true) {
+                    previousState
+                } else failure
+                failure
             }
-            state
         }
     }
 

@@ -340,7 +340,8 @@ internal fun TerminalScreen(
                                     TerminalStatus.RUNNING -> stringResource(R.string.terminal_running)
                                     TerminalStatus.COMPLETE -> state.exitCode?.let { stringResource(R.string.terminal_complete, it) }
                                         ?: stringResource(R.string.terminal_no_exit)
-                                    TerminalStatus.CANCELLED -> stringResource(R.string.terminal_cancelled)
+                                    TerminalStatus.CANCELLED -> stringResource(if (state.connectionPreserved)
+                                        R.string.terminal_stopped_connected else R.string.terminal_cancelled)
                                     TerminalStatus.TIMEOUT -> stringResource(R.string.terminal_timeout)
                                     TerminalStatus.FAILED -> stringResource((state.problem ?: TerminalProblem.IO).labelRes())
                                 }

@@ -14,6 +14,21 @@ import org.junit.Test
 
 class NtpScannerTest {
 
+    @Test fun `shared reply IPs appear once and a different endpoint stays available`() = runBlocking {
+        val query = object : SntpQuery {
+            override fun query(host: String): SntpResult = SntpResult(
+                rttMs = if (host == "fast.example") 5 else 20,
+                offsetSeconds = 0.1,
+                address = if (host == "other.example") "192.0.2.2" else "192.0.2.1",
+            )
+        }
+        val result = NtpScanner(NtpProbe(query, attempts = 2))
+            .scan(listOf("slow.example", "fast.example", "other.example")).toList().last()
+        assertEquals(3, result.checked)
+        assertTrue(result.sharedAddresses)
+        assertEquals(listOf("fast.example", "other.example"), result.best.map { it.server })
+    }
+
     @Test fun `cancelling scan interrupts active probe without counting it as checked`() = runBlocking {
         val started = java.util.concurrent.CountDownLatch(1)
         val interrupted = java.util.concurrent.CountDownLatch(1)

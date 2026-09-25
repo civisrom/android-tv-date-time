@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="error_connection_refused">The connection to this port was refused. Check the current connection port on the TV and enable network debugging; a pairing port cannot be used for connection.</string>
-    <string name="error_connection_timeout">The device did not answer in time. Check the address, the authorization prompt on the TV, the shared network and router client isolation. Then reconnect.</string>
+    <string name="error_connection_timeout">The device did not answer in time. On the TV, check for a denied or unanswered authorization request and close other pending dialogs. Check the address and shared network, then reconnect.</string>
     <string name="error_network_unavailable">No route to the device or its address could not be resolved. Connect both devices to an accessible shared network and check the IP address.</string>
     <string name="ntp_scan_stopped">Scan stopped: checked %1$d of %2$d. Results found so far were retained.</string>
     <string name="setup_title">Set up the app on this TV</string>
@@ -83,7 +83,7 @@
     <string name="error_pairing_rejected">The device rejected the pairing code. Codes expire quickly — open a fresh one.</string>
     <string name="error_pairing_timeout">Pairing timed out. Check the network and request a fresh pairing code.</string>
     <string name="error_pairing_failed">Pairing could not finish. Check the pairing port and request a fresh code on the TV.</string>
-    <string name="error_tls_failed">The secure connection could not be established. Check the debugging port and try again.</string>
+    <string name="error_tls_failed">The secure connection failed. Check the wireless debugging connection port. If it is correct, pair again using a new code from the TV.</string>
     <string name="error_wireless_unsupported">This system does not provide the TLS support needed for pairing. Android 10 or later and a compatible TLS provider are required. Use classic network debugging or the desktop version.</string>
     <string name="error_unknown">Connection failed for an unexpected reason.</string>
 
@@ -131,7 +131,7 @@
     <string name="ntp_not_confirmed">The device still reports %1$s. The connection may not have permission to change secure settings.</string>
     <string name="ntp_failed">Could not change the time server: %1$s</string>
     <string name="ntp_permission_denied">The connected device denied permission to change the time server via ADB. Check debugging restrictions in its developer options.</string>
-    <string name="time_check_title">Device time verification</string>
+    <string name="time_check_title">Device clock check</string>
     <string name="time_check_action">Verify device time</string>
     <string name="time_check_working">Verifying device time…</string>
     <string name="time_check_match">At the time of this check, the device clock agrees with the NTP reply within 5 seconds.</string>
@@ -141,14 +141,14 @@
     <string name="time_check_ntp_unavailable">Could not obtain an NTP reply to compare clocks. Check server availability and try again.</string>
     <string name="time_check_unavailable">Could not read the device time or NTP setting. Check the connection and try again.</string>
     <string name="time_check_server">Comparison server: %1$s</string>
-    <string name="time_check_device_time">Device time when checked (UTC): %1$s</string>
-    <string name="time_check_device_local_time">Local device time when checked: %1$s (%2$s)</string>
-    <string name="time_check_utc_note">UTC has no local offset. For example, 13:00 UTC and 16:00 in UTC+3 are the same moment, not a synchronization error.</string>
-    <string name="time_check_difference">Device − NTP: %1$s s; estimated uncertainty ±%2$s s.</string>
+    <string name="time_check_device_time">Device time (UTC): %1$s</string>
+    <string name="time_check_device_local_time">Local device time: %1$s (%2$s)</string>
+    <string name="time_check_utc_note">UTC and local time show the same moment in different time zones.</string>
+    <string name="time_check_difference">Clock difference: %1$s s; measurement accuracy ±%2$s s.</string>
     <string name="time_check_auto_on">Automatic date and time are enabled.</string>
     <string name="time_check_auto_off">Automatic date and time are disabled. Enable them in the device settings.</string>
     <string name="time_check_auto_unknown">Automatic date and time status is unavailable.</string>
-    <string name="time_check_note">Comparison uses the NTP reply received by the device running this app. Matching clocks do not confirm that the connected device synchronized with this particular server.</string>
+    <string name="time_check_note">This app compares the device clock with an NTP reply. A match does not prove which source Android used to set its clock.</string>
 
     <string name="time_zone_title">Time zone</string>
     <string name="time_zone_note">The time zone determines local time on the connected device. Applying a zone enables manual zone selection. The NTP server and automatic date and time settings stay unchanged.</string>
@@ -666,4 +666,9 @@
     <string name="time_effective_on">Enabled</string>
     <string name="time_effective_off">Disabled or not supported by the device</string>
     <string name="time_monitor_reconnect">Monitoring stopped and its interrupted ADB command closed the connection. Reconnect to continue.</string>
+    <string name="time_value_on">Enabled</string>
+    <string name="time_value_off">Disabled</string>
+    <string name="time_value_change">Current: %1$s → New: %2$s</string>
+    <string name="ntp_scan_shared_addresses">Some names replied from the same IP address; the list combines these results.</string>
+    <string name="terminal_stopped_connected">Command stopped. The device remains connected.</string>
 </resources>

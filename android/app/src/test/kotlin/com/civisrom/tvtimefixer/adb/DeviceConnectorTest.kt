@@ -208,14 +208,15 @@ class DeviceConnectorTest {
         assertFalse(client.closed)
     }
 
-    @Test fun `invalid pairing input cannot leave an old transport hidden behind a failure`() = runBlocking {
+    @Test fun `invalid pairing input preserves the visible working connection`() = runBlocking {
         for ((address, code) in listOf("192.0.2.2" to "123456", "192.0.2.2:40001" to "12345")) {
             val factory = FakeFactory()
             val connector = DeviceConnector(factory)
-            connector.connect("192.0.2.1")
+            val connected = connector.connect("192.0.2.1")
             assertTrue(connector.pairAndConnect(address, code, "192.0.2.2:40002") is ConnectionState.Failed)
-            assertNull(connector.activeClient)
-            assertTrue(factory.clients.single().closed)
+            assertEquals(connected, connector.state)
+            assertSame(factory.clients.single(), connector.activeClient)
+            assertFalse(factory.clients.single().closed)
             assertTrue(factory.paired.isEmpty())
         }
     }
@@ -260,13 +261,40 @@ class DeviceConnectorTest {
         }
     }
 
-    @Test fun `failed pairing closes the previous transport instead of leaving it hidden`() = runBlocking {
+    @Test fun `failed pairing returns an error and preserves the visible previous transport`() = runBlocking {
         val factory = FakeFactory(pairFailWith = ConnectionError.PAIRING_REJECTED)
         val connector = DeviceConnector(factory)
-        connector.connect("192.0.2.1")
-        connector.pairAndConnect("192.0.2.2:40001", "123456", "192.0.2.2:40002")
-        assertTrue(factory.clients.single().closed)
-        assertNull(connector.activeClient)
+        val connected = connector.connect("192.0.2.1")
+        val result = connector.pairAndConnect("192.0.2.2:40001", "123456", "192.0.2.2:40002")
+        assertEquals(ConnectionError.PAIRING_REJECTED, (result as ConnectionState.Failed).reason)
+        assertEquals(connected, connector.state)
+        assertFalse(factory.clients.single().closed)
+        assertSame(factory.clients.single(), connector.activeClient)
+        assertEquals(connected, connector.checkConnection())
+    }
+
+    @Test fun `cancelling pairing preserves the previous connection and successful pairing switches targets`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val proceed = CompletableDeferred<Unit>()
+        val clients = mutableListOf<FakeClient>()
+        val factory = object : AdbClientFactory {
+            override fun connect(address: DeviceAddress) = FakeClient().also { clients += it }
+            override suspend fun pair(address: DeviceAddress, pairingCode: String) {
+                entered.complete(Unit); proceed.await()
+            }
+        }
+        val connector = DeviceConnector(factory)
+        val original = connector.connect("192.0.2.1")
+        val pairing = async { connector.pairAndConnect("192.0.2.2:40001", "123456", "192.0.2.2:40002") }
+        entered.await()
+        pairing.cancelAndJoin()
+        assertEquals(original, connector.checkConnection())
+        assertFalse(clients.single().closed)
+        proceed.complete(Unit)
+        assertEquals(ConnectionState.Connected(DeviceAddress("192.0.2.2", 40002)),
+            connector.pairAndConnect("192.0.2.2:40001", "123456", "192.0.2.2:40002"))
+        assertTrue(clients.first().closed)
+        assertSame(clients.last(), connector.activeClient)
     }
 
     @Test fun `открытый сокет без ответа устройства больше не считается подключением`() {

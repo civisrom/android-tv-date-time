@@ -31,6 +31,8 @@ data class ShellResult(
 interface AdbClient : AutoCloseable {
     fun shell(command: String): ShellResult
     val shellV2Supported: Boolean get() = false
+    /** Multiplexed transports can stop one service without closing the device. */
+    val independentServiceClose: Boolean get() = false
     /** Двоичный ADB service; вызывающий владеет потоком и обязан закрыть его. */
     fun openService(destination: String, timeoutMs: Int): AdbService =
         throw UnsupportedOperationException("ADB services unavailable")

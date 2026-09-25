@@ -22,6 +22,7 @@ data class TerminalState(
     val status: TerminalStatus = TerminalStatus.READY,
     val exitCode: Int? = null,
     val problem: TerminalProblem? = null,
+    val connectionPreserved: Boolean = false,
     val transferred: Long? = null,
     val transfer: TerminalTransfer? = null,
     val helpRequest: Int = 0,
@@ -137,12 +138,14 @@ class TerminalSession {
         mutable.update { it.copy(status = TerminalStatus.COMPLETE, exitCode = exitCode) }
     }
 
-    fun fail(error: Exception) {
+    fun fail(error: Exception, connectionPreserved: Boolean = false) {
         publish(true)
         mutable.update { it.copy(status = when (error) {
             is CancellationException, is InterruptedException -> TerminalStatus.CANCELLED
             is SocketTimeoutException -> TerminalStatus.TIMEOUT
             else -> TerminalStatus.FAILED
-        }, problem = (error as? TerminalException)?.problem ?: TerminalProblem.IO) }
+        }, problem = if (error is CancellationException || error is InterruptedException) null
+            else (error as? TerminalException)?.problem ?: TerminalProblem.IO,
+            connectionPreserved = connectionPreserved) }
     }
 }

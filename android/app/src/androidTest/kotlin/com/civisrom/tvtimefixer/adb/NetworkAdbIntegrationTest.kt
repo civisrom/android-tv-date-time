@@ -6,6 +6,7 @@ import com.civisrom.tvtimefixer.data.parseDeviceAddress
 import com.civisrom.tvtimefixer.device.*
 import com.civisrom.tvtimefixer.terminal.*
 import java.io.File
+import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -37,6 +38,29 @@ class NetworkAdbIntegrationTest {
         val originalZone = client.shell("getprop persist.sys.timezone").trimmedOutput
         val originalAutoZone = client.shell("cmd time_zone_detector is_auto_detection_enabled").trimmedOutput
         try {
+            repeat(3) {
+                session.edit("printf CANCEL_READY; sleep 30")
+                val parsed = checkNotNull(session.start(address.toString()))
+                runBlocking {
+                    val job = launch(Dispatchers.Default) {
+                        try {
+                            runInterruptible(Dispatchers.IO) { TerminalExecutor(files, session).execute(client, parsed) }
+                            fail("Blocked command should have been cancelled")
+                        } catch (e: CancellationException) { session.fail(e); throw e }
+                    }
+                    try {
+                        withTimeout(10_000) { while (!output().contains("CANCEL_READY")) delay(20) }
+                        withTimeout(3_000) { job.cancelAndJoin() }
+                    } finally { job.cancelAndJoin() }
+                }
+                assertEquals(TerminalStatus.CANCELLED, session.state.value.status)
+                assertNull(session.state.value.problem)
+                assertTrue(client.isAlive())
+                assertEquals(ConnectionState.Connected(address), connector.checkConnection())
+                execute("printf after-stop")
+                assertEquals("after-stop", output())
+            }
+            println("Network ADB: three cancelled shell streams preserve the connection and next command")
             execute("mkdir -p $remote")
             execute("printf 'Привет 世界\\n'; printf 'ошибка\\n' >&2; exit 7", 7)
             assertTrue(session.state.value.output.any { !it.error && "Привет 世界" in it.text })

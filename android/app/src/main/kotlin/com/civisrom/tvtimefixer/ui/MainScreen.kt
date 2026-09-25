@@ -722,7 +722,8 @@ private fun NtpSection(mode: DeviceMode, state: AppState, actions: AppActions,
         title = { Text(stringResource(R.string.ntp_confirm_title)) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(if (confirmation == "unverified") R.string.ntp_unverified_note else R.string.ntp_restore_note))
-            Text(stringResource(R.string.ntp_current, state.currentNtpServer.ifEmpty { "—" }))
+            Text(stringResource(R.string.ntp_current, settingValueText(
+                com.civisrom.tvtimefixer.device.TimeSetting.NTP, state.currentNtpServer.ifEmpty { null })))
             Text(stringResource(R.string.ntp_new_value, if (confirmedServer == "null")
                 stringResource(R.string.ntp_system_default) else confirmedServer))
         } },
@@ -1205,6 +1206,7 @@ private fun NtpScanBlock(state: AppState, actions: AppActions, onPick: (String) 
 
     if (scan != null && scan.best.isNotEmpty()) {
         Text(stringResource(R.string.ntp_scan_best), style = MaterialTheme.typography.bodyMedium)
+        if (scan.sharedAddresses) Text(stringResource(R.string.ntp_scan_shared_addresses), style = MaterialTheme.typography.bodySmall)
         scan.best.forEach { result ->
             TextButton(shape = MaterialTheme.shapes.medium, onClick = { onPick(result.server) }, enabled = !state.busy) {
                 CopyableText(

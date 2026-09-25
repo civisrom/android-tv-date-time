@@ -139,6 +139,16 @@ internal class ScreenActions : AppActions {
 }
 
 class MainScreenTest {
+    @Test fun system_default_in_confirmation_is_localized_instead_of_null() {
+        screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "null", apiLevel = "34")))
+        compose.onNodeWithTag("ntp-reset").performScrollTo().performClick()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_current,
+            russianString(com.civisrom.tvtimefixer.R.string.time_value_absent))).assertExists()
+        compose.onNodeWithText(russianString(com.civisrom.tvtimefixer.R.string.ntp_current, "null")).assertDoesNotExist()
+        compose.onNodeWithTag("ntp-confirm-cancel").performClick()
+        assertTrue(actions.calls.isEmpty())
+    }
+
     @Test fun system_default_reset_needs_confirmation_and_can_be_cancelled() {
         screen(connected.copy(deviceInfo = DeviceInfo(currentNtpServer = "pool.ntp.org", apiLevel = "30")))
         compose.onNodeWithTag("ntp-reset").performScrollTo().performClick()

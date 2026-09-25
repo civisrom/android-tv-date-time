@@ -18,15 +18,25 @@ import org.junit.rules.TemporaryFolder
 class TerminalCancellationTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun `stop interrupts blocked input closes transport and preserves partial output`() = runBlocking {
+    @Test fun `stop preserves multiplexed connection and closes non multiplexed transport without an IO error`() = runBlocking {
+        for (independent in listOf(false, true)) checkCancellation(independent)
+    }
+
+    private suspend fun checkCancellation(independent: Boolean) = coroutineScope {
         val reading = CountDownLatch(1)
+        val stopped = CountDownLatch(1)
+        val inputClosed = CountDownLatch(1)
         var closed = false
         var serviceClosed = false
         var initial = true
         val client = object : AdbClient {
+            override val independentServiceClose = independent
             override fun isAlive() = !closed
-            override fun close() { closed = true }
-            override fun shell(command: String): ShellResult = error("unexpected")
+            override fun close() { closed = true; stopped.countDown() }
+            override fun shell(command: String): ShellResult {
+                check(!closed)
+                return ShellResult("still connected", "", 0)
+            }
             override fun openService(destination: String, timeoutMs: Int): AdbService = object : AdbService {
                 override val source = object : Source {
                     override fun timeout() = Timeout.NONE
@@ -34,12 +44,12 @@ class TerminalCancellationTest {
                     override fun read(sink: Buffer, byteCount: Long): Long {
                         if (initial) { initial = false; sink.writeUtf8("partial\n"); return 8 }
                         reading.countDown()
-                        CountDownLatch(1).await()
+                        stopped.await()
                         return -1
                     }
                 }.buffer()
                 override val sink = Buffer()
-                override fun close() { serviceClosed = true }
+                override fun close() { serviceClosed = true; stopped.countDown(); inputClosed.countDown() }
             }
         }
         val session = TerminalSession().apply { edit("logcat"); start("TV") }
@@ -54,11 +64,14 @@ class TerminalCancellationTest {
         try {
             assertTrue(reading.await(3, TimeUnit.SECONDS))
             withTimeout(3000) { job.cancelAndJoin() }
-            assertTrue(closed)
+            assertEquals(!independent, closed)
+            assertTrue(inputClosed.await(1, TimeUnit.SECONDS))
             assertTrue(serviceClosed)
             assertFalse(session.state.value.running)
             assertEquals(TerminalStatus.CANCELLED, session.state.value.status)
+            assertNull(session.state.value.problem)
             assertEquals("partial\n", session.state.value.output.joinToString("") { it.text })
+            if (independent) assertEquals("still connected", client.shell("echo").trimmedOutput)
         } finally { job.cancelAndJoin() }
     }
 }

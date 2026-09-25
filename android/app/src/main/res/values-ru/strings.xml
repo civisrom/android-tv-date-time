@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="error_connection_refused">Подключение к этому порту отклонено. Проверьте актуальный порт подключения на TV и включите сетевую отладку; порт спаривания для подключения не подходит.</string>
-    <string name="error_connection_timeout">Устройство не ответило вовремя. Проверьте адрес, запрос разрешения на TV, общую сеть и изоляцию клиентов в роутере. Затем повторите подключение.</string>
+    <string name="error_connection_timeout">Устройство не ответило вовремя. Проверьте на TV, не отклонён ли запрос разрешения и не ожидает ли он ответа; закройте другие открытые диалоги. Проверьте адрес и общую сеть, затем подключитесь снова.</string>
     <string name="error_network_unavailable">Нет маршрута к устройству или не удалось определить адрес. Подключите оба устройства к одной доступной сети и проверьте IP-адрес.</string>
     <string name="ntp_scan_stopped">Проверка остановлена: проверено %1$d из %2$d. Найденные результаты сохранены.</string>
     <string name="setup_title">Настройка приложения на этом TV</string>
@@ -83,7 +83,7 @@
     <string name="error_pairing_rejected">Устройство отвергло код спаривания. Коды быстро истекают — откройте новый.</string>
     <string name="error_pairing_timeout">Время ожидания спаривания истекло. Проверьте сеть и получите новый код.</string>
     <string name="error_pairing_failed">Не удалось завершить спаривание. Проверьте порт спаривания и получите новый код на телевизоре.</string>
-    <string name="error_tls_failed">Не удалось установить защищённое соединение. Проверьте порт отладки и повторите попытку.</string>
+    <string name="error_tls_failed">Не удалось установить защищённое соединение. Проверьте порт подключения беспроводной отладки. Если он верен, повторите сопряжение с новым кодом на TV.</string>
     <string name="error_wireless_unsupported">Эта система не предоставляет нужную поддержку TLS для спаривания. Нужен Android 10 или новее и совместимый TLS-провайдер. Используйте классическую сетевую отладку или десктопную версию.</string>
     <string name="error_unknown">Подключение не удалось по неожиданной причине.</string>
 
@@ -131,7 +131,7 @@
     <string name="ntp_not_confirmed">Устройство по-прежнему сообщает %1$s. Возможно, у подключения нет прав менять защищённые настройки.</string>
     <string name="ntp_failed">Не удалось сменить сервер времени: %1$s</string>
     <string name="ntp_permission_denied">Подключённое устройство запретило изменение сервера времени через ADB. Проверьте ограничения отладки в его настройках разработчика.</string>
-    <string name="time_check_title">Проверка времени устройства</string>
+    <string name="time_check_title">Проверка часов устройства</string>
     <string name="time_check_action">Проверить время устройства</string>
     <string name="time_check_working">Проверяется время устройства…</string>
     <string name="time_check_match">На момент проверки часы устройства совпадают с ответом NTP в пределах 5 секунд.</string>
@@ -141,14 +141,14 @@
     <string name="time_check_ntp_unavailable">Не удалось получить ответ NTP для сравнения часов. Проверьте доступность сервера и повторите проверку.</string>
     <string name="time_check_unavailable">Не удалось прочитать время или настройку NTP с устройства. Проверьте соединение и повторите проверку.</string>
     <string name="time_check_server">Сервер сравнения: %1$s</string>
-    <string name="time_check_device_time">Время устройства при проверке (UTC): %1$s</string>
-    <string name="time_check_device_local_time">Местное время устройства при проверке: %1$s (%2$s)</string>
-    <string name="time_check_utc_note">UTC — время без местного смещения. Например, 13:00 UTC и 16:00 в поясе UTC+3 — один момент; это не ошибка синхронизации.</string>
-    <string name="time_check_difference">Устройство − NTP: %1$s с; погрешность оценки ±%2$s с.</string>
+    <string name="time_check_device_time">Время устройства (UTC): %1$s</string>
+    <string name="time_check_device_local_time">Местное время устройства: %1$s (%2$s)</string>
+    <string name="time_check_utc_note">UTC и местное время показывают один момент в разных часовых поясах.</string>
+    <string name="time_check_difference">Разница часов: %1$s с; точность измерения ±%2$s с.</string>
     <string name="time_check_auto_on">Автоматическая дата и время включены.</string>
     <string name="time_check_auto_off">Автоматическая дата и время выключены. Включите их в настройках устройства.</string>
     <string name="time_check_auto_unknown">Состояние автоматической даты и времени недоступно.</string>
-    <string name="time_check_note">Сравнение выполняется с ответом NTP на устройстве, где запущено приложение. Совпадение часов не подтверждает, что подключённое устройство синхронизировалось именно с этим сервером.</string>
+    <string name="time_check_note">Приложение сравнивает часы устройства с ответом NTP. Совпадение не подтверждает, из какого источника Android установил время.</string>
 
     <string name="time_zone_title">Часовой пояс</string>
     <string name="time_zone_note">Часовой пояс определяет местное время на подключённом устройстве. При применении включается ручной выбор пояса. Сервер NTP и автоматическая дата и время не меняются.</string>
@@ -666,4 +666,9 @@
     <string name="time_effective_on">Включено</string>
     <string name="time_effective_off">Выключено или не поддерживается устройством</string>
     <string name="time_monitor_reconnect">Наблюдение остановлено; прерванная команда ADB закрыла соединение. Подключитесь заново для продолжения.</string>
+    <string name="time_value_on">Включено</string>
+    <string name="time_value_off">Выключено</string>
+    <string name="time_value_change">Сейчас: %1$s → Будет: %2$s</string>
+    <string name="ntp_scan_shared_addresses">Некоторые имена ответили с одного IP-адреса; такие результаты объединены в списке.</string>
+    <string name="terminal_stopped_connected">Команда остановлена. Соединение с устройством сохранено.</string>
 </resources>

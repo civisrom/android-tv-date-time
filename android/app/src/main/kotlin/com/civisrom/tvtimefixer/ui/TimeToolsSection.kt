@@ -56,15 +56,21 @@ internal fun TimeSettingStatus.label(): Int = when (this) {
     TimeSettingStatus.INVALID -> R.string.time_status_invalid
 }
 
-@Composable private fun SettingValues(settings: TimeSettings) {
+@Composable internal fun settingValueText(field: TimeSetting, value: String?): String = when {
+    value == null -> stringResource(R.string.time_status_unavailable)
+    value == "null" -> stringResource(R.string.time_value_absent)
+    value == "" -> stringResource(R.string.time_value_empty)
+    field in setOf(TimeSetting.AUTO_TIME, TimeSetting.AUTO_TIME_ZONE) && value == "1" -> stringResource(R.string.time_value_on)
+    field in setOf(TimeSetting.AUTO_TIME, TimeSetting.AUTO_TIME_ZONE) && value == "0" -> stringResource(R.string.time_value_off)
+    field == TimeSetting.NTP -> value.split('|').joinToString(", ") { it.removePrefix("ntp://") }
+    else -> value
+}
+
+@Composable private fun SettingValues(settings: TimeSettings, before: TimeSettings? = null) {
     TimeSetting.entries.forEach { field ->
-        val value = settings[field]
-        Text(stringResource(field.label()) + ": " + when (value) {
-            null -> stringResource(R.string.time_status_unavailable)
-            "null" -> stringResource(R.string.time_value_absent)
-            "" -> stringResource(R.string.time_value_empty)
-            else -> value
-        })
+        val value = settingValueText(field, settings[field])
+        Text(stringResource(field.label()) + ": " + if (before == null) value else
+            stringResource(R.string.time_value_change, settingValueText(field, before[field]), value))
     }
     Text(stringResource(R.string.time_effective_auto_zone, when (settings.effectiveAutoZone) {
         true -> stringResource(R.string.time_effective_on)
@@ -195,12 +201,12 @@ internal fun TimeSettingStatus.label(): Int = when (this) {
                     else -> R.string.time_restore_preview
                 }))
                 when (kind) {
-                    "restore" -> tools.snapshot?.let { SettingValues(it.settings) }
-                    "apply-profile" -> selectedProfile?.let { Text(it.name); SettingValues(it.saved.settings) }
+                    "restore" -> tools.snapshot?.let { SettingValues(it.settings, tools.current?.settings) }
+                    "apply-profile" -> selectedProfile?.let { Text(it.name); SettingValues(it.saved.settings, tools.current?.settings) }
                     "delete-profile" -> selectedProfile?.let { Text(it.name) }
                     "save-profile" -> { Text(profileName.trim()); tools.current?.let { SettingValues(it.settings) } }
                     "snapshot" -> tools.current?.let { SettingValues(it.settings) }
-                    "ntp" -> Text(formatted.orEmpty())
+                    "ntp" -> hosts.forEachIndexed { index, host -> Text("${index + 1}. $host") }
                 }
             } }, confirmButton = { TextButton(enabled = enabled, modifier = Modifier.testTag("time-preview-confirm"), onClick = {
                 when (kind) {

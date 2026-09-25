@@ -23,6 +23,7 @@ data class NtpProbeResult(
     val failure: NtpProbeFailure? = null,
     val medianRttMs: Long? = null,
     val rttJitterMs: Double? = null,
+    val addresses: Set<String> = setOfNotNull(ipAddress),
 )
 
 /**
@@ -60,6 +61,7 @@ class NtpProbe(
         var lastError: String? = null
         var failure: NtpProbeFailure? = null
         var resolved: String? = null
+        val addresses = mutableSetOf<String>()
 
         repeat(attempts) { attempt ->
             checkCancelled()
@@ -73,6 +75,7 @@ class NtpProbe(
                 rtts += result.rttMs
                 offsets += result.offsetSeconds
                 if (resolved == null) resolved = result.address.takeIf { it.isNotBlank() }
+                result.address.takeIf { it.isNotBlank() }?.let(addresses::add)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: InterruptedException) {
@@ -105,6 +108,7 @@ class NtpProbe(
             ipAddress = resolved,
             medianRttMs = median.toLong(),
             rttJitterMs = jitter,
+            addresses = addresses,
         )
     }
 
@@ -126,3 +130,13 @@ fun rankNtpServers(results: List<NtpProbeResult>): List<NtpProbeResult> =
             .thenBy { (it.medianRttMs ?: it.avgRttMs)?.toDouble()?.plus(it.rttJitterMs ?: 0.0)
                 ?: Double.POSITIVE_INFINITY },
     )
+
+/** Keep the best measured name for overlapping reply addresses, without another DNS query. */
+internal fun distinctNtpEndpoints(ranked: List<NtpProbeResult>): List<NtpProbeResult> {
+    val seen = mutableSetOf<String>()
+    return ranked.filter { result ->
+        val distinct = result.addresses.none { it in seen }
+        seen.addAll(result.addresses)
+        distinct
+    }
+}
