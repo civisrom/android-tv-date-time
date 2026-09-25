@@ -657,7 +657,7 @@
     <string name="time_profile_deleted">Profile deleted; device settings did not change.</string>
     <string name="time_storage_or_capture_failed">Could not read or save a stable snapshot/profile. Check device permissions, unchanged settings and local storage. Existing saved data was kept.</string>
     <string name="time_snapshot_required">A stable original snapshot could not be saved. The requested setting was not changed. Open Time settings to inspect device identity, permissions and storage.</string>
-    <string name="time_measurement_stale">Last check: older than 30 seconds or age unavailable. It does not confirm the current clock state.</string>
+    <string name="time_measurement_stale">Last check: over 30 seconds old or age unknown. Check again.</string>
     <string name="time_export_save">Save anonymized report</string>
     <string name="time_export_saved">Anonymized report saved.</string>
     <string name="time_export_failed">Could not save the report. You can copy it instead.</string>
