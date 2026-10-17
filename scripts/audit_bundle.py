@@ -20,6 +20,14 @@ import check_dependencies as osv  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 TOC_TYPES = {'BINARY', 'DATA', 'EXTENSION', 'PYMODULE', 'PYSOURCE'}
+# Reviewed findings that the distribution has not fixed. Each stays accepted
+# only while its package contributes exactly these files to the executable.
+NOT_AFFECTED = {
+    ('gcc-12', 'UBUNTU-CVE-2022-27943'): ({'libgcc_s.so.1'}, 'libiberty demangler, not part of libgcc_s'),
+    ('gcc-12', 'UBUNTU-CVE-2026-102010'): ({'libgcc_s.so.1'}, 'libstdc++ priority queue; libstdc++ is not bundled'),
+    ('gcc-12', 'UBUNTU-CVE-2026-95619'): ({'libgcc_s.so.1'}, 'libstdc++ aligned new; libstdc++ is not bundled'),
+    ('zlib', 'UBUNTU-CVE-2026-85091'): ({'libz.so.1'}, 'gzFile/gzwrite API, which CPython and OpenSSL never call'),
+}
 
 
 def _absolute(path):
@@ -103,6 +111,11 @@ def traced(path, workpath, owners, runtime_prefixes):
     return None
 
 
+def reviewed(dep, identifier, files):
+    allowed, reason = NOT_AFFECTED.get((dep.name, identifier), (set(), None))
+    return reason if reason and files <= allowed else None
+
+
 def classify(path, workpath, owners, runtime_prefixes, packages, system=sys.platform):
     """Return (category, dependency or None) for one bundled source file."""
     found = traced(path, workpath, owners, runtime_prefixes)
@@ -127,21 +140,34 @@ def main():
     sources = sorted(toc_sources(workpath))
     system_files = [path for path in sources if traced(path, workpath, owners, runtime) is None]
     packages = debian_packages(system_files, ubuntu_ecosystem()) if sys.platform.startswith('linux') and system_files else {}
-    categories, deps = {}, set()
+    categories, files, unknown = {}, {}, []
     for path in sources:
-        category, dep = classify(path, workpath, owners, runtime, packages)
+        try:
+            category, dep = classify(path, workpath, owners, runtime, packages)
+        except ValueError:
+            unknown.append(path)
+            continue
         categories[category] = categories.get(category, 0) + 1
         if dep:
-            deps.add(dep)
+            files.setdefault(dep, set()).add(path.name)
+    if unknown:
+        raise ValueError(f'{len(unknown)} bundled files have no audited source: '
+                         + ', '.join(map(str, unknown[:40])))
+    deps = set(files)
     # The bootloader is copied from PyInstaller itself, not listed in the TOC.
     deps.add(osv.Dependency('PyPI', 'pyinstaller', metadata.version('pyinstaller'), 'bundled'))
     findings = osv.audit_native(sorted(deps))
+    blocking = []
     for dep, identifier in findings:
-        print(f'{dep.ecosystem} {dep.name} {dep.version}: https://osv.dev/vulnerability/{identifier}')
+        reason = reviewed(dep, identifier, files.get(dep, set()))
+        print(f'{dep.ecosystem} {dep.name} {dep.version}: https://osv.dev/vulnerability/{identifier}'
+              + (f' (reviewed, not affected: {reason})' if reason else ''))
+        if not reason:
+            blocking.append(identifier)
     print('Bundled files:', ', '.join(f'{name} {count}' for name, count in sorted(categories.items())))
     print('Audited sources:', ', '.join(f'{d.name} {d.version}' for d in sorted(deps)))
     print('Python runtime files are audited by verify_native_crypto.py and check_dependencies.py.')
-    return 1 if findings else 0
+    return 1 if blocking else 0
 
 
 if __name__ == '__main__':

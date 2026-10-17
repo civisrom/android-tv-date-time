@@ -59,6 +59,12 @@ class BundleAuditTests(unittest.TestCase):
         self.assertEqual("zlib", packages[files[1]].name)
         self.assertEqual(1, sum(call[1] == "-S" for call in calls))
 
+    def test_reviewed_findings_hold_only_for_the_reviewed_files(self):
+        gcc = bundle.osv.Dependency("Ubuntu:22.04:LTS", "gcc-12", "12.3.0", "bundled")
+        self.assertIsNotNone(bundle.reviewed(gcc, "UBUNTU-CVE-2026-102010", {"libgcc_s.so.1"}))
+        self.assertIsNone(bundle.reviewed(gcc, "UBUNTU-CVE-2026-102010", {"libgcc_s.so.1", "libstdc++.so.6"}))
+        self.assertIsNone(bundle.reviewed(gcc, "UBUNTU-CVE-2099-0001", {"libgcc_s.so.1"}))
+
     def test_unowned_files_never_pass_silently(self):
         for path, system in [("/opt/other/libfoo.so", "linux"), (bundle.ROOT / ".venv/lib/stray.so", "linux"),
                              ("/opt/homebrew/lib/libssl.3.dylib", "darwin"), (self.base / "site-packages/other.py", "win32")]:
