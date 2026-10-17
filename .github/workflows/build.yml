@@ -292,9 +292,15 @@ jobs:
       # Юнит-тесты существуют только в debug-варианте — AGP не создаёт для
       # release задачу testReleaseUnitTest, а исходники тестов одни и те же;
       # lint при этом берётся именно релизный.
-      - name: Unit tests and lint
+      # Отдельными запусками, как в android.yml: параллельный lint исчерпывал
+      # Metaspace сборки, и тесты с ограничением по времени падали от нехватки ресурсов.
+      - name: Unit tests
         working-directory: android
-        run: ./gradlew --no-daemon testDebugUnitTest lintRelease
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Lint
+        working-directory: android
+        run: ./gradlew --no-daemon lintRelease
 
       - name: Assemble release APK
         working-directory: android
