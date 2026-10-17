@@ -243,15 +243,19 @@ Run via PowerShell
 
 ### Linux
 
-1.  Download the archive for your processor from the [Releases](https://github.com/civisrom/android-tv-date-time/releases)
-    section: `AndroidTVTimeFixer-linux.zip` for x86-64 or
-    `AndroidTVTimeFixer-linux-arm64.zip` for ARM64 (Raspberry Pi 4/5 with a
-    64-bit OS, ARM laptops and servers). `uname -m` prints `x86_64` or `aarch64`.
-2.  Extract the archive:
+Choose the archive for your processor in [release 2.6.7](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.7);
+`uname -m` shows the architecture:
+
+| Processor | Archive |
+|---|---|
+| x86-64 (`x86_64`) | [AndroidTVTimeFixer-linux.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-linux.zip) |
+| ARM64 (`aarch64`): Raspberry Pi 4/5 with a 64-bit OS, ARM laptops and servers | [AndroidTVTimeFixer-linux-arm64.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-linux-arm64.zip) |
+
+1.  Extract the archive:
     ```bash
     unzip AndroidTVTimeFixer-linux.zip    # or AndroidTVTimeFixer-linux-arm64.zip
     ```
-3.  Make the file executable and run:
+2.  Make the file executable and run:
     ```bash
     chmod +x AndroidTVTimeFixer
     ./AndroidTVTimeFixer

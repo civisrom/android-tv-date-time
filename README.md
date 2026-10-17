@@ -249,16 +249,19 @@ VPN или фильтрация multicast могут мешать связи и 
 
 ### Linux
 
-1.  Скачайте из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases)
-    архив под процессор: `AndroidTVTimeFixer-linux.zip` для x86-64 или
-    `AndroidTVTimeFixer-linux-arm64.zip` для ARM64 (Raspberry Pi 4/5 с 64-битной
-    системой, ARM-ноутбуки и серверы). Архитектуру покажет `uname -m`:
-    `x86_64` или `aarch64`.
-2.  Распакуйте архив:
+В [выпуске 2.6.7](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.7) выберите архив под процессор, архитектуру
+покажет `uname -m`:
+
+| Процессор | Архив |
+|---|---|
+| x86-64 (`x86_64`) | [AndroidTVTimeFixer-linux.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-linux.zip) |
+| ARM64 (`aarch64`): Raspberry Pi 4/5 с 64-битной системой, ARM-ноутбуки и серверы | [AndroidTVTimeFixer-linux-arm64.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-linux-arm64.zip) |
+
+1.  Распакуйте архив:
     ```bash
     unzip AndroidTVTimeFixer-linux.zip    # или AndroidTVTimeFixer-linux-arm64.zip
     ```
-3.  Сделайте файл исполняемым и запустите:
+2.  Сделайте файл исполняемым и запустите:
     ```bash
     chmod +x AndroidTVTimeFixer
     ./AndroidTVTimeFixer
