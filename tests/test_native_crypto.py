@@ -52,23 +52,24 @@ class NativeCryptoTests(unittest.TestCase):
         self.assertIn('no unreviewed vulnerabilities', output)
 
     def test_only_reviewed_findings_in_bundled_libraries_are_accepted(self):
-        reviewed = (crypto.osv.Dependency('GIT', crypto.osv.ZLIB_GIT, 'v1.3.1', 'runtime'), 'CVE-2026-27171')
+        reviewed = (crypto.osv.Dependency('GIT', crypto.osv.EXPAT_GIT, 'R_2_8_5', 'runtime'), 'CVE-2026-77214')
         _, output = self._audited_main([reviewed])
         self.assertIn('reviewed, not affected', output)
-        other = (crypto.osv.Dependency('GIT', crypto.osv.ZLIB_GIT, 'v1.3.1', 'runtime'), 'CVE-2099-0001')
+        other = (crypto.osv.Dependency('GIT', crypto.osv.EXPAT_GIT, 'R_2_8_5', 'runtime'), 'CVE-2099-0001')
         with self.assertRaisesRegex(RuntimeError, 'known vulnerabilities'):
             self._audited_main([reviewed, other])
 
     def test_expat_exemptions_require_xml_to_stay_out_of_the_executables(self):
-        spec = (Path(__file__).resolve().parents[1] / 'pyinstaller.spec').read_text()
+        spec = (Path(__file__).resolve().parents[1] / 'pyinstaller.spec').read_text(encoding='utf-8')
         excludes = spec[spec.index('excludes=['):spec.index(']', spec.index('excludes=['))]
         for module in ['xml', 'pyexpat']:
             self.assertIn(f"'{module}',", excludes)
         self.assertTrue(any(name == crypto.osv.EXPAT_GIT for name, _ in crypto.NOT_AFFECTED))
 
-    def test_standalone_runtime_also_audits_bundled_expat_and_zlib(self):
+    def _standalone_components(self, system):
         from cryptography.hazmat.backends.openssl.backend import backend
         with patch.dict(crypto.os.environ, {'BUILD_PYTHON_STANDALONE': crypto.pinned.MARKER}), \
+                patch.object(crypto.sys, 'platform', system), \
                 patch.object(crypto.sys, 'version_info', tuple(map(int, crypto.pinned.CPYTHON_VERSION.split('.')))), \
                 patch.object(crypto.ssl, 'OPENSSL_VERSION', f'OpenSSL {crypto.pinned.OPENSSL_VERSION} 29 Sep 2026'), \
                 patch.object(crypto.platform, 'python_version', return_value=crypto.pinned.CPYTHON_VERSION), \
@@ -77,9 +78,16 @@ class NativeCryptoTests(unittest.TestCase):
                 patch.object(crypto.osv, 'audit_native', return_value=[]) as audit, \
                 patch('sys.stdout', new_callable=io.StringIO):
             crypto.main()
-        self.assertLessEqual({crypto.osv.Dependency('GIT', crypto.osv.EXPAT_GIT, 'R_2_9_0', 'runtime'),
-                              crypto.osv.Dependency('GIT', crypto.osv.ZLIB_GIT, 'v1.3.2', 'runtime')},
-                             set(audit.call_args.args[0]))
+        return set(audit.call_args.args[0])
+
+    def test_standalone_runtime_audits_bundled_expat_and_windows_zlib(self):
+        expat = crypto.osv.Dependency('GIT', crypto.osv.EXPAT_GIT, 'R_2_9_0', 'runtime')
+        zlib = crypto.osv.Dependency('GIT', crypto.osv.ZLIB_GIT, 'v1.3.2', 'runtime')
+        self.assertLessEqual({expat, zlib}, self._standalone_components('win32'))
+        # macOS links Apple's system libz, which is serviced with the OS.
+        components = self._standalone_components('darwin')
+        self.assertIn(expat, components)
+        self.assertNotIn(zlib, components)
 
     def test_osv_finding_in_loaded_runtime_fails_even_above_offline_floor(self):
         finding = (crypto.osv.openssl('3.5.9', 'runtime'), 'CVE-2099-0001')
