@@ -133,6 +133,11 @@ def source_built_adb(path):
     return b'android-tools' in data and build_adb.ANDROID_TOOLS_VERSION.encode() in data
 
 
+def requires_source_adb(system=sys.platform, machine=platform.machine()):
+    """Google ships no Linux ARM64 adb, so that bundle must carry the one build_adb.py made."""
+    return system.startswith('linux') and machine.lower() in ('aarch64', 'arm64')
+
+
 def reviewed(dep, identifier, files):
     allowed, reason = NOT_AFFECTED.get((dep.name, identifier), (set(), None))
     return reason if reason and files <= allowed else None
@@ -169,9 +174,13 @@ def main():
         except ValueError:
             unknown.append(path)
             continue
-        if category == 'platform-tools' and source_built_adb(path):
+        if category == 'platform-tools' and path.name == 'adb' and source_built_adb(path):
             category = 'adb (android-tools)'
             dep = osv.Dependency('GIT', build_adb.LIBUSB_GIT, f'v{build_adb.LIBUSB_VERSION}', 'bundled')
+        elif category == 'platform-tools' and path.name == 'adb' and requires_source_adb():
+            # Fail closed: an unrecognised adb here would skip the libusb audit.
+            unknown.append(path)
+            continue
         categories[category] = categories.get(category, 0) + 1
         if dep:
             files.setdefault(dep, set()).add(path.name)

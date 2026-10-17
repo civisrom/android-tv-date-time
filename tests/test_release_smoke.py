@@ -56,6 +56,8 @@ class ReleaseSmokeTests(unittest.TestCase):
             struct.pack_into('<H', header, 0x84, machine)
             image.write_bytes(bytes(header))
             self.assertEqual(machine, smoke_windows_arm.pe_machine(image))
-        (self.root / 'text.exe').write_bytes(b'not an executable')
-        with self.assertRaises(ValueError):
-            smoke_windows_arm.pe_machine(self.root / 'text.exe')
+        for name, content in [('text.exe', b'not an executable'), ('short.exe', b'MZ' + b'\0' * 10),
+                              ('offset.exe', b'MZ' + b'\0' * 58 + b'\xff\xff\0\0')]:
+            (self.root / name).write_bytes(content)
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                smoke_windows_arm.pe_machine(self.root / name)

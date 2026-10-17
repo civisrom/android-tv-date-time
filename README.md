@@ -256,7 +256,7 @@ VPN или фильтрация multicast могут мешать связи и 
     `x86_64` или `aarch64`.
 2.  Распакуйте архив:
     ```bash
-    unzip AndroidTVTimeFixer-linux*.zip
+    unzip AndroidTVTimeFixer-linux.zip    # или AndroidTVTimeFixer-linux-arm64.zip
     ```
 3.  Сделайте файл исполняемым и запустите:
     ```bash

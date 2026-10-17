@@ -80,6 +80,13 @@ class BundleAuditTests(unittest.TestCase):
             with self.subTest(name=name, expected=expected):
                 self.assertIs(expected, bundle.source_built_adb(path))
 
+    def test_linux_arm64_bundles_must_carry_the_adb_built_from_source(self):
+        self.assertTrue(bundle.requires_source_adb("linux", "aarch64"))
+        self.assertTrue(bundle.requires_source_adb("linux", "ARM64"))
+        for system, machine in [("linux", "x86_64"), ("darwin", "arm64"), ("win32", "ARM64")]:
+            with self.subTest(system=system, machine=machine):
+                self.assertFalse(bundle.requires_source_adb(system, machine))
+
     def test_unowned_files_never_pass_silently(self):
         for path, system in [("/opt/other/libfoo.so", "linux"), (bundle.ROOT / ".venv/lib/stray.so", "linux"),
                              ("/opt/homebrew/lib/libssl.3.dylib", "darwin"), (self.base / "site-packages/other.py", "win32")]:

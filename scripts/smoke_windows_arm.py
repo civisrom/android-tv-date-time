@@ -19,8 +19,8 @@ def pe_machine(path):
         header = image.read(4096)
     if header[:2] != b'MZ':
         raise ValueError(f'{path} is not a Windows executable')
-    offset = struct.unpack_from('<I', header, 0x3C)[0]
-    if header[offset:offset + 4] != b'PE\0\0':
+    offset = struct.unpack_from('<I', header, 0x3C)[0] if len(header) >= 0x40 else len(header)
+    if offset + 6 > len(header) or header[offset:offset + 4] != b'PE\0\0':
         raise ValueError(f'{path} has no PE header')
     return struct.unpack_from('<H', header, offset + 4)[0]
 

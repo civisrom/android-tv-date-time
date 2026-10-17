@@ -97,8 +97,11 @@ def build(output):
         android_tools = sources / f'android-tools-{ANDROID_TOOLS_VERSION}'
         replace_libusb(android_tools, sources / f'libusb-{LIBUSB_VERSION}')
         # protoc 3.12 из Ubuntu 22.04 принимает поля proto3 optional только с флагом.
+        system_protoc = shutil.which('protoc')
+        if not system_protoc:
+            raise RuntimeError('protoc is not installed')
         protoc = work / 'protoc'
-        protoc.write_text('#!/bin/sh\nexec protoc --experimental_allow_proto3_optional "$@"\n',
+        protoc.write_text(f'#!/bin/sh\nexec {system_protoc} --experimental_allow_proto3_optional "$@"\n',
                           encoding='utf-8')
         protoc.chmod(0o755)
         build_dir = work / 'build'

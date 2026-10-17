@@ -40,12 +40,12 @@ jobs:
           - os: ubuntu-22.04
             python: '3.12'
             adb_platform: linux
+            adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
           # Google не выпускает adb для Linux ARM64: он собирается из android-tools.
           - os: ubuntu-22.04-arm
             python: '3.11'
             artifact_platform: Linux-ARM64
             adb_source: android-tools
-            adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
           - os: windows-latest
             python: '3.12.15'
             bootstrap_python: '3.11'

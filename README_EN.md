@@ -249,7 +249,7 @@ Run via PowerShell
     64-bit OS, ARM laptops and servers). `uname -m` prints `x86_64` or `aarch64`.
 2.  Extract the archive:
     ```bash
-    unzip AndroidTVTimeFixer-linux*.zip
+    unzip AndroidTVTimeFixer-linux.zip    # or AndroidTVTimeFixer-linux-arm64.zip
     ```
 3.  Make the file executable and run:
     ```bash
