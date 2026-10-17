@@ -333,7 +333,7 @@ def parse_usb_devices(output: str) -> List[UsbAdbDevice]:
     Поля Device плоские; строки TextFormat экранируются как C-литералы.
     """
     devices = []
-    records = re.compile(r'(?m)^device \{\n((?:[ \t]+[^\n]*\n)*)\}\n?')
+    records = re.compile(r'(?m)^device \{\n((?:[ \t][^\n]*\n)*)\}\n?')
     if records.sub('', output).strip():
         raise ValueError('Invalid ADB device list')
     for match in records.finditer(output):
