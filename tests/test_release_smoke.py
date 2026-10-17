@@ -3,9 +3,10 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
 from zipfile import ZipFile
 
-from scripts import release_archive, smoke_linux_systems, smoke_windows_arm
+from scripts import release_archive, smoke_desktop, smoke_linux_systems, smoke_windows_arm
 
 
 class ReleaseSmokeTests(unittest.TestCase):
@@ -61,3 +62,18 @@ class ReleaseSmokeTests(unittest.TestCase):
             (self.root / name).write_bytes(content)
             with self.subTest(name=name), self.assertRaises(ValueError):
                 smoke_windows_arm.pe_machine(self.root / name)
+
+    def test_test_copy_is_deleted_only_after_no_process_runs_it(self):
+        binary = self.root / 'AndroidTVTimeFixer.exe'
+        binary.write_bytes(b'MZ')
+        running = mock.Mock(pid=42, info={'exe': str(binary)})
+        clock = iter(range(0, 100, 10))
+        with mock.patch.object(smoke_desktop.psutil, 'process_iter', return_value=[running]), \
+                mock.patch.object(smoke_desktop.time, 'monotonic', side_effect=lambda: next(clock)), \
+                mock.patch.object(smoke_desktop.time, 'sleep'), \
+                self.assertRaisesRegex(AssertionError, 'still running or locked: \\[42\\]'):
+            smoke_desktop.release_copy(binary, 'case')
+        self.assertTrue(binary.exists())
+        with mock.patch.object(smoke_desktop.psutil, 'process_iter', return_value=[]):
+            smoke_desktop.release_copy(binary, 'case')
+        self.assertFalse(binary.exists())

@@ -15,6 +15,29 @@ def adb_pids():
     return {p.pid for p in psutil.process_iter(['name']) if (p.info['name'] or '').lower() in ('adb', 'adb.exe')}
 
 
+def release_copy(binary, name):
+    """Delete the test copy once nothing runs it; Windows may hold the file shortly after exit."""
+    deadline = time.monotonic() + 30
+    while True:
+        running = []
+        for process in psutil.process_iter(['exe']):
+            try:
+                if process.info['exe'] and os.path.samefile(process.info['exe'], binary):
+                    running.append(process.pid)
+            except OSError:
+                continue
+        if not running:
+            try:
+                binary.unlink()
+                return
+            except PermissionError:
+                # Antivirus scans and x64 emulation on Windows ARM release the file a little later.
+                pass
+        if time.monotonic() > deadline:
+            raise AssertionError(f'{name}: packaged application is still running or locked: {running}')
+        time.sleep(.5)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('executable', type=Path)
@@ -74,6 +97,7 @@ def main():
                         or report['system_clock_source'] != 'unconfirmed'
                         or text.count(expected[1]) < 5):
                     raise AssertionError(f'{name}: invalid offline time-tool behavior')
+            release_copy(binary, name)
             print(f'{name}: passed')
 
 
