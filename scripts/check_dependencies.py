@@ -56,6 +56,7 @@ CPYTHON_GIT = "https://github.com/python/cpython"
 GRADLE_GIT = "https://github.com/gradle/gradle"
 EXPAT_GIT = "https://github.com/libexpat/libexpat"
 ZLIB_GIT = "https://github.com/madler/zlib"
+XZ_GIT = "https://github.com/tukaani-project/xz"
 UBUNTU_JAMMY = "Ubuntu:22.04:LTS"
 # Native runtimes are not package-manager coordinates: OSV matches them by
 # upstream release tag. A version OSV does not know also returns no findings,
@@ -66,6 +67,7 @@ CANARIES = (Dependency("GIT", OPENSSL_GIT, "openssl-3.5.8", "canary"),
             Dependency("GIT", GRADLE_GIT, "v7.6.0", "canary"),
             Dependency("GIT", EXPAT_GIT, "R_2_6_0", "canary"),
             Dependency("GIT", ZLIB_GIT, "v1.2.11", "canary"),
+            Dependency("GIT", XZ_GIT, "v5.6.1", "canary"),
             Dependency(UBUNTU_JAMMY, "openssl", "3.0.2-0ubuntu1.29", "canary"))
 
 
@@ -78,9 +80,7 @@ def cpython(version, scope):
 
 
 def pinned_native(root):
-    spec = importlib.util.spec_from_file_location("setup_build_python", root / "scripts/setup_build_python.py")
-    pinned = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(pinned)
+    pinned = _load(root / "scripts/setup_build_python.py")
     wrapper = (root / "android/gradle/wrapper/gradle-wrapper.properties").read_text()
     match = re.search(r"^distributionUrl=.*/gradle-(\d+)\.(\d+)(?:\.(\d+))?-bin\.zip$", wrapper, re.MULTILINE)
     if not match:
@@ -88,6 +88,69 @@ def pinned_native(root):
     gradle = ".".join(part or "0" for part in match.groups())
     return [cpython(pinned.CPYTHON_VERSION, "release"), openssl(pinned.OPENSSL_VERSION, "release"),
             Dependency("GIT", GRADLE_GIT, f"v{gradle}", "build")]
+
+
+# Libraries of the pinned python-build-standalone release that ship in the
+# executables, with the upstream tag format OSV matches.
+STANDALONE_COMPONENTS = {
+    "openssl-3.5": lambda v: Dependency("GIT", OPENSSL_GIT, f"openssl-{v}", "release"),
+    "expat": lambda v: Dependency("GIT", EXPAT_GIT, "R_" + v.replace(".", "_"), "release"),
+    "zlib": lambda v: Dependency("GIT", ZLIB_GIT, f"v{v}", "release"),
+    "xz": lambda v: Dependency("GIT", XZ_GIT, f"v{v}", "release"),
+}
+# Also shipped, but OSV reports nothing even for releases with known CVEs.
+STANDALONE_WITHOUT_FEED = ("bzip2", "libffi", "mpdecimal")
+
+
+def fetch(url):
+    with urlopen(Request(url, headers={"User-Agent": "TVTimeFixer-dependency-check"}), timeout=30) as response:
+        data = response.read(4 * 1024 * 1024 + 1)
+    if len(data) > 4 * 1024 * 1024:
+        raise ValueError("Response is too large")
+    return data
+
+
+def _load(path):
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def standalone_components(root, request=fetch):
+    """Audited and feed-less libraries of the pinned build Python release."""
+    pinned = _load(root / "scripts/setup_build_python.py")
+    sources = json.loads((root / "licenses/python-standalone/SOURCES.json").read_text())
+    if sources["release"] != pinned.RELEASE or not re.fullmatch(r"[0-9a-f]{40}", sources["commit"]):
+        raise ValueError("Licence sources do not match the pinned build Python release")
+    downloads = json.loads(request("https://raw.githubusercontent.com/astral-sh/python-build-standalone/"
+                                   f"{sources['commit']}/pythonbuild/downloads.json"))
+    minor = ".".join(pinned.CPYTHON_VERSION.split(".")[:2])
+    if (downloads[f"cpython-{minor}"]["version"] != pinned.CPYTHON_VERSION
+            or downloads["openssl-3.5"]["version"] != pinned.OPENSSL_VERSION):
+        raise ValueError("Pinned CPython/OpenSSL versions differ from the build Python release")
+    audited = [make(downloads[key]["version"]) for key, make in STANDALONE_COMPONENTS.items()]
+    return audited, {key: downloads[key]["version"] for key in STANDALONE_WITHOUT_FEED}
+
+
+def _revision(element):
+    return tuple(int(element.findtext(f"{{*}}{part}") or element.findtext(part) or 0)
+                 for part in ("major", "minor", "micro"))
+
+
+def platform_tools(root, request=fetch):
+    """Return the pinned and the latest stable Android Platform Tools revision."""
+    workflows = "".join((root / ".github/workflows" / name).read_text() for name in ("ci.yml", "build.yml"))
+    pins = set(re.findall(r"platform-tools_r(\d+)\.(\d+)\.(\d+)-", workflows))
+    if len(pins) != 1:
+        raise ValueError("Workflows pin different or no Platform Tools revisions")
+    repository = ET.fromstring(request("https://dl.google.com/android/repository/repository2-3.xml"))
+    latest = [_revision(package.find("revision")) for package in repository.iter("remotePackage")
+              if package.get("path") == "platform-tools" and package.find("channelRef") is not None
+              and package.find("channelRef").get("ref") == "channel-0"]
+    if not latest:
+        raise ValueError("Platform Tools are missing from the Android repository")
+    return tuple(map(int, pins.pop())), max(latest)
 
 
 def post(queries):
@@ -144,7 +207,8 @@ def main():
     parser.add_argument("--sbom", type=Path, help="Write a local CycloneDX dependency inventory (no binaries or credentials)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    packages = dependencies(root) + pinned_native(root)
+    standalone, without_feed = standalone_components(root)
+    packages = sorted(set(dependencies(root) + pinned_native(root) + standalone))
     if args.sbom:
         args.sbom.parent.mkdir(parents=True, exist_ok=True)
         args.sbom.write_text(json.dumps({"bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
@@ -155,9 +219,18 @@ def main():
     for dep, identifier in findings:
         print(f"{dep.ecosystem} {dep.name} {dep.version} ({dep.scope}): https://osv.dev/vulnerability/{identifier}")
     print(f"OSV: {len(packages)} dependency versions checked, {len(findings)} findings.")
-    print("Scope: locked Python packages, verified Maven artifacts including test/build tools, the pinned "
-          "desktop CPython/OpenSSL and the Gradle wrapper; not a binary SBOM.")
-    return 1 if findings else 0
+    print("No OSV advisory feed, review upstream manually:",
+          ", ".join(f"{name} {version}" for name, version in without_feed.items()), "(build Python)")
+    pinned_adb, latest_adb = platform_tools(root)
+    adb = ".".join(map(str, pinned_adb))
+    if pinned_adb < latest_adb:
+        print(f"Platform Tools r{adb} is older than r{'.'.join(map(str, latest_adb))}: update the workflow URLs and SHA-256.")
+    else:
+        print(f"Platform Tools r{adb} is the latest stable release (no OSV feed for adb).")
+    print("Scope: locked Python packages, verified Maven artifacts including test/build tools, the Gradle "
+          "wrapper and the pinned build Python with its bundled libraries. Shipped executables are audited "
+          "file by file by audit_bundle.py.")
+    return 1 if findings or pinned_adb < latest_adb else 0
 
 
 if __name__ == "__main__":

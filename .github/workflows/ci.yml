@@ -199,6 +199,9 @@ jobs:
             test "$(lipo -archs ./dist/AndroidTVTimeFixer)" = "$(uname -m)"
           fi
 
+      - name: Audit every bundled file against OSV
+        run: poetry run python scripts/audit_bundle.py build/pyinstaller
+
       - name: Package desktop test build
         if: matrix.artifact_platform != ''
         shell: bash

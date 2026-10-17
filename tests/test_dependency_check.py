@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -70,3 +71,37 @@ class DependencyCheckTests(unittest.TestCase):
         self.assertRegex(native[2].version, r"^v\d+\.\d+\.\d+$")
         wrapper = (root / "android/gradle/wrapper/gradle-wrapper.properties").read_text()
         self.assertIn(f"gradle-{native[2].version[1:].removesuffix('.0')}-bin.zip", wrapper)
+
+    def test_build_python_components_must_match_the_pinned_release(self):
+        root = Path(__file__).resolve().parents[1]
+        pinned = module._load(root / "scripts/setup_build_python.py")
+        minor = ".".join(pinned.CPYTHON_VERSION.split(".")[:2])
+        downloads = {f"cpython-{minor}": {"version": pinned.CPYTHON_VERSION},
+                     "openssl-3.5": {"version": pinned.OPENSSL_VERSION}, "expat": {"version": "2.9.0"},
+                     "zlib": {"version": "1.3.2"}, "xz": {"version": "5.8.4"}, "bzip2": {"version": "1.0.8"},
+                     "libffi": {"version": "3.8.0"}, "mpdecimal": {"version": "4.0.0"}}
+        urls = []
+
+        def request(url):
+            urls.append(url)
+            return json.dumps(downloads).encode()
+
+        audited, without_feed = module.standalone_components(root, request)
+        self.assertIn(module.Dependency("GIT", module.EXPAT_GIT, "R_2_9_0", "release"), audited)
+        self.assertIn(module.Dependency("GIT", module.XZ_GIT, "v5.8.4", "release"), audited)
+        self.assertEqual({"bzip2": "1.0.8", "libffi": "3.8.0", "mpdecimal": "4.0.0"}, without_feed)
+        self.assertRegex(urls[0], r"/[0-9a-f]{40}/pythonbuild/downloads\.json$")
+        downloads["openssl-3.5"] = {"version": "3.5.8"}
+        with self.assertRaisesRegex(ValueError, "differ"):
+            module.standalone_components(root, request)
+
+    def test_platform_tools_pin_is_compared_with_the_stable_channel(self):
+        root = Path(__file__).resolve().parents[1]
+        xml = """<sdk:repository xmlns:sdk="http://schemas.android.com/sdk/android/repo/repository2/03">
+          <remotePackage path="platform-tools"><revision><major>99</major><minor>0</minor><micro>0</micro></revision>
+            <channelRef ref="channel-2"/></remotePackage>
+          <remotePackage path="platform-tools"><revision><major>37</major><minor>0</minor><micro>2</micro></revision>
+            <channelRef ref="channel-0"/></remotePackage></sdk:repository>"""
+        pinned, latest = module.platform_tools(root, lambda _: xml.encode())
+        self.assertEqual((37, 0, 2), latest)
+        self.assertEqual(3, len(pinned))

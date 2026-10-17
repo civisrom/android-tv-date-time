@@ -14,6 +14,7 @@ on:
       - 'scripts/check_dependencies.py'
       - 'scripts/setup_build_python.py'
       - 'android/gradle/wrapper/gradle-wrapper.properties'
+      - 'licenses/python-standalone/SOURCES.json'
       - '.github/workflows/dependency-security.yml'
   pull_request:
     paths:
@@ -23,6 +24,7 @@ on:
       - 'scripts/check_dependencies.py'
       - 'scripts/setup_build_python.py'
       - 'android/gradle/wrapper/gradle-wrapper.properties'
+      - 'licenses/python-standalone/SOURCES.json'
       - '.github/workflows/dependency-security.yml'
 
 permissions:

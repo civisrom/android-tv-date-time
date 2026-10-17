@@ -186,6 +186,9 @@ jobs:
         run: poetry run pyinstaller --clean pyinstaller.spec
         shell: bash
 
+      - name: Audit every bundled file against OSV
+        run: poetry run python scripts/audit_bundle.py build/pyinstaller
+
       - name: Smoke-test executable
         run: |
           if [[ "${{ runner.os }}" == "Windows" ]]; then
