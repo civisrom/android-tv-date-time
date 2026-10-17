@@ -7,13 +7,28 @@ remains under its own license.
 ## Bundled binaries
 
 These apply to the desktop release archives
-(`AndroidTVTimeFixer-{windows,linux,macos,macos-intel}.zip`).
+(`AndroidTVTimeFixer-{windows,linux,linux-arm64,macos,macos-intel}.zip`).
 
 ### Android Debug Bridge (adb)
 
-The release archives contain the `adb` executable from Android SDK
-Platform-Tools r37.0.1, downloaded from Google's official distribution and
-verified by SHA-256 during the build (see `.github/workflows/build.yml`).
+The Windows, Linux x86-64 and macOS archives contain the `adb` executable from
+Android SDK Platform-Tools r37.0.1, downloaded from Google's official
+distribution and verified by SHA-256 during the build (see
+`.github/workflows/build.yml`).
+
+Google publishes no Linux ARM64 Platform-Tools, so the `linux-arm64` archive
+contains `adb` built during the release from android-tools 37.0.0p1
+(https://github.com/nmeum/android-tools, the AOSP adb sources with a CMake
+build). Its vendored libusb snapshot is replaced by the libusb 1.0.30 release,
+which fixes CVE-2026-23679 and CVE-2026-47104; both source archives are verified
+by SHA-256 (see `scripts/build_adb.py`). That `adb` statically includes AOSP
+code (Apache-2.0), BoringSSL (Apache-2.0, ISC and OpenSSL licences), fmt (MIT)
+and **libusb (LGPL-2.1-or-later)**. To use another libusb, change
+`LIBUSB_VERSION` and `LIBUSB_SHA256` in `scripts/build_adb.py` and rebuild. The
+archive also contains the Ubuntu 22.04 shared libraries this `adb` loads:
+protobuf (BSD-3-Clause), Brotli (MIT), LZ4 (BSD-2-Clause), Zstandard
+(BSD-3-Clause), zlib (Zlib), and libstdc++/libgcc_s (GPL-3.0 with the GCC
+Runtime Library Exception).
 
 `adb` is part of the Android Open Source Project and is licensed under the
 **Apache License 2.0** — the same licence as this project, a copy of which is in
@@ -54,22 +69,21 @@ work** from the desktop executables and is subject to a different licence — se
 
 | Component | Licence |
 |---|---|
-| `com.flyfishxu:kadb-android` 2.1.3 | Apache-2.0 |
+| `com.flyfishxu:kadb-android` 2.1.5 | Apache-2.0 |
 | **`com.github.Flyfish233:spake2-java` 1.1.1** | **GPL-3.0-only** |
 | `cafe.cryptography:ed25519-elisabeth`, `curve25519-elisabeth` 0.1.0 | MIT |
-| `asia.hombre:kyber`, `asia.hombre:keccak` 2.0.1 | Apache-2.0 |
 | `org.bouncycastle:bcprov-jdk18on`, `bcpkix-jdk18on`, `bcutil-jdk18on` | MIT |
 | AndroidX, Jetpack Compose, `androidx.tv:tv-material` | Apache-2.0 |
 | Kotlin standard library, `kotlinx-coroutines` | Apache-2.0 |
-| `org.lsposed.hiddenapibypass:hiddenapibypass` 6.1 | Apache-2.0 |
+| `org.lsposed.hiddenapibypass:hiddenapibypass` 6.2 | Apache-2.0 |
 
 `adb/PairingSession.kt` adapts the framing/socket portion of Kadb 2.1.3's
 `PairingConnectionCtx.kt`, Copyright (c) 2024 Flyfish-Xu, Apache-2.0.
 Changes add socket deadlines, cancellation and typed errors; SPAKE2 and
 authenticated encryption remain in the pinned Kadb dependency.
-`org.conscrypt:conscrypt-openjdk-uber:2.5.2` (Apache-2.0) is used only by JVM
-tests and is not included in the APK. Build and run those tests with JDK 21:
-the published Kadb AAR contains Java 21 class files. App bytecode targets
+`org.conscrypt:conscrypt-openjdk-uber:2.7.0` (Apache-2.0) is used only by JVM
+tests and is not included in the APK. Build and run those tests with JDK 25:
+the published Kadb 2.1.5 AAR contains Java 25 class files. App bytecode targets
 Java 17 and the Android minimum version is unchanged.
 
 ## The APK and the GPL

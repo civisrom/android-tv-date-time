@@ -16,17 +16,30 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import build_adb  # noqa: E402
 import check_dependencies as osv  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 TOC_TYPES = {'BINARY', 'DATA', 'EXTENSION', 'PYMODULE', 'PYSOURCE'}
 # Reviewed findings that the distribution has not fixed. Each stays accepted
 # only while its package contributes exactly these files to the executable.
+# libstdc++, lz4, zstd and protobuf ship only with the adb built from source.
 NOT_AFFECTED = {
-    ('gcc-12', 'UBUNTU-CVE-2022-27943'): ({'libgcc_s.so.1'}, 'libiberty demangler, not part of libgcc_s'),
-    ('gcc-12', 'UBUNTU-CVE-2026-102010'): ({'libgcc_s.so.1'}, 'libstdc++ priority queue; libstdc++ is not bundled'),
-    ('gcc-12', 'UBUNTU-CVE-2026-95619'): ({'libgcc_s.so.1'}, 'libstdc++ aligned new; libstdc++ is not bundled'),
-    ('zlib', 'UBUNTU-CVE-2026-85091'): ({'libz.so.1'}, 'gzFile/gzwrite API, which CPython and OpenSSL never call'),
+    ('gcc-12', 'UBUNTU-CVE-2022-27943'): ({'libgcc_s.so.1', 'libstdc++.so.6'},
+                                          'Rust demangler of libiberty; libstdc++ has only the C++ one'),
+    ('gcc-12', 'UBUNTU-CVE-2026-102010'): ({'libgcc_s.so.1', 'libstdc++.so.6'},
+                                           'header-only priority queue erase_if; adb and protobuf 3.12 never use it'),
+    ('gcc-12', 'UBUNTU-CVE-2026-95619'): ({'libgcc_s.so.1', 'libstdc++.so.6'},
+                                          'aligned operator new; adb allocates no over-aligned heap objects'),
+    ('zlib', 'UBUNTU-CVE-2026-85091'): ({'libz.so.1'},
+                                        'gzFile/gzwrite API, which CPython, OpenSSL, adb and protobuf never call'),
+    ('lz4', 'UBUNTU-CVE-2025-62813'): ({'liblz4.so.1'},
+                                       'NULL arguments to LZ4F_createCDict_advanced/LZ4F_getFrameInfo, unused by adb'),
+    ('libzstd', 'UBUNTU-CVE-2022-4899'): ({'libzstd.so.1'}, 'zstd command-line tool, which is not bundled'),
+    ('protobuf', 'UBUNTU-CVE-2022-3171'): ({'libprotobuf.so.23'}, 'protobuf-java; only the C++ runtime is bundled'),
+    ('protobuf', 'UBUNTU-CVE-2022-3510'): ({'libprotobuf.so.23'}, 'protobuf-java; only the C++ runtime is bundled'),
+    ('protobuf', 'UBUNTU-CVE-2026-104635'): ({'libprotobuf.so.23'}, 'elixir-protobuf; only the C++ runtime is bundled'),
+    ('protobuf', 'UBUNTU-CVE-2026-6409'): ({'libprotobuf.so.23'}, 'protobuf PHP; only the C++ runtime is bundled'),
 }
 
 
@@ -111,6 +124,15 @@ def traced(path, workpath, owners, runtime_prefixes):
     return None
 
 
+def source_built_adb(path):
+    """True for the adb that build_adb.py compiled; its static libusb is audited separately."""
+    if path.name != 'adb':
+        return False
+    # adb stores the release and the vendor name of its version line as separate strings.
+    data = path.read_bytes()
+    return b'android-tools' in data and build_adb.ANDROID_TOOLS_VERSION.encode() in data
+
+
 def reviewed(dep, identifier, files):
     allowed, reason = NOT_AFFECTED.get((dep.name, identifier), (set(), None))
     return reason if reason and files <= allowed else None
@@ -147,6 +169,9 @@ def main():
         except ValueError:
             unknown.append(path)
             continue
+        if category == 'platform-tools' and source_built_adb(path):
+            category = 'adb (android-tools)'
+            dep = osv.Dependency('GIT', build_adb.LIBUSB_GIT, f'v{build_adb.LIBUSB_VERSION}', 'bundled')
         categories[category] = categories.get(category, 0) + 1
         if dep:
             files.setdefault(dep, set()).add(path.name)

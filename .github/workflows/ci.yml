@@ -40,6 +40,11 @@ jobs:
           - os: ubuntu-22.04
             python: '3.12'
             adb_platform: linux
+          # Google не выпускает adb для Linux ARM64: он собирается из android-tools.
+          - os: ubuntu-22.04-arm
+            python: '3.11'
+            artifact_platform: Linux-ARM64
+            adb_source: android-tools
             adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
           - os: windows-latest
             python: '3.12.15'
@@ -60,7 +65,7 @@ jobs:
             adb_platform: darwin
             adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 25 || 15 }}
+    timeout-minutes: ${{ (matrix.os == 'macos-15-intel' || matrix.adb_source) && 30 || 15 }}
 
     steps:
       - name: Checkout repository
@@ -138,6 +143,7 @@ jobs:
       # Проверяем native ADB: моки не обнаруживают различия его ОС-бэкендов
       # и правил автозапуска сервера. Никакие устройства CI не изменяет.
       - name: Prepare verified Platform Tools for USB tests and packaging
+        if: matrix.adb_source != 'android-tools'
         shell: bash
         env:
           ADB_PLATFORM: ${{ matrix.adb_platform }}
@@ -161,6 +167,15 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as env:
               env.write('USB_TEST_ADB=' + str(destination / names[0]) + '\n')
           PY
+
+      - name: Build adb from pinned android-tools sources
+        if: matrix.adb_source == 'android-tools'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $(python scripts/build_adb.py --print-apt-packages)
+          python scripts/build_adb.py
+          echo "USB_TEST_ADB=resources/adb" >> "$GITHUB_ENV"
 
       - name: Probe native USB discovery
         shell: bash
@@ -237,3 +252,67 @@ jobs:
             dist/AndroidTVTimeFixer-*.zip.sha256
           if-no-files-found: error
           retention-days: 14
+
+  # Те же архивы, что пользователи скачивают, на системах без библиотек раннера.
+  linux-systems:
+    name: Чистые Linux-системы (${{ matrix.platform }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: Linux
+          - os: ubuntu-22.04-arm
+            platform: Linux-ARM64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Download desktop test build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: AndroidTVTimeFixer-${{ matrix.platform }}-dev
+          path: dist
+
+      - name: Run on Ubuntu 22.04, Debian 12 and Ubuntu 24.04 containers
+        shell: bash
+        run: python3 scripts/smoke_linux_systems.py dist/AndroidTVTimeFixer-*.zip
+
+  # Windows 11 на ARM запускает x64-сборку через встроенную эмуляцию.
+  windows-arm:
+    name: Windows 11 ARM (x64-сборка в эмуляции)
+    needs: test
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install locked psutil for the smoke test
+        shell: bash
+        run: |
+          python - > "$RUNNER_TEMP/smoke-requirements.txt" <<'PY'
+          import tomllib
+          lock = tomllib.load(open('poetry.lock', 'rb'))
+          package = next(p for p in lock['package'] if p['name'] == 'psutil')
+          print(f"psutil=={package['version']} " + ' '.join(f"--hash={f['hash']}" for f in package['files']))
+          PY
+          python -m pip install --require-hashes --only-binary :all: -r "$RUNNER_TEMP/smoke-requirements.txt"
+
+      - name: Download desktop test build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: AndroidTVTimeFixer-Windows-dev
+          path: dist
+
+      - name: Smoke-test the x64 build on ARM64
+        shell: bash
+        run: python scripts/smoke_windows_arm.py dist/AndroidTVTimeFixer-windows.zip

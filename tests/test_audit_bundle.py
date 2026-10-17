@@ -62,8 +62,23 @@ class BundleAuditTests(unittest.TestCase):
     def test_reviewed_findings_hold_only_for_the_reviewed_files(self):
         gcc = bundle.osv.Dependency("Ubuntu:22.04:LTS", "gcc-12", "12.3.0", "bundled")
         self.assertIsNotNone(bundle.reviewed(gcc, "UBUNTU-CVE-2026-102010", {"libgcc_s.so.1"}))
-        self.assertIsNone(bundle.reviewed(gcc, "UBUNTU-CVE-2026-102010", {"libgcc_s.so.1", "libstdc++.so.6"}))
+        # The source-built adb adds libstdc++, which was reviewed with adb's sources.
+        self.assertIsNotNone(bundle.reviewed(gcc, "UBUNTU-CVE-2026-102010", {"libgcc_s.so.1", "libstdc++.so.6"}))
+        self.assertIsNone(bundle.reviewed(gcc, "UBUNTU-CVE-2026-102010", {"libgcc_s.so.1", "libasan.so.8"}))
         self.assertIsNone(bundle.reviewed(gcc, "UBUNTU-CVE-2099-0001", {"libgcc_s.so.1"}))
+        protobuf = bundle.osv.Dependency("Ubuntu:22.04:LTS", "protobuf", "3.12.4", "bundled")
+        self.assertIsNotNone(bundle.reviewed(protobuf, "UBUNTU-CVE-2022-3171", {"libprotobuf.so.23"}))
+        self.assertIsNone(bundle.reviewed(protobuf, "UBUNTU-CVE-2022-3171", {"libprotoc.so.23"}))
+
+    def test_only_the_adb_built_from_source_is_marked_for_its_libusb_audit(self):
+        built = b"\x7fELF\0" + bundle.build_adb.ANDROID_TOOLS_VERSION.encode() + b"\0android-tools\0"
+        for name, content, expected in [("adb", built, True), ("adb", b"\x7fELF\0" + b"37.0.1-14190925", False),
+                                        ("adb", b"\x7fELF\0android-tools\0" + b"36.0.1", False),
+                                        ("libusb.so", built, False)]:
+            path = self.base / name
+            path.write_bytes(content)
+            with self.subTest(name=name, expected=expected):
+                self.assertIs(expected, bundle.source_built_adb(path))
 
     def test_unowned_files_never_pass_silently(self):
         for path, system in [("/opt/other/libfoo.so", "linux"), (bundle.ROOT / ".venv/lib/stray.so", "linux"),

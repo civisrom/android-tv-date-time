@@ -57,6 +57,7 @@ GRADLE_GIT = "https://github.com/gradle/gradle"
 EXPAT_GIT = "https://github.com/libexpat/libexpat"
 ZLIB_GIT = "https://github.com/madler/zlib"
 XZ_GIT = "https://github.com/tukaani-project/xz"
+LIBUSB_GIT = "https://github.com/libusb/libusb"
 UBUNTU_JAMMY = "Ubuntu:22.04:LTS"
 # Native runtimes are not package-manager coordinates: OSV matches them by
 # upstream release tag. A version OSV does not know also returns no findings,
@@ -68,6 +69,7 @@ CANARIES = (Dependency("GIT", OPENSSL_GIT, "openssl-3.5.8", "canary"),
             Dependency("GIT", EXPAT_GIT, "R_2_6_0", "canary"),
             Dependency("GIT", ZLIB_GIT, "v1.2.11", "canary"),
             Dependency("GIT", XZ_GIT, "v5.6.1", "canary"),
+            Dependency("GIT", LIBUSB_GIT, "v1.0.29", "canary"),
             Dependency(UBUNTU_JAMMY, "openssl", "3.0.2-0ubuntu1.29", "canary"))
 
 
@@ -86,8 +88,10 @@ def pinned_native(root):
     if not match:
         raise ValueError("Gradle wrapper version is not recognised")
     gradle = ".".join(part or "0" for part in match.groups())
+    adb = _load(root / "scripts/build_adb.py")
     return [cpython(pinned.CPYTHON_VERSION, "release"), openssl(pinned.OPENSSL_VERSION, "release"),
-            Dependency("GIT", GRADLE_GIT, f"v{gradle}", "build")]
+            Dependency("GIT", GRADLE_GIT, f"v{gradle}", "build"),
+            Dependency("GIT", LIBUSB_GIT, f"v{adb.LIBUSB_VERSION}", "release")]
 
 
 # Libraries of the pinned python-build-standalone release that ship in the
@@ -151,6 +155,26 @@ def platform_tools(root, request=fetch):
     if not latest:
         raise ValueError("Platform Tools are missing from the Android repository")
     return tuple(map(int, pins.pop())), max(latest)
+
+
+def _android_tools_version(text):
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:p(\d+))?", text)
+    if not match:
+        raise ValueError(f"Unrecognised android-tools version: {text}")
+    return tuple(int(part or 0) for part in match.groups())
+
+
+def android_tools(root, request=fetch):
+    """Return the pinned and the latest android-tools release used for the Linux ARM64 adb."""
+    pinned = _load(root / "scripts/build_adb.py").ANDROID_TOOLS_VERSION
+    # The Atom feed needs no API token and has no API rate limit.
+    feed = ET.fromstring(request("https://github.com/nmeum/android-tools/releases.atom"))
+    tags = [link.get("href", "").rsplit("/", 1)[-1] for link in feed.iter("{http://www.w3.org/2005/Atom}link")
+            if "/releases/tag/" in link.get("href", "")]
+    releases = [tag for tag in tags if re.fullmatch(r"\d+\.\d+\.\d+(?:p\d+)?", tag)]
+    if not releases:
+        raise ValueError("android-tools releases are missing from the feed")
+    return pinned, max(releases, key=_android_tools_version)
 
 
 def post(queries):
@@ -229,9 +253,16 @@ def main():
               "update the workflow URLs and SHA-256.")
     else:
         print(f"Platform Tools r{adb} is the latest stable release (no OSV feed for adb).")
+    pinned_tools, latest_tools = android_tools(root)
+    if _android_tools_version(pinned_tools) < _android_tools_version(latest_tools):
+        # adb itself has no advisory feed; its static libusb is audited above.
+        print(f"::warning::android-tools {pinned_tools} (Linux ARM64 adb) is older than {latest_tools}: "
+              "update scripts/build_adb.py and its SHA-256.")
+    else:
+        print(f"android-tools {pinned_tools} is the latest release (Linux ARM64 adb, no OSV feed for adb).")
     print("Scope: locked Python packages, verified Maven artifacts including test/build tools, the Gradle "
-          "wrapper and the pinned build Python with its bundled libraries. Shipped executables are audited "
-          "file by file by audit_bundle.py.")
+          "wrapper, the pinned build Python with its bundled libraries and the libusb built into the Linux "
+          "ARM64 adb. Shipped executables are audited file by file by audit_bundle.py.")
     return 1 if findings else 0
 
 

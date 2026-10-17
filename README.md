@@ -230,6 +230,11 @@ VPN или фильтрация multicast могут мешать связи и 
 2.  Распакуйте архив в удобное место на вашем компьютере, например, `D:\AndroidTVTimeFixer`.
 3.  Запустите `AndroidTVTimeFixer.exe` или используйте `start.bat` / `start.ps1`.
 
+Для Windows 11 на ARM (например, ноутбуки на Snapdragon X) подходит тот же
+архив: x86-64-программа работает через встроенную в Windows эмуляцию, и CI
+проверяет её запуск на Windows 11 ARM. USB-подключение на ARM-компьютерах
+не проверялось: драйвер Google USB выпускается только для x86 и x86-64.
+
 Запуск через **PowerShell**
 
 1.  Откройте **PowerShell** в обычном режиме. Для повседневного запуска права администратора не требуются.
@@ -244,10 +249,14 @@ VPN или фильтрация multicast могут мешать связи и 
 
 ### Linux
 
-1.  Скачайте архив `AndroidTVTimeFixer-linux.zip` из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases).
+1.  Скачайте из раздела [Releases](https://github.com/civisrom/android-tv-date-time/releases)
+    архив под процессор: `AndroidTVTimeFixer-linux.zip` для x86-64 или
+    `AndroidTVTimeFixer-linux-arm64.zip` для ARM64 (Raspberry Pi 4/5 с 64-битной
+    системой, ARM-ноутбуки и серверы). Архитектуру покажет `uname -m`:
+    `x86_64` или `aarch64`.
 2.  Распакуйте архив:
     ```bash
-    unzip AndroidTVTimeFixer-linux.zip
+    unzip AndroidTVTimeFixer-linux*.zip
     ```
 3.  Сделайте файл исполняемым и запустите:
     ```bash
@@ -1517,8 +1526,8 @@ APK. Если сетевой режим отсутствует или локал
 
 | Где запускается программа | Требования |
 |---|---|
-| Windows | Windows 10/11; текущая готовая сборка x86-64 |
-| Linux | Текущая сборка x86-64 создаётся на Ubuntu 22.04; нужны совместимые системные библиотеки. Для других архитектур нужна отдельная сборка |
+| Windows | Windows 10/11 x86-64; на Windows 11 ARM та же сборка работает через эмуляцию x86-64 (USB там не проверялся) |
+| Linux | Сборки x86-64 и ARM64 создаются на Ubuntu 22.04 и работают с glibc 2.35 и новее: Ubuntu 22.04+, Debian 12+, 64-битная Raspberry Pi OS Bookworm+. CI запускает их в чистых Ubuntu 22.04, Debian 12 и Ubuntu 24.04. Google не выпускает adb для Linux ARM64, поэтому он собирается из исходников android-tools 37 с libusb 1.0.30 и без собственного mDNS (поиск устройств идёт через zeroconf). 32-битные ARM-системы не поддерживаются |
 | macOS | Отдельные сборки на macOS 15: arm64 для Apple Silicon и x86-64 для Intel |
 | Android: классический ADB или USB | Android 6.0+; для USB на управляющем устройстве нужна аппаратная поддержка host/OTG |
 | Android: TLS-спаривание | Android 10+ на устройстве с APK; на целевом устройстве должен быть режим Wireless debugging |
@@ -1552,8 +1561,9 @@ APK. Если сетевой режим отсутствует или локал
 
 ## Проверки при разработке
 
-В `dev` CI собирает desktop для Windows, Linux и обеих архитектур macOS, проверяет Python-пакет,
-нативный ADB и запускает тесты. Полный прогон Android CI собирает debug и неподписанный release,
+В `dev` CI собирает desktop для Windows, Linux x86-64 и ARM64 и обеих архитектур macOS, проверяет Python-пакет,
+нативный ADB и запускает тесты. Linux-архивы запускаются в чистых контейнерах
+Ubuntu 22.04, Debian 12 и Ubuntu 24.04, Windows-архив — на Windows 11 ARM. Полный прогон Android CI собирает debug и неподписанный release,
 выполняет unit-тесты, Lint и матрицу UI на эмуляторах. Публикация релиза зависит
 от Android-проверок и проверки зависимостей той же версии исходников.
 
@@ -1569,7 +1579,8 @@ APK. Если сетевой режим отсутствует или локал
 
 `python3 scripts/check_dependencies.py` проверяет закреплённые Python- и Maven-
 зависимости через OSV, включая инструменты и тесты, а также Gradle wrapper,
-CPython и библиотеки закреплённого Python для сборки и актуальность Platform Tools (устаревшая версия adb — предупреждение);
+CPython и библиотеки закреплённого Python для сборки, libusb в adb для Linux ARM64 и актуальность
+Platform Tools и android-tools (устаревшая версия adb — предупреждение);
 в CI проверка выполняется также по расписанию. После каждой desktop-сборки
 `scripts/audit_bundle.py` сопоставляет каждый упакованный файл с его источником
 (Python-пакет, пакет Ubuntu, Python для сборки, ОС или этот репозиторий), проверяет

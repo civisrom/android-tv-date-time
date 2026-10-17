@@ -73,6 +73,9 @@ class DependencyCheckTests(unittest.TestCase):
         self.assertRegex(native[2].version, r"^v\d+\.\d+\.\d+$")
         wrapper = (root / "android/gradle/wrapper/gradle-wrapper.properties").read_text()
         self.assertIn(f"gradle-{native[2].version[1:].removesuffix('.0')}-bin.zip", wrapper)
+        adb = module._load(root / "scripts/build_adb.py")
+        self.assertEqual(module.Dependency("GIT", module.LIBUSB_GIT, f"v{adb.LIBUSB_VERSION}", "release"), native[3])
+        self.assertEqual(adb.LIBUSB_GIT, module.LIBUSB_GIT)
 
     def test_build_python_components_must_match_the_pinned_release(self):
         root = Path(__file__).resolve().parents[1]
@@ -108,13 +111,30 @@ class DependencyCheckTests(unittest.TestCase):
         self.assertEqual((37, 0, 2), latest)
         self.assertEqual(3, len(pinned))
 
+    def test_android_tools_pin_is_compared_with_the_newest_release_tag(self):
+        root = Path(__file__).resolve().parents[1]
+        base = "https://github.com/nmeum/android-tools/releases/tag/"
+        feed = ('<feed xmlns="http://www.w3.org/2005/Atom">'
+                + "".join(f'<entry><link rel="alternate" href="{base}{tag}"/></entry>'
+                          for tag in ("37.0.0", "37.0.0p2", "36.0.1", "nightly"))
+                + '<link rel="alternate" href="https://github.com/nmeum/android-tools/releases"/></feed>')
+        pinned, latest = module.android_tools(root, lambda _: feed.encode())
+        self.assertEqual(module._load(root / "scripts/build_adb.py").ANDROID_TOOLS_VERSION, pinned)
+        self.assertEqual("37.0.0p2", latest)
+        self.assertLess(module._android_tools_version("37.0.0"), module._android_tools_version("37.0.0p1"))
+        self.assertLess(module._android_tools_version("37.0.0p9"), module._android_tools_version("37.0.1"))
+        with self.assertRaisesRegex(ValueError, "missing"):
+            module.android_tools(root, lambda _: b'<feed xmlns="http://www.w3.org/2005/Atom"/>')
+
     def test_outdated_platform_tools_only_warn(self):
         with patch.object(module, "standalone_components", return_value=([], {})), \
                 patch.object(module, "dependencies", return_value=[]), \
                 patch.object(module, "pinned_native", return_value=[]), \
                 patch.object(module, "audit_native", return_value=[]), \
                 patch.object(module, "platform_tools", return_value=((37, 0, 1), (37, 0, 2))), \
+                patch.object(module, "android_tools", return_value=("37.0.0p1", "37.0.1")), \
                 patch.object(sys, "argv", ["check_dependencies.py"]), \
                 patch("sys.stdout", new_callable=io.StringIO) as output:
             self.assertEqual(0, module.main())
         self.assertIn("::warning::Platform Tools r37.0.1 is older than r37.0.2", output.getvalue())
+        self.assertIn("::warning::android-tools 37.0.0p1 (Linux ARM64 adb) is older than 37.0.1", output.getvalue())

@@ -48,6 +48,10 @@ jobs:
             adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip
             adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
             adb_base: "adb"
+          # Google не выпускает adb для Linux ARM64: он собирается из android-tools.
+          - os: ubuntu-22.04-arm
+            platform: Linux-ARM64
+            adb_source: android-tools
           - os: macos-15
             platform: macOS
             adb_url: https://dl.google.com/android/repository/platform-tools_r37.0.1-darwin.zip
@@ -151,6 +155,7 @@ jobs:
         run: poetry run python scripts/verify_macos_crypto.py
 
       - name: Setup ADB
+        if: matrix.adb_source != 'android-tools'
         shell: bash
         run: |
           mkdir -p resources temp_adb
@@ -167,6 +172,13 @@ jobs:
           
           rm -rf temp_adb
           
+      - name: Build adb from pinned android-tools sources
+        if: matrix.adb_source == 'android-tools'
+        shell: bash
+        run: |
+          sudo apt-get install -y --no-install-recommends $(python scripts/build_adb.py --print-apt-packages)
+          python scripts/build_adb.py
+
       - name: Check Poetry source
         run: poetry config --list
 
@@ -364,8 +376,71 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+  # Те же архивы, что попадут в релиз, на системах без библиотек раннера.
+  verify-linux-systems:
+    name: Clean Linux systems (${{ matrix.platform }})
+    needs: setup-and-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: Linux
+          - os: ubuntu-22.04-arm
+            platform: Linux-ARM64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Download build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ env.APP_NAME }}-${{ matrix.platform }}
+          path: dist
+
+      - name: Run on Ubuntu 22.04, Debian 12 and Ubuntu 24.04 containers
+        run: python3 scripts/smoke_linux_systems.py dist/${{ env.APP_NAME }}-*.zip
+
+  # Windows 11 на ARM запускает x64-сборку через встроенную эмуляцию.
+  verify-windows-arm:
+    name: Windows 11 ARM (x64 build under emulation)
+    needs: setup-and-build
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install locked psutil for the smoke test
+        shell: bash
+        run: |
+          python - > "$RUNNER_TEMP/smoke-requirements.txt" <<'PY'
+          import tomllib
+          lock = tomllib.load(open('poetry.lock', 'rb'))
+          package = next(p for p in lock['package'] if p['name'] == 'psutil')
+          print(f"psutil=={package['version']} " + ' '.join(f"--hash={f['hash']}" for f in package['files']))
+          PY
+          python -m pip install --require-hashes --only-binary :all: -r "$RUNNER_TEMP/smoke-requirements.txt"
+
+      - name: Download build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ env.APP_NAME }}-Windows
+          path: dist
+
+      - name: Smoke-test the x64 build on ARM64
+        shell: bash
+        run: python scripts/smoke_windows_arm.py dist/${{ env.APP_NAME }}-windows.zip
+
   create-release:
-    needs: [setup-and-build, build-android, validate-android, validate-dependencies]
+    needs: [setup-and-build, build-android, validate-android, validate-dependencies, verify-linux-systems, verify-windows-arm]
     runs-on: ubuntu-latest
     # Релиз публикует только тег v*, а создавать такие теги может только
     # администратор (ruleset). Ручной запуск лишь собирает артефакты.

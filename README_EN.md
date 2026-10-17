@@ -224,6 +224,11 @@ need a shared network, but NTP checks and subsequent synchronization need networ
 2.  Extract the archive to a convenient location on your computer, for example, `D:\AndroidTVTimeFixer`.
 3.  Run `AndroidTVTimeFixer.exe` or use `start.bat` / `start.ps1`.
 
+Windows 11 on ARM (for example, Snapdragon X laptops) uses the same archive: the
+x86-64 program runs through Windows' built-in emulation, and CI checks that it
+starts on Windows 11 ARM. USB connections on ARM PCs are untested: the Google
+USB driver is published only for x86 and x86-64.
+
 Run via PowerShell
 
 1.  Open **PowerShell** normally. Everyday use does not require administrator privileges.
@@ -238,10 +243,13 @@ Run via PowerShell
 
 ### Linux
 
-1.  Download the `AndroidTVTimeFixer-linux.zip` archive from the [Releases](https://github.com/civisrom/android-tv-date-time/releases) section.
+1.  Download the archive for your processor from the [Releases](https://github.com/civisrom/android-tv-date-time/releases)
+    section: `AndroidTVTimeFixer-linux.zip` for x86-64 or
+    `AndroidTVTimeFixer-linux-arm64.zip` for ARM64 (Raspberry Pi 4/5 with a
+    64-bit OS, ARM laptops and servers). `uname -m` prints `x86_64` or `aarch64`.
 2.  Extract the archive:
     ```bash
-    unzip AndroidTVTimeFixer-linux.zip
+    unzip AndroidTVTimeFixer-linux*.zip
     ```
 3.  Make the file executable and run:
     ```bash
@@ -1489,8 +1497,8 @@ not guarantee this: firmware, ports and permissions also matter.
 
 | Where the program runs | Requirements |
 |---|---|
-| Windows | Windows 10/11; the current prebuilt executable is x86-64 |
-| Linux | The current x86-64 build is produced on Ubuntu 22.04 and needs compatible system libraries. Other architectures require a separate build |
+| Windows | Windows 10/11 x86-64; on Windows 11 ARM the same build runs through x86-64 emulation (USB is untested there) |
+| Linux | x86-64 and ARM64 builds are produced on Ubuntu 22.04 and run with glibc 2.35 or newer: Ubuntu 22.04+, Debian 12+, 64-bit Raspberry Pi OS Bookworm+. CI runs them in clean Ubuntu 22.04, Debian 12 and Ubuntu 24.04. Google publishes no Linux ARM64 adb, so it is built from android-tools 37 sources with libusb 1.0.30 and without its own mDNS (devices are discovered through zeroconf). 32-bit ARM systems are not supported |
 | macOS | Separate macOS 15 builds: arm64 for Apple Silicon and x86-64 for Intel |
 | Android: classic ADB or USB | Android 6.0+; the controller needs hardware host/OTG support for USB |
 | Android: TLS pairing | Android 10+ on the APK device; the target must offer Wireless debugging |
@@ -1522,8 +1530,9 @@ connection method and the error text. In the APK, details are available through 
 
 ## Development checks
 
-On `dev`, CI builds desktop for Windows, Linux and both macOS architectures, checks the Python
-package and native ADB, and runs tests. A full Android CI run builds debug and unsigned
+On `dev`, CI builds desktop for Windows, Linux x86-64 and ARM64 and both macOS architectures, checks the Python
+package and native ADB, and runs tests. Linux archives run in clean Ubuntu 22.04,
+Debian 12 and Ubuntu 24.04 containers, the Windows archive on Windows 11 ARM. A full Android CI run builds debug and unsigned
 release APKs, runs unit tests, Lint, and emulator UI tests. Release publication
 depends on Android and dependency checks for the same source revision.
 
@@ -1540,7 +1549,8 @@ signed builds must also use `--no-build-cache`.
 
 `python3 scripts/check_dependencies.py` checks locked Python and Maven dependencies
 with OSV, including test and build tools, plus the Gradle wrapper, the CPython and
-libraries of the pinned build Python, and whether Platform Tools are current (an outdated adb is a warning); CI also
+libraries of the pinned build Python, the libusb in the Linux ARM64 adb, and whether Platform Tools and
+android-tools are current (an outdated adb is a warning); CI also
 runs it on a schedule. After every desktop build `scripts/audit_bundle.py` traces each
 packed file to its source (Python package, Ubuntu package, build Python, OS or this
 repository), checks those sources with OSV and stops the build on a file of unknown

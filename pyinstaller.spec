@@ -115,7 +115,10 @@ elif sys.platform == 'darwin':
         datas.append((openssl_license, 'licenses'))
 else:  # linux
     runtime_hooks = [os.path.join(HOOKS_PATH, 'linux_hook.py')]
-    platform_data = [('resources/adb', 'resources')]
+    # adb как исполняемый файл: PyInstaller соберёт его библиотеки (adb для ARM64
+    # из исходников связан с protobuf и libstdc++), а audit_bundle.py проверит их.
+    binaries.append(('resources/adb', 'resources'))
+    platform_data = []
 
 # Добавляем платформо-зависимые данные
 datas.extend(platform_data)
@@ -201,7 +204,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=['vcruntime140.dll', 'python*.dll', 'api-ms-*.dll'],
+    upx_exclude=['vcruntime140.dll', 'python*.dll', 'api-ms-*.dll', 'adb'],
     runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
