@@ -224,13 +224,15 @@ def main():
     pinned_adb, latest_adb = platform_tools(root)
     adb = ".".join(map(str, pinned_adb))
     if pinned_adb < latest_adb:
-        print(f"Platform Tools r{adb} is older than r{'.'.join(map(str, latest_adb))}: update the workflow URLs and SHA-256.")
+        # No advisory feed exists for adb, so a newer release is a prompt to update, not a failure.
+        print(f"::warning::Platform Tools r{adb} is older than r{'.'.join(map(str, latest_adb))}: "
+              "update the workflow URLs and SHA-256.")
     else:
         print(f"Platform Tools r{adb} is the latest stable release (no OSV feed for adb).")
     print("Scope: locked Python packages, verified Maven artifacts including test/build tools, the Gradle "
           "wrapper and the pinned build Python with its bundled libraries. Shipped executables are audited "
           "file by file by audit_bundle.py.")
-    return 1 if findings or pinned_adb < latest_adb else 0
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":

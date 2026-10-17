@@ -1,8 +1,10 @@
 import importlib.util
+import io
 import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("dependency_check", Path(__file__).resolve().parents[1] / "scripts/check_dependencies.py")
 module = importlib.util.module_from_spec(spec)
@@ -105,3 +107,14 @@ class DependencyCheckTests(unittest.TestCase):
         pinned, latest = module.platform_tools(root, lambda _: xml.encode())
         self.assertEqual((37, 0, 2), latest)
         self.assertEqual(3, len(pinned))
+
+    def test_outdated_platform_tools_only_warn(self):
+        with patch.object(module, "standalone_components", return_value=([], {})), \
+                patch.object(module, "dependencies", return_value=[]), \
+                patch.object(module, "pinned_native", return_value=[]), \
+                patch.object(module, "audit_native", return_value=[]), \
+                patch.object(module, "platform_tools", return_value=((37, 0, 1), (37, 0, 2))), \
+                patch.object(sys, "argv", ["check_dependencies.py"]), \
+                patch("sys.stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(0, module.main())
+        self.assertIn("::warning::Platform Tools r37.0.1 is older than r37.0.2", output.getvalue())

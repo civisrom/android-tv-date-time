@@ -1540,7 +1540,7 @@ signed builds must also use `--no-build-cache`.
 
 `python3 scripts/check_dependencies.py` checks locked Python and Maven dependencies
 with OSV, including test and build tools, plus the Gradle wrapper, the CPython and
-libraries of the pinned build Python, and whether Platform Tools are current; CI also
+libraries of the pinned build Python, and whether Platform Tools are current (an outdated adb is a warning); CI also
 runs it on a schedule. After every desktop build `scripts/audit_bundle.py` traces each
 packed file to its source (Python package, Ubuntu package, build Python, OS or this
 repository), checks those sources with OSV and stops the build on a file of unknown
