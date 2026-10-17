@@ -54,6 +54,8 @@ def dependencies(root):
 OPENSSL_GIT = "https://github.com/openssl/openssl"
 CPYTHON_GIT = "https://github.com/python/cpython"
 GRADLE_GIT = "https://github.com/gradle/gradle"
+EXPAT_GIT = "https://github.com/libexpat/libexpat"
+ZLIB_GIT = "https://github.com/madler/zlib"
 UBUNTU_JAMMY = "Ubuntu:22.04:LTS"
 # Native runtimes are not package-manager coordinates: OSV matches them by
 # upstream release tag. A version OSV does not know also returns no findings,
@@ -62,6 +64,8 @@ UBUNTU_JAMMY = "Ubuntu:22.04:LTS"
 CANARIES = (Dependency("GIT", OPENSSL_GIT, "openssl-3.5.8", "canary"),
             Dependency("GIT", CPYTHON_GIT, "v3.12.14", "canary"),
             Dependency("GIT", GRADLE_GIT, "v7.6.0", "canary"),
+            Dependency("GIT", EXPAT_GIT, "R_2_6_0", "canary"),
+            Dependency("GIT", ZLIB_GIT, "v1.2.11", "canary"),
             Dependency(UBUNTU_JAMMY, "openssl", "3.0.2-0ubuntu1.29", "canary"))
 
 

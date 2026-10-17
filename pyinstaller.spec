@@ -136,6 +136,7 @@ a = Analysis(
         'difflib',
         'doctest',
         'xml',
+        'pyexpat',
         'pydoc',
         'test',
         '_pytest',

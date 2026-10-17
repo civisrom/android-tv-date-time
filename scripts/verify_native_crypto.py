@@ -19,6 +19,16 @@ PATCH_FLOORS = {(3, 0): 23, (3, 4): 8, (3, 5): 9, (3, 6): 5, (4, 0): 3}
 # Ubuntu backports fixes without changing the upstream version string.
 # https://ubuntu.com/security/notices/USN-8847-1
 UBUNTU_JAMMY_FLOOR = '3.0.2-0ubuntu1.30'
+# Reviewed OSV findings in libraries of the standalone build Python that the
+# executables do not contain or never reach; any other finding still fails.
+NOT_AFFECTED = {
+    (osv.ZLIB_GIT, 'CVE-2026-22184'): 'contrib/untgz is not part of the zlib library',
+    (osv.ZLIB_GIT, 'CVE-2026-3381'): 'advisory for the Perl Compress::Raw::Zlib module',
+    (osv.ZLIB_GIT, 'CVE-2026-27171'): 'CPython 3.12 never calls crc32_combine64/crc32_combine_gen64',
+    (osv.ZLIB_GIT, 'CVE-2026-76844'): 'CPython never uses the gzFile API; gzip is built on deflate',
+    (osv.EXPAT_GIT, 'CVE-2026-102633'): 'pyexpat and xml are excluded from the executables',
+    (osv.EXPAT_GIT, 'CVE-2026-77214'): 'pyexpat and xml are excluded from the executables',
+}
 
 
 def openssl_version(text):
@@ -105,6 +115,14 @@ def main():
                        or openssl_version(ssl.OPENSSL_VERSION) != openssl_version(f'OpenSSL {pinned.OPENSSL_VERSION}')):
         raise RuntimeError('Build interpreter does not match the pinned standalone distribution')
     components = [osv.cpython(platform.python_version(), 'runtime')]
+    if standalone:
+        # These copies ship inside the Windows/macOS executables; on Linux the
+        # Ubuntu packages maintain them.
+        import pyexpat
+        import zlib
+        expat = pyexpat.EXPAT_VERSION.removeprefix('expat_').replace('.', '_')
+        components += [osv.Dependency('GIT', osv.EXPAT_GIT, f'R_{expat}', 'runtime'),
+                       osv.Dependency('GIT', osv.ZLIB_GIT, f'v{zlib.ZLIB_RUNTIME_VERSION}', 'runtime')]
     try:
         verify_upstream(ssl.OPENSSL_VERSION)
         components.append(osv.openssl('.'.join(map(str, openssl_version(ssl.OPENSSL_VERSION))), 'runtime'))
@@ -123,10 +141,13 @@ def main():
     components.append(osv.openssl('.'.join(map(str, openssl_version(crypto_version))), 'runtime'))
     findings = osv.audit_native(components)
     for dep, identifier in findings:
-        print(f'{dep.name} {dep.version}: https://osv.dev/vulnerability/{identifier}')
-    if findings:
+        reason = NOT_AFFECTED.get((dep.name, identifier))
+        print(f'{dep.name} {dep.version}: https://osv.dev/vulnerability/{identifier}'
+              + (f' (reviewed, not affected: {reason})' if reason else ''))
+    if any((dep.name, identifier) not in NOT_AFFECTED for dep, identifier in findings):
         raise RuntimeError('Loaded native runtime has known vulnerabilities')
-    print('OSV:', ', '.join(f'{dep.name.rsplit("/", 1)[-1]} {dep.version}' for dep in sorted(set(components))), '- no known vulnerabilities')
+    print('OSV:', ', '.join(f'{dep.name.rsplit("/", 1)[-1]} {dep.version}' for dep in sorted(set(components))),
+          '- no unreviewed vulnerabilities')
     print('Native OpenSSL verification passed')
 
 
