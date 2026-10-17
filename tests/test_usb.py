@@ -4,6 +4,7 @@ import logging
 import socket
 import subprocess
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -41,6 +42,12 @@ class UsbDiscoveryTests(unittest.TestCase):
         for data in ('garbage', record(transport=0), record()[:-3]):
             with self.assertRaises(ValueError):
                 parse_usb_devices(data)
+
+    def test_malformed_list_is_rejected_without_backtracking(self):
+        started = time.monotonic()
+        with self.assertRaises(ValueError):
+            parse_usb_devices('device {\n' + '\t\t\n' * 40 + 'x')
+        self.assertLess(time.monotonic() - started, 1)
 
     def test_utf8_octal_escapes_preserve_device_identity(self):
         device = parse_usb_devices(record(serial=r'\320\242\320\2221', model=r'\320\242\320\222'))[0]

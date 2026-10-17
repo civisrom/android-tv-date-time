@@ -1,3 +1,4 @@
+import time
 import unittest
 
 from scripts.verify_macos_crypto import openssl_dependencies, verify_openssl_version
@@ -23,6 +24,11 @@ class MacOSCryptoBuildTests(unittest.TestCase):
 '''
         self.assertEqual(['/usr/local/opt/openssl@3/lib/libssl.3.dylib', '@rpath/libcrypto.3.dylib'],
                          openssl_dependencies(output))
+
+    def test_dependency_scan_has_no_backtracking(self):
+        started = time.monotonic()
+        self.assertEqual([], openssl_dependencies('header\n    libssl' + '.!' * 40 + ' x\n'))
+        self.assertLess(time.monotonic() - started, 1)
 
     def test_accepts_static_openssl_with_normal_macos_system_libraries(self):
         output = '''/tmp/libssl-folder/cryptography/_rust.abi3.so:

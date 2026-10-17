@@ -15,7 +15,7 @@ LTS_BRANCH = (3, 5)
 
 def openssl_dependencies(otool_output):
     return [line.strip().split()[0] for line in otool_output.splitlines()[1:]
-            if re.search(r'(?:^|/)(?:libssl|libcrypto)(?:\.[^/ ]+)*\.dylib\s', line.strip())]
+            if re.search(r'(?:^|/)(?:libssl|libcrypto)(?:\.[^./ ]+)*\.dylib\s', line.strip())]
 
 
 def verify_openssl_version(version_text):
