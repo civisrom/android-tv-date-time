@@ -42,19 +42,19 @@ jobs:
             adb_platform: linux
             adb_sha256: d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1
           - os: windows-latest
-            python: '3.12.14'
+            python: '3.12.15'
             bootstrap_python: '3.11'
             artifact_platform: Windows
             adb_platform: win
             adb_sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
           - os: macos-15
-            python: '3.12.14'
+            python: '3.12.15'
             bootstrap_python: '3.11'
             artifact_platform: macOS
             adb_platform: darwin
             adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
           - os: macos-15-intel
-            python: '3.12.14'
+            python: '3.12.15'
             bootstrap_python: '3.11'
             artifact_platform: macOS-Intel
             adb_platform: darwin
@@ -88,6 +88,9 @@ jobs:
         shell: bash
         run: |
           brew update
+          # The runner image links openssl@1.1 into /usr/local/bin, which makes
+          # linking openssl@3 (3.5 LTS) fail after it is built.
+          if brew list openssl@1.1 &>/dev/null; then brew unlink openssl@1.1; fi
           brew upgrade openssl@3
           echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
           echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"

@@ -6,6 +6,12 @@ import shutil
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from verify_native_crypto import PATCH_FLOORS  # noqa: E402
+
+# Homebrew openssl@3 tracks the 3.5 LTS branch (supported until 2030-04-08).
+LTS_BRANCH = (3, 5)
+
 
 def openssl_dependencies(otool_output):
     return [line.strip().split()[0] for line in otool_output.splitlines()[1:]
@@ -14,8 +20,10 @@ def openssl_dependencies(otool_output):
 
 def verify_openssl_version(version_text):
     match = re.match(r'OpenSSL (\d+)\.(\d+)\.(\d+)(?:\s|$)', version_text)
-    if not match or tuple(map(int, match.groups())) < (3, 6, 4):
-        raise RuntimeError('Static cryptography requires OpenSSL 3.6.4 or newer')
+    version = tuple(map(int, match.groups())) if match else ()
+    floor = (*LTS_BRANCH, PATCH_FLOORS[LTS_BRANCH])
+    if version[:2] != LTS_BRANCH or version < floor:
+        raise RuntimeError(f'Static cryptography requires OpenSSL LTS {".".join(map(str, floor))} or a later 3.5 patch')
 
 
 def main():
