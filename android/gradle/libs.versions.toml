@@ -1,5 +1,5 @@
 [versions]
-# kadb-android требует kotlin-stdlib 2.4.0, поэтому компилятор не ниже
+# kadb-android 2.1.5 требует kotlin-stdlib 2.4.20, поэтому компилятор не ниже
 kotlin = "2.4.21"
 agp = "9.4.1"
 composeBom = "2026.09.00"
@@ -11,7 +11,9 @@ composeBom = "2026.09.00"
 # написано поверх системного NsdManager — см. adb/NsdDeviceDiscovery.kt
 # PairingSession и UsbAdbIdentity используют internal crypto API:
 # перед обновлением повторить pairing/USB protocol tests.
-kadb = "2.1.4"
+# kadb 2.1.5 собран под Java 25 (class file 69): Gradle запускается на JDK 25,
+# иначе javac не читает его классы; байткод приложения остаётся Java 17.
+kadb = "2.1.5"
 hiddenApiBypass = "6.2"
 coreKtx = "1.19.1"
 lifecycle = "2.11.0"
