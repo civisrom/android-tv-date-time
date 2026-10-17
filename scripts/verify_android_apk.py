@@ -7,6 +7,21 @@ from zipfile import ZIP_STORED, ZipFile
 
 ABIS = {"armeabi-v7a": (1, 40), "arm64-v8a": (2, 183), "x86": (1, 3), "x86_64": (2, 62)}
 PAGE = 16384
+# Native code in the APK and the locked runtime artifact that ships it; the
+# dependency check audits that artifact with OSV. A new library must be added
+# here with its source, so it cannot reach the APK unreviewed.
+NATIVE_SOURCES = {"libandroidx.graphics.path.so": "androidx.graphics:graphics-path"}
+LOCKFILE = Path(__file__).resolve().parents[1] / "android/app/gradle.lockfile"
+
+
+def locked_runtime_modules(lockfile=LOCKFILE):
+    modules = set()
+    for line in lockfile.read_text().splitlines():
+        if "=" in line and not line.startswith(("#", "empty=")):
+            coordinate, configurations = line.split("=", 1)
+            if any(name in ("debugRuntimeClasspath", "releaseRuntimeClasspath") for name in configurations.split(",")):
+                modules.add(coordinate.rsplit(":", 1)[0])
+    return modules
 
 
 def verify_elf(data, abi):
@@ -39,7 +54,8 @@ def verify_elf(data, abi):
         raise ValueError("ELF has no loadable segments")
 
 
-def verify_apk(path):
+def verify_apk(path, runtime_modules=None):
+    runtime_modules = locked_runtime_modules() if runtime_modules is None else runtime_modules
     seen = set()
     count = 0
     with ZipFile(path) as archive, Path(path).open("rb") as raw:
@@ -49,6 +65,8 @@ def verify_apk(path):
             parts = item.filename.split("/")
             if len(parts) != 3 or parts[1] not in ABIS:
                 raise ValueError("Unexpected native ABI")
+            if NATIVE_SOURCES.get(parts[2]) not in runtime_modules:
+                raise ValueError(f"Native library has no locked runtime source: {parts[2]}")
             verify_elf(archive.read(item), parts[1])
             if item.compress_type != ZIP_STORED:
                 raise ValueError("Native library is compressed; mmap alignment cannot be verified")

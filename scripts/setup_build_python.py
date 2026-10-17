@@ -12,14 +12,19 @@ import time
 import urllib.request
 
 
-# Published python-build-standalone 20260901, CPython 3.12.14, OpenSSL 3.5.8.
-# https://github.com/astral-sh/python-build-standalone/releases/tag/20260901
+# Published python-build-standalone release with its bundled OpenSSL; the
+# runtime check confirms both versions and audits them against OSV.
+# https://github.com/astral-sh/python-build-standalone/releases/tag/20261013
+RELEASE = '20261013'
+CPYTHON_VERSION = '3.12.15'
+OPENSSL_VERSION = '3.5.9'
 BUILD_SHA256 = {
-    'aarch64-apple-darwin': '81a359f1cfadd4da11766534c5913791cea55f26e1bb902cacd2a531bb1e4b2b',
-    'x86_64-apple-darwin': '65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb',
-    'x86_64-pc-windows-msvc': '7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14',
+    'aarch64-apple-darwin': '9866e11cf2ae9caa1e671383786f248859a52dd8bfb702fb4c0dc2c65f1d36de',
+    'x86_64-apple-darwin': 'd09998f85752b646873a8a6bc7eea442a0d251b1c8d2413aa8ea06ef131c3335',
+    'x86_64-pc-windows-msvc': '7a2aef48e5ee569e310b29b32681debbc5d888e92790d85331a47736c6b06aad',
 }
-RELEASE_URL = 'https://github.com/astral-sh/python-build-standalone/releases/download/20260901/'
+RELEASE_URL = f'https://github.com/astral-sh/python-build-standalone/releases/download/{RELEASE}/'
+MARKER = f'{RELEASE}-{CPYTHON_VERSION}'
 
 
 def build_target(system, machine):
@@ -48,7 +53,7 @@ def install_python(destination, target):
     destination.mkdir(parents=True, exist_ok=False)
     archive = destination / 'distribution.tar.gz'
     try:
-        name = f'cpython-3.12.14%2B20260901-{target}-install_only_stripped.tar.gz'
+        name = f'cpython-{CPYTHON_VERSION}%2B{RELEASE}-{target}-install_only_stripped.tar.gz'
         deadline = time.monotonic() + 180
         size = 0
         with urllib.request.urlopen(RELEASE_URL + name, timeout=15) as response, archive.open('wb') as output:
@@ -61,7 +66,7 @@ def install_python(destination, target):
         archive.unlink()
         executable = destination / ('python/python.exe' if 'windows' in target else 'python/bin/python3')
         subprocess.run([str(executable), '-c',
-                        'import sys; assert sys.version_info[:3] == (3, 12, 14); print(sys.version)'],
+                        f'import sys; assert sys.version.split()[0] == {CPYTHON_VERSION!r}; print(sys.version)'],
                        check=True, timeout=30)
         return executable
     except BaseException:
@@ -79,7 +84,7 @@ def main():
     with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as environment:
         environment.write(f'BUILD_PYTHON_EXECUTABLE={executable}\n')
         if target:
-            environment.write('BUILD_PYTHON_STANDALONE=20260901-3.12.14\n')
+            environment.write(f'BUILD_PYTHON_STANDALONE={MARKER}\n')
     print(f'Build Python: {executable}')
 
 

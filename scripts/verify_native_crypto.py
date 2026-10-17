@@ -7,13 +7,24 @@ import ssl
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_dependencies as osv  # noqa: E402
+import setup_build_python as pinned  # noqa: E402
 
-# OpenSSL advisories of 2026-08-25; compare within each supported branch.
+
+# Offline floor from the OpenSSL advisories of 2026-09-29; main() also audits
+# the loaded versions against OSV, which covers advisories published later.
 # https://openssl-library.org/news/vulnerabilities/
-PATCH_FLOORS = {(3, 0): 22, (3, 4): 7, (3, 5): 8, (3, 6): 4, (4, 0): 2}
+PATCH_FLOORS = {(3, 0): 23, (3, 4): 8, (3, 5): 9, (3, 6): 5, (4, 0): 3}
 # Ubuntu backports fixes without changing the upstream version string.
-# https://ubuntu.com/security/notices/USN-8678-1
-UBUNTU_JAMMY_FLOOR = '3.0.2-0ubuntu1.29'
+# https://ubuntu.com/security/notices/USN-8847-1
+UBUNTU_JAMMY_FLOOR = '3.0.2-0ubuntu1.30'
+# Reviewed OSV findings in libraries of the standalone build Python that the
+# executables do not contain; any other finding still fails.
+NOT_AFFECTED = {
+    (osv.EXPAT_GIT, 'CVE-2026-102633'): 'pyexpat and xml are excluded from the executables',
+    (osv.EXPAT_GIT, 'CVE-2026-77214'): 'pyexpat and xml are excluded from the executables',
+}
 
 
 def openssl_version(text):
@@ -47,7 +58,8 @@ def loaded_openssl_paths(maps):
 
 
 def _run(args):
-    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=15).stdout.strip()
+    # dpkg-query -S scans every installed file list, which can take tens of seconds on CI runners.
+    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=60).stdout.strip()
 
 
 def _package_owner(path):
@@ -95,10 +107,23 @@ def main():
     crypto_version = backend.openssl_version_text()
     print('cryptography:', crypto_version)
     standalone = os.environ.get('BUILD_PYTHON_STANDALONE')
-    if standalone and (standalone != '20260901-3.12.14' or sys.version_info[:3] != (3, 12, 14)):
+    if standalone and (standalone != pinned.MARKER
+                       or '.'.join(map(str, sys.version_info[:3])) != pinned.CPYTHON_VERSION
+                       or openssl_version(ssl.OPENSSL_VERSION) != openssl_version(f'OpenSSL {pinned.OPENSSL_VERSION}')):
         raise RuntimeError('Build interpreter does not match the pinned standalone distribution')
+    components = [osv.cpython(platform.python_version(), 'runtime')]
+    if standalone:
+        # The standalone build Python bundles Expat everywhere and zlib on
+        # Windows; Linux uses Ubuntu packages and macOS links Apple's libz.
+        import pyexpat
+        expat = pyexpat.EXPAT_VERSION.removeprefix('expat_').replace('.', '_')
+        components.append(osv.Dependency('GIT', osv.EXPAT_GIT, f'R_{expat}', 'runtime'))
+        if sys.platform == 'win32':
+            import zlib
+            components.append(osv.Dependency('GIT', osv.ZLIB_GIT, f'v{zlib.ZLIB_RUNTIME_VERSION}', 'runtime'))
     try:
         verify_upstream(ssl.OPENSSL_VERSION)
+        components.append(osv.openssl('.'.join(map(str, openssl_version(ssl.OPENSSL_VERSION))), 'runtime'))
     except RuntimeError:
         if not sys.platform.startswith('linux'):
             raise
@@ -107,9 +132,20 @@ def main():
                                          platform.freedesktop_os_release())
         for path, owner, version in records:
             print(f'Ubuntu security backport: {owner} {version}; loaded {path}')
+        components.extend(osv.Dependency(osv.UBUNTU_JAMMY, 'openssl', version, 'runtime') for _, _, version in records)
     # Wheel/static cryptography has its own OpenSSL: a fixed system package
     # must never excuse an outdated library embedded in this extension.
     verify_upstream(crypto_version)
+    components.append(osv.openssl('.'.join(map(str, openssl_version(crypto_version))), 'runtime'))
+    findings = osv.audit_native(components)
+    for dep, identifier in findings:
+        reason = NOT_AFFECTED.get((dep.name, identifier))
+        print(f'{dep.name} {dep.version}: https://osv.dev/vulnerability/{identifier}'
+              + (f' (reviewed, not affected: {reason})' if reason else ''))
+    if any((dep.name, identifier) not in NOT_AFFECTED for dep, identifier in findings):
+        raise RuntimeError('Loaded native runtime has known vulnerabilities')
+    print('OSV:', ', '.join(f'{dep.name.rsplit("/", 1)[-1]} {dep.version}' for dep in sorted(set(components))),
+          '- no unreviewed vulnerabilities')
     print('Native OpenSSL verification passed')
 
 

@@ -136,6 +136,12 @@ a = Analysis(
         'difflib',
         'doctest',
         'xml',
+        'pyexpat',
+        # Только REPL (code, asyncio.__main__) импортирует readline с запасным
+        # путём; без него в Linux-сборку не попадают libreadline и ncurses.
+        'readline',
+        # uuid4() берёт os.urandom; без _uuid не попадает libuuid (util-linux).
+        '_uuid',
         'pydoc',
         'test',
         '_pytest',
@@ -161,6 +167,13 @@ a = Analysis(
     cipher=None,
     noarchive=False
 )
+
+# Windows 10/11 всегда загружает собственные API set и UCRT, даже если рядом
+# лежат копии; PyInstaller подбирает такие копии из PATH раннера (каталог JDK).
+if sys.platform == 'win32':
+    a.binaries = [entry for entry in a.binaries
+                  if not os.path.basename(entry[0]).lower().startswith('api-ms-win-')
+                  and os.path.basename(entry[0]).lower() != 'ucrtbase.dll']
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 

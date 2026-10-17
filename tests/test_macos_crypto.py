@@ -4,13 +4,14 @@ from scripts.verify_macos_crypto import openssl_dependencies, verify_openssl_ver
 
 
 class MacOSCryptoBuildTests(unittest.TestCase):
-    def test_rejects_runner_openssl_with_known_fixed_vulnerabilities(self):
-        for version in ['OpenSSL 3.6.3 9 Jun 2026', 'OpenSSL 3.6.4-dev', 'LibreSSL 4.2.0']:
+    def test_rejects_vulnerable_or_non_lts_openssl(self):
+        for version in ['OpenSSL 3.5.8 25 Aug 2026', 'OpenSSL 3.5.9-dev', 'OpenSSL 3.6.5', 'OpenSSL 4.0.3',
+                        'OpenSSL 3.0.23', 'LibreSSL 4.2.0']:
             with self.subTest(version=version), self.assertRaises(RuntimeError):
                 verify_openssl_version(version)
 
-    def test_accepts_fixed_openssl_and_later_patch(self):
-        for version in ['OpenSSL 3.6.4 25 Aug 2026', 'OpenSSL 3.6.5']:
+    def test_accepts_fixed_lts_openssl_and_later_patch(self):
+        for version in ['OpenSSL 3.5.9 29 Sep 2026', 'OpenSSL 3.5.10']:
             with self.subTest(version=version):
                 verify_openssl_version(version)
 

@@ -1539,8 +1539,15 @@ Signing secrets are not needed for these checks. Configuration cache is disabled
 signed builds must also use `--no-build-cache`.
 
 `python3 scripts/check_dependencies.py` checks locked Python and Maven dependencies
-with OSV, including test and build tools; CI also runs it on a schedule. Service
-unavailability means the check is incomplete. `python3 scripts/verify_android_apk.py <APK>`
+with OSV, including test and build tools, plus the Gradle wrapper, the CPython and
+libraries of the pinned build Python, and whether Platform Tools are current; CI also
+runs it on a schedule. After every desktop build `scripts/audit_bundle.py` traces each
+packed file to its source (Python package, Ubuntu package, build Python, OS or this
+repository), checks those sources with OSV and stops the build on a file of unknown
+origin. `scripts/verify_native_crypto.py` checks the CPython and OpenSSL actually
+loaded. OSV has no advisory data for bzip2, libffi, mpdecimal and adb, so their
+versions are printed for manual review. Service unavailability means the check is
+incomplete. `python3 scripts/verify_android_apk.py <APK>`
 checks native ABIs and alignment. These checks complement functional app testing.
 
 
