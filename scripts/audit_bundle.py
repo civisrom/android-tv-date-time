@@ -56,21 +56,29 @@ def distribution_owners():
     return owners
 
 
-def _run(args):
-    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=30).stdout.strip()
-
-
-def debian_package(path, ecosystem):
-    # dpkg may record /lib while the loader reports /usr/lib on merged-/usr.
-    candidates = [path] + ([Path(str(path)[4:])] if str(path).startswith('/usr/lib/') else [])
-    for candidate in candidates:
-        try:
-            owner = _run(['dpkg-query', '-S', str(candidate)]).split(': ', 1)[0]
-        except subprocess.CalledProcessError:
-            continue
-        source, version = _run(['dpkg-query', '-W', '-f=${source:Package}\t${source:Version}', owner]).split('\t')
-        return osv.Dependency(ecosystem, source, version, 'bundled')
-    return None
+def debian_packages(paths, ecosystem):
+    """Map files to their Debian source packages; dpkg -S scans every file list, so query once."""
+    aliases = {}
+    for path in paths:
+        aliases[path] = path
+        # On merged-/usr systems dpkg may record /lib or /usr/lib for the same file.
+        for recorded, other in (('/usr/lib/', '/lib/'), ('/lib/', '/usr/lib/')):
+            if path.as_posix().startswith(recorded):
+                aliases[Path(other + path.as_posix()[len(recorded):])] = path
+    # Missing paths only make dpkg-query exit 1; the owned ones are still listed.
+    output = subprocess.run(['dpkg-query', '-S', *map(str, aliases)], capture_output=True, text=True,
+                            timeout=300).stdout
+    owners = {}
+    for line in output.splitlines():
+        package, _, file = line.partition(': ')
+        if Path(file) in aliases and ', ' not in package and not package.startswith('diversion'):
+            owners.setdefault(aliases[Path(file)], package)
+    sources = {}
+    for package in set(owners.values()):
+        result = subprocess.run(['dpkg-query', '-W', '-f=${source:Package}\t${source:Version}', package],
+                                check=True, capture_output=True, text=True, timeout=60).stdout.split('\t')
+        sources[package] = osv.Dependency(ecosystem, result[0], result[1], 'bundled')
+    return {path: sources[package] for path, package in owners.items()}
 
 
 def ubuntu_ecosystem():
@@ -80,8 +88,8 @@ def ubuntu_ecosystem():
     return f"Ubuntu:{release['VERSION_ID']}" + (':LTS' if 'LTS' in release.get('VERSION', '') else '')
 
 
-def classify(path, workpath, owners, runtime_prefixes, system=sys.platform, package=debian_package):
-    """Return (category, dependency or None) for one bundled source file."""
+def traced(path, workpath, owners, runtime_prefixes):
+    """Category of a file that comes from Python, PyInstaller or this repository, else None."""
     if path in owners:
         return 'python package', owners[path]
     if path.is_relative_to(workpath):
@@ -92,13 +100,19 @@ def classify(path, workpath, owners, runtime_prefixes, system=sys.platform, pack
         return 'project', None
     if any(path.is_relative_to(prefix) for prefix in runtime_prefixes):
         return 'python runtime', None
-    if system.startswith('linux'):
-        dep = package(path, ubuntu_ecosystem())
-        if dep:
-            return 'ubuntu package', dep
-    elif system == 'win32' and path.is_relative_to(Path(os.environ.get('SystemRoot', r'C:\Windows')).resolve()):
+    return None
+
+
+def classify(path, workpath, owners, runtime_prefixes, packages, system=sys.platform):
+    """Return (category, dependency or None) for one bundled source file."""
+    found = traced(path, workpath, owners, runtime_prefixes)
+    if found:
+        return found
+    if system.startswith('linux') and path in packages:
+        return 'ubuntu package', packages[path]
+    if system == 'win32' and path.is_relative_to(Path(os.environ.get('SystemRoot', r'C:\Windows')).resolve()):
         return 'windows system', None
-    elif system == 'darwin' and path.parts[:3] in (('/', 'usr', 'lib'), ('/', 'System', 'Library')):
+    if system == 'darwin' and path.as_posix().startswith(('/usr/lib/', '/System/Library/')):
         return 'macos system', None
     raise ValueError(f'Bundled file has no audited source: {path}')
 
@@ -110,9 +124,12 @@ def main():
     workpath = _absolute(args.workpath)
     owners = distribution_owners()
     runtime = {_absolute(prefix) for prefix in (sys.base_prefix, sys.base_exec_prefix)}
+    sources = sorted(toc_sources(workpath))
+    system_files = [path for path in sources if traced(path, workpath, owners, runtime) is None]
+    packages = debian_packages(system_files, ubuntu_ecosystem()) if sys.platform.startswith('linux') and system_files else {}
     categories, deps = {}, set()
-    for path in sorted(toc_sources(workpath)):
-        category, dep = classify(path, workpath, owners, runtime)
+    for path in sources:
+        category, dep = classify(path, workpath, owners, runtime, packages)
         categories[category] = categories.get(category, 0) + 1
         if dep:
             deps.add(dep)

@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -22,10 +23,9 @@ class BundleAuditTests(unittest.TestCase):
         self.wheel = self.base / "site-packages/pkg/_native.so"
         self.owner = bundle.osv.Dependency("PyPI", "pkg", "1.0", "bundled")
 
-    def classify(self, path, system="linux", package=lambda path, ecosystem: None):
-        with patch.object(bundle, "ubuntu_ecosystem", return_value="Ubuntu:22.04:LTS"):
-            return bundle.classify(Path(path), self.workpath, {self.wheel: self.owner}, {self.runtime},
-                                   system=system, package=package)
+    def classify(self, path, system="linux", packages=None):
+        return bundle.classify(Path(path), self.workpath, {self.wheel: self.owner}, {self.runtime},
+                               packages or {}, system=system)
 
     def test_every_source_category_is_recognised(self):
         self.assertEqual(("python package", self.owner), self.classify(self.wheel))
@@ -37,8 +37,27 @@ class BundleAuditTests(unittest.TestCase):
 
     def test_linux_system_libraries_become_ubuntu_packages(self):
         package = bundle.osv.Dependency("Ubuntu:22.04:LTS", "openssl", "3.0.2-0ubuntu1.30", "bundled")
-        self.assertEqual(("ubuntu package", package),
-                         self.classify("/usr/lib/x86_64-linux-gnu/libssl.so.3", package=lambda path, ecosystem: package))
+        path = Path("/lib/x86_64-linux-gnu/libssl.so.3")
+        self.assertEqual(("ubuntu package", package), self.classify(path, packages={path: package}))
+
+    def test_dpkg_owners_are_found_through_merged_usr_aliases_in_one_query(self):
+        files = [Path("/lib/x86_64-linux-gnu/libcrypto.so.3"), Path("/usr/lib/x86_64-linux-gnu/libz.so.1")]
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            if args[1] == "-S":
+                stdout = ("libssl3:amd64: /usr/lib/x86_64-linux-gnu/libcrypto.so.3\n"
+                          "zlib1g:amd64: /lib/x86_64-linux-gnu/libz.so.1\n")
+            else:
+                stdout = {"libssl3:amd64": "openssl\t3.0.2-0ubuntu1.30", "zlib1g:amd64": "zlib\t1:1.2.11"}[args[-1]]
+            return subprocess.CompletedProcess(args, 0, stdout, "")
+
+        with patch.object(bundle.subprocess, "run", side_effect=run):
+            packages = bundle.debian_packages(files, "Ubuntu:22.04:LTS")
+        self.assertEqual("openssl", packages[files[0]].name)
+        self.assertEqual("zlib", packages[files[1]].name)
+        self.assertEqual(1, sum(call[1] == "-S" for call in calls))
 
     def test_unowned_files_never_pass_silently(self):
         for path, system in [("/opt/other/libfoo.so", "linux"), (bundle.ROOT / ".venv/lib/stray.so", "linux"),

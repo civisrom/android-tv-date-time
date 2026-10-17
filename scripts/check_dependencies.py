@@ -81,7 +81,7 @@ def cpython(version, scope):
 
 def pinned_native(root):
     pinned = _load(root / "scripts/setup_build_python.py")
-    wrapper = (root / "android/gradle/wrapper/gradle-wrapper.properties").read_text()
+    wrapper = (root / "android/gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")
     match = re.search(r"^distributionUrl=.*/gradle-(\d+)\.(\d+)(?:\.(\d+))?-bin\.zip$", wrapper, re.MULTILINE)
     if not match:
         raise ValueError("Gradle wrapper version is not recognised")
@@ -120,7 +120,7 @@ def _load(path):
 def standalone_components(root, request=fetch):
     """Audited and feed-less libraries of the pinned build Python release."""
     pinned = _load(root / "scripts/setup_build_python.py")
-    sources = json.loads((root / "licenses/python-standalone/SOURCES.json").read_text())
+    sources = json.loads((root / "licenses/python-standalone/SOURCES.json").read_text(encoding="utf-8"))
     if sources["release"] != pinned.RELEASE or not re.fullmatch(r"[0-9a-f]{40}", sources["commit"]):
         raise ValueError("Licence sources do not match the pinned build Python release")
     downloads = json.loads(request("https://raw.githubusercontent.com/astral-sh/python-build-standalone/"
@@ -140,7 +140,7 @@ def _revision(element):
 
 def platform_tools(root, request=fetch):
     """Return the pinned and the latest stable Android Platform Tools revision."""
-    workflows = "".join((root / ".github/workflows" / name).read_text() for name in ("ci.yml", "build.yml"))
+    workflows = "".join((root / ".github/workflows" / name).read_text(encoding="utf-8") for name in ("ci.yml", "build.yml"))
     pins = set(re.findall(r"platform-tools_r(\d+)\.(\d+)\.(\d+)-", workflows))
     if len(pins) != 1:
         raise ValueError("Workflows pin different or no Platform Tools revisions")

@@ -58,7 +58,8 @@ def loaded_openssl_paths(maps):
 
 
 def _run(args):
-    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=15).stdout.strip()
+    # dpkg-query -S scans every installed file list, which can take tens of seconds on CI runners.
+    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=60).stdout.strip()
 
 
 def _package_owner(path):
