@@ -129,9 +129,12 @@ jobs:
         shell: bash
         run: |
           brew update
-          # The runner image links openssl@1.1 into /usr/local/bin, which makes
-          # linking openssl@3 (3.5 LTS) fail after it is built.
-          if brew list openssl@1.1 &>/dev/null; then brew unlink openssl@1.1; fi
+          # The runner image points /usr/local/bin/openssl at openssl@1.1 outside
+          # Homebrew's own links, so `brew unlink` keeps it and linking openssl@3
+          # (3.5 LTS) fails after it is built. Remove only that stale symlink.
+          if [ "$(readlink /usr/local/bin/openssl)" = /usr/local/opt/openssl@1.1/bin/openssl ]; then
+            rm /usr/local/bin/openssl
+          fi
           brew upgrade openssl@3
           echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
           echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
