@@ -94,7 +94,12 @@ class DiagnosticJournalTest {
     }
 
     @Test fun `crash is migrated once and remains until retention or explicit clear`() = temporary { root ->
-        DiagnosticJournal(root).use { it.recordCrash(IOException("secret")) }
+        DiagnosticJournal(root).use {
+            // Иначе начальный load() фонового потока может сразу перенести и
+            // удалить только что записанный crash.bin.
+            it.awaitIdle()
+            it.recordCrash(IOException("secret"))
+        }
         assertTrue(File(root, "crash.bin").isFile)
         DiagnosticJournal(root).use {
             it.awaitIdle()
