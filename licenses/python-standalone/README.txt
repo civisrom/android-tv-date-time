@@ -1,5 +1,5 @@
-Upstream licence reference set from Astral python-build-standalone 20261013.
-CPython 3.12.15 is used to build the Windows and macOS executables.
+Upstream licence reference set from Astral python-build-standalone 20261026.
+CPython 3.12.16 is used to build the Windows and macOS executables.
 
 These unmodified files cover the upstream distribution and optional libraries.
 Their inclusion does not mean every upstream component is bundled in this app.
@@ -13,8 +13,8 @@ The install_only_stripped distribution omits upstream root licence files.
 They are preserved separately here; SOURCES.json records exact source URLs
 and SHA-256 hashes. The embedded runtime retains its PSF licensing.
 
-The exact CPython 3.12.15 LICENSE and Doc/license.rst are also preserved as
-LICENSE.cpython-3.12.15.txt and NOTICE.cpython-3.12.15.rst. They supplement the
+The exact CPython 3.12.16 LICENSE and Doc/license.rst are also preserved as
+LICENSE.cpython-3.12.16.txt and NOTICE.cpython-3.12.16.rst. They supplement the
 older CPython reference notice in the standalone builder repository.
 The latter document includes current acknowledgements for software incorporated
 in CPython. Both texts are unmodified, with provenance in SOURCES.json.

@@ -47,19 +47,19 @@ jobs:
             artifact_platform: Linux-ARM64
             adb_source: android-tools
           - os: windows-latest
-            python: '3.12.15'
+            python: '3.12.16'
             bootstrap_python: '3.11'
             artifact_platform: Windows
             adb_platform: win
             adb_sha256: 45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99
           - os: macos-15
-            python: '3.12.15'
+            python: '3.12.16'
             bootstrap_python: '3.11'
             artifact_platform: macOS
             adb_platform: darwin
             adb_sha256: ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d
           - os: macos-15-intel
-            python: '3.12.15'
+            python: '3.12.16'
             bootstrap_python: '3.11'
             artifact_platform: macOS-Intel
             adb_platform: darwin

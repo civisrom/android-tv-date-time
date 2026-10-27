@@ -94,10 +94,10 @@ jobs:
             .venv
             ~/AppData/Local/pypoetry/Cache
             ~/.cache/pypoetry
-          key: poetry-${{ runner.os }}-${{ runner.arch }}${{ runner.os != 'Linux' && '-pbs20261013-3.12.15' || '' }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
+          key: poetry-${{ runner.os }}-${{ runner.arch }}${{ runner.os != 'Linux' && '-pbs20261026-3.12.16' || '' }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
           restore-keys: |
-            poetry-${{ runner.os }}-${{ runner.arch }}${{ runner.os != 'Linux' && '-pbs20261013-3.12.15' || '' }}-py${{ env.PYTHON_VERSION }}-
-            poetry-${{ runner.os }}-${{ runner.arch }}${{ runner.os != 'Linux' && '-pbs20261013-3.12.15' || '' }}-
+            poetry-${{ runner.os }}-${{ runner.arch }}${{ runner.os != 'Linux' && '-pbs20261026-3.12.16' || '' }}-py${{ env.PYTHON_VERSION }}-
+            poetry-${{ runner.os }}-${{ runner.arch }}${{ runner.os != 'Linux' && '-pbs20261026-3.12.16' || '' }}-
 
       - name: Install Poetry
         run: python -m pip install "poetry==${{ env.POETRY_VERSION }}"

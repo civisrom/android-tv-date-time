@@ -41,8 +41,8 @@ Source: https://android.googlesource.com/platform/packages/modules/adb/
 
 ### Embedded Python runtime
 
-The Windows and macOS executables use CPython 3.12.15 from Astral's
-`python-build-standalone` release `20261013`, with OpenSSL 3.5.9. The build
+The Windows and macOS executables use CPython 3.12.16 from Astral's
+`python-build-standalone` release `20261026`, with OpenSSL 3.5.9. The build
 downloads architecture-specific archives and verifies their pinned SHA-256
 hashes. Linux uses the Ubuntu build runtime and its security-maintained OpenSSL
 package.
@@ -58,8 +58,8 @@ Berkeley DB and OpenSSL 1.1 are not bundled by this application.
 
 Exact source URLs and checksums are recorded in that directory's `SOURCES.json`.
 Runtime source and build definitions:
-https://github.com/astral-sh/python-build-standalone/tree/20261013 and
-https://github.com/python/cpython/tree/v3.12.15.
+https://github.com/astral-sh/python-build-standalone/tree/20261026 and
+https://github.com/python/cpython/tree/v3.12.16.
 
 ## Android application (APK)
 
