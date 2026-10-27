@@ -75,6 +75,8 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.bootstrap_python || matrix.python }}
+          # The runner image may cache a Python without the latest security fixes.
+          check-latest: true
           cache: pip
 
       - name: Select verified build Python
