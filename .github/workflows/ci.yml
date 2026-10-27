@@ -200,6 +200,14 @@ jobs:
         shell: bash
         run: poetry run python scripts/probe_adb_cleanup.py --adb "$USB_TEST_ADB"
 
+      - name: Install Ubuntu security updates for bundled libraries
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # The runner image can lag behind Ubuntu security updates of bundled libraries (USN-8945-1).
+          sudo apt-get update
+          sudo apt-get install -y --only-upgrade liblzma5
+
       - name: Build and smoke-test desktop executable
         shell: bash
         run: |
