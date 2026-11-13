@@ -243,13 +243,13 @@ Run via PowerShell
 
 ### Linux
 
-Choose the archive for your processor in [release 2.6.7](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.7);
+Choose the archive for your processor in [release 2.6.8](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.8);
 `uname -m` shows the architecture:
 
 | Processor | Archive |
 |---|---|
-| x86-64 (`x86_64`) | [AndroidTVTimeFixer-linux.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-linux.zip) |
-| ARM64 (`aarch64`): Raspberry Pi 4/5 with a 64-bit OS, ARM laptops and servers | [AndroidTVTimeFixer-linux-arm64.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-linux-arm64.zip) |
+| x86-64 (`x86_64`) | [AndroidTVTimeFixer-linux.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.8/AndroidTVTimeFixer-linux.zip) |
+| ARM64 (`aarch64`): Raspberry Pi 4/5 with a 64-bit OS, ARM laptops and servers | [AndroidTVTimeFixer-linux-arm64.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.8/AndroidTVTimeFixer-linux-arm64.zip) |
 
 1.  Extract the archive:
     ```bash
@@ -263,13 +263,13 @@ Choose the archive for your processor in [release 2.6.7](https://github.com/civi
 
 ### macOS
 
-Choose the archive in [release 2.6.7](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.7)
+Choose the archive in [release 2.6.8](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.8)
 that matches your Mac's processor:
 
 | Processor | Archive |
 |---|---|
-| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-macos.zip) |
-| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.7/AndroidTVTimeFixer-macos-intel.zip) |
+| Apple Silicon (arm64) | [AndroidTVTimeFixer-macos.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.8/AndroidTVTimeFixer-macos.zip) |
+| Intel (x86-64) | [AndroidTVTimeFixer-macos-intel.zip](https://github.com/civisrom/android-tv-date-time/releases/download/v2.6.8/AndroidTVTimeFixer-macos-intel.zip) |
 
 Download the matching archive from the release,
 extract it and open Terminal in its folder. This is a console program:
@@ -286,22 +286,28 @@ for the result of a particular revision.
 
 ### Android (APK)
 
-1.  Download `AndroidTVTimeFixer-2.6.7.apk` from [release 2.6.7](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.7). The release page describes the changes.
+1.  Download `AndroidTVTimeFixer-2.6.8.apk` from [release 2.6.8](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.8). The release page describes the changes.
 2.  Verify it against the `.apk.sha256` file next to it:
     ```bash
-    sha256sum -c AndroidTVTimeFixer-2.6.7.apk.sha256
+    sha256sum -c AndroidTVTimeFixer-2.6.8.apk.sha256
     ```
 3.  Install it:
     *   **On a phone** — open the file and allow installation from unknown
         sources for your file manager or browser.
-    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.7.apk`
+    *   **On the Android TV itself** — either `adb install AndroidTVTimeFixer-2.6.8.apk`
         from a computer, or any file manager on the TV. The icon appears both in
         the regular launcher and in the Android TV launcher.
 
 Requires **Android 6.0** or newer. See
 [Android application](#android-application) for details.
 
-The current release is [2.6.7](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.7); the Android app continues to operate in test mode.
+Starting with 2.6.8, later versions can be installed from the app itself: the
+**App update** section at the bottom of the main screen checks GitHub releases,
+downloads the APK, verifies its size, SHA-256 and signature and hands it to the
+Android system installer. You confirm the installation; on the first update
+Android asks you to allow the app to install apps.
+
+The current release is [2.6.8](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.8); the Android app continues to operate in test mode.
 
 **Google Play Protect.** This APK is distributed through GitHub Releases.
 Installing outside Google Play may trigger a scan prompt or warning; not every
@@ -1428,7 +1434,8 @@ Change history: [2.6.1](release-notes/v2.6.1-en.md),
 [2.6.2](release-notes/v2.6.2-en.md), [2.6.3](release-notes/v2.6.3-en.md),
 [2.6.4](release-notes/v2.6.4-en.md), [2.6.5](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.5),
 [2.6.6](https://github.com/civisrom/android-tv-date-time/releases/tag/v2.6.6),
-and [2.6.7](release-notes/v2.6.7-en.md).
+[2.6.7](release-notes/v2.6.7-en.md),
+and [2.6.8](release-notes/v2.6.8-en.md).
 
 ### If the app misbehaves
 
