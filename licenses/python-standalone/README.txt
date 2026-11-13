@@ -1,4 +1,4 @@
-Upstream licence reference set from Astral python-build-standalone 20261026.
+Upstream licence reference set from Astral python-build-standalone 20261110.
 CPython 3.12.16 is used to build the Windows and macOS executables.
 
 These unmodified files cover the upstream distribution and optional libraries.

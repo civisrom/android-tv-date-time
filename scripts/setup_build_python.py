@@ -14,14 +14,14 @@ import urllib.request
 
 # Published python-build-standalone release with its bundled OpenSSL; the
 # runtime check confirms both versions and audits them against OSV.
-# https://github.com/astral-sh/python-build-standalone/releases/tag/20261026
-RELEASE = '20261026'
+# https://github.com/astral-sh/python-build-standalone/releases/tag/20261110
+RELEASE = '20261110'
 CPYTHON_VERSION = '3.12.16'
 OPENSSL_VERSION = '3.5.9'
 BUILD_SHA256 = {
-    'aarch64-apple-darwin': '353d5f1b4fd2715e7053f12f068435d5bbad16b91e057006b5d01e0925709a7e',
-    'x86_64-apple-darwin': '37c38fda76fec1fbf310adcbafb7f0d96af13b5511bf8ea954c3aa8eec185734',
-    'x86_64-pc-windows-msvc': '1f2ab53880fc67ea323398c6388e05af28addc99a8e389209f08a51fdff4b149',
+    'aarch64-apple-darwin': '2f11b8aa3726bdbd87dd9eb76568412faddf4f47e26913fa45d6a2e424972acd',
+    'x86_64-apple-darwin': 'b78a4c479f1964ec484880bee567568266f68da102269fb93a05fe8716b45f91',
+    'x86_64-pc-windows-msvc': '355ee61b8207b91574491b1c6dc9b0ebb4408fc56bfafe498f3ef439314b52dc',
 }
 RELEASE_URL = f'https://github.com/astral-sh/python-build-standalone/releases/download/{RELEASE}/'
 MARKER = f'{RELEASE}-{CPYTHON_VERSION}'

@@ -50,6 +50,7 @@ include(":terminal_install_split")
 val buildDependencyFixes = mapOf(
     "org.apache.commons:commons-lang3:3.16.0" to "3.18.0", // CVE-2025-48924
     "org.apache.httpcomponents:httpclient:4.5.6" to "4.5.14", // CVE-2020-13956
+    "com.google.guava:guava:33.4.0-jre" to "33.7.2-jre", // GHSA-xxph-c9ww-hj94 (Android Lint)
     "org.bitbucket.b_c:jose4j:0.9.5" to "0.9.6", // CVE-2024-29371
     "org.bouncycastle:bcprov-jdk18on:1.80.2" to "1.86", // CVE-2026-8763 / CVE-2026-13506
     "org.bouncycastle:bcpkix-jdk18on:1.80.2" to "1.86", // CVE-2026-5588; keep BC aligned
