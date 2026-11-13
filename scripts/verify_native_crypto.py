@@ -19,12 +19,8 @@ PATCH_FLOORS = {(3, 0): 23, (3, 4): 8, (3, 5): 9, (3, 6): 5, (4, 0): 3}
 # Ubuntu backports fixes without changing the upstream version string.
 # https://ubuntu.com/security/notices/USN-8847-1
 UBUNTU_JAMMY_FLOOR = '3.0.2-0ubuntu1.30'
-# Reviewed OSV findings in libraries of the standalone build Python that the
-# executables do not contain; any other finding still fails.
-NOT_AFFECTED = {
-    (osv.EXPAT_GIT, 'CVE-2026-102633'): 'pyexpat and xml are excluded from the executables',
-    (osv.EXPAT_GIT, 'CVE-2026-77214'): 'pyexpat and xml are excluded from the executables',
-}
+# Reviewed OSV findings shared with check_dependencies.py; any other finding still fails.
+NOT_AFFECTED = osv.NOT_AFFECTED
 
 
 def openssl_version(text):

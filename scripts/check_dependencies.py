@@ -72,6 +72,23 @@ CANARIES = (Dependency("GIT", OPENSSL_GIT, "openssl-3.5.8", "canary"),
             Dependency("GIT", LIBUSB_GIT, "v1.0.29", "canary"),
             Dependency(UBUNTU_JAMMY, "openssl", "3.0.2-0ubuntu1.29", "canary"))
 
+# Reviewed OSV findings that cannot reach the shipped programs; any other
+# finding still fails. Each entry is keyed by the upstream repository, so it
+# covers every bundled release of that library, and must be removed once a
+# fixed release is pinned.
+_NO_QUIC = "OpenSSL QUIC: CPython 3.12 ssl and cryptography expose no QUIC API, and the app uses none"
+_NO_GCM_SIV = ("AES-GCM-SIV is not a TLS cipher; neither the app nor its libraries (adb-shell uses RSA "
+               "and hashes only) call it")
+NOT_AFFECTED = {
+    (EXPAT_GIT, "CVE-2026-102633"): "pyexpat and xml are excluded from the executables",
+    (EXPAT_GIT, "CVE-2026-77214"): "pyexpat and xml are excluded from the executables",
+    (EXPAT_GIT, "CVE-2026-124317"): "pyexpat and xml are excluded from the executables",
+    (OPENSSL_GIT, "CVE-2026-88822"): _NO_QUIC,
+    (OPENSSL_GIT, "CVE-2026-95691"): _NO_QUIC,
+    (OPENSSL_GIT, "CVE-2026-88823"): _NO_GCM_SIV,
+    (OPENSSL_GIT, "CVE-2026-95692"): _NO_GCM_SIV,
+}
+
 
 def openssl(version, scope):
     return Dependency("GIT", OPENSSL_GIT, f"openssl-{version}", scope)
@@ -240,9 +257,13 @@ def main():
                 "properties": [{"name": "ecosystem", "value": d.ecosystem},
                                {"name": "usage", "value": d.scope}]} for d in packages]}, indent=2) + "\n")
     findings = audit_native(packages)
+    unreviewed = 0
     for dep, identifier in findings:
-        print(f"{dep.ecosystem} {dep.name} {dep.version} ({dep.scope}): https://osv.dev/vulnerability/{identifier}")
-    print(f"OSV: {len(packages)} dependency versions checked, {len(findings)} findings.")
+        reason = NOT_AFFECTED.get((dep.name, identifier))
+        unreviewed += reason is None
+        print(f"{dep.ecosystem} {dep.name} {dep.version} ({dep.scope}): https://osv.dev/vulnerability/{identifier}"
+              + (f" (reviewed, not affected: {reason})" if reason else ""))
+    print(f"OSV: {len(packages)} dependency versions checked, {len(findings)} findings, {unreviewed} unreviewed.")
     print("No OSV advisory feed, review upstream manually:",
           ", ".join(f"{name} {version}" for name, version in without_feed.items()), "(build Python)")
     pinned_adb, latest_adb = platform_tools(root)
@@ -263,7 +284,7 @@ def main():
     print("Scope: locked Python packages, verified Maven artifacts including test/build tools, the Gradle "
           "wrapper, the pinned build Python with its bundled libraries and the libusb built into the Linux "
           "ARM64 adb. Shipped executables are audited file by file by audit_bundle.py.")
-    return 1 if findings else 0
+    return 1 if unreviewed else 0
 
 
 if __name__ == "__main__":

@@ -126,6 +126,27 @@ class DependencyCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing"):
             module.android_tools(root, lambda _: b'<feed xmlns="http://www.w3.org/2005/Atom"/>')
 
+    def _main_with_findings(self, findings):
+        with patch.object(module, "standalone_components", return_value=([], {})), \
+                patch.object(module, "dependencies", return_value=[]), \
+                patch.object(module, "pinned_native", return_value=[]), \
+                patch.object(module, "audit_native", return_value=findings), \
+                patch.object(module, "platform_tools", return_value=((37, 0, 1), (37, 0, 1))), \
+                patch.object(module, "android_tools", return_value=("37.0.0p1", "37.0.0p1")), \
+                patch.object(sys, "argv", ["check_dependencies.py"]), \
+                patch("sys.stdout", new_callable=io.StringIO) as output:
+            return module.main(), output.getvalue()
+
+    def test_only_reviewed_findings_pass(self):
+        reviewed = (module.Dependency("GIT", module.OPENSSL_GIT, "openssl-3.5.9", "release"), "CVE-2026-88822")
+        code, output = self._main_with_findings([reviewed])
+        self.assertEqual(0, code)
+        self.assertIn("reviewed, not affected", output)
+        other = (module.Dependency("GIT", module.OPENSSL_GIT, "openssl-3.5.9", "release"), "CVE-2099-0001")
+        self.assertEqual(1, self._main_with_findings([reviewed, other])[0])
+        package = (module.Dependency("PyPI", "pyasn1", "0.6.4", "runtime"), "CVE-2026-88822")
+        self.assertEqual(1, self._main_with_findings([package])[0])
+
     def test_outdated_platform_tools_only_warn(self):
         with patch.object(module, "standalone_components", return_value=([], {})), \
                 patch.object(module, "dependencies", return_value=[]), \
