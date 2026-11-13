@@ -83,6 +83,10 @@ NOT_AFFECTED = {
     (EXPAT_GIT, "CVE-2026-102633"): "pyexpat and xml are excluded from the executables",
     (EXPAT_GIT, "CVE-2026-77214"): "pyexpat and xml are excluded from the executables",
     (EXPAT_GIT, "CVE-2026-124317"): "pyexpat and xml are excluded from the executables",
+    # The Windows build Python links CPython's vendored Expat 2.9.0, not 2.10.0.
+    (EXPAT_GIT, "CVE-2026-113351"): "pyexpat and xml are excluded from the executables",
+    (EXPAT_GIT, "CVE-2026-115506"): "pyexpat and xml are excluded from the executables",
+    (EXPAT_GIT, "CVE-2026-118370"): "pyexpat and xml are excluded from the executables",
     (OPENSSL_GIT, "CVE-2026-88822"): _NO_QUIC,
     (OPENSSL_GIT, "CVE-2026-95691"): _NO_QUIC,
     (OPENSSL_GIT, "CVE-2026-88823"): _NO_GCM_SIV,
