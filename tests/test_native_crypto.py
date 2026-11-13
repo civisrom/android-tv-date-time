@@ -59,6 +59,12 @@ class NativeCryptoTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'known vulnerabilities'):
             self._audited_main([reviewed, other])
 
+    def test_reviewed_ubuntu_backport_findings_are_accepted(self):
+        reviewed = (crypto.osv.Dependency(crypto.osv.UBUNTU_JAMMY, 'openssl', '3.0.2-0ubuntu1.30', 'runtime'),
+                    'UBUNTU-CVE-2026-107496')
+        _, output = self._audited_main([reviewed])
+        self.assertIn('reviewed, not affected', output)
+
     def test_expat_exemptions_require_xml_to_stay_out_of_the_executables(self):
         spec = (Path(__file__).resolve().parents[1] / 'pyinstaller.spec').read_text(encoding='utf-8')
         excludes = spec[spec.index('excludes=['):spec.index(']', spec.index('excludes=['))]

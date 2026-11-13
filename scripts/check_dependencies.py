@@ -87,6 +87,13 @@ NOT_AFFECTED = {
     (OPENSSL_GIT, "CVE-2026-95691"): _NO_QUIC,
     (OPENSSL_GIT, "CVE-2026-88823"): _NO_GCM_SIV,
     (OPENSSL_GIT, "CVE-2026-95692"): _NO_GCM_SIV,
+    # Ubuntu 22.04 libssl3 3.0.2 loaded by the Linux build: QUIC and AES-GCM-SIV
+    # first appeared in OpenSSL 3.2, and neither ssl nor the app performs CMS.
+    ("openssl", "UBUNTU-CVE-2026-88822"): "OpenSSL 3.0 has no QUIC implementation",
+    ("openssl", "UBUNTU-CVE-2026-95691"): "OpenSSL 3.0 has no QUIC implementation",
+    ("openssl", "UBUNTU-CVE-2026-88823"): "OpenSSL 3.0 has no AES-GCM-SIV implementation",
+    ("openssl", "UBUNTU-CVE-2026-95692"): "OpenSSL 3.0 has no AES-GCM-SIV implementation",
+    ("openssl", "UBUNTU-CVE-2026-107496"): "CMS_encrypt only; Python ssl and the app never create CMS messages",
 }
 
 
