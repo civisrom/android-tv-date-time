@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <application>
+    <!-- Сервер выпусков для проверки обновления на стенде слушает 127.0.0.1 без TLS. -->
+    <application android:networkSecurityConfig="@xml/network_security_config">
         <!-- Compose test host обрабатывает поворот так же, как MainActivity. -->
         <activity android:name="androidx.activity.ComponentActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"

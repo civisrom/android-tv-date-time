@@ -26,6 +26,12 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: "2.6.7-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Проверка обновлений: только опубликованные выпуски этого репозитория.
+        buildConfigField("String", "UPDATE_RELEASE_API",
+            "\"https://api.github.com/repos/civisrom/android-tv-date-time/releases/latest\"")
+        buildConfigField("String", "UPDATE_DOWNLOAD_PREFIX",
+            "\"https://github.com/civisrom/android-tv-date-time/releases/download/\"")
     }
 
     // Подпись релиза берётся из окружения и только из него: ключ и пароли
@@ -55,6 +61,14 @@ android {
     }
 
     buildTypes {
+        // Только для debug: локальный сервер выпусков при проверке обновления
+        // на тестовом стенде (UPDATE_TEST_SERVER=http://127.0.0.1:порт).
+        debug {
+            System.getenv("UPDATE_TEST_SERVER")?.takeIf { it.isNotBlank() }?.trimEnd('/')?.let { server ->
+                buildConfigField("String", "UPDATE_RELEASE_API", "\"$server/releases/latest\"")
+                buildConfigField("String", "UPDATE_DOWNLOAD_PREFIX", "\"$server/download/\"")
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -236,6 +250,8 @@ dependencies {
     implementation(libs.hidden.api.bypass)
 
     testImplementation(libs.junit)
+    // Настоящий org.json вместо заглушек android.jar для разбора ответа GitHub.
+    testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.core)
     // JVM-only TLS exporter for protocol fixtures; never packaged into the APK.
     testImplementation(libs.conscrypt.fixture)

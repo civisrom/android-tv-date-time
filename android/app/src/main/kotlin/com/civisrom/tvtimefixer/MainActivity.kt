@@ -135,6 +135,11 @@ class MainActivity : ComponentActivity() {
     private var terminalFileBusy by mutableStateOf(false)
     private var terminalFileMessage by mutableStateOf<Int?>(null)
     private var exportDocument: String? = null
+    private val updates by lazy {
+        com.civisrom.tvtimefixer.update.UpdateController(this, com.civisrom.tvtimefixer.update.UpdateClient(
+            com.civisrom.tvtimefixer.update.UpdateSource(BuildConfig.UPDATE_RELEASE_API, BuildConfig.UPDATE_DOWNLOAD_PREFIX),
+            "AndroidTVTimeFixer/${BuildConfig.VERSION_NAME}"), BuildConfig.VERSION_NAME)
+    }
 
     private val importDocuments = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) runTerminalFileOperation {
@@ -847,6 +852,7 @@ class MainActivity : ComponentActivity() {
         }
         ContextCompat.registerReceiver(this, usbReceiver, usbFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         usbReceiverRegistered = true
+        updates.register()
         refreshUsbList()
         val mode = detectDeviceMode(this)
 
@@ -855,10 +861,12 @@ class MainActivity : ComponentActivity() {
                 Surface {
                     val diagnostics by journal.snapshot.collectAsState()
                     val terminalState by terminal.state.collectAsState()
+                    val updateState by updates.state.collectAsState()
                     MainScreen(mode = mode, state = state, actions = actions, diagnostics = diagnostics,
                         onRefreshDiagnostics = journal::refresh, onClearDiagnostics = journal::clear,
                         terminal = terminalState, terminalActions = terminalActions,
-                        terminalFileBusy = terminalFileBusy, terminalFileMessage = terminalFileMessage)
+                        terminalFileBusy = terminalFileBusy, terminalFileMessage = terminalFileMessage,
+                        update = updateState, updateActions = updates)
                 }
             }
         }
@@ -896,6 +904,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        updates.onStart()
         state = state.copy(localSetup = readLocalSetup(this))
         if (!state.favoritesReady && !state.favoritesBusy) loadFavorites()
         val connected = state.connection as? ConnectionState.Connected
@@ -972,6 +981,7 @@ class MainActivity : ComponentActivity() {
         actionGeneration++
         actionJob?.cancel()
         if (usbReceiverRegistered) unregisterReceiver(usbReceiver)
+        updates.unregister()
         scanJob?.cancel()
         runCatching { discovery?.close() }
         // Закрытие тоже идёт по сокету, а lifecycleScope здесь уже отменён:

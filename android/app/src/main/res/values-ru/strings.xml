@@ -671,4 +671,37 @@
     <string name="time_value_change">Сейчас: %1$s → Будет: %2$s</string>
     <string name="ntp_scan_shared_addresses">Некоторые имена ответили с одного IP-адреса; такие результаты объединены в списке.</string>
     <string name="terminal_stopped_connected">Команда остановлена. Соединение с устройством сохранено.</string>
+
+    <!-- Обновление приложения -->
+    <string name="update_title">Обновление приложения</string>
+    <string name="update_installed_version">Установлена версия: %1$s</string>
+    <string name="update_check">Проверить обновления</string>
+    <string name="update_checking">Проверка новой версии на GitHub…</string>
+    <string name="update_up_to_date">Установлена последняя версия (%1$s).</string>
+    <string name="update_available">Доступна версия %1$s (%2$s).</string>
+    <string name="update_download_install">Скачать и установить</string>
+    <string name="update_downloading">Загрузка: %1$s из %2$s</string>
+    <string name="update_cancel">Отмена</string>
+    <string name="update_ready">Версия %1$s загружена, контрольная сумма SHA-256 совпала.</string>
+    <string name="update_install">Установить</string>
+    <string name="update_installing">Подтвердите установку в окне Android. Если окно закрылось, нажмите «Установить» ещё раз.</string>
+    <string name="update_permission_required">Android требует разрешить этому приложению установку обновлений. Откройте настройки, разрешите установку приложений и вернитесь: установка продолжится сама.</string>
+    <string name="update_open_settings">Открыть настройки</string>
+    <string name="update_settings_unavailable">На этом устройстве нет прямого перехода к этой настройке. Разрешите установку неизвестных приложений для Android TV Time Fixer в системных настройках (раздел «Безопасность» или «Приложения»).</string>
+    <string name="update_error_network">Не удалось связаться с GitHub. Проверьте подключение к интернету и повторите.</string>
+    <string name="update_error_rate_limited">GitHub временно ограничил запросы из этой сети. Повторите позже.</string>
+    <string name="update_error_not_found">На GitHub не найдено опубликованного выпуска.</string>
+    <string name="update_error_bad_response">GitHub вернул неожиданный ответ.</string>
+    <string name="update_error_no_apk">В последнем выпуске нет APK для Android.</string>
+    <string name="update_error_checksum">Скачанный файл не прошёл проверку размера или SHA-256 и удалён.</string>
+    <string name="update_error_storage">Не удалось сохранить файл: возможно, мало свободного места.</string>
+    <string name="update_error_package">Скачанный файл не является обновлением этого приложения.</string>
+    <string name="update_error_not_newer">Скачанный APK не новее установленной версии.</string>
+    <string name="update_error_signature">Обновление подписано другим ключом, чем эта сборка, и Android не установит его поверх неё. Удалите эту сборку и установите APK с GitHub.</string>
+    <string name="update_error_install_aborted">Установка отменена.</string>
+    <string name="update_error_install_blocked">Android заблокировал установку.</string>
+    <string name="update_error_install_conflict">Android отказался обновлять: обновление конфликтует с установленным приложением.</string>
+    <string name="update_error_install_storage">Недостаточно места для установки.</string>
+    <string name="update_error_install_invalid">Android сообщил, что APK повреждён или не подходит для этого устройства.</string>
+    <string name="update_error_install_failed">Установка не удалась.</string>
 </resources>

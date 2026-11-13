@@ -671,4 +671,37 @@
     <string name="time_value_change">Current: %1$s → New: %2$s</string>
     <string name="ntp_scan_shared_addresses">Some names replied from the same IP address; the list combines these results.</string>
     <string name="terminal_stopped_connected">Command stopped. The device remains connected.</string>
+
+    <!-- Обновление приложения -->
+    <string name="update_title">App update</string>
+    <string name="update_installed_version">Installed version: %1$s</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking GitHub for a new version…</string>
+    <string name="update_up_to_date">You have the latest version (%1$s).</string>
+    <string name="update_available">Version %1$s is available (%2$s).</string>
+    <string name="update_download_install">Download and install</string>
+    <string name="update_downloading">Downloading: %1$s of %2$s</string>
+    <string name="update_cancel">Cancel</string>
+    <string name="update_ready">Version %1$s is downloaded and its SHA-256 checksum is verified.</string>
+    <string name="update_install">Install</string>
+    <string name="update_installing">Confirm the installation in the Android window. If the window was closed, press Install again.</string>
+    <string name="update_permission_required">Android needs permission for this app to install updates. Open the settings, allow installing apps and come back: the installation continues automatically.</string>
+    <string name="update_open_settings">Open settings</string>
+    <string name="update_settings_unavailable">This device has no direct link to this setting. Allow installing unknown apps for Android TV Time Fixer in the system settings (Security or Apps).</string>
+    <string name="update_error_network">Could not reach GitHub. Check the internet connection and try again.</string>
+    <string name="update_error_rate_limited">GitHub has temporarily limited requests from this network. Try again later.</string>
+    <string name="update_error_not_found">No published release was found on GitHub.</string>
+    <string name="update_error_bad_response">GitHub returned an unexpected response.</string>
+    <string name="update_error_no_apk">The latest release has no Android APK.</string>
+    <string name="update_error_checksum">The downloaded file failed the size or SHA-256 check and was deleted.</string>
+    <string name="update_error_storage">Could not save the file: there may not be enough free space.</string>
+    <string name="update_error_package">The downloaded file is not an update for this app.</string>
+    <string name="update_error_not_newer">The downloaded APK is not newer than the installed version.</string>
+    <string name="update_error_signature">The update is signed with a different key than this build, so Android will not install it over it. Uninstall this build and install the APK from GitHub.</string>
+    <string name="update_error_install_aborted">Installation was cancelled.</string>
+    <string name="update_error_install_blocked">Android blocked the installation.</string>
+    <string name="update_error_install_conflict">Android refused the update: it conflicts with the installed app.</string>
+    <string name="update_error_install_storage">There is not enough storage for the installation.</string>
+    <string name="update_error_install_invalid">Android reported the APK as invalid or incompatible with this device.</string>
+    <string name="update_error_install_failed">The installation failed.</string>
 </resources>

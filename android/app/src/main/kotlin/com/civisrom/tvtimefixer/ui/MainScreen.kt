@@ -153,6 +153,8 @@ fun MainScreen(
     terminalActions: TerminalActions? = null,
     terminalFileBusy: Boolean = false,
     terminalFileMessage: Int? = null,
+    update: com.civisrom.tvtimefixer.update.UpdateState = com.civisrom.tvtimefixer.update.UpdateState(),
+    updateActions: com.civisrom.tvtimefixer.update.UpdateActions? = null,
 ) {
     var showSetup by rememberSaveable { mutableStateOf(false) }
     var showDiagnostics by rememberSaveable { mutableStateOf(false) }
@@ -217,7 +219,7 @@ fun MainScreen(
             }, returnFocus = returnFocus, onFocusRestored = { returnFocus = null }, onSetup = { showSetup = true },
             onTerminal = if (terminalActions == null) null else ({
                 if (terminalAccepted) showTerminal = true else terminalWarning = true
-            }))
+            }), update = update, updateActions = updateActions)
     }
 }
 
@@ -256,6 +258,8 @@ private fun MainContent(
     onFocusRestored: () -> Unit,
     onSetup: () -> Unit,
     onTerminal: (() -> Unit)?,
+    update: com.civisrom.tvtimefixer.update.UpdateState,
+    updateActions: com.civisrom.tvtimefixer.update.UpdateActions?,
 ) {
     val uriHandler = LocalUriHandler.current
     var repositoryLinkFailed by remember { mutableStateOf(false) }
@@ -399,6 +403,11 @@ private fun MainContent(
             }
         }
         if (state.connected) DeviceInfoSection(state, actions)
+        if (updateActions != null) FunctionCard("app-update") {
+            ExpandableSection(stringResource(R.string.update_title), "app-update") {
+                UpdateSection(update, updateActions, BuildConfig.VERSION_NAME)
+            }
+        }
         HorizontalDivider()
         Column(
             Modifier.fillMaxWidth().testTag("usage-terms")
